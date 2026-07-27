@@ -96,13 +96,16 @@ jobs:
         run: |
           VER="${{ steps.ver.outputs.ver }}"
           URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${{ steps.ver.outputs.tag }}/${{ steps.pkg.outputs.zip }}"
+          # Changelog for this version comes from the matching CHANGELOG.md section.
+          CHANGELOG=$(awk -v ver="$VER" '$0=="## "ver{f=1;next} /^## /{f=0} f{print}' CHANGELOG.md | sed '/^[[:space:]]*$/d')
           NEW=$(jq -n \
             --arg v "$VER" \
+            --arg cl "$CHANGELOG" \
             --arg abi "10.11.0.0" \
             --arg url "$URL" \
             --arg chk "${{ steps.pkg.outputs.chk }}" \
             --arg ts "$(date -u +%FT%TZ)" \
-            '{version:$v, changelog:"", targetAbi:$abi, sourceUrl:$url, checksum:$chk, timestamp:$ts}')
+            '{version:$v, changelog:$cl, targetAbi:$abi, sourceUrl:$url, checksum:$chk, timestamp:$ts}')
           # Idempotent: drop any existing entry for this version, then prepend.
           jq --argjson e "$NEW" \
             '.[0].versions = ([$e] + [ (.[0].versions // [])[] | select(.version != $e.version) ])' \
