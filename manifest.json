@@ -9,14 +9,6 @@
     "imageUrl": "",
     "versions": [
       {
-        "version": "1.2.1",
-        "changelog": "Fixes. The config page now reliably follows your Jellyfin UI language — the detection reads Jellyfin's stored language setting, not just the browser language (Dutch now shows correctly). Picking a library poster as the background now works: the image is fetched through Jellyfin's own image endpoint and uploaded, instead of resolving a local file path that wasn't always available.\nThe text under each version heading is published to the plugin's manifest by the\nrelease workflow (and shown as the version's changelog inside Jellyfin). Add a\nnew `## <version>` section when you bump `<Version>` in the csproj.",
-        "targetAbi": "10.11.0.0",
-        "sourceUrl": "https://github.com/Bardesss/customcoverart/releases/download/v1.2.1/customcoverart_1.2.1.zip",
-        "checksum": "0fd46466c4bb2acb9d9c3540a35a30e6",
-        "timestamp": "2026-07-27T12:44:44Z"
-      },
-      {
         "version": "1.2.0.0",
         "changelog": "The config page now follows your Jellyfin UI language, with a complete Dutch (NL) translation and English fallback. Font weight now works — all six weights (Light–ExtraBold) are bundled as distinct Noto Sans faces. Background images are cover-fitted instead of stretched, so posters keep their aspect ratio. Added a Landscape 16:9 preset (now the default, best for library covers), a Download button for the generated image, and logging when a background image can't be used.",
         "targetAbi": "10.11.0.0",
