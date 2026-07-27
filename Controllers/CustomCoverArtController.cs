@@ -87,6 +87,22 @@ public class CustomCoverArtController : ControllerBase
         }
     }
 
+    /// <summary>Get cover-art targets of a type: "library", "collection" or "playlist".</summary>
+    [HttpGet("targets/{type}")]
+    public async Task<ApiResponse<IEnumerable<LibraryInfo>>> GetTargets(string type)
+    {
+        try
+        {
+            var targets = await _libraryService.GetTargetsAsync(type).ConfigureAwait(false);
+            return Success(targets);
+        }
+        catch (Exception ex)
+        {
+            _loggingService.LogError("Failed to get targets", ex);
+            return Fail<IEnumerable<LibraryInfo>>(ex.Message);
+        }
+    }
+
     /// <summary>Get a library by ID.</summary>
     [HttpGet("libraries/{libraryId}")]
     public async Task<ApiResponse<LibraryInfo>> GetLibrary(string libraryId)
