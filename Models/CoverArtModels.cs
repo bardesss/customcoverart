@@ -23,8 +23,12 @@ public class CoverArtSettings
     public int TextSize { get; set; } = 120;
     public FontWeight TextWeight { get; set; } = FontWeight.Normal;
     public string CustomFontPath { get; set; } = string.Empty;
-    public float BackgroundDim { get; set; } = 0.4f;
+    public float BackgroundDim { get; set; } = 0.25f;
     public float BackgroundBlur { get; set; } = 0f;
+
+    /// <summary>How the background image fills the canvas: "cover" (fill + crop),
+    /// "contain" (fit whole image, letterboxed) or "stretch" (distort to fill).</summary>
+    public string BackgroundFit { get; set; } = "cover";
     public string TextColor { get; set; } = "#ffffff";
     public string DimColor { get; set; } = "#000000";
     public GradientSettings? BackgroundGradient { get; set; }
@@ -127,6 +131,16 @@ public class GradientSettings
     public float CenterX { get; set; } = 0.5f; // For radial gradients (0-1)
     public float CenterY { get; set; } = 0.5f; // For radial gradients (0-1)
     public float Radius { get; set; } = 0.5f; // For radial gradients (0-1)
+
+    /// <summary>Ordered colour stops (2+). Takes priority over Start/End colour.</summary>
+    public List<GradientStop> Stops { get; set; } = new();
+}
+
+/// <summary>A single gradient colour stop.</summary>
+public class GradientStop
+{
+    public string Color { get; set; } = "#000000";
+    public float Position { get; set; } = 0f; // 0..1
 }
 
 /// <summary>

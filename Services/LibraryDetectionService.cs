@@ -1,5 +1,6 @@
 using System.Threading;
 using CustomCoverArt.Models;
+using Jellyfin.Data.Enums;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Model.Entities;
@@ -57,6 +58,45 @@ public class LibraryDetectionService : ILibraryDetectionService
         }
 
         return Task.FromResult<IEnumerable<LibraryInfo>>(libraries);
+    }
+
+    public Task<IEnumerable<LibraryInfo>> GetTargetsAsync(string type)
+    {
+        try
+        {
+            return (type ?? "library").ToLowerInvariant() switch
+            {
+                "collection" => Task.FromResult(QueryItems(BaseItemKind.BoxSet, "Collection")),
+                "playlist" => Task.FromResult(QueryItems(BaseItemKind.Playlist, "Playlist")),
+                _ => GetLibrariesAsync()
+            };
+        }
+        catch (Exception ex)
+        {
+            _loggingService.LogError("Failed to get targets ({Type}): {Error}", type ?? "?", ex.Message);
+            return Task.FromResult(Enumerable.Empty<LibraryInfo>());
+        }
+    }
+
+    private IEnumerable<LibraryInfo> QueryItems(BaseItemKind kind, string typeLabel)
+    {
+        var query = new InternalItemsQuery
+        {
+            IncludeItemTypes = new[] { kind },
+            Recursive = true
+        };
+
+        return _libraryManager.GetItemList(query)
+            .OrderBy(item => item.Name)
+            .Select(item => new LibraryInfo
+            {
+                Id = item.Id.ToString(),
+                Name = item.Name ?? "Unknown",
+                Type = typeLabel,
+                HasCustomCover = item.HasImage(ImageType.Primary),
+                LastModified = item.DateModified
+            })
+            .ToList();
     }
 
     private static string MapCollectionType(string? type) => type?.ToLowerInvariant() switch

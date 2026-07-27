@@ -19,12 +19,22 @@
                 <div class="ccaControls">
 
                     <section class="ccaCard">
-                        <div class="ccaCardHead" data-i18n="card.library">Library</div>
-                        <div class="inputContainer">
-                            <label for="ccaLibrarySelect" data-i18n="lib.choose">Choose a library</label>
-                            <select is="emby-select" id="ccaLibrarySelect" class="emby-select">
-                                <option value="" data-i18n="lib.selectOption">Select a library…</option>
-                            </select>
+                        <div class="ccaCardHead" data-i18n="card.target">Target</div>
+                        <div class="ccaGrid">
+                            <div class="inputContainer">
+                                <label for="ccaTargetType" data-i18n="target.type">Type</label>
+                                <select is="emby-select" id="ccaTargetType" class="emby-select">
+                                    <option value="library" selected data-i18n="target.library">Library</option>
+                                    <option value="collection" data-i18n="target.collection">Collection</option>
+                                    <option value="playlist" data-i18n="target.playlist">Playlist</option>
+                                </select>
+                            </div>
+                            <div class="inputContainer">
+                                <label for="ccaLibrarySelect" data-i18n="lib.choose">Choose</label>
+                                <select is="emby-select" id="ccaLibrarySelect" class="emby-select">
+                                    <option value="" data-i18n="lib.selectOption">Select…</option>
+                                </select>
+                            </div>
                         </div>
                     </section>
 
@@ -78,8 +88,8 @@
                         <div class="ccaCardHead" data-i18n="card.background">Background</div>
                         <div class="ccaGrid">
                             <div class="inputContainer">
-                                <label for="ccaDim"><span data-i18n="bg.dim">Dimming</span> <span class="ccaVal" id="ccaDimVal">0.4</span></label>
-                                <input type="range" class="ccaRange" id="ccaDim" min="0" max="1" step="0.05" value="0.4" />
+                                <label for="ccaDim"><span data-i18n="bg.dim">Dimming</span> <span class="ccaVal" id="ccaDimVal">0.25</span></label>
+                                <input type="range" class="ccaRange" id="ccaDim" min="0" max="1" step="0.05" value="0.25" />
                             </div>
                             <div class="inputContainer">
                                 <label for="ccaBlur"><span data-i18n="bg.blur">Blur</span> <span class="ccaVal" id="ccaBlurVal">0</span></label>
@@ -100,15 +110,14 @@
                                     <option value="1" data-i18n="g.radial">Radial</option>
                                 </select>
                             </div>
-                            <div class="ccaGrid">
-                                <div class="inputContainer">
-                                    <label for="ccaGradientStart" data-i18n="bg.startcolor">Start color</label>
-                                    <input type="color" id="ccaGradientStart" value="#000000" />
-                                </div>
-                                <div class="inputContainer">
-                                    <label for="ccaGradientEnd" data-i18n="bg.endcolor">End color</label>
-                                    <input type="color" id="ccaGradientEnd" value="#ffffff" />
-                                </div>
+                            <div class="inputContainer" id="ccaGradientAngleRow">
+                                <label for="ccaGradientAngle"><span data-i18n="bg.angle">Angle</span> <span class="ccaVal" id="ccaGradientAngleVal">0°</span></label>
+                                <input type="range" class="ccaRange" id="ccaGradientAngle" min="0" max="360" step="5" value="0" />
+                            </div>
+                            <div class="inputContainer">
+                                <label data-i18n="bg.colors">Colours</label>
+                                <div id="ccaGradientStops"></div>
+                                <button is="emby-button" type="button" id="ccaAddStop" class="raised"><span data-i18n="bg.addcolor">Add colour</span></button>
                             </div>
                         </div>
 
@@ -120,6 +129,15 @@
                             </div>
                             <div class="fieldDescription" data-i18n="hint.image">JPG, PNG, GIF, BMP, WebP or TIFF · up to 5 MB.</div>
                             <input type="file" id="ccaBgImage" accept=".jpg,.jpeg,.png,.gif,.bmp,.webp,.tiff,.tif" class="ccaHiddenFile" />
+                        </div>
+                        <div class="inputContainer">
+                            <label for="ccaBgFit" data-i18n="bg.fit">Image fit</label>
+                            <select is="emby-select" id="ccaBgFit" class="emby-select">
+                                <option value="cover" selected data-i18n="fit.cover">Fill (crop to fit)</option>
+                                <option value="contain" data-i18n="fit.contain">Fit (show whole image)</option>
+                                <option value="stretch" data-i18n="fit.stretch">Stretch to fill</option>
+                            </select>
+                            <div class="fieldDescription" data-i18n="hint.fit">Fill crops to cover the cover; Fit keeps the whole image and pads the rest with the base colour.</div>
                         </div>
                         <div class="inputContainer">
                             <label data-i18n="bg.orposter">Or use an existing library poster</label>
@@ -291,6 +309,16 @@
 
         #CustomCoverArtConfigPage .ccaSelected { margin-top: .6em; opacity: .85; font-size: .92em; }
 
+        #CustomCoverArtConfigPage .ccaStop { display: flex; align-items: center; gap: .6em; margin-bottom: .5em; }
+        #CustomCoverArtConfigPage .ccaStop input[type="color"] { flex: 0 0 auto; }
+        #CustomCoverArtConfigPage .ccaStop .ccaStopPos { flex: 1 1 auto; margin: 0; }
+        #CustomCoverArtConfigPage .ccaStopRemove {
+            flex: 0 0 auto; width: 1.9em; height: 1.9em; line-height: 1;
+            border: 1px solid rgba(127, 127, 127, .35); border-radius: 6px;
+            background: transparent; color: inherit; cursor: pointer; opacity: .7;
+        }
+        #CustomCoverArtConfigPage .ccaStopRemove:hover { opacity: 1; }
+
         #CustomCoverArtConfigPage .ccaHiddenFile { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); border: 0; }
         #CustomCoverArtConfigPage .ccaFileRow { display: flex; align-items: center; gap: .75em; flex-wrap: wrap; }
         #CustomCoverArtConfigPage .ccaFileRow .emby-button { margin: 0; }
@@ -354,7 +382,8 @@
         var I18N = {
             en: {
                 'lede': 'Design a cover for a library, preview it live, then apply it.',
-                'card.library': 'Library', 'lib.choose': 'Choose a library', 'lib.selectOption': 'Select a library…',
+                'card.target': 'Target', 'target.type': 'Type', 'target.library': 'Library', 'target.collection': 'Collection', 'target.playlist': 'Playlist',
+                'card.library': 'Library', 'lib.choose': 'Choose', 'lib.selectOption': 'Select…',
                 'card.text': 'Text', 'text.title': 'Title', 'text.weight': 'Font weight',
                 'w.light': 'Light', 'w.normal': 'Normal', 'w.medium': 'Medium', 'w.semibold': 'SemiBold', 'w.bold': 'Bold', 'w.extrabold': 'ExtraBold',
                 'text.align': 'Alignment', 'a.left': 'Left', 'a.center': 'Center', 'a.right': 'Right',
@@ -362,8 +391,11 @@
                 'card.background': 'Background', 'bg.dim': 'Dimming', 'bg.blur': 'Blur', 'bg.dimcolor': 'Dim / base color',
                 'bg.gradient': 'Enable gradient background', 'bg.gtype': 'Gradient type', 'g.linear': 'Linear', 'g.radial': 'Radial',
                 'bg.startcolor': 'Start color', 'bg.endcolor': 'End color',
+                'bg.angle': 'Angle', 'bg.colors': 'Colours', 'bg.addcolor': 'Add colour',
                 'bg.image': 'Background image (optional)', 'f.chooseImage': 'Choose image…', 'f.none': 'No file chosen',
                 'hint.image': 'JPG, PNG, GIF, BMP, WebP or TIFF · up to 5 MB.',
+                'bg.fit': 'Image fit', 'fit.cover': 'Fill (crop to fit)', 'fit.contain': 'Fit (show whole image)', 'fit.stretch': 'Stretch to fill',
+                'hint.fit': 'Fill crops to cover the cover; Fit keeps the whole image and pads the rest with the base colour.',
                 'bg.orposter': 'Or use an existing library poster', 'bg.browse': 'Browse library posters', 'bg.selected': 'Selected background:',
                 'card.output': 'Output', 'out.dims': 'Dimensions',
                 'd.landscape': 'Landscape 16:9 (1920×1080)', 'd.cover': 'Square (1400×1400)', 'd.poster': 'Portrait Poster (1000×1500)', 'd.banner': 'Wide Banner (1920×540)', 'd.custom': 'Custom',
@@ -381,7 +413,8 @@
             },
             nl: {
                 'lede': 'Ontwerp een cover voor een bibliotheek, bekijk het live en pas het toe.',
-                'card.library': 'Bibliotheek', 'lib.choose': 'Kies een bibliotheek', 'lib.selectOption': 'Selecteer een bibliotheek…',
+                'card.target': 'Doel', 'target.type': 'Type', 'target.library': 'Bibliotheek', 'target.collection': 'Verzameling', 'target.playlist': 'Afspeellijst',
+                'card.library': 'Bibliotheek', 'lib.choose': 'Kies', 'lib.selectOption': 'Selecteer…',
                 'card.text': 'Tekst', 'text.title': 'Titel', 'text.weight': 'Letterdikte',
                 'w.light': 'Licht', 'w.normal': 'Normaal', 'w.medium': 'Medium', 'w.semibold': 'Halfvet', 'w.bold': 'Vet', 'w.extrabold': 'Extra vet',
                 'text.align': 'Uitlijning', 'a.left': 'Links', 'a.center': 'Gecentreerd', 'a.right': 'Rechts',
@@ -389,8 +422,11 @@
                 'card.background': 'Achtergrond', 'bg.dim': 'Dimmen', 'bg.blur': 'Vervaging', 'bg.dimcolor': 'Dim- / basiskleur',
                 'bg.gradient': 'Verloop-achtergrond inschakelen', 'bg.gtype': 'Verlooptype', 'g.linear': 'Lineair', 'g.radial': 'Radiaal',
                 'bg.startcolor': 'Startkleur', 'bg.endcolor': 'Eindkleur',
+                'bg.angle': 'Hoek', 'bg.colors': 'Kleuren', 'bg.addcolor': 'Kleur toevoegen',
                 'bg.image': 'Achtergrondafbeelding (optioneel)', 'f.chooseImage': 'Kies afbeelding…', 'f.none': 'Geen bestand gekozen',
                 'hint.image': 'JPG, PNG, GIF, BMP, WebP of TIFF · max. 5 MB.',
+                'bg.fit': 'Afbeelding passen', 'fit.cover': 'Vullen (bijsnijden)', 'fit.contain': 'Passen (volledig tonen)', 'fit.stretch': 'Uitrekken',
+                'hint.fit': 'Vullen snijdt bij om de cover te vullen; Passen toont de hele afbeelding en vult de rest met de basiskleur.',
                 'bg.orposter': 'Of gebruik een bestaande bibliotheekposter', 'bg.browse': 'Bibliotheekposters bladeren', 'bg.selected': 'Geselecteerde achtergrond:',
                 'card.output': 'Uitvoer', 'out.dims': 'Afmetingen',
                 'd.landscape': 'Liggend 16:9 (1920×1080)', 'd.cover': 'Vierkant (1400×1400)', 'd.poster': 'Staande poster (1000×1500)', 'd.banner': 'Brede banner (1920×540)', 'd.custom': 'Aangepast',
@@ -537,11 +573,12 @@
                 BackgroundGradient: {
                     IsEnabled: el('ccaGradient').checked,
                     Type: parseInt(el('ccaGradientType').value, 10),
-                    StartColor: el('ccaGradientStart').value,
-                    EndColor: el('ccaGradientEnd').value,
-                    Angle: 0, CenterX: 0.5, CenterY: 0.5, Radius: 0.5
+                    Angle: parseFloat(el('ccaGradientAngle').value) || 0,
+                    Stops: collectGradientStops(),
+                    CenterX: 0.5, CenterY: 0.5, Radius: 0.5
                 },
                 BackgroundImagePath: state.backgroundImagePath || '',
+                BackgroundFit: el('ccaBgFit').value,
                 CustomFontPath: state.customFontPath || '',
                 ExportWidth: width,
                 ExportHeight: height,
@@ -556,24 +593,73 @@
             el('ccaApplyBtn').disabled = !state.libraryId;
             el('ccaCustomDims').style.display = el('ccaPreset').value === 'custom' ? '' : 'none';
             el('ccaGradientOpts').style.display = el('ccaGradient').checked ? '' : 'none';
+            el('ccaGradientAngleRow').style.display = el('ccaGradientType').value === '0' ? '' : 'none';
         }
 
+        // Loads the targets (libraries / collections / playlists) for the selected type.
         function loadLibraries() {
-            return jsonFetch('CustomCoverArt/libraries').then(function (res) {
-                if (!pick(res, 'Success')) { return; }
+            var type = el('ccaTargetType') ? el('ccaTargetType').value : 'library';
+            state.libraryId = '';
+            return jsonFetch('CustomCoverArt/targets/' + type).then(function (res) {
                 var select = el('ccaLibrarySelect');
                 select.innerHTML = '';
                 var placeholder = document.createElement('option');
                 placeholder.value = '';
                 placeholder.textContent = t('lib.selectOption');
                 select.appendChild(placeholder);
-                (pick(res, 'Data') || []).forEach(function (lib) {
-                    var opt = document.createElement('option');
-                    opt.value = pick(lib, 'Id');
-                    opt.textContent = pick(lib, 'Name') + ' (' + pick(lib, 'Type') + ')';
-                    select.appendChild(opt);
+                if (pick(res, 'Success')) {
+                    (pick(res, 'Data') || []).forEach(function (lib) {
+                        var opt = document.createElement('option');
+                        opt.value = pick(lib, 'Id');
+                        opt.textContent = pick(lib, 'Name');
+                        select.appendChild(opt);
+                    });
+                }
+                updateUI();
+            });
+        }
+
+        function collectGradientStops() {
+            var stops = [];
+            page.querySelectorAll('#ccaGradientStops .ccaStop').forEach(function (row) {
+                stops.push({
+                    Color: row.querySelector('input[type="color"]').value,
+                    Position: (parseFloat(row.querySelector('input[type="range"]').value) || 0) / 100
                 });
             });
+            return stops;
+        }
+
+        function addGradientStop(color, posPercent) {
+            var container = el('ccaGradientStops');
+            var row = document.createElement('div');
+            row.className = 'ccaStop';
+
+            var c = document.createElement('input');
+            c.type = 'color';
+            c.value = color || '#888888';
+
+            var p = document.createElement('input');
+            p.type = 'range';
+            p.min = '0'; p.max = '100'; p.step = '1';
+            p.value = (posPercent == null ? 50 : posPercent);
+            p.className = 'ccaRange ccaStopPos';
+
+            var rm = document.createElement('button');
+            rm.type = 'button';
+            rm.className = 'ccaStopRemove';
+            rm.textContent = '✕';
+            rm.addEventListener('click', function () {
+                if (container.querySelectorAll('.ccaStop').length > 2) {
+                    container.removeChild(row);
+                    schedulePreview();
+                }
+            });
+
+            row.appendChild(c);
+            row.appendChild(p);
+            row.appendChild(rm);
+            container.appendChild(row);
         }
 
         function uploadFile(endpoint, file) {
@@ -665,6 +751,16 @@
             el('ccaBlur').addEventListener('input', function () { el('ccaBlurVal').textContent = this.value; });
             el('ccaPreset').addEventListener('change', updateUI);
             el('ccaGradient').addEventListener('change', updateUI);
+            el('ccaGradientType').addEventListener('change', updateUI);
+            el('ccaGradientAngle').addEventListener('input', function () { el('ccaGradientAngleVal').textContent = this.value + '°'; });
+            el('ccaAddStop').addEventListener('click', function () { addGradientStop('#888888', 50); schedulePreview(); });
+
+            el('ccaTargetType').addEventListener('change', function () {
+                Dashboard.showLoadingMsg();
+                loadLibraries()
+                    .then(function () { updateUI(); Dashboard.hideLoadingMsg(); })
+                    .catch(function () { Dashboard.hideLoadingMsg(); });
+            });
 
             el('ccaBgImageBtn').addEventListener('click', function () { el('ccaBgImage').click(); });
             el('ccaFontBtn').addEventListener('click', function () { el('ccaFont').click(); });
@@ -847,6 +943,10 @@
             applyI18n(page);
             if (!page.dataset.ccaInit) {
                 bindEvents();
+                if (!page.querySelector('#ccaGradientStops .ccaStop')) {
+                    addGradientStop('#000000', 0);
+                    addGradientStop('#3388ff', 100);
+                }
                 page.dataset.ccaInit = 'true';
             }
             Dashboard.showLoadingMsg();

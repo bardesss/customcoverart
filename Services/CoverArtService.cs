@@ -304,42 +304,73 @@ public class CoverArtService : ICoverArtService
 
     private static async Task ApplyBackgroundAsync(Image<Rgba32> image, Image backgroundImage, CoverArtSettings settings)
     {
-        // Always cover-fit the background: scale to fill the canvas while keeping
-        // the source aspect ratio, then centre-crop (like CSS background-size: cover).
-        // This avoids distorting posters/backdrops when the canvas ratio differs.
-        var scale = Math.Max((float)image.Width / backgroundImage.Width,
-                             (float)image.Height / backgroundImage.Height);
-        var newWidth = Math.Max(image.Width, (int)Math.Ceiling(backgroundImage.Width * scale));
-        var newHeight = Math.Max(image.Height, (int)Math.Ceiling(backgroundImage.Height * scale));
+        var fit = (settings.BackgroundFit ?? "cover").Trim().ToLowerInvariant();
+        var baseColor = SafeColor(settings.DimColor, Color.Black);
 
-        backgroundImage.Mutate(x => x.Resize(newWidth, newHeight));
-
-        var offsetX = (newWidth - image.Width) / 2;
-        var offsetY = (newHeight - image.Height) / 2;
-        backgroundImage.Mutate(x => x.Crop(new Rectangle(offsetX, offsetY, image.Width, image.Height)));
-
-        // Apply blur effect if specified
-        if (settings.BackgroundBlur > 0)
+        if (fit == "stretch")
         {
-            backgroundImage.Mutate(x => x.GaussianBlur(settings.BackgroundBlur));
+            // Distort to fill the whole canvas exactly.
+            backgroundImage.Mutate(x => x.Resize(image.Width, image.Height));
+            if (settings.BackgroundBlur > 0)
+            {
+                backgroundImage.Mutate(x => x.GaussianBlur(settings.BackgroundBlur));
+            }
+            image.Mutate(x => x.DrawImage(backgroundImage, Point.Empty, 1f));
+        }
+        else if (fit == "contain")
+        {
+            // Fit the whole image inside the canvas (like background-size: contain),
+            // letterboxing the remainder with the base colour.
+            image.Mutate(x => x.Fill(baseColor));
+
+            var scale = Math.Min((float)image.Width / backgroundImage.Width,
+                                 (float)image.Height / backgroundImage.Height);
+            var w = Math.Max(1, (int)Math.Round(backgroundImage.Width * scale));
+            var h = Math.Max(1, (int)Math.Round(backgroundImage.Height * scale));
+            backgroundImage.Mutate(x => x.Resize(w, h));
+            if (settings.BackgroundBlur > 0)
+            {
+                backgroundImage.Mutate(x => x.GaussianBlur(settings.BackgroundBlur));
+            }
+
+            var px = (image.Width - w) / 2;
+            var py = (image.Height - h) / 2;
+            image.Mutate(x => x.DrawImage(backgroundImage, new Point(px, py), 1f));
+        }
+        else
+        {
+            // "cover" (default): scale to fill the canvas keeping the source aspect
+            // ratio, then centre-crop (like CSS background-size: cover).
+            var scale = Math.Max((float)image.Width / backgroundImage.Width,
+                                 (float)image.Height / backgroundImage.Height);
+            var newWidth = Math.Max(image.Width, (int)Math.Ceiling(backgroundImage.Width * scale));
+            var newHeight = Math.Max(image.Height, (int)Math.Ceiling(backgroundImage.Height * scale));
+
+            backgroundImage.Mutate(x => x.Resize(newWidth, newHeight));
+
+            var offsetX = (newWidth - image.Width) / 2;
+            var offsetY = (newHeight - image.Height) / 2;
+            backgroundImage.Mutate(x => x.Crop(new Rectangle(offsetX, offsetY, image.Width, image.Height)));
+
+            if (settings.BackgroundBlur > 0)
+            {
+                backgroundImage.Mutate(x => x.GaussianBlur(settings.BackgroundBlur));
+            }
+            image.Mutate(x => x.DrawImage(backgroundImage, Point.Empty, 1f));
         }
 
-        // Apply dimming effect
+        // Apply dimming by compositing a solid overlay at fractional opacity.
+        // IMPORTANT: do NOT use Fill() with a semi-transparent SolidBrush here —
+        // on backgrounds decoded without an alpha channel (JPEG posters load as
+        // Rgb24) Fill ignores the brush alpha and paints fully opaque, which
+        // blacked out the entire background for any non-zero dim. DrawImage with
+        // an opacity blends correctly on every pixel format. Text is drawn later,
+        // so only the background is dimmed.
         if (settings.BackgroundDim > 0)
         {
-            var dimPixel = SafeColor(settings.DimColor, Color.Black).ToPixel<Rgba32>();
-            var dimBrush = new SolidBrush(Color.FromRgba(
-                dimPixel.R,
-                dimPixel.G,
-                dimPixel.B,
-                (byte)(255 * settings.BackgroundDim)
-            ));
-
-            backgroundImage.Mutate(x => x.Fill(dimBrush));
+            using var dimOverlay = new Image<Rgba32>(image.Width, image.Height, baseColor);
+            image.Mutate(x => x.DrawImage(dimOverlay, Point.Empty, settings.BackgroundDim));
         }
-
-        // Draw background onto main image
-        image.Mutate(x => x.DrawImage(backgroundImage, Point.Empty, 1f));
     }
 
     private static async Task CreateGradientBackgroundAsync(Image<Rgba32> image, CoverArtSettings settings)
@@ -518,44 +549,59 @@ public class CoverArtService : ICoverArtService
     }
 
     /// <summary>
-    /// Applies gradient background to the image
+    /// Applies a multi-stop gradient background (linear at a given angle, or radial).
     /// </summary>
     private static async Task ApplyGradientBackgroundAsync(Image<Rgba32> image, GradientSettings gradient)
     {
-        var startColor = SafeColor(gradient.StartColor, Color.Black);
-        var endColor = SafeColor(gradient.EndColor, Color.White);
+        var stops = BuildColorStops(gradient);
 
-        if (gradient.Type == GradientType.Linear)
+        if (gradient.Type == GradientType.Radial)
         {
-            // Create linear gradient
-            var gradientBrush = new LinearGradientBrush(
-                new PointF(0, 0),
-                new PointF((float)Math.Cos(gradient.Angle * Math.PI / 180) * image.Width,
-                          (float)Math.Sin(gradient.Angle * Math.PI / 180) * image.Height),
-                GradientRepetitionMode.None,
-                new ColorStop(0f, startColor),
-                new ColorStop(1f, endColor)
-            );
-
-            image.Mutate(x => x.Fill(gradientBrush));
-        }
-        else if (gradient.Type == GradientType.Radial)
-        {
-            // Create radial gradient
             var centerX = gradient.CenterX * image.Width;
             var centerY = gradient.CenterY * image.Height;
-            var radius = gradient.Radius * Math.Min(image.Width, image.Height);
+            var radius = Math.Max(1f, gradient.Radius * Math.Min(image.Width, image.Height));
 
-            var gradientBrush = new RadialGradientBrush(
-                new PointF(centerX, centerY),
-                radius,
-                GradientRepetitionMode.None,
-                new ColorStop(0f, startColor),
-                new ColorStop(1f, endColor)
-            );
-
-            image.Mutate(x => x.Fill(gradientBrush));
+            var brush = new RadialGradientBrush(new PointF(centerX, centerY), radius, GradientRepetitionMode.None, stops);
+            image.Mutate(x => x.Fill(brush));
         }
+        else
+        {
+            // Linear: a line through the centre at `Angle` degrees, long enough to
+            // span the whole canvas so the gradient covers it corner to corner.
+            var rad = gradient.Angle * Math.PI / 180.0;
+            var dx = (float)Math.Cos(rad);
+            var dy = (float)Math.Sin(rad);
+            var cx = image.Width / 2f;
+            var cy = image.Height / 2f;
+            var half = (Math.Abs(dx) * image.Width + Math.Abs(dy) * image.Height) / 2f;
+
+            var p0 = new PointF(cx - dx * half, cy - dy * half);
+            var p1 = new PointF(cx + dx * half, cy + dy * half);
+
+            var brush = new LinearGradientBrush(p0, p1, GradientRepetitionMode.None, stops);
+            image.Mutate(x => x.Fill(brush));
+        }
+    }
+
+    /// <summary>
+    /// Builds the colour stops from the settings — the explicit Stops list if it
+    /// has 2+ entries, otherwise the Start/End colours as a fallback.
+    /// </summary>
+    private static ColorStop[] BuildColorStops(GradientSettings gradient)
+    {
+        if (gradient.Stops is { Count: >= 2 })
+        {
+            return gradient.Stops
+                .OrderBy(s => s.Position)
+                .Select(s => new ColorStop(Math.Clamp(s.Position, 0f, 1f), SafeColor(s.Color, Color.Gray)))
+                .ToArray();
+        }
+
+        return new[]
+        {
+            new ColorStop(0f, SafeColor(gradient.StartColor, Color.Black)),
+            new ColorStop(1f, SafeColor(gradient.EndColor, Color.White))
+        };
     }
 
     /// <summary>
