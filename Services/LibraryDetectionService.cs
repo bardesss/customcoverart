@@ -28,20 +28,26 @@ public class LibraryDetectionService : ILibraryDetectionService
 
         try
         {
-            // Top-level libraries are the CollectionFolder children of the root.
-            var collectionFolders = _libraryManager.RootFolder?.Children?
-                .OfType<CollectionFolder>() ?? Enumerable.Empty<CollectionFolder>();
-
-            foreach (var folder in collectionFolders)
+            // GetVirtualFolders() is the canonical list of configured libraries
+            // (the same source as Jellyfin's /Library/VirtualFolders API). The
+            // library views are NOT children of the physical RootFolder, so the
+            // previous RootFolder.Children approach returned nothing.
+            foreach (var vf in _libraryManager.GetVirtualFolders())
             {
                 try
                 {
-                    libraries.Add(ToLibraryInfo(folder));
+                    libraries.Add(new LibraryInfo
+                    {
+                        Id = vf.ItemId ?? string.Empty,
+                        Name = vf.Name ?? "Unknown Library",
+                        Type = MapCollectionType(vf.CollectionType?.ToString()),
+                        HasCustomCover = false,
+                        LastModified = DateTime.MinValue
+                    });
                 }
                 catch (Exception ex)
                 {
-                    _loggingService.LogError("Error processing library folder {FolderId}: {Error}",
-                        folder.Id, ex.Message);
+                    _loggingService.LogError("Error processing library {Name}: {Error}", vf.Name ?? "unknown", ex.Message);
                 }
             }
         }
@@ -52,6 +58,21 @@ public class LibraryDetectionService : ILibraryDetectionService
 
         return Task.FromResult<IEnumerable<LibraryInfo>>(libraries);
     }
+
+    private static string MapCollectionType(string? type) => type?.ToLowerInvariant() switch
+    {
+        "movies" => "Movies",
+        "tvshows" => "TV Shows",
+        "music" => "Music",
+        "musicvideos" => "Music Videos",
+        "homevideos" => "Home Videos",
+        "books" => "Books",
+        "photos" => "Photos",
+        "boxsets" => "Collections",
+        "mixed" => "Mixed",
+        null or "" => "Other",
+        _ => type!
+    };
 
     public Task<LibraryInfo?> GetLibraryByIdAsync(string libraryId)
     {
