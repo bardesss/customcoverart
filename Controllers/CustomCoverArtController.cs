@@ -129,7 +129,8 @@ public class CustomCoverArtController : ControllerBase
     [HttpPost("preview")]
     public async Task<IActionResult> GeneratePreview([FromBody] CoverArtSettings settings)
     {
-        if (RateLimited("preview", maxRequests: 30, TimeSpan.FromMinutes(1)))
+        // Higher limit: the config page renders a live preview on every adjustment.
+        if (RateLimited("preview", maxRequests: 240, TimeSpan.FromMinutes(1)))
         {
             return StatusCode(429, new { error = "Too many requests" });
         }
