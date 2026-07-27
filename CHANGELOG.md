@@ -1,11 +1,11 @@
 # Changelog
 
-## 1.2.1
-Fixes. The config page now reliably follows your Jellyfin UI language — the detection reads Jellyfin's stored language setting, not just the browser language (Dutch now shows correctly). Picking a library poster as the background now works: the image is fetched through Jellyfin's own image endpoint and uploaded, instead of resolving a local file path that wasn't always available.
-
 The text under each version heading is published to the plugin's manifest by the
 release workflow (and shown as the version's changelog inside Jellyfin). Add a
 new `## <version>` section when you bump `<Version>` in the csproj.
+
+## 1.2.1.0
+Fixes. The config page now reliably follows your Jellyfin UI language — the detection reads Jellyfin's stored language setting, not just the browser language (Dutch now shows correctly). Picking a library poster as the background now works: the image is fetched through Jellyfin's own image endpoint and uploaded, instead of resolving a local file path that wasn't always available.
 
 ## 1.2.0.0
 The config page now follows your Jellyfin UI language, with a complete Dutch (NL) translation and English fallback. Font weight now works — all six weights (Light–ExtraBold) are bundled as distinct Noto Sans faces. Background images are cover-fitted instead of stretched, so posters keep their aspect ratio. Added a Landscape 16:9 preset (now the default, best for library covers), a Download button for the generated image, and logging when a background image can't be used.
