@@ -1,13 +1,18 @@
 name: Release
 
-# Push a tag like v1.0.1 to build the plugin, publish a GitHub release with the
-# packaged zip, and append the new version to manifest.json on main.
+# Releases on every push to main (i.e. when a PR is merged), but only when the
+# <Version> in the csproj has not been released yet. To ship a new version:
+# bump <Version> in a PR and merge it.
 on:
   push:
-    tags: [ 'v*' ]
+    branches: [ main ]
 
 permissions:
   contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
   release:
@@ -22,23 +27,35 @@ jobs:
         with:
           dotnet-version: '9.0.x'
 
-      - name: Compute version
+      - name: Read version from csproj
         id: ver
         run: |
-          TAG="${GITHUB_REF_NAME}"
-          VER="${TAG#v}"
-          IFS='.' read -r a b c d <<< "$VER"
-          VER4="${a:-1}.${b:-0}.${c:-0}.${d:-0}"
-          echo "tag=$TAG"   >> "$GITHUB_OUTPUT"
-          echo "ver4=$VER4" >> "$GITHUB_OUTPUT"
+          VER=$(grep -oPm1 '(?<=<Version>)[^<]+' CustomCoverArt.csproj)
+          if [ -z "$VER" ]; then echo "No <Version> found in csproj"; exit 1; fi
+          echo "ver=$VER" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VER" >> "$GITHUB_OUTPUT"
+
+      - name: Already released?
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "${{ steps.ver.outputs.tag }}" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Release ${{ steps.ver.outputs.tag }} already exists — nothing to do."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Build
+        if: steps.check.outputs.exists == 'false'
         run: dotnet build -c Release
 
       - name: Package
+        if: steps.check.outputs.exists == 'false'
         id: pkg
         run: |
-          VER4="${{ steps.ver.outputs.ver4 }}"
+          VER="${{ steps.ver.outputs.ver }}"
           mkdir -p dist/stage
           cp bin/Release/net9.0/CustomCoverArt.dll dist/stage/
           cp bin/Release/net9.0/SixLabors.*.dll dist/stage/
@@ -52,42 +69,41 @@ jobs:
             "owner": "Bardesss",
             "targetAbi": "10.11.0.0",
             "framework": "net9.0",
-            "version": "$VER4",
+            "version": "$VER",
             "timestamp": "$(date -u +%FT%TZ)",
             "status": "Active",
             "autoUpdate": true
           }
           EOF
-          ZIP="customcoverart_${VER4}.zip"
+          ZIP="customcoverart_${VER}.zip"
           (cd dist/stage && zip -r "../$ZIP" .)
-          CHK=$(md5sum "dist/$ZIP" | cut -d' ' -f1)
           echo "zip=$ZIP" >> "$GITHUB_OUTPUT"
-          echo "chk=$CHK" >> "$GITHUB_OUTPUT"
+          echo "chk=$(md5sum "dist/$ZIP" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
 
-      - name: Create or update GitHub release
+      - name: Create GitHub release
+        if: steps.check.outputs.exists == 'false'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          TAG="${{ steps.ver.outputs.tag }}"
-          ZIP="dist/${{ steps.pkg.outputs.zip }}"
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" "$ZIP" --clobber
-          else
-            gh release create "$TAG" "$ZIP" --title "$TAG" --generate-notes
-          fi
+        run: >
+          gh release create "${{ steps.ver.outputs.tag }}"
+          "dist/${{ steps.pkg.outputs.zip }}"
+          --title "${{ steps.ver.outputs.tag }}"
+          --generate-notes
+          --target "$GITHUB_SHA"
 
       - name: Update manifest.json on main
+        if: steps.check.outputs.exists == 'false'
         run: |
-          VER4="${{ steps.ver.outputs.ver4 }}"
+          VER="${{ steps.ver.outputs.ver }}"
           URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${{ steps.ver.outputs.tag }}/${{ steps.pkg.outputs.zip }}"
           NEW=$(jq -n \
-            --arg v "$VER4" \
+            --arg v "$VER" \
             --arg abi "10.11.0.0" \
             --arg url "$URL" \
             --arg chk "${{ steps.pkg.outputs.chk }}" \
             --arg ts "$(date -u +%FT%TZ)" \
             '{version:$v, changelog:"", targetAbi:$abi, sourceUrl:$url, checksum:$chk, timestamp:$ts}')
-          # Idempotent: drop any existing entry for this version, then prepend the new one.
+          # Idempotent: drop any existing entry for this version, then prepend.
           jq --argjson e "$NEW" \
             '.[0].versions = ([$e] + [ (.[0].versions // [])[] | select(.version != $e.version) ])' \
             manifest.json > manifest.tmp
@@ -98,6 +114,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "manifest already up to date"
           else
-            git commit -m "chore: manifest $VER4 [skip ci]"
+            git commit -m "chore: manifest $VER [skip ci]"
             git push origin HEAD:main
           fi
