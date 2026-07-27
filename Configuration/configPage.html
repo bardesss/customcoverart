@@ -9,161 +9,184 @@
     <div data-role="content">
         <div class="content-primary">
 
-            <h1>Custom Cover Art</h1>
-            <p>Create custom cover art for your Jellyfin libraries.</p>
-
-            <div class="inputContainer">
-                <label for="ccaLibrarySelect">Library</label>
-                <select is="emby-select" id="ccaLibrarySelect" class="emby-select">
-                    <option value="">Select a library…</option>
-                </select>
+            <div class="ccaHeader">
+                <h1 class="ccaH1">Custom Cover Art</h1>
+                <p class="ccaLede">Design a cover for a library, preview it live, then apply it.</p>
             </div>
 
-            <div id="ccaSettings">
-                <h2>Settings</h2>
+            <div class="ccaLayout">
 
-                <div class="inputContainer">
-                    <label for="ccaTitle">Title</label>
-                    <input is="emby-input" type="text" id="ccaTitle" value="Movies" />
+                <div class="ccaControls">
+
+                    <section class="ccaCard">
+                        <div class="ccaCardHead">Library</div>
+                        <div class="inputContainer">
+                            <label for="ccaLibrarySelect">Choose a library</label>
+                            <select is="emby-select" id="ccaLibrarySelect" class="emby-select">
+                                <option value="">Select a library…</option>
+                            </select>
+                        </div>
+                    </section>
+
+                    <section class="ccaCard" id="ccaSettings">
+                        <div class="ccaCardHead">Text</div>
+                        <div class="inputContainer">
+                            <label for="ccaTitle">Title</label>
+                            <input is="emby-input" type="text" id="ccaTitle" value="Movies" />
+                        </div>
+                        <div class="ccaGrid">
+                            <div class="inputContainer">
+                                <label for="ccaTextWeight">Font weight</label>
+                                <select is="emby-select" id="ccaTextWeight" class="emby-select">
+                                    <option value="300">Light</option>
+                                    <option value="400" selected>Normal</option>
+                                    <option value="500">Medium</option>
+                                    <option value="600">SemiBold</option>
+                                    <option value="700">Bold</option>
+                                    <option value="800">ExtraBold</option>
+                                </select>
+                            </div>
+                            <div class="inputContainer">
+                                <label for="ccaTextAlign">Alignment</label>
+                                <select is="emby-select" id="ccaTextAlign" class="emby-select">
+                                    <option value="0">Left</option>
+                                    <option value="1" selected>Center</option>
+                                    <option value="2">Right</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="inputContainer">
+                            <label for="ccaTextSize">Text size <span class="ccaVal" id="ccaTextSizeVal">120</span></label>
+                            <input type="range" class="ccaRange" id="ccaTextSize" min="20" max="300" value="120" />
+                        </div>
+                        <div class="ccaGrid">
+                            <div class="inputContainer">
+                                <label for="ccaTextColor">Text color</label>
+                                <input type="color" id="ccaTextColor" value="#ffffff" />
+                            </div>
+                            <div class="inputContainer">
+                                <label>Effects</label>
+                                <div class="ccaChecks">
+                                    <label class="ccaCheck"><input is="emby-checkbox" type="checkbox" id="ccaShadow" /><span>Shadow</span></label>
+                                    <label class="ccaCheck"><input is="emby-checkbox" type="checkbox" id="ccaOutline" /><span>Outline</span></label>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="ccaCard">
+                        <div class="ccaCardHead">Background</div>
+                        <div class="ccaGrid">
+                            <div class="inputContainer">
+                                <label for="ccaDim">Dimming <span class="ccaVal" id="ccaDimVal">0.4</span></label>
+                                <input type="range" class="ccaRange" id="ccaDim" min="0" max="1" step="0.05" value="0.4" />
+                            </div>
+                            <div class="inputContainer">
+                                <label for="ccaBlur">Blur <span class="ccaVal" id="ccaBlurVal">0</span></label>
+                                <input type="range" class="ccaRange" id="ccaBlur" min="0" max="20" step="0.5" value="0" />
+                            </div>
+                        </div>
+                        <div class="inputContainer">
+                            <label for="ccaDimColor">Dim / base color</label>
+                            <input type="color" id="ccaDimColor" value="#000000" />
+                        </div>
+
+                        <label class="ccaCheck ccaCheckBlock"><input is="emby-checkbox" type="checkbox" id="ccaGradient" /><span>Enable gradient background</span></label>
+                        <div id="ccaGradientOpts" class="ccaSub" style="display:none;">
+                            <div class="inputContainer">
+                                <label for="ccaGradientType">Gradient type</label>
+                                <select is="emby-select" id="ccaGradientType" class="emby-select">
+                                    <option value="0" selected>Linear</option>
+                                    <option value="1">Radial</option>
+                                </select>
+                            </div>
+                            <div class="ccaGrid">
+                                <div class="inputContainer">
+                                    <label for="ccaGradientStart">Start color</label>
+                                    <input type="color" id="ccaGradientStart" value="#000000" />
+                                </div>
+                                <div class="inputContainer">
+                                    <label for="ccaGradientEnd">End color</label>
+                                    <input type="color" id="ccaGradientEnd" value="#ffffff" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="inputContainer">
+                            <label>Background image (optional)</label>
+                            <div class="ccaFileRow">
+                                <button is="emby-button" type="button" id="ccaBgImageBtn" class="raised"><span>Choose image…</span></button>
+                                <span class="ccaFileName" id="ccaBgImageName">No file chosen</span>
+                            </div>
+                            <div class="fieldDescription">JPG, PNG, GIF, BMP, WebP or TIFF · up to 5 MB.</div>
+                            <input type="file" id="ccaBgImage" accept=".jpg,.jpeg,.png,.gif,.bmp,.webp,.tiff,.tif" class="ccaHiddenFile" />
+                        </div>
+                        <div class="inputContainer">
+                            <label>Or use an existing library poster</label>
+                            <button is="emby-button" type="button" id="ccaBrowseBtn" class="raised ccaBtnWide"><span>Browse library posters</span></button>
+                            <div id="ccaSelectedBg" class="ccaSelected" style="display:none;">Selected background: <strong id="ccaSelectedBgName"></strong></div>
+                        </div>
+                    </section>
+
+                    <section class="ccaCard">
+                        <div class="ccaCardHead">Output</div>
+                        <div class="ccaGrid">
+                            <div class="inputContainer">
+                                <label for="ccaPreset">Dimensions</label>
+                                <select is="emby-select" id="ccaPreset" class="emby-select">
+                                    <option value="cover" selected>Square Cover (1400×1400)</option>
+                                    <option value="poster">Portrait Poster (1000×1500)</option>
+                                    <option value="banner">Wide Banner (1920×540)</option>
+                                    <option value="custom">Custom</option>
+                                </select>
+                            </div>
+                            <div class="inputContainer">
+                                <label for="ccaFormat">Format</label>
+                                <select is="emby-select" id="ccaFormat" class="emby-select">
+                                    <option value="auto" selected>Auto (recommended)</option>
+                                    <option value="png">PNG</option>
+                                    <option value="gif">GIF</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div id="ccaCustomDims" class="ccaGrid ccaSub" style="display:none;">
+                            <div class="inputContainer">
+                                <label for="ccaWidth">Width</label>
+                                <input is="emby-input" type="number" id="ccaWidth" min="100" max="2048" value="1400" />
+                            </div>
+                            <div class="inputContainer">
+                                <label for="ccaHeight">Height</label>
+                                <input is="emby-input" type="number" id="ccaHeight" min="100" max="2048" value="1400" />
+                            </div>
+                        </div>
+                        <div class="inputContainer">
+                            <label>Custom font (optional)</label>
+                            <div class="ccaFileRow">
+                                <button is="emby-button" type="button" id="ccaFontBtn" class="raised"><span>Choose font…</span></button>
+                                <span class="ccaFileName" id="ccaFontName">No file chosen</span>
+                            </div>
+                            <div class="fieldDescription">TTF, OTF, TTC, WOFF or WOFF2 · up to 5 MB. Leave empty to use the bundled Noto Sans.</div>
+                            <input type="file" id="ccaFont" accept=".ttf,.otf,.ttc,.woff,.woff2" class="ccaHiddenFile" />
+                        </div>
+                    </section>
+
                 </div>
 
-                <div class="inputContainer">
-                    <label for="ccaTextSize">Text size: <span id="ccaTextSizeVal">120</span></label>
-                    <input type="range" id="ccaTextSize" min="20" max="300" value="120" />
+                <div class="ccaPreviewCol">
+                    <section class="ccaCard">
+                        <div class="ccaCardHead">Preview</div>
+                        <div class="ccaPreviewWrap">
+                            <img id="ccaPreview" alt="Cover art preview" />
+                            <div id="ccaPreviewPlaceholder" class="ccaPreviewPlaceholder">Generate a preview to see your cover art.</div>
+                        </div>
+                        <div class="ccaActions">
+                            <button is="emby-button" type="button" id="ccaApplyBtn" class="raised block button-submit" disabled><span>Apply to library</span></button>
+                            <div class="fieldDescription ccaPreviewHint">The preview updates automatically as you adjust settings.</div>
+                        </div>
+                    </section>
                 </div>
 
-                <div class="inputContainer">
-                    <label for="ccaTextWeight">Font weight</label>
-                    <select is="emby-select" id="ccaTextWeight" class="emby-select">
-                        <option value="300">Light</option>
-                        <option value="400" selected>Normal</option>
-                        <option value="500">Medium</option>
-                        <option value="600">SemiBold</option>
-                        <option value="700">Bold</option>
-                        <option value="800">ExtraBold</option>
-                    </select>
-                </div>
-
-                <div class="inputContainer">
-                    <label for="ccaTextColor">Text color</label>
-                    <input type="color" id="ccaTextColor" value="#ffffff" />
-                </div>
-
-                <div class="inputContainer">
-                    <label for="ccaTextAlign">Text alignment</label>
-                    <select is="emby-select" id="ccaTextAlign" class="emby-select">
-                        <option value="0">Left</option>
-                        <option value="1" selected>Center</option>
-                        <option value="2">Right</option>
-                    </select>
-                </div>
-
-                <div class="inputContainer">
-                    <label for="ccaDim">Background dimming: <span id="ccaDimVal">0.4</span></label>
-                    <input type="range" id="ccaDim" min="0" max="1" step="0.05" value="0.4" />
-                </div>
-
-                <div class="inputContainer">
-                    <label for="ccaBlur">Background blur: <span id="ccaBlurVal">0</span></label>
-                    <input type="range" id="ccaBlur" min="0" max="20" step="0.5" value="0" />
-                </div>
-
-                <div class="inputContainer">
-                    <label for="ccaDimColor">Dim / base color</label>
-                    <input type="color" id="ccaDimColor" value="#000000" />
-                </div>
-
-                <div class="checkboxContainer">
-                    <label><input is="emby-checkbox" type="checkbox" id="ccaShadow" /><span>Text shadow</span></label>
-                </div>
-                <div class="checkboxContainer">
-                    <label><input is="emby-checkbox" type="checkbox" id="ccaOutline" /><span>Text outline</span></label>
-                </div>
-
-                <div class="inputContainer">
-                    <label for="ccaPreset">Dimension preset</label>
-                    <select is="emby-select" id="ccaPreset" class="emby-select">
-                        <option value="cover" selected>Square Cover (1400×1400)</option>
-                        <option value="poster">Portrait Poster (1000×1500)</option>
-                        <option value="banner">Wide Banner (1920×540)</option>
-                        <option value="custom">Custom</option>
-                    </select>
-                </div>
-
-                <div id="ccaCustomDims" style="display:none;">
-                    <div class="inputContainer">
-                        <label for="ccaWidth">Width</label>
-                        <input is="emby-input" type="number" id="ccaWidth" min="100" max="2048" value="1400" />
-                    </div>
-                    <div class="inputContainer">
-                        <label for="ccaHeight">Height</label>
-                        <input is="emby-input" type="number" id="ccaHeight" min="100" max="2048" value="1400" />
-                    </div>
-                </div>
-
-                <div class="inputContainer">
-                    <label for="ccaFormat">Output format</label>
-                    <select is="emby-select" id="ccaFormat" class="emby-select">
-                        <option value="auto" selected>Auto (recommended)</option>
-                        <option value="png">PNG</option>
-                        <option value="gif">GIF</option>
-                    </select>
-                </div>
-
-                <h3>Background</h3>
-                <div class="checkboxContainer">
-                    <label><input is="emby-checkbox" type="checkbox" id="ccaGradient" /><span>Enable gradient background</span></label>
-                </div>
-                <div id="ccaGradientOpts" style="display:none;">
-                    <div class="inputContainer">
-                        <label for="ccaGradientType">Gradient type</label>
-                        <select is="emby-select" id="ccaGradientType" class="emby-select">
-                            <option value="0" selected>Linear</option>
-                            <option value="1">Radial</option>
-                        </select>
-                    </div>
-                    <div class="inputContainer">
-                        <label for="ccaGradientStart">Start color</label>
-                        <input type="color" id="ccaGradientStart" value="#000000" />
-                    </div>
-                    <div class="inputContainer">
-                        <label for="ccaGradientEnd">End color</label>
-                        <input type="color" id="ccaGradientEnd" value="#ffffff" />
-                    </div>
-                </div>
-
-                <div class="inputContainer">
-                    <label for="ccaBgImage">Background image (optional)</label>
-                    <input type="file" id="ccaBgImage" accept="image/*" />
-                </div>
-                <div class="inputContainer">
-                    <label>Or use an existing library poster</label>
-                    <button is="emby-button" type="button" id="ccaBrowseBtn" class="raised">
-                        <span>Browse library posters</span>
-                    </button>
-                    <div id="ccaSelectedBg" style="display:none;margin-top:0.5em;">
-                        Selected background: <strong id="ccaSelectedBgName"></strong>
-                    </div>
-                </div>
-                <div class="inputContainer">
-                    <label for="ccaFont">Custom font (optional)</label>
-                    <input type="file" id="ccaFont" accept=".ttf,.otf,.woff,.woff2" />
-                </div>
             </div>
-
-            <h2>Preview</h2>
-            <div style="text-align:center;padding:1em;border:1px dashed #555;border-radius:6px;">
-                <img id="ccaPreview" alt="Preview" style="max-width:100%;height:auto;display:none;" />
-                <div id="ccaPreviewPlaceholder">Generate a preview to see your cover art.</div>
-            </div>
-
-            <br />
-            <button is="emby-button" type="button" id="ccaPreviewBtn" class="raised block">
-                <span>Generate Preview</span>
-            </button>
-            <button is="emby-button" type="button" id="ccaApplyBtn" class="raised block button-submit" disabled>
-                <span>Apply to Library</span>
-            </button>
 
             <div id="ccaBrowserModal" class="ccaModal" style="display:none;">
                 <div class="ccaModalBox">
@@ -180,7 +203,7 @@
                             <option value="Season">Seasons</option>
                         </select>
                     </div>
-                    <div id="ccaBrowserGrid" class="ccaGrid"></div>
+                    <div id="ccaBrowserGrid" class="ccaPosterGrid"></div>
                     <div class="ccaModalPager">
                         <button is="emby-button" type="button" id="ccaBrowserPrev" class="raised"><span>Previous</span></button>
                         <span id="ccaBrowserPage">Page 1</span>
@@ -193,19 +216,128 @@
     </div>
 
     <style>
-        .ccaModal { position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 1000; display: flex; align-items: center; justify-content: center; }
-        .ccaModalBox { background: #101010; width: 92%; max-width: 960px; max-height: 85vh; border-radius: 8px; display: flex; flex-direction: column; overflow: hidden; }
-        .ccaModalHead { display: flex; justify-content: space-between; align-items: center; padding: .75em 1em; border-bottom: 1px solid #333; }
-        .ccaModalHead h3 { margin: 0; }
-        .ccaModalFilters { display: flex; gap: .75em; padding: .75em 1em; border-bottom: 1px solid #333; flex-wrap: wrap; }
-        .ccaModalFilters input { flex: 1; min-width: 180px; }
-        .ccaGrid { padding: 1em; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px; }
-        .ccaGridItem { cursor: pointer; border: 2px solid transparent; border-radius: 6px; overflow: hidden; background: #1c1c1c; }
-        .ccaGridItem:hover { border-color: #00a4dc; }
-        .ccaGridItem img { width: 100%; height: 190px; object-fit: cover; display: block; background: #000; }
-        .ccaGridItem .cap { padding: 6px; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .ccaModalPager { display: flex; gap: 1em; align-items: center; justify-content: center; padding: .75em; border-top: 1px solid #333; }
-        .ccaGridEmpty { padding: 2em; text-align: center; opacity: .7; grid-column: 1 / -1; }
+        #CustomCoverArtConfigPage .ccaHeader { margin-bottom: 1.5em; }
+        #CustomCoverArtConfigPage .ccaH1 { margin: 0 0 .2em; }
+        #CustomCoverArtConfigPage .ccaLede { margin: 0; opacity: .7; }
+
+        #CustomCoverArtConfigPage .ccaLayout {
+            display: grid;
+            grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+            gap: 1.5em;
+            align-items: start;
+        }
+        @media (max-width: 900px) {
+            #CustomCoverArtConfigPage .ccaLayout { grid-template-columns: 1fr; }
+        }
+
+        #CustomCoverArtConfigPage .ccaControls { display: flex; flex-direction: column; gap: 1.25em; }
+
+        #CustomCoverArtConfigPage .ccaCard {
+            border: 1px solid rgba(127, 127, 127, .22);
+            border-radius: 10px;
+            padding: 1.15em 1.2em;
+            background: rgba(127, 127, 127, .05);
+        }
+        #CustomCoverArtConfigPage .ccaCardHead {
+            font-size: .78em;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .09em;
+            opacity: .55;
+            margin-bottom: 1.1em;
+        }
+
+        #CustomCoverArtConfigPage .ccaGrid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 1.05em 1.25em;
+        }
+        @media (max-width: 480px) {
+            #CustomCoverArtConfigPage .ccaGrid { grid-template-columns: 1fr; }
+        }
+
+        #CustomCoverArtConfigPage .ccaCard .inputContainer { margin: 0 0 1.05em; }
+        #CustomCoverArtConfigPage .ccaCard > .inputContainer:last-child { margin-bottom: 0; }
+        #CustomCoverArtConfigPage .ccaGrid .inputContainer { margin-bottom: 0; }
+
+        #CustomCoverArtConfigPage .ccaVal { float: right; opacity: .6; font-weight: 400; font-variant-numeric: tabular-nums; }
+        #CustomCoverArtConfigPage .ccaRange { width: 100%; margin: .55em 0 0; }
+
+        #CustomCoverArtConfigPage input[type="color"] {
+            width: 100%;
+            height: 34px;
+            padding: 2px;
+            border: 1px solid rgba(127, 127, 127, .35);
+            border-radius: 6px;
+            background: transparent;
+            cursor: pointer;
+        }
+        #CustomCoverArtConfigPage .ccaFile { width: 100%; }
+        #CustomCoverArtConfigPage .ccaBtnWide { width: 100%; margin: 0; }
+
+        #CustomCoverArtConfigPage .ccaChecks { display: flex; flex-wrap: wrap; gap: .3em 1.25em; padding-top: .45em; }
+        #CustomCoverArtConfigPage .ccaCheck { display: inline-flex; align-items: center; gap: .5em; }
+        #CustomCoverArtConfigPage .ccaCheckBlock { display: flex; margin: .3em 0 .5em; }
+
+        #CustomCoverArtConfigPage .ccaSub {
+            margin: .4em 0 1.05em;
+            padding: .95em 1em;
+            border: 1px solid rgba(127, 127, 127, .2);
+            border-radius: 8px;
+            background: rgba(127, 127, 127, .04);
+        }
+
+        #CustomCoverArtConfigPage .ccaSelected { margin-top: .6em; opacity: .85; font-size: .92em; }
+
+        #CustomCoverArtConfigPage .ccaHiddenFile { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); border: 0; }
+        #CustomCoverArtConfigPage .ccaFileRow { display: flex; align-items: center; gap: .75em; flex-wrap: wrap; }
+        #CustomCoverArtConfigPage .ccaFileRow .emby-button { margin: 0; }
+        #CustomCoverArtConfigPage .ccaFileName { opacity: .6; font-size: .9em; word-break: break-all; }
+        #CustomCoverArtConfigPage .fieldDescription { margin-top: .4em; opacity: .55; font-size: .85em; }
+        #CustomCoverArtConfigPage .ccaPreviewHint { text-align: center; margin-top: .35em; }
+
+        /* Preview column */
+        #CustomCoverArtConfigPage .ccaPreviewCol { position: sticky; top: 1em; }
+        @media (max-width: 900px) {
+            #CustomCoverArtConfigPage .ccaPreviewCol { position: static; }
+        }
+        #CustomCoverArtConfigPage .ccaPreviewWrap {
+            display: flex; align-items: center; justify-content: center;
+            min-height: 260px;
+            border: 1px dashed rgba(127, 127, 127, .4);
+            border-radius: 10px;
+            padding: 1em;
+            background: rgba(0, 0, 0, .18);
+            text-align: center;
+        }
+        #CustomCoverArtConfigPage #ccaPreview {
+            display: none;
+            max-width: 100%;
+            max-height: 62vh;
+            height: auto;
+            border-radius: 6px;
+            box-shadow: 0 8px 28px rgba(0, 0, 0, .4);
+            transition: opacity .15s ease;
+        }
+        #CustomCoverArtConfigPage .ccaPreviewPlaceholder { opacity: .5; }
+        #CustomCoverArtConfigPage .ccaActions { display: flex; flex-direction: column; gap: .6em; margin-top: 1em; }
+        #CustomCoverArtConfigPage .ccaActions .emby-button { margin: 0; }
+
+        /* Poster picker modal */
+        #CustomCoverArtConfigPage .ccaModal { position: fixed; inset: 0; background: rgba(0, 0, 0, .65); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 1em; }
+        #CustomCoverArtConfigPage .ccaModalBox { background: #1b1b1b; width: 100%; max-width: 960px; max-height: 85vh; border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; border: 1px solid rgba(127, 127, 127, .25); }
+        #CustomCoverArtConfigPage .ccaModalHead { display: flex; justify-content: space-between; align-items: center; padding: .75em 1em; border-bottom: 1px solid rgba(127, 127, 127, .2); }
+        #CustomCoverArtConfigPage .ccaModalHead h3 { margin: 0; }
+        #CustomCoverArtConfigPage .ccaModalFilters { display: flex; gap: .75em; padding: .85em 1em; border-bottom: 1px solid rgba(127, 127, 127, .2); flex-wrap: wrap; }
+        #CustomCoverArtConfigPage .ccaModalFilters input { flex: 1; min-width: 180px; }
+        #CustomCoverArtConfigPage .ccaPosterGrid { padding: 1em; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px; }
+        #CustomCoverArtConfigPage .ccaGridItem { cursor: pointer; border: 2px solid transparent; border-radius: 8px; overflow: hidden; background: rgba(127, 127, 127, .1); transition: border-color .15s; }
+        #CustomCoverArtConfigPage .ccaGridItem:hover { border-color: var(--theme-primary-color, #00a4dc); }
+        #CustomCoverArtConfigPage .ccaGridItem img { width: 100%; height: 190px; object-fit: cover; display: block; background: #000; }
+        #CustomCoverArtConfigPage .ccaGridItem .cap { padding: 7px 8px; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        #CustomCoverArtConfigPage .ccaModalPager { display: flex; gap: 1em; align-items: center; justify-content: center; padding: .85em; border-top: 1px solid rgba(127, 127, 127, .2); }
+        #CustomCoverArtConfigPage .ccaGridEmpty { padding: 2em; text-align: center; opacity: .7; grid-column: 1 / -1; }
+        #CustomCoverArtConfigPage .ccaModalClose { min-width: 0; }
     </style>
 
     <script type="text/javascript">
@@ -329,8 +461,23 @@
                 .then(function (r) { return r.json(); });
         }
 
-        function generatePreview() {
-            Dashboard.showLoadingMsg();
+        // Live preview: any change schedules a debounced render. Only one request
+        // is in flight at a time; if changes arrive while one is running, exactly
+        // one more runs afterwards. Failures are silent so the last good preview stays.
+        var previewInFlight = false, previewQueued = false;
+        var schedulePreview = debounce(runPreview, 450);
+
+        function onControlChange(e) {
+            var t = e.target;
+            if (!t || t.type === 'file' || t.id === 'ccaLibrarySelect') { return; }
+            schedulePreview();
+        }
+
+        function runPreview() {
+            if (previewInFlight) { previewQueued = true; return; }
+            previewInFlight = true;
+            var img = el('ccaPreview');
+            img.style.opacity = '0.45';
             authFetch('CustomCoverArt/preview', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -340,14 +487,17 @@
                 return r.blob();
             }).then(function (blob) {
                 var url = URL.createObjectURL(blob);
-                var img = el('ccaPreview');
+                var previous = img.getAttribute('src');
                 img.src = url;
                 img.style.display = 'block';
+                img.style.opacity = '1';
                 el('ccaPreviewPlaceholder').style.display = 'none';
-                Dashboard.hideLoadingMsg();
-            }).catch(function (e) {
-                Dashboard.hideLoadingMsg();
-                Dashboard.alert('Could not generate preview: ' + e.message);
+                if (previous && previous.indexOf('blob:') === 0) { URL.revokeObjectURL(previous); }
+            }).catch(function () {
+                img.style.opacity = '1';
+            }).then(function () {
+                previewInFlight = false;
+                if (previewQueued) { previewQueued = false; runPreview(); }
             });
         }
 
@@ -381,13 +531,18 @@
             el('ccaPreset').addEventListener('change', updateUI);
             el('ccaGradient').addEventListener('change', updateUI);
 
+            el('ccaBgImageBtn').addEventListener('click', function () { el('ccaBgImage').click(); });
+            el('ccaFontBtn').addEventListener('click', function () { el('ccaFont').click(); });
+
             el('ccaBgImage').addEventListener('change', function () {
                 if (!this.files || !this.files[0]) { return; }
+                el('ccaBgImageName').textContent = this.files[0].name;
                 Dashboard.showLoadingMsg();
                 uploadFile('upload', this.files[0]).then(function (res) {
                     Dashboard.hideLoadingMsg();
                     if (pick(res, 'Success')) {
                         state.backgroundImagePath = pick(res, 'Data');
+                        schedulePreview();
                     } else {
                         Dashboard.alert('Upload failed: ' + (pick(res, 'ErrorMessage') || 'unknown error'));
                     }
@@ -396,19 +551,26 @@
 
             el('ccaFont').addEventListener('change', function () {
                 if (!this.files || !this.files[0]) { return; }
+                el('ccaFontName').textContent = this.files[0].name;
                 Dashboard.showLoadingMsg();
                 uploadFile('uploadFont', this.files[0]).then(function (res) {
                     Dashboard.hideLoadingMsg();
                     if (pick(res, 'Success')) {
                         state.customFontPath = pick(res, 'Data');
+                        schedulePreview();
                     } else {
                         Dashboard.alert('Font upload failed: ' + (pick(res, 'ErrorMessage') || 'unknown error'));
                     }
                 }).catch(function (e) { Dashboard.hideLoadingMsg(); Dashboard.alert(e.message); });
             });
 
-            el('ccaPreviewBtn').addEventListener('click', generatePreview);
             el('ccaApplyBtn').addEventListener('click', applyCoverArt);
+
+            // Auto-preview: any control change (except file inputs and the library
+            // picker) schedules a debounced live render.
+            var controls = page.querySelector('.ccaControls');
+            controls.addEventListener('input', onControlChange);
+            controls.addEventListener('change', onControlChange);
 
             el('ccaBrowseBtn').addEventListener('click', openBrowser);
             el('ccaBrowserClose').addEventListener('click', closeBrowser);
@@ -510,6 +672,7 @@
                         state.backgroundImagePath = pick(res, 'Data');
                         el('ccaSelectedBgName').textContent = name;
                         el('ccaSelectedBg').style.display = '';
+                        schedulePreview();
                         closeBrowser();
                     } else {
                         Dashboard.alert('Could not use that image: ' + (pick(res, 'ErrorMessage') || 'unknown error'));
@@ -530,6 +693,7 @@
             loadLibraries().then(function () {
                 updateUI();
                 Dashboard.hideLoadingMsg();
+                schedulePreview();
             }).catch(function () { Dashboard.hideLoadingMsg(); });
         });
     })();
