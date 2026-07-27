@@ -68,6 +68,7 @@ public class LibraryDetectionService : ILibraryDetectionService
             {
                 "collection" => Task.FromResult(QueryItems(BaseItemKind.BoxSet, "Collection")),
                 "playlist" => Task.FromResult(QueryItems(BaseItemKind.Playlist, "Playlist")),
+                "livetv" => Task.FromResult(QueryLiveTvViews()),
                 _ => GetLibrariesAsync()
             };
         }
@@ -98,6 +99,42 @@ public class LibraryDetectionService : ILibraryDetectionService
             })
             .ToList();
     }
+
+    // Live TV has no path-based virtual folder, so it never appears in
+    // GetVirtualFolders(). Its home-screen tile is a UserView (or, on some
+    // setups, a CollectionFolder) whose collection type is livetv. Locate that
+    // item so a cover can be applied to it. Best-effort: whether Jellyfin keeps
+    // a custom image on a generated view can vary by server/version.
+    private IEnumerable<LibraryInfo> QueryLiveTvViews()
+    {
+        var query = new InternalItemsQuery
+        {
+            IncludeItemTypes = new[] { BaseItemKind.UserView, BaseItemKind.CollectionFolder },
+            Recursive = true
+        };
+
+        return _libraryManager.GetItemList(query)
+            .Where(IsLiveTvView)
+            .GroupBy(item => item.Id)
+            .Select(group => group.First())
+            .OrderBy(item => item.Name)
+            .Select(item => new LibraryInfo
+            {
+                Id = item.Id.ToString(),
+                Name = item.Name ?? "Live TV",
+                Type = "Live TV",
+                HasCustomCover = item.HasImage(ImageType.Primary),
+                LastModified = item.DateModified
+            })
+            .ToList();
+    }
+
+    private static bool IsLiveTvView(BaseItem item) => item switch
+    {
+        UserView view => view.ViewType == CollectionType.livetv || view.CollectionType == CollectionType.livetv,
+        CollectionFolder folder => folder.CollectionType == CollectionType.livetv,
+        _ => false
+    };
 
     private static string MapCollectionType(string? type) => type?.ToLowerInvariant() switch
     {

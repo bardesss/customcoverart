@@ -27,6 +27,7 @@
                                     <option value="library" selected data-i18n="target.library">Library</option>
                                     <option value="collection" data-i18n="target.collection">Collection</option>
                                     <option value="playlist" data-i18n="target.playlist">Playlist</option>
+                                    <option value="livetv" data-i18n="target.livetv">Live TV</option>
                                 </select>
                             </div>
                             <div class="inputContainer">
@@ -81,6 +82,15 @@
                                     <label class="ccaCheck"><input is="emby-checkbox" type="checkbox" id="ccaOutline" /><span data-i18n="e.outline">Outline</span></label>
                                 </div>
                             </div>
+                        </div>
+                        <div class="inputContainer">
+                            <label data-i18n="text.font">Custom font (optional)</label>
+                            <div class="ccaFileRow">
+                                <button is="emby-button" type="button" id="ccaFontBtn" class="raised"><span data-i18n="f.chooseFont">Choose font…</span></button>
+                                <span class="ccaFileName" id="ccaFontName" data-i18n="f.none">No file chosen</span>
+                            </div>
+                            <div class="fieldDescription" data-i18n="hint.font">TTF, OTF, TTC, WOFF or WOFF2 · up to 5 MB. Leave empty to use the bundled Noto Sans.</div>
+                            <input type="file" id="ccaFont" accept=".ttf,.otf,.ttc,.woff,.woff2" class="ccaHiddenFile" />
                         </div>
                     </section>
 
@@ -177,15 +187,6 @@
                                 <label for="ccaHeight" data-i18n="out.height">Height</label>
                                 <input is="emby-input" type="number" id="ccaHeight" min="100" max="2048" value="1400" />
                             </div>
-                        </div>
-                        <div class="inputContainer">
-                            <label data-i18n="out.font">Custom font (optional)</label>
-                            <div class="ccaFileRow">
-                                <button is="emby-button" type="button" id="ccaFontBtn" class="raised"><span data-i18n="f.chooseFont">Choose font…</span></button>
-                                <span class="ccaFileName" id="ccaFontName" data-i18n="f.none">No file chosen</span>
-                            </div>
-                            <div class="fieldDescription" data-i18n="hint.font">TTF, OTF, TTC, WOFF or WOFF2 · up to 5 MB. Leave empty to use the bundled Noto Sans.</div>
-                            <input type="file" id="ccaFont" accept=".ttf,.otf,.ttc,.woff,.woff2" class="ccaHiddenFile" />
                         </div>
                     </section>
 
@@ -382,12 +383,13 @@
         var I18N = {
             en: {
                 'lede': 'Design a cover for a library, preview it live, then apply it.',
-                'card.target': 'Target', 'target.type': 'Type', 'target.library': 'Library', 'target.collection': 'Collection', 'target.playlist': 'Playlist',
+                'card.target': 'Target', 'target.type': 'Type', 'target.library': 'Library', 'target.collection': 'Collection', 'target.playlist': 'Playlist', 'target.livetv': 'Live TV',
                 'card.library': 'Library', 'lib.choose': 'Choose', 'lib.selectOption': 'Select…',
                 'card.text': 'Text', 'text.title': 'Title', 'text.weight': 'Font weight',
                 'w.light': 'Light', 'w.normal': 'Normal', 'w.medium': 'Medium', 'w.semibold': 'SemiBold', 'w.bold': 'Bold', 'w.extrabold': 'ExtraBold',
                 'text.align': 'Alignment', 'a.left': 'Left', 'a.center': 'Center', 'a.right': 'Right',
                 'text.size': 'Text size', 'text.color': 'Text color', 'text.effects': 'Effects', 'e.shadow': 'Shadow', 'e.outline': 'Outline',
+                'text.font': 'Custom font (optional)',
                 'card.background': 'Background', 'bg.dim': 'Dimming', 'bg.blur': 'Blur', 'bg.dimcolor': 'Dim / base color',
                 'bg.gradient': 'Enable gradient background', 'bg.gtype': 'Gradient type', 'g.linear': 'Linear', 'g.radial': 'Radial',
                 'bg.startcolor': 'Start color', 'bg.endcolor': 'End color',
@@ -413,12 +415,13 @@
             },
             nl: {
                 'lede': 'Ontwerp een cover voor een bibliotheek, bekijk het live en pas het toe.',
-                'card.target': 'Doel', 'target.type': 'Type', 'target.library': 'Bibliotheek', 'target.collection': 'Verzameling', 'target.playlist': 'Afspeellijst',
+                'card.target': 'Doel', 'target.type': 'Type', 'target.library': 'Bibliotheek', 'target.collection': 'Verzameling', 'target.playlist': 'Afspeellijst', 'target.livetv': 'Live-tv',
                 'card.library': 'Bibliotheek', 'lib.choose': 'Kies', 'lib.selectOption': 'Selecteer…',
                 'card.text': 'Tekst', 'text.title': 'Titel', 'text.weight': 'Letterdikte',
                 'w.light': 'Licht', 'w.normal': 'Normaal', 'w.medium': 'Medium', 'w.semibold': 'Halfvet', 'w.bold': 'Vet', 'w.extrabold': 'Extra vet',
                 'text.align': 'Uitlijning', 'a.left': 'Links', 'a.center': 'Gecentreerd', 'a.right': 'Rechts',
                 'text.size': 'Tekstgrootte', 'text.color': 'Tekstkleur', 'text.effects': 'Effecten', 'e.shadow': 'Schaduw', 'e.outline': 'Omlijning',
+                'text.font': 'Aangepast lettertype (optioneel)',
                 'card.background': 'Achtergrond', 'bg.dim': 'Dimmen', 'bg.blur': 'Vervaging', 'bg.dimcolor': 'Dim- / basiskleur',
                 'bg.gradient': 'Verloop-achtergrond inschakelen', 'bg.gtype': 'Verlooptype', 'g.linear': 'Lineair', 'g.radial': 'Radiaal',
                 'bg.startcolor': 'Startkleur', 'bg.endcolor': 'Eindkleur',
