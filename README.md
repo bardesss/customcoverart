@@ -40,6 +40,14 @@ Text, gradients, blur, custom backgrounds and fonts — with a live preview, rig
 | 👁️ | **Live preview** | Render a preview before applying anything |
 | 🌍 | **Localisation** | English and Dutch included; easy to add more |
 
+## 📸 Screenshots
+
+<div align="center">
+
+![The Custom Cover Art configuration page inside the Jellyfin dashboard, with live preview](screenshots/1.png)
+
+</div>
+
 ## 📋 Requirements
 
 - **Jellyfin Server 10.11.x** (the plugin is ABI‑locked to this major version)
