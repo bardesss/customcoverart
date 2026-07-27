@@ -12,6 +12,15 @@ Text, gradients, blur, custom backgrounds and fonts — with a live preview, rig
 
 ---
 
+> ### 🤖 AI assistance disclaimer
+>
+> This plugin was substantially rebuilt and refactored with the help of an AI assistant
+> (Anthropic's Claude). The code **compiles cleanly and passes an automated unit-test suite**
+> (image generation, upload validation, the path-traversal sandbox, and plugin wiring), and
+> the runtime paths have been tested against a live Jellyfin server.
+
+---
+
 ## ✨ Features
 
 | | Feature | Details |
