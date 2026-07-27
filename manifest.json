@@ -9,6 +9,14 @@
     "imageUrl": "",
     "versions": [
       {
+        "version": "1.1.0.0",
+        "changelog": "Redesigned the config page into a native Jellyfin two-column layout with grouped cards and a sticky **live preview** that updates automatically as you adjust settings (no more manual preview button). Styled the file pickers as native buttons showing the chosen file, and made allowed formats and size limits explicit. Fixed the empty library dropdown (libraries now come from GetVirtualFolders). Backfilled earlier version changelogs.",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://github.com/Bardesss/customcoverart/releases/download/v1.1.0.0/customcoverart_1.1.0.0.zip",
+        "checksum": "9a4e26ba0221b709bea0d228d0e713c2",
+        "timestamp": "2026-07-27T12:12:21Z"
+      },
+      {
         "version": "1.0.1.0",
         "changelog": "Bundled Noto Sans so titles always render (even on Docker/minimal Linux). Security & correctness hardening: fixed path-traversal and decompression-bomb risks, added rate limiting and font-signature validation, safe colour parsing, image disposal, and generated-file cleanup.",
         "targetAbi": "10.11.0.0",
