@@ -411,9 +411,33 @@
         var LANG = 'en';
 
         function detectLang() {
-            var l = (document.documentElement.getAttribute('lang') || navigator.language || 'en');
-            l = String(l).toLowerCase().split('-')[0];
-            return I18N[l] ? l : 'en';
+            var candidates = [];
+            // Jellyfin stores the selected UI language in the browser (localStorage),
+            // e.g. "<userId>-language" = "nl". navigator.language is the BROWSER
+            // language, which often differs, so check the stored setting first.
+            try {
+                for (var i = 0; i < localStorage.length; i++) {
+                    var k = localStorage.key(i);
+                    if (k && /language|locale|culture/i.test(k)) {
+                        var v = localStorage.getItem(k);
+                        if (v && v.length > 0 && v.length <= 12) { candidates.push(v); }
+                    }
+                }
+            } catch (e) { /* localStorage unavailable */ }
+            try {
+                var htmlLang = document.documentElement.getAttribute('lang');
+                if (htmlLang) { candidates.push(htmlLang); }
+            } catch (e) { /* ignore */ }
+            try {
+                if (navigator.languages) { candidates = candidates.concat(navigator.languages); }
+            } catch (e) { /* ignore */ }
+            if (navigator.language) { candidates.push(navigator.language); }
+
+            for (var j = 0; j < candidates.length; j++) {
+                var lang = String(candidates[j]).toLowerCase().split('-')[0].split('_')[0];
+                if (I18N[lang]) { return lang; }
+            }
+            return 'en';
         }
 
         function t(key, a, b) {
@@ -780,8 +804,20 @@
         }
 
         function selectBrowserItem(itemId, name) {
+            var imgUrl;
+            try { imgUrl = ApiClient.getImageUrl(itemId, { type: 'Primary', maxHeight: 2000 }); } catch (e) { imgUrl = null; }
+            if (!imgUrl) { Dashboard.alert(t('dyn.useImgFail', t('dyn.unknown'))); return; }
+
             Dashboard.showLoadingMsg();
-            jsonFetch('CustomCoverArt/items/' + encodeURIComponent(itemId) + '/useAsBackground', 'POST')
+            // Fetch the poster through Jellyfin's own image endpoint (the same one
+            // the thumbnails use, so it always works) and upload it as a normal
+            // background — more reliable than resolving a local file path server-side.
+            fetch(imgUrl)
+                .then(function (r) { if (!r.ok) { throw new Error('image ' + r.status); } return r.blob(); })
+                .then(function (blob) {
+                    var ext = blob.type === 'image/png' ? 'png' : 'jpg';
+                    return uploadFile('upload', new File([blob], 'poster.' + ext, { type: blob.type || 'image/jpeg' }));
+                })
                 .then(function (res) {
                     Dashboard.hideLoadingMsg();
                     if (pick(res, 'Success')) {
@@ -793,9 +829,10 @@
                     } else {
                         Dashboard.alert(t('dyn.useImgFail', pick(res, 'ErrorMessage') || t('dyn.unknown')));
                     }
-                }).catch(function (e) {
+                })
+                .catch(function (e) {
                     Dashboard.hideLoadingMsg();
-                    Dashboard.alert(e.message);
+                    Dashboard.alert(t('dyn.useImgFail', e.message));
                 });
         }
 
