@@ -62,6 +62,12 @@ public static class PluginPaths
             return false;
         }
 
-        return candidateFull.StartsWith(baseFull, System.StringComparison.OrdinalIgnoreCase);
+        // Match the filesystem's case behaviour: case-insensitive on Windows,
+        // case-sensitive elsewhere (Linux, where Jellyfin usually runs).
+        var comparison = System.OperatingSystem.IsWindows()
+            ? System.StringComparison.OrdinalIgnoreCase
+            : System.StringComparison.Ordinal;
+
+        return candidateFull.StartsWith(baseFull, comparison);
     }
 }

@@ -54,6 +54,23 @@ public class CustomCoverArtController : ControllerBase
         _applicationPaths = applicationPaths;
     }
 
+    // Returns true if the caller has exceeded the limit for this action.
+    // Records the attempt on every call (so failed attempts also count).
+    private bool RateLimited(string action, int maxRequests, TimeSpan window)
+    {
+        var clientId = _userContextService.GetCurrentUserId()
+            ?? HttpContext.Connection.RemoteIpAddress?.ToString()
+            ?? "unknown";
+
+        if (!_rateLimitingService.IsAllowed(clientId, action, maxRequests, window))
+        {
+            return true;
+        }
+
+        _rateLimitingService.RecordRequest(clientId, action);
+        return false;
+    }
+
     /// <summary>Get all available libraries.</summary>
     [HttpGet("libraries")]
     public async Task<ApiResponse<IEnumerable<LibraryInfo>>> GetLibraries()
@@ -91,6 +108,11 @@ public class CustomCoverArtController : ControllerBase
     [HttpPost("generate")]
     public async Task<ApiResponse<string>> GenerateCoverArt([FromBody] CoverArtSettings settings)
     {
+        if (RateLimited("generate", maxRequests: 30, TimeSpan.FromMinutes(1)))
+        {
+            return Fail<string>(_localizationService.GetString("errors.too_many_uploads"));
+        }
+
         try
         {
             var coverArtPath = await _coverArtService.GenerateCoverArtAsync(settings).ConfigureAwait(false);
@@ -107,6 +129,11 @@ public class CustomCoverArtController : ControllerBase
     [HttpPost("preview")]
     public async Task<IActionResult> GeneratePreview([FromBody] CoverArtSettings settings)
     {
+        if (RateLimited("preview", maxRequests: 30, TimeSpan.FromMinutes(1)))
+        {
+            return StatusCode(429, new { error = "Too many requests" });
+        }
+
         try
         {
             var coverArtPath = await _coverArtService.GenerateCoverArtAsync(settings).ConfigureAwait(false);
@@ -137,6 +164,12 @@ public class CustomCoverArtController : ControllerBase
 
     private async Task<ApiResponse<bool>> ApplyInternal(string libraryId, CoverArtSettings settings)
     {
+        // Validate the library id up front, before it is used anywhere.
+        if (!Guid.TryParse(libraryId, out _))
+        {
+            return Fail<bool>("Invalid library id");
+        }
+
         try
         {
             var userName = _userContextService.GetCurrentUserName();
@@ -144,13 +177,14 @@ public class CustomCoverArtController : ControllerBase
 
             var coverArtPath = await _coverArtService.GenerateCoverArtAsync(settings).ConfigureAwait(false);
 
-            var saved = await _coverArtService.SaveCoverArtAsync(libraryId, coverArtPath).ConfigureAwait(false);
-            if (!saved)
+            // Persist into the per-library folder; apply THAT stable path.
+            var savedPath = await _coverArtService.SaveCoverArtAsync(libraryId, coverArtPath).ConfigureAwait(false);
+            if (savedPath is null)
             {
                 return Fail<bool>("Failed to save cover art");
             }
 
-            var updated = await _libraryService.UpdateLibraryCoverArtAsync(libraryId, coverArtPath).ConfigureAwait(false);
+            var updated = await _libraryService.UpdateLibraryCoverArtAsync(libraryId, savedPath).ConfigureAwait(false);
             if (!updated)
             {
                 return Fail<bool>("Failed to update library cover art");
@@ -161,7 +195,7 @@ public class CustomCoverArtController : ControllerBase
         catch (Exception ex)
         {
             _loggingService.LogError("Failed to apply cover art to library {LibraryId}", ex, libraryId);
-            return Fail<bool>(ex.Message);
+            return Fail<bool>("Failed to apply cover art.");
         }
     }
 
@@ -193,24 +227,48 @@ public class CustomCoverArtController : ControllerBase
             validate: ValidateFontAsync).ConfigureAwait(false);
     }
 
-    private Task<ValidationResult> ValidateFontAsync(IFormFile file)
+    private async Task<ValidationResult> ValidateFontAsync(IFormFile file)
     {
         var result = new ValidationResult { IsValid = true };
 
-        var allowedExtensions = new[] { ".ttf", ".otf", ".woff", ".woff2" };
+        var allowedExtensions = new[] { ".ttf", ".otf", ".ttc", ".woff", ".woff2" };
         var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
         if (!allowedExtensions.Contains(extension))
         {
             result.IsValid = false;
             result.ErrorMessage = _localizationService.GetString("errors.invalid_file_format");
+            return result;
         }
-        else if (file.Length > 5 * 1024 * 1024)
+
+        if (file.Length > 5 * 1024 * 1024)
         {
             result.IsValid = false;
             result.ErrorMessage = _localizationService.GetString("errors.font_too_large");
+            return result;
         }
 
-        return Task.FromResult(result);
+        // Verify a real font signature (magic bytes), not just the extension.
+        var header = new byte[4];
+        await using var stream = file.OpenReadStream();
+        var read = await stream.ReadAsync(header.AsMemory(0, 4)).ConfigureAwait(false);
+        if (read < 4 || !IsFontSignature(header))
+        {
+            result.IsValid = false;
+            result.ErrorMessage = _localizationService.GetString("errors.invalid_file_format");
+        }
+
+        return result;
+    }
+
+    private static bool IsFontSignature(byte[] h)
+    {
+        bool Eq(byte a, byte b, byte c, byte d) => h[0] == a && h[1] == b && h[2] == c && h[3] == d;
+        return Eq(0x00, 0x01, 0x00, 0x00) // TrueType (TTF)
+            || Eq(0x4F, 0x54, 0x54, 0x4F) // 'OTTO' (OpenType/CFF)
+            || Eq(0x74, 0x72, 0x75, 0x65) // 'true'
+            || Eq(0x74, 0x74, 0x63, 0x66) // 'ttcf' (font collection)
+            || Eq(0x77, 0x4F, 0x46, 0x46) // 'wOFF'
+            || Eq(0x77, 0x4F, 0x46, 0x32); // 'wOF2'
     }
 
     private async Task<ApiResponse<string>> SaveUploadAsync(
@@ -263,7 +321,7 @@ public class CustomCoverArtController : ControllerBase
         }
         catch (Exception ex)
         {
-            _loggingService.LogError("Upload failed for user {UserName}", ex, userName);
+            _loggingService.LogError("Upload failed for user {UserName}", ex, userName ?? "unknown");
             return Fail<string>(_localizationService.GetString("errors.error_saving_file", ex.Message));
         }
     }
@@ -272,6 +330,11 @@ public class CustomCoverArtController : ControllerBase
     [HttpPost("getImageDimensions")]
     public async Task<ApiResponse<ImageDimensionsDto>> GetImageDimensions(IFormFile file)
     {
+        if (RateLimited("getImageDimensions", maxRequests: 30, TimeSpan.FromMinutes(1)))
+        {
+            return Fail<ImageDimensionsDto>(_localizationService.GetString("errors.too_many_uploads"));
+        }
+
         try
         {
             if (file is null || file.Length == 0)
