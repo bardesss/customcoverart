@@ -9,6 +9,14 @@
     "imageUrl": "",
     "versions": [
       {
+        "version": "1.2.2.0",
+        "changelog": "Poster background reliability: authenticate the image download, build the upload without the (sometimes unavailable) File constructor, and surface a clear message at each step so any failure is visible instead of silent.",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://github.com/Bardesss/customcoverart/releases/download/v1.2.2.0/customcoverart_1.2.2.0.zip",
+        "checksum": "306c7705b6ed23fd9701356437ee8838",
+        "timestamp": "2026-07-27T13:12:42Z"
+      },
+      {
         "version": "1.2.1.0",
         "changelog": "Fixes. The config page now reliably follows your Jellyfin UI language — the detection reads Jellyfin's stored language setting, not just the browser language (Dutch now shows correctly). Picking a library poster as the background now works: the image is fetched through Jellyfin's own image endpoint and uploaded, instead of resolving a local file path that wasn't always available.",
         "targetAbi": "10.11.0.0",
