@@ -1,0 +1,16 @@
+# Build output
+bin/
+obj/
+
+# Release packaging
+dist/
+*.zip
+
+# IDE
+.vs/
+.vscode/
+*.user
+*.suo
+
+# Local tooling
+.dotnet/
