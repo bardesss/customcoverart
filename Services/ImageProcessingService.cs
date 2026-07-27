@@ -96,12 +96,15 @@ namespace CustomCoverArt.Services;
         }
     }
 
-    public async Task<(int width, int height)> GetImageDimensionsAsync(byte[] imageData)
+    public Task<(int width, int height)> GetImageDimensionsAsync(byte[] imageData)
     {
         try
         {
-            using var image = Image.Load(imageData);
-            return (image.Width, image.Height);
+            // Identify reads only the header — it does NOT fully decode the
+            // pixels, so a small file that declares huge dimensions (a
+            // decompression bomb) cannot exhaust memory here.
+            var info = Image.Identify(imageData);
+            return Task.FromResult((info.Width, info.Height));
         }
         catch (Exception ex)
         {
@@ -110,62 +113,15 @@ namespace CustomCoverArt.Services;
     }
 
     /// <summary>
-    /// Intelligently determines the optimal output format based on content analysis
+    /// Determines the output format for "auto". The generator always produces a
+    /// single (non-animated) frame, so PNG is used unconditionally: it is 24-bit
+    /// and lossless, whereas GIF is limited to 256 colours and would badly band
+    /// photographic backgrounds, blurs and gradients. Users can still force GIF
+    /// explicitly, but "auto" never chooses it.
     /// </summary>
-    public async Task<string> DetermineOptimalFormatAsync(CoverArtSettings settings)
+    public Task<string> DetermineOptimalFormatAsync(CoverArtSettings settings)
     {
-        try
-        {
-            // Check if background image is animated GIF
-            if (!string.IsNullOrEmpty(settings.BackgroundImagePath) && File.Exists(settings.BackgroundImagePath))
-            {
-                var imageBytes = await File.ReadAllBytesAsync(settings.BackgroundImagePath);
-                if (await IsGifImageAsync(imageBytes))
-                {
-                    // Check if it's actually animated (has multiple frames)
-                    using var gif = Image.Load(imageBytes);
-                    if (gif.Frames.Count > 1)
-                    {
-                        return "gif"; // Animated background -> GIF output
-                    }
-                }
-            }
-
-            // Check for complex visual effects that benefit from GIF
-            var hasComplexEffects = 
-                settings.BackgroundBlur > 0 ||           // Blur effects
-                settings.TextShadow ||                    // Text shadows
-                settings.TextOutline ||                  // Text outlines
-                (settings.BackgroundGradient?.IsEnabled == true &&
-                 settings.BackgroundGradient.Type == GradientType.Radial); // Radial gradients
-
-            if (hasComplexEffects)
-            {
-                return "gif"; // Complex effects -> GIF for better quality
-            }
-
-            // Check text complexity
-            var textComplexity = CalculateTextComplexity(settings);
-            if (textComplexity > 0.7) // High complexity threshold
-            {
-                return "gif"; // Complex text -> GIF
-            }
-
-            // Check dimensions - larger images might benefit from PNG
-            var totalPixels = settings.ExportWidth * settings.ExportHeight;
-            if (totalPixels > 1920 * 1080) // 4K threshold
-            {
-                return "png"; // Large images -> PNG for better compression
-            }
-
-            // Default to PNG for simple content
-            return "png";
-        }
-        catch (Exception ex)
-        {
-            // Fallback to PNG on any error
-            return "png";
-        }
+        return Task.FromResult("png");
     }
 
     /// <summary>

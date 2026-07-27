@@ -41,7 +41,7 @@ public class LibraryDetectionService : ILibraryDetectionService
                 catch (Exception ex)
                 {
                     _loggingService.LogError("Error processing library folder {FolderId}: {Error}",
-                        folder?.Id, ex.Message);
+                        folder.Id, ex.Message);
                 }
             }
         }

@@ -21,7 +21,10 @@ public interface ILibraryDetectionService
 public interface ICoverArtService
 {
     Task<string> GenerateCoverArtAsync(CoverArtSettings settings);
-    Task<bool> SaveCoverArtAsync(string libraryId, string coverArtPath);
+
+    /// <summary>Persists the cover into the per-library folder and returns that
+    /// stable path (or null on failure) so it can be applied to the library.</summary>
+    Task<string?> SaveCoverArtAsync(string libraryId, string coverArtPath);
     Task<byte[]?> GetCoverArtAsync(string libraryId);
     Task<bool> DeleteCoverArtAsync(string libraryId);
 }

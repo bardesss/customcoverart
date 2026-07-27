@@ -43,6 +43,9 @@ public class CoverArtService : ICoverArtService
             if (settings.ExportWidth <= 0 || settings.ExportHeight <= 0)
                 throw new ArgumentException("Invalid dimensions");
 
+            // Housekeeping: drop stale preview/generated files.
+            PruneOldGenerated();
+
             // Security: background image and font paths come from the client.
             // Only honour them if they resolve inside our own data directory,
             // otherwise ignore them (prevents reading arbitrary server files).
@@ -55,6 +58,15 @@ public class CoverArtService : ICoverArtService
             {
                 settings.CustomFontPath = string.Empty;
             }
+
+            // Clamp client-controlled effect sizes. The outline is drawn as an
+            // O(n^2) grid of text passes, so an unbounded width could hang the
+            // request; the others just guard against absurd input.
+            settings.TextOutlineWidth = Math.Clamp(settings.TextOutlineWidth, 0, 10);
+            settings.BackgroundBlur = Math.Clamp(settings.BackgroundBlur, 0f, 100f);
+            settings.BackgroundDim = Math.Clamp(settings.BackgroundDim, 0f, 1f);
+            settings.TextShadowOffsetX = Math.Clamp(settings.TextShadowOffsetX, -50, 50);
+            settings.TextShadowOffsetY = Math.Clamp(settings.TextShadowOffsetY, -50, 50);
 
             // Validate dimensions and estimated file size
             var dimensionValidation = ImageProcessingService.ValidateCoverArtDimensions(
@@ -74,47 +86,66 @@ public class CoverArtService : ICoverArtService
                 settings.OutputFormat = await _imageProcessingService.DetermineOptimalFormatAsync(settings);
             }
 
+            // Whitelist the output format. The extension is NEVER derived from the
+            // raw client string (which could contain path-traversal segments) —
+            // anything that is not "gif" becomes "png".
+            settings.OutputFormat = settings.OutputFormat?.ToLowerInvariant() == "gif" ? "gif" : "png";
+            var extension = settings.OutputFormat;
+
             // Create output filename with correct extension
-            var extension = settings.OutputFormat?.ToLowerInvariant() ?? "png";
             var fileName = $"cover_{Guid.NewGuid():N}.{extension}";
             var outputPath = Path.Combine(_outputDirectory, fileName);
 
-            // Load background image if provided with null safety
+            // Load background image if provided (path already sandboxed above).
             Image? backgroundImage = null;
-            if (!string.IsNullOrEmpty(settings.BackgroundImagePath) && File.Exists(settings.BackgroundImagePath))
+            try
             {
-                try
+                if (!string.IsNullOrEmpty(settings.BackgroundImagePath) && File.Exists(settings.BackgroundImagePath))
                 {
-                    backgroundImage = await Image.LoadAsync(settings.BackgroundImagePath);
+                    try
+                    {
+                        // Reject oversize source images before a full decode
+                        // (decompression-bomb guard).
+                        var info = Image.Identify(settings.BackgroundImagePath);
+                        const long maxSourcePixels = 8192L * 8192L;
+                        if ((long)info.Width * info.Height <= maxSourcePixels)
+                        {
+                            backgroundImage = await Image.LoadAsync(settings.BackgroundImagePath);
+                        }
+                    }
+                    catch
+                    {
+                        // Could not identify/decode the background — use a gradient.
+                    }
                 }
-                catch (Exception ex)
+
+                // Create new image with specified dimensions
+                using var image = new Image<Rgba32>(settings.ExportWidth, settings.ExportHeight);
+
+                // Apply background
+                if (backgroundImage != null)
                 {
-                    // Log error but continue without background image
-                    // This will be handled by the fallback mechanism
+                    await ApplyBackgroundAsync(image, backgroundImage, settings);
                 }
-            }
+                else
+                {
+                    // Create gradient background if no image provided
+                    await CreateGradientBackgroundAsync(image, settings);
+                }
 
-            // Create new image with specified dimensions
-            using var image = new Image<Rgba32>(settings.ExportWidth, settings.ExportHeight);
-            
-            // Apply background
-            if (backgroundImage != null)
+                // Apply text overlay with fallback
+                await ApplyTextOverlayWithFallbackAsync(image, settings);
+
+                // Save image with retry mechanism
+                await SaveImageWithRetryAsync(image, outputPath, settings);
+
+                return outputPath;
+            }
+            finally
             {
-                await ApplyBackgroundAsync(image, backgroundImage, settings);
+                // Always release the decoded background image.
+                backgroundImage?.Dispose();
             }
-            else
-            {
-                // Create gradient background if no image provided
-                await CreateGradientBackgroundAsync(image, settings);
-            }
-
-            // Apply text overlay with fallback
-            await ApplyTextOverlayWithFallbackAsync(image, settings);
-
-            // Save image with retry mechanism
-            await SaveImageWithRetryAsync(image, outputPath, settings);
-
-            return outputPath;
         }
         catch (Exception ex)
         {
@@ -122,28 +153,89 @@ public class CoverArtService : ICoverArtService
         }
     }
 
-    public async Task<bool> SaveCoverArtAsync(string libraryId, string coverArtPath)
+    // Resolves the per-library output directory. Validating the id as a GUID
+    // prevents a client-supplied libraryId from containing path-traversal
+    // segments (e.g. "../../..") that would escape the output directory.
+    private string LibraryDir(string libraryId)
+    {
+        if (!Guid.TryParse(libraryId, out var id))
+        {
+            throw new ArgumentException("Invalid library id", nameof(libraryId));
+        }
+
+        return Path.Combine(_outputDirectory, "Libraries", id.ToString("N"));
+    }
+
+    // Parses a #rrggbb colour, falling back to a default instead of throwing so
+    // a malformed colour in the request body cannot abort the whole render.
+    private static Color SafeColor(string? hex, Color fallback)
+    {
+        if (string.IsNullOrWhiteSpace(hex))
+        {
+            return fallback;
+        }
+
+        try
+        {
+            return Color.ParseHex(hex);
+        }
+        catch
+        {
+            return fallback;
+        }
+    }
+
+    // Best-effort cleanup of stale generated/preview files so the folder does
+    // not grow without bound (preview fires on every UI tweak). Only prunes the
+    // flat generated root; the per-library copies under Libraries/ are kept.
+    private void PruneOldGenerated()
+    {
+        try
+        {
+            var cutoff = DateTime.UtcNow.AddHours(-6);
+            foreach (var file in Directory.EnumerateFiles(_outputDirectory))
+            {
+                try
+                {
+                    if (File.GetLastWriteTimeUtc(file) < cutoff)
+                    {
+                        File.Delete(file);
+                    }
+                }
+                catch
+                {
+                    // Ignore individual files we cannot delete.
+                }
+            }
+        }
+        catch
+        {
+            // Directory missing or inaccessible — nothing to prune.
+        }
+    }
+
+    public Task<string?> SaveCoverArtAsync(string libraryId, string coverArtPath)
     {
         try
         {
             if (!File.Exists(coverArtPath))
-                return false;
+                return Task.FromResult<string?>(null);
 
-            // Create library-specific directory
-            var libraryDirectory = Path.Combine(_outputDirectory, "Libraries", libraryId);
+            // Create library-specific directory (libraryId validated as a GUID).
+            var libraryDirectory = LibraryDir(libraryId);
             Directory.CreateDirectory(libraryDirectory);
 
-            // Copy cover art to library directory
-            var fileName = Path.GetFileName(coverArtPath);
-            var destinationPath = Path.Combine(libraryDirectory, fileName);
-            
+            // Copy the cover into the stable per-library location and return that
+            // path — this is what gets applied to the library, NOT the transient
+            // file in the generated root (which the cleanup may later prune).
+            var destinationPath = Path.Combine(libraryDirectory, Path.GetFileName(coverArtPath));
             File.Copy(coverArtPath, destinationPath, overwrite: true);
 
-            return true;
+            return Task.FromResult<string?>(destinationPath);
         }
         catch
         {
-            return false;
+            return Task.FromResult<string?>(null);
         }
     }
 
@@ -151,7 +243,7 @@ public class CoverArtService : ICoverArtService
     {
         try
         {
-            var libraryDirectory = Path.Combine(_outputDirectory, "Libraries", libraryId);
+            var libraryDirectory = LibraryDir(libraryId);
             if (!Directory.Exists(libraryDirectory))
                 return null;
 
@@ -177,7 +269,7 @@ public class CoverArtService : ICoverArtService
     {
         try
         {
-            var libraryDirectory = Path.Combine(_outputDirectory, "Libraries", libraryId);
+            var libraryDirectory = LibraryDir(libraryId);
             if (!Directory.Exists(libraryDirectory))
                 return true;
 
@@ -229,7 +321,7 @@ public class CoverArtService : ICoverArtService
         // Apply dimming effect
         if (settings.BackgroundDim > 0)
         {
-            var dimPixel = Color.ParseHex(settings.DimColor).ToPixel<Rgba32>();
+            var dimPixel = SafeColor(settings.DimColor, Color.Black).ToPixel<Rgba32>();
             var dimBrush = new SolidBrush(Color.FromRgba(
                 dimPixel.R,
                 dimPixel.G,
@@ -252,7 +344,7 @@ public class CoverArtService : ICoverArtService
         }
         else
         {
-            var backgroundColor = Color.ParseHex(settings.DimColor);
+            var backgroundColor = SafeColor(settings.DimColor, Color.Black);
             image.Mutate(x => x.Fill(backgroundColor));
         }
     }
@@ -263,7 +355,7 @@ public class CoverArtService : ICoverArtService
         var font = CreateFont(settings);
 
         // Parse text color
-        var textColor = Color.ParseHex(settings.TextColor);
+        var textColor = SafeColor(settings.TextColor, Color.White);
 
         // Calculate text position
         var textPosition = CalculateTextPosition(image, settings);
@@ -279,7 +371,7 @@ public class CoverArtService : ICoverArtService
         // Apply text effects
         if (settings.TextShadow)
         {
-            var shadowColor = Color.ParseHex(settings.TextShadowColor);
+            var shadowColor = SafeColor(settings.TextShadowColor, Color.Black);
             var shadowPosition = new PointF(
                 textPosition.X + settings.TextShadowOffsetX,
                 textPosition.Y + settings.TextShadowOffsetY
@@ -297,7 +389,7 @@ public class CoverArtService : ICoverArtService
 
         if (settings.TextOutline)
         {
-            var outlineColor = Color.ParseHex(settings.TextOutlineColor);
+            var outlineColor = SafeColor(settings.TextOutlineColor, Color.Black);
             // Draw outline by drawing text multiple times with slight offsets
             for (int x = -settings.TextOutlineWidth; x <= settings.TextOutlineWidth; x++)
             {
@@ -358,57 +450,52 @@ public class CoverArtService : ICoverArtService
         };
     }
 
+    // Bundled fonts (Noto Sans, SIL OFL-1.1 — the same family Jellyfin's web UI
+    // uses), embedded so text ALWAYS renders, even on Jellyfin Docker images
+    // that ship no system fonts.
+    private static readonly FontCollection BundledFonts = new();
+    private static readonly object FontLock = new();
+    private static FontFamily? _regular;
+    private static FontFamily? _bold;
+
+    private static FontFamily RegularFamily => LoadBundled(ref _regular, "CustomCoverArt.Resources.fonts.NotoSans-Regular.ttf");
+    private static FontFamily BoldFamily => LoadBundled(ref _bold, "CustomCoverArt.Resources.fonts.NotoSans-Bold.ttf");
+
+    private static FontFamily LoadBundled(ref FontFamily? cache, string resourceName)
+    {
+        lock (FontLock)
+        {
+            cache ??= BundledFonts.Add(
+                typeof(CoverArtService).Assembly.GetManifestResourceStream(resourceName)
+                ?? throw new InvalidOperationException($"Bundled font not found: {resourceName}"));
+            return cache.Value;
+        }
+    }
+
     /// <summary>
-    /// Creates a font with custom font support and fallback options
+    /// Creates a font: a client-uploaded custom font if one was provided,
+    /// otherwise the bundled Open Sans (guaranteed to exist).
     /// </summary>
     private static Font CreateFont(CoverArtSettings settings)
     {
-        // Try custom font first if provided
+        // Custom uploaded font takes priority (its path is already sandboxed).
         if (!string.IsNullOrEmpty(settings.CustomFontPath) && File.Exists(settings.CustomFontPath))
         {
             try
             {
                 var fontCollection = new FontCollection();
                 var fontFamily = fontCollection.Add(settings.CustomFontPath);
-                return fontFamily.CreateFont(settings.TextSize, (FontStyle)(int)settings.TextWeight);
+                return fontFamily.CreateFont(settings.TextSize);
             }
             catch
             {
-                // Fall back to system fonts if custom font fails
+                // Fall back to the bundled font if the custom one fails to load.
             }
         }
 
-        // Try common system fonts in order of preference
-        var fontNames = new[] { "Arial", "Segoe UI", "Helvetica", "Tahoma", "Verdana", "DejaVu Sans" };
-        
-        foreach (var fontName in fontNames)
-        {
-            try
-            {
-                return SystemFonts.CreateFont(fontName, settings.TextSize, (FontStyle)(int)settings.TextWeight);
-            }
-            catch
-            {
-                // Continue to next font if this one fails
-                continue;
-            }
-        }
-        
-        // If all specific fonts fail, use the first available system font
-        try
-        {
-            var availableFonts = SystemFonts.Families.ToList();
-            if (availableFonts.Any())
-            {
-                return SystemFonts.CreateFont(availableFonts.First().Name, settings.TextSize, (FontStyle)(int)settings.TextWeight);
-            }
-        }
-        catch
-        {
-            // If even this fails, we'll throw an exception
-        }
-        
-        throw new InvalidOperationException("No suitable fonts found on the system");
+        // Bundled default. Bold weights use the bold face; everything else regular.
+        var family = settings.TextWeight >= FontWeight.SemiBold ? BoldFamily : RegularFamily;
+        return family.CreateFont(settings.TextSize);
     }
 
     /// <summary>
@@ -416,8 +503,8 @@ public class CoverArtService : ICoverArtService
     /// </summary>
     private static async Task ApplyGradientBackgroundAsync(Image<Rgba32> image, GradientSettings gradient)
     {
-        var startColor = Color.ParseHex(gradient.StartColor);
-        var endColor = Color.ParseHex(gradient.EndColor);
+        var startColor = SafeColor(gradient.StartColor, Color.Black);
+        var endColor = SafeColor(gradient.EndColor, Color.White);
 
         if (gradient.Type == GradientType.Linear)
         {
@@ -461,13 +548,13 @@ public class CoverArtService : ICoverArtService
         {
             await ApplyTextOverlayAsync(image, settings);
         }
-        catch (Exception ex)
+        catch
         {
             // Fallback: Create simple text overlay without advanced features
             try
             {
-                var font = SystemFonts.CreateFont("Arial", Math.Max(12, settings.TextSize * 0.5f));
-                var textColor = Color.ParseHex(settings.TextColor);
+                var font = RegularFamily.CreateFont(Math.Max(12, settings.TextSize * 0.5f));
+                var textColor = SafeColor(settings.TextColor, Color.White);
                 var position = new PointF(image.Width / 2f, image.Height / 2f);
 
                 image.Mutate(x => x.DrawText(settings.Title, font, textColor, position));
@@ -475,7 +562,7 @@ public class CoverArtService : ICoverArtService
             catch
             {
                 // Ultimate fallback: Just fill with the dim/background color
-                var backgroundColor = Color.ParseHex(settings.DimColor);
+                var backgroundColor = SafeColor(settings.DimColor, Color.Black);
                 image.Mutate(x => x.Fill(backgroundColor));
             }
         }

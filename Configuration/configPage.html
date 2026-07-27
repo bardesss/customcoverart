@@ -460,7 +460,11 @@
                 el('ccaBrowserPrev').disabled = browser.page <= 1;
                 el('ccaBrowserNext').disabled = browser.page >= browser.totalPages;
             }).catch(function (e) {
-                grid.innerHTML = '<div class="ccaGridEmpty">' + e.message + '</div>';
+                grid.innerHTML = '';
+                var errDiv = document.createElement('div');
+                errDiv.className = 'ccaGridEmpty';
+                errDiv.textContent = e.message;
+                grid.appendChild(errDiv);
             });
         }
 
