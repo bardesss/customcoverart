@@ -4,6 +4,9 @@ The text under each version heading is published to the plugin's manifest by the
 release workflow (and shown as the version's changelog inside Jellyfin). Add a
 new `## <version>` section when you bump `<Version>` in the csproj.
 
+## 1.3.0.0
+Fixed the background dim: any non-zero dimming used to black out a picked poster entirely (JPEG posters have no alpha channel, so the overlay painted fully opaque). Dimming now composites correctly and the default was lowered to 0.25. Added an **Image fit** option — Fill (crop), Fit (show the whole image, letterboxed) or Stretch — so a portrait poster no longer gets cropped to a strip in a wide cover. New **multi-colour gradient** picker with an angle control for linear gradients and add/remove colour stops. You can now target **collections** and **playlists** in addition to libraries.
+
 ## 1.2.2.0
 Poster background reliability: authenticate the image download, build the upload without the (sometimes unavailable) File constructor, and surface a clear message at each step so any failure is visible instead of silent.
 

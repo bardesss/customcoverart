@@ -9,6 +9,10 @@ namespace CustomCoverArt.Services;
 public interface ILibraryDetectionService
 {
     Task<IEnumerable<LibraryInfo>> GetLibrariesAsync();
+
+    /// <summary>Lists cover-art targets of the given type: "library", "collection" or "playlist".</summary>
+    Task<IEnumerable<LibraryInfo>> GetTargetsAsync(string type);
+
     Task<LibraryInfo?> GetLibraryByIdAsync(string libraryId);
     Task<bool> UpdateLibraryCoverArtAsync(string libraryId, string coverArtPath);
     Task<string?> BackupCurrentCoverArtAsync(string libraryId);
