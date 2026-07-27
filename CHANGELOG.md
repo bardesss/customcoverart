@@ -4,6 +4,9 @@ The text under each version heading is published to the plugin's manifest by the
 release workflow (and shown as the version's changelog inside Jellyfin). Add a
 new `## <version>` section when you bump `<Version>` in the csproj.
 
+## 1.2.0.0
+The config page now follows your Jellyfin UI language, with a complete Dutch (NL) translation and English fallback. Font weight now works — all six weights (Light–ExtraBold) are bundled as distinct Noto Sans faces. Background images are cover-fitted instead of stretched, so posters keep their aspect ratio. Added a Landscape 16:9 preset (now the default, best for library covers), a Download button for the generated image, and logging when a background image can't be used.
+
 ## 1.1.0.0
 Redesigned the config page into a native Jellyfin two-column layout with grouped cards and a sticky **live preview** that updates automatically as you adjust settings (no more manual preview button). Styled the file pickers as native buttons showing the chosen file, and made allowed formats and size limits explicit. Fixed the empty library dropdown (libraries now come from GetVirtualFolders). Backfilled earlier version changelogs.
 

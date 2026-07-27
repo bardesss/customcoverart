@@ -11,7 +11,7 @@
 
             <div class="ccaHeader">
                 <h1 class="ccaH1">Custom Cover Art</h1>
-                <p class="ccaLede">Design a cover for a library, preview it live, then apply it.</p>
+                <p class="ccaLede" data-i18n="lede">Design a cover for a library, preview it live, then apply it.</p>
             </div>
 
             <div class="ccaLayout">
@@ -19,131 +19,132 @@
                 <div class="ccaControls">
 
                     <section class="ccaCard">
-                        <div class="ccaCardHead">Library</div>
+                        <div class="ccaCardHead" data-i18n="card.library">Library</div>
                         <div class="inputContainer">
-                            <label for="ccaLibrarySelect">Choose a library</label>
+                            <label for="ccaLibrarySelect" data-i18n="lib.choose">Choose a library</label>
                             <select is="emby-select" id="ccaLibrarySelect" class="emby-select">
-                                <option value="">Select a library…</option>
+                                <option value="" data-i18n="lib.selectOption">Select a library…</option>
                             </select>
                         </div>
                     </section>
 
                     <section class="ccaCard" id="ccaSettings">
-                        <div class="ccaCardHead">Text</div>
+                        <div class="ccaCardHead" data-i18n="card.text">Text</div>
                         <div class="inputContainer">
-                            <label for="ccaTitle">Title</label>
+                            <label for="ccaTitle" data-i18n="text.title">Title</label>
                             <input is="emby-input" type="text" id="ccaTitle" value="Movies" />
                         </div>
                         <div class="ccaGrid">
                             <div class="inputContainer">
-                                <label for="ccaTextWeight">Font weight</label>
+                                <label for="ccaTextWeight" data-i18n="text.weight">Font weight</label>
                                 <select is="emby-select" id="ccaTextWeight" class="emby-select">
-                                    <option value="300">Light</option>
-                                    <option value="400" selected>Normal</option>
-                                    <option value="500">Medium</option>
-                                    <option value="600">SemiBold</option>
-                                    <option value="700">Bold</option>
-                                    <option value="800">ExtraBold</option>
+                                    <option value="300" data-i18n="w.light">Light</option>
+                                    <option value="400" selected data-i18n="w.normal">Normal</option>
+                                    <option value="500" data-i18n="w.medium">Medium</option>
+                                    <option value="600" data-i18n="w.semibold">SemiBold</option>
+                                    <option value="700" data-i18n="w.bold">Bold</option>
+                                    <option value="800" data-i18n="w.extrabold">ExtraBold</option>
                                 </select>
                             </div>
                             <div class="inputContainer">
-                                <label for="ccaTextAlign">Alignment</label>
+                                <label for="ccaTextAlign" data-i18n="text.align">Alignment</label>
                                 <select is="emby-select" id="ccaTextAlign" class="emby-select">
-                                    <option value="0">Left</option>
-                                    <option value="1" selected>Center</option>
-                                    <option value="2">Right</option>
+                                    <option value="0" data-i18n="a.left">Left</option>
+                                    <option value="1" selected data-i18n="a.center">Center</option>
+                                    <option value="2" data-i18n="a.right">Right</option>
                                 </select>
                             </div>
                         </div>
                         <div class="inputContainer">
-                            <label for="ccaTextSize">Text size <span class="ccaVal" id="ccaTextSizeVal">120</span></label>
+                            <label for="ccaTextSize"><span data-i18n="text.size">Text size</span> <span class="ccaVal" id="ccaTextSizeVal">120</span></label>
                             <input type="range" class="ccaRange" id="ccaTextSize" min="20" max="300" value="120" />
                         </div>
                         <div class="ccaGrid">
                             <div class="inputContainer">
-                                <label for="ccaTextColor">Text color</label>
+                                <label for="ccaTextColor" data-i18n="text.color">Text color</label>
                                 <input type="color" id="ccaTextColor" value="#ffffff" />
                             </div>
                             <div class="inputContainer">
-                                <label>Effects</label>
+                                <label data-i18n="text.effects">Effects</label>
                                 <div class="ccaChecks">
-                                    <label class="ccaCheck"><input is="emby-checkbox" type="checkbox" id="ccaShadow" /><span>Shadow</span></label>
-                                    <label class="ccaCheck"><input is="emby-checkbox" type="checkbox" id="ccaOutline" /><span>Outline</span></label>
+                                    <label class="ccaCheck"><input is="emby-checkbox" type="checkbox" id="ccaShadow" /><span data-i18n="e.shadow">Shadow</span></label>
+                                    <label class="ccaCheck"><input is="emby-checkbox" type="checkbox" id="ccaOutline" /><span data-i18n="e.outline">Outline</span></label>
                                 </div>
                             </div>
                         </div>
                     </section>
 
                     <section class="ccaCard">
-                        <div class="ccaCardHead">Background</div>
+                        <div class="ccaCardHead" data-i18n="card.background">Background</div>
                         <div class="ccaGrid">
                             <div class="inputContainer">
-                                <label for="ccaDim">Dimming <span class="ccaVal" id="ccaDimVal">0.4</span></label>
+                                <label for="ccaDim"><span data-i18n="bg.dim">Dimming</span> <span class="ccaVal" id="ccaDimVal">0.4</span></label>
                                 <input type="range" class="ccaRange" id="ccaDim" min="0" max="1" step="0.05" value="0.4" />
                             </div>
                             <div class="inputContainer">
-                                <label for="ccaBlur">Blur <span class="ccaVal" id="ccaBlurVal">0</span></label>
+                                <label for="ccaBlur"><span data-i18n="bg.blur">Blur</span> <span class="ccaVal" id="ccaBlurVal">0</span></label>
                                 <input type="range" class="ccaRange" id="ccaBlur" min="0" max="20" step="0.5" value="0" />
                             </div>
                         </div>
                         <div class="inputContainer">
-                            <label for="ccaDimColor">Dim / base color</label>
+                            <label for="ccaDimColor" data-i18n="bg.dimcolor">Dim / base color</label>
                             <input type="color" id="ccaDimColor" value="#000000" />
                         </div>
 
-                        <label class="ccaCheck ccaCheckBlock"><input is="emby-checkbox" type="checkbox" id="ccaGradient" /><span>Enable gradient background</span></label>
+                        <label class="ccaCheck ccaCheckBlock"><input is="emby-checkbox" type="checkbox" id="ccaGradient" /><span data-i18n="bg.gradient">Enable gradient background</span></label>
                         <div id="ccaGradientOpts" class="ccaSub" style="display:none;">
                             <div class="inputContainer">
-                                <label for="ccaGradientType">Gradient type</label>
+                                <label for="ccaGradientType" data-i18n="bg.gtype">Gradient type</label>
                                 <select is="emby-select" id="ccaGradientType" class="emby-select">
-                                    <option value="0" selected>Linear</option>
-                                    <option value="1">Radial</option>
+                                    <option value="0" selected data-i18n="g.linear">Linear</option>
+                                    <option value="1" data-i18n="g.radial">Radial</option>
                                 </select>
                             </div>
                             <div class="ccaGrid">
                                 <div class="inputContainer">
-                                    <label for="ccaGradientStart">Start color</label>
+                                    <label for="ccaGradientStart" data-i18n="bg.startcolor">Start color</label>
                                     <input type="color" id="ccaGradientStart" value="#000000" />
                                 </div>
                                 <div class="inputContainer">
-                                    <label for="ccaGradientEnd">End color</label>
+                                    <label for="ccaGradientEnd" data-i18n="bg.endcolor">End color</label>
                                     <input type="color" id="ccaGradientEnd" value="#ffffff" />
                                 </div>
                             </div>
                         </div>
 
                         <div class="inputContainer">
-                            <label>Background image (optional)</label>
+                            <label data-i18n="bg.image">Background image (optional)</label>
                             <div class="ccaFileRow">
-                                <button is="emby-button" type="button" id="ccaBgImageBtn" class="raised"><span>Choose image…</span></button>
-                                <span class="ccaFileName" id="ccaBgImageName">No file chosen</span>
+                                <button is="emby-button" type="button" id="ccaBgImageBtn" class="raised"><span data-i18n="f.chooseImage">Choose image…</span></button>
+                                <span class="ccaFileName" id="ccaBgImageName" data-i18n="f.none">No file chosen</span>
                             </div>
-                            <div class="fieldDescription">JPG, PNG, GIF, BMP, WebP or TIFF · up to 5 MB.</div>
+                            <div class="fieldDescription" data-i18n="hint.image">JPG, PNG, GIF, BMP, WebP or TIFF · up to 5 MB.</div>
                             <input type="file" id="ccaBgImage" accept=".jpg,.jpeg,.png,.gif,.bmp,.webp,.tiff,.tif" class="ccaHiddenFile" />
                         </div>
                         <div class="inputContainer">
-                            <label>Or use an existing library poster</label>
-                            <button is="emby-button" type="button" id="ccaBrowseBtn" class="raised ccaBtnWide"><span>Browse library posters</span></button>
-                            <div id="ccaSelectedBg" class="ccaSelected" style="display:none;">Selected background: <strong id="ccaSelectedBgName"></strong></div>
+                            <label data-i18n="bg.orposter">Or use an existing library poster</label>
+                            <button is="emby-button" type="button" id="ccaBrowseBtn" class="raised ccaBtnWide"><span data-i18n="bg.browse">Browse library posters</span></button>
+                            <div id="ccaSelectedBg" class="ccaSelected" style="display:none;"><span data-i18n="bg.selected">Selected background:</span> <strong id="ccaSelectedBgName"></strong></div>
                         </div>
                     </section>
 
                     <section class="ccaCard">
-                        <div class="ccaCardHead">Output</div>
+                        <div class="ccaCardHead" data-i18n="card.output">Output</div>
                         <div class="ccaGrid">
                             <div class="inputContainer">
-                                <label for="ccaPreset">Dimensions</label>
+                                <label for="ccaPreset" data-i18n="out.dims">Dimensions</label>
                                 <select is="emby-select" id="ccaPreset" class="emby-select">
-                                    <option value="cover" selected>Square Cover (1400×1400)</option>
-                                    <option value="poster">Portrait Poster (1000×1500)</option>
-                                    <option value="banner">Wide Banner (1920×540)</option>
-                                    <option value="custom">Custom</option>
+                                    <option value="landscape" selected data-i18n="d.landscape">Landscape 16:9 (1920×1080)</option>
+                                    <option value="cover" data-i18n="d.cover">Square (1400×1400)</option>
+                                    <option value="poster" data-i18n="d.poster">Portrait Poster (1000×1500)</option>
+                                    <option value="banner" data-i18n="d.banner">Wide Banner (1920×540)</option>
+                                    <option value="custom" data-i18n="d.custom">Custom</option>
                                 </select>
                             </div>
                             <div class="inputContainer">
-                                <label for="ccaFormat">Format</label>
+                                <label for="ccaFormat" data-i18n="out.format">Format</label>
                                 <select is="emby-select" id="ccaFormat" class="emby-select">
-                                    <option value="auto" selected>Auto (recommended)</option>
+                                    <option value="auto" selected data-i18n="fmt.auto">Auto (recommended)</option>
                                     <option value="png">PNG</option>
                                     <option value="gif">GIF</option>
                                 </select>
@@ -151,21 +152,21 @@
                         </div>
                         <div id="ccaCustomDims" class="ccaGrid ccaSub" style="display:none;">
                             <div class="inputContainer">
-                                <label for="ccaWidth">Width</label>
+                                <label for="ccaWidth" data-i18n="out.width">Width</label>
                                 <input is="emby-input" type="number" id="ccaWidth" min="100" max="2048" value="1400" />
                             </div>
                             <div class="inputContainer">
-                                <label for="ccaHeight">Height</label>
+                                <label for="ccaHeight" data-i18n="out.height">Height</label>
                                 <input is="emby-input" type="number" id="ccaHeight" min="100" max="2048" value="1400" />
                             </div>
                         </div>
                         <div class="inputContainer">
-                            <label>Custom font (optional)</label>
+                            <label data-i18n="out.font">Custom font (optional)</label>
                             <div class="ccaFileRow">
-                                <button is="emby-button" type="button" id="ccaFontBtn" class="raised"><span>Choose font…</span></button>
-                                <span class="ccaFileName" id="ccaFontName">No file chosen</span>
+                                <button is="emby-button" type="button" id="ccaFontBtn" class="raised"><span data-i18n="f.chooseFont">Choose font…</span></button>
+                                <span class="ccaFileName" id="ccaFontName" data-i18n="f.none">No file chosen</span>
                             </div>
-                            <div class="fieldDescription">TTF, OTF, TTC, WOFF or WOFF2 · up to 5 MB. Leave empty to use the bundled Noto Sans.</div>
+                            <div class="fieldDescription" data-i18n="hint.font">TTF, OTF, TTC, WOFF or WOFF2 · up to 5 MB. Leave empty to use the bundled Noto Sans.</div>
                             <input type="file" id="ccaFont" accept=".ttf,.otf,.ttc,.woff,.woff2" class="ccaHiddenFile" />
                         </div>
                     </section>
@@ -174,14 +175,15 @@
 
                 <div class="ccaPreviewCol">
                     <section class="ccaCard">
-                        <div class="ccaCardHead">Preview</div>
+                        <div class="ccaCardHead" data-i18n="card.preview">Preview</div>
                         <div class="ccaPreviewWrap">
                             <img id="ccaPreview" alt="Cover art preview" />
-                            <div id="ccaPreviewPlaceholder" class="ccaPreviewPlaceholder">Generate a preview to see your cover art.</div>
+                            <div id="ccaPreviewPlaceholder" class="ccaPreviewPlaceholder" data-i18n="preview.placeholder">Generate a preview to see your cover art.</div>
                         </div>
                         <div class="ccaActions">
-                            <button is="emby-button" type="button" id="ccaApplyBtn" class="raised block button-submit" disabled><span>Apply to library</span></button>
-                            <div class="fieldDescription ccaPreviewHint">The preview updates automatically as you adjust settings.</div>
+                            <button is="emby-button" type="button" id="ccaApplyBtn" class="raised block button-submit" disabled><span data-i18n="action.apply">Apply to library</span></button>
+                            <button is="emby-button" type="button" id="ccaDownloadBtn" class="raised block" disabled><span data-i18n="action.download">Download image</span></button>
+                            <div class="fieldDescription ccaPreviewHint" data-i18n="preview.hint">The preview updates automatically as you adjust settings.</div>
                         </div>
                     </section>
                 </div>
@@ -191,23 +193,23 @@
             <div id="ccaBrowserModal" class="ccaModal" style="display:none;">
                 <div class="ccaModalBox">
                     <div class="ccaModalHead">
-                        <h3>Select a poster</h3>
+                        <h3 data-i18n="modal.title">Select a poster</h3>
                         <button is="emby-button" type="button" id="ccaBrowserClose" class="ccaModalClose"><span>✕</span></button>
                     </div>
                     <div class="ccaModalFilters">
-                        <input is="emby-input" type="text" id="ccaBrowserSearch" placeholder="Search…" />
+                        <input is="emby-input" type="text" id="ccaBrowserSearch" placeholder="Search…" data-i18n-ph="modal.search" />
                         <select is="emby-select" id="ccaBrowserType" class="emby-select">
-                            <option value="">All types</option>
-                            <option value="Movie">Movies</option>
-                            <option value="Series">Series</option>
-                            <option value="Season">Seasons</option>
+                            <option value="" data-i18n="modal.alltypes">All types</option>
+                            <option value="Movie" data-i18n="ty.movies">Movies</option>
+                            <option value="Series" data-i18n="ty.series">Series</option>
+                            <option value="Season" data-i18n="ty.seasons">Seasons</option>
                         </select>
                     </div>
                     <div id="ccaBrowserGrid" class="ccaPosterGrid"></div>
                     <div class="ccaModalPager">
-                        <button is="emby-button" type="button" id="ccaBrowserPrev" class="raised"><span>Previous</span></button>
+                        <button is="emby-button" type="button" id="ccaBrowserPrev" class="raised"><span data-i18n="modal.prev">Previous</span></button>
                         <span id="ccaBrowserPage">Page 1</span>
-                        <button is="emby-button" type="button" id="ccaBrowserNext" class="raised"><span>Next</span></button>
+                        <button is="emby-button" type="button" id="ccaBrowserNext" class="raised"><span data-i18n="modal.next">Next</span></button>
                     </div>
                 </div>
             </div>
@@ -346,6 +348,97 @@
 
         var page;
 
+        // --- Localization -------------------------------------------------
+        // The config page is static HTML, so it carries its own translations
+        // and applies them based on the current Jellyfin UI language.
+        var I18N = {
+            en: {
+                'lede': 'Design a cover for a library, preview it live, then apply it.',
+                'card.library': 'Library', 'lib.choose': 'Choose a library', 'lib.selectOption': 'Select a library…',
+                'card.text': 'Text', 'text.title': 'Title', 'text.weight': 'Font weight',
+                'w.light': 'Light', 'w.normal': 'Normal', 'w.medium': 'Medium', 'w.semibold': 'SemiBold', 'w.bold': 'Bold', 'w.extrabold': 'ExtraBold',
+                'text.align': 'Alignment', 'a.left': 'Left', 'a.center': 'Center', 'a.right': 'Right',
+                'text.size': 'Text size', 'text.color': 'Text color', 'text.effects': 'Effects', 'e.shadow': 'Shadow', 'e.outline': 'Outline',
+                'card.background': 'Background', 'bg.dim': 'Dimming', 'bg.blur': 'Blur', 'bg.dimcolor': 'Dim / base color',
+                'bg.gradient': 'Enable gradient background', 'bg.gtype': 'Gradient type', 'g.linear': 'Linear', 'g.radial': 'Radial',
+                'bg.startcolor': 'Start color', 'bg.endcolor': 'End color',
+                'bg.image': 'Background image (optional)', 'f.chooseImage': 'Choose image…', 'f.none': 'No file chosen',
+                'hint.image': 'JPG, PNG, GIF, BMP, WebP or TIFF · up to 5 MB.',
+                'bg.orposter': 'Or use an existing library poster', 'bg.browse': 'Browse library posters', 'bg.selected': 'Selected background:',
+                'card.output': 'Output', 'out.dims': 'Dimensions',
+                'd.landscape': 'Landscape 16:9 (1920×1080)', 'd.cover': 'Square (1400×1400)', 'd.poster': 'Portrait Poster (1000×1500)', 'd.banner': 'Wide Banner (1920×540)', 'd.custom': 'Custom',
+                'out.format': 'Format', 'fmt.auto': 'Auto (recommended)', 'out.width': 'Width', 'out.height': 'Height',
+                'out.font': 'Custom font (optional)', 'f.chooseFont': 'Choose font…',
+                'hint.font': 'TTF, OTF, TTC, WOFF or WOFF2 · up to 5 MB. Leave empty to use the bundled Noto Sans.',
+                'card.preview': 'Preview', 'preview.placeholder': 'Generate a preview to see your cover art.',
+                'action.apply': 'Apply to library', 'action.download': 'Download image', 'preview.hint': 'The preview updates automatically as you adjust settings.',
+                'modal.title': 'Select a poster', 'modal.search': 'Search…', 'modal.alltypes': 'All types',
+                'ty.movies': 'Movies', 'ty.series': 'Series', 'ty.seasons': 'Seasons', 'modal.prev': 'Previous', 'modal.next': 'Next',
+                'dyn.loading': 'Loading…', 'dyn.errorItems': 'Error loading items', 'dyn.noItems': 'No items found', 'dyn.page': 'Page {0} of {1}',
+                'dyn.applied': 'Cover art applied successfully.', 'dyn.error': 'Error: {0}', 'dyn.applyFail': 'Could not apply cover art: {0}',
+                'dyn.uploadFail': 'Upload failed: {0}', 'dyn.fontFail': 'Font upload failed: {0}', 'dyn.useImgFail': 'Could not use that image: {0}',
+                'dyn.unknown': 'unknown error'
+            },
+            nl: {
+                'lede': 'Ontwerp een cover voor een bibliotheek, bekijk het live en pas het toe.',
+                'card.library': 'Bibliotheek', 'lib.choose': 'Kies een bibliotheek', 'lib.selectOption': 'Selecteer een bibliotheek…',
+                'card.text': 'Tekst', 'text.title': 'Titel', 'text.weight': 'Letterdikte',
+                'w.light': 'Licht', 'w.normal': 'Normaal', 'w.medium': 'Medium', 'w.semibold': 'Halfvet', 'w.bold': 'Vet', 'w.extrabold': 'Extra vet',
+                'text.align': 'Uitlijning', 'a.left': 'Links', 'a.center': 'Gecentreerd', 'a.right': 'Rechts',
+                'text.size': 'Tekstgrootte', 'text.color': 'Tekstkleur', 'text.effects': 'Effecten', 'e.shadow': 'Schaduw', 'e.outline': 'Omlijning',
+                'card.background': 'Achtergrond', 'bg.dim': 'Dimmen', 'bg.blur': 'Vervaging', 'bg.dimcolor': 'Dim- / basiskleur',
+                'bg.gradient': 'Verloop-achtergrond inschakelen', 'bg.gtype': 'Verlooptype', 'g.linear': 'Lineair', 'g.radial': 'Radiaal',
+                'bg.startcolor': 'Startkleur', 'bg.endcolor': 'Eindkleur',
+                'bg.image': 'Achtergrondafbeelding (optioneel)', 'f.chooseImage': 'Kies afbeelding…', 'f.none': 'Geen bestand gekozen',
+                'hint.image': 'JPG, PNG, GIF, BMP, WebP of TIFF · max. 5 MB.',
+                'bg.orposter': 'Of gebruik een bestaande bibliotheekposter', 'bg.browse': 'Bibliotheekposters bladeren', 'bg.selected': 'Geselecteerde achtergrond:',
+                'card.output': 'Uitvoer', 'out.dims': 'Afmetingen',
+                'd.landscape': 'Liggend 16:9 (1920×1080)', 'd.cover': 'Vierkant (1400×1400)', 'd.poster': 'Staande poster (1000×1500)', 'd.banner': 'Brede banner (1920×540)', 'd.custom': 'Aangepast',
+                'out.format': 'Formaat', 'fmt.auto': 'Automatisch (aanbevolen)', 'out.width': 'Breedte', 'out.height': 'Hoogte',
+                'out.font': 'Aangepast lettertype (optioneel)', 'f.chooseFont': 'Kies lettertype…',
+                'hint.font': 'TTF, OTF, TTC, WOFF of WOFF2 · max. 5 MB. Laat leeg voor de meegeleverde Noto Sans.',
+                'card.preview': 'Voorbeeld', 'preview.placeholder': 'Het voorbeeld verschijnt hier automatisch.',
+                'action.apply': 'Toepassen op bibliotheek', 'action.download': 'Afbeelding downloaden', 'preview.hint': 'Het voorbeeld wordt automatisch bijgewerkt terwijl je instellingen aanpast.',
+                'modal.title': 'Selecteer een poster', 'modal.search': 'Zoeken…', 'modal.alltypes': 'Alle types',
+                'ty.movies': 'Films', 'ty.series': 'Series', 'ty.seasons': 'Seizoenen', 'modal.prev': 'Vorige', 'modal.next': 'Volgende',
+                'dyn.loading': 'Laden…', 'dyn.errorItems': 'Fout bij laden van items', 'dyn.noItems': 'Geen items gevonden', 'dyn.page': 'Pagina {0} van {1}',
+                'dyn.applied': 'Cover art succesvol toegepast.', 'dyn.error': 'Fout: {0}', 'dyn.applyFail': 'Kon cover art niet toepassen: {0}',
+                'dyn.uploadFail': 'Uploaden mislukt: {0}', 'dyn.fontFail': 'Lettertype uploaden mislukt: {0}', 'dyn.useImgFail': 'Kon die afbeelding niet gebruiken: {0}',
+                'dyn.unknown': 'onbekende fout'
+            }
+        };
+
+        var LANG = 'en';
+
+        function detectLang() {
+            var l = (document.documentElement.getAttribute('lang') || navigator.language || 'en');
+            l = String(l).toLowerCase().split('-')[0];
+            return I18N[l] ? l : 'en';
+        }
+
+        function t(key, a, b) {
+            var d = I18N[LANG] || I18N.en;
+            var s = d[key];
+            if (s === undefined) { s = I18N.en[key]; }
+            if (s === undefined) { s = key; }
+            if (a !== undefined) { s = s.replace('{0}', a); }
+            if (b !== undefined) { s = s.replace('{1}', b); }
+            return s;
+        }
+
+        function applyI18n(root) {
+            if (LANG === 'en') { return; }
+            root.querySelectorAll('[data-i18n]').forEach(function (elm) {
+                var s = t(elm.getAttribute('data-i18n'));
+                if (s) { elm.textContent = s; }
+            });
+            root.querySelectorAll('[data-i18n-ph]').forEach(function (elm) {
+                var s = t(elm.getAttribute('data-i18n-ph'));
+                if (s) { elm.setAttribute('placeholder', s); }
+            });
+        }
+        // ------------------------------------------------------------------
+
         // Casing-agnostic read: server may serialize PascalCase (Data) or camelCase (data).
         function pick(obj, name) {
             if (!obj) { return undefined; }
@@ -385,10 +478,11 @@
         }
 
         var PRESETS = {
+            landscape: { w: 1920, h: 1080 },
             cover: { w: 1400, h: 1400 },
             poster: { w: 1000, h: 1500 },
             banner: { w: 1920, h: 540 },
-            custom: { w: 1400, h: 1400 }
+            custom: { w: 1920, h: 1080 }
         };
 
         // Build the settings object using the EXACT C# property names (PascalCase)
@@ -444,7 +538,11 @@
             return jsonFetch('CustomCoverArt/libraries').then(function (res) {
                 if (!pick(res, 'Success')) { return; }
                 var select = el('ccaLibrarySelect');
-                select.innerHTML = '<option value="">Select a library…</option>';
+                select.innerHTML = '';
+                var placeholder = document.createElement('option');
+                placeholder.value = '';
+                placeholder.textContent = t('lib.selectOption');
+                select.appendChild(placeholder);
                 (pick(res, 'Data') || []).forEach(function (lib) {
                     var opt = document.createElement('option');
                     opt.value = pick(lib, 'Id');
@@ -468,8 +566,8 @@
         var schedulePreview = debounce(runPreview, 450);
 
         function onControlChange(e) {
-            var t = e.target;
-            if (!t || t.type === 'file' || t.id === 'ccaLibrarySelect') { return; }
+            var target = e.target;
+            if (!target || target.type === 'file' || target.id === 'ccaLibrarySelect') { return; }
             schedulePreview();
         }
 
@@ -492,6 +590,7 @@
                 img.style.display = 'block';
                 img.style.opacity = '1';
                 el('ccaPreviewPlaceholder').style.display = 'none';
+                el('ccaDownloadBtn').disabled = false;
                 if (previous && previous.indexOf('blob:') === 0) { URL.revokeObjectURL(previous); }
             }).catch(function () {
                 img.style.opacity = '1';
@@ -499,6 +598,18 @@
                 previewInFlight = false;
                 if (previewQueued) { previewQueued = false; runPreview(); }
             });
+        }
+
+        function downloadPreview() {
+            var img = el('ccaPreview');
+            if (!img.src || img.style.display === 'none') { return; }
+            var ext = el('ccaFormat').value === 'gif' ? 'gif' : 'png';
+            var a = document.createElement('a');
+            a.href = img.src;
+            a.download = 'cover.' + ext;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
         }
 
         function applyCoverArt() {
@@ -510,13 +621,13 @@
             }).then(function (res) {
                 Dashboard.hideLoadingMsg();
                 if (pick(res, 'Success')) {
-                    Dashboard.alert('Cover art applied successfully.');
+                    Dashboard.alert(t('dyn.applied'));
                 } else {
-                    Dashboard.alert('Error: ' + (pick(res, 'ErrorMessage') || 'unknown error'));
+                    Dashboard.alert(t('dyn.error', pick(res, 'ErrorMessage') || t('dyn.unknown')));
                 }
             }).catch(function (e) {
                 Dashboard.hideLoadingMsg();
-                Dashboard.alert('Could not apply cover art: ' + e.message);
+                Dashboard.alert(t('dyn.applyFail', e.message));
             });
         }
 
@@ -544,7 +655,7 @@
                         state.backgroundImagePath = pick(res, 'Data');
                         schedulePreview();
                     } else {
-                        Dashboard.alert('Upload failed: ' + (pick(res, 'ErrorMessage') || 'unknown error'));
+                        Dashboard.alert(t('dyn.uploadFail', pick(res, 'ErrorMessage') || t('dyn.unknown')));
                     }
                 }).catch(function (e) { Dashboard.hideLoadingMsg(); Dashboard.alert(e.message); });
             });
@@ -559,12 +670,13 @@
                         state.customFontPath = pick(res, 'Data');
                         schedulePreview();
                     } else {
-                        Dashboard.alert('Font upload failed: ' + (pick(res, 'ErrorMessage') || 'unknown error'));
+                        Dashboard.alert(t('dyn.fontFail', pick(res, 'ErrorMessage') || t('dyn.unknown')));
                     }
                 }).catch(function (e) { Dashboard.hideLoadingMsg(); Dashboard.alert(e.message); });
             });
 
             el('ccaApplyBtn').addEventListener('click', applyCoverArt);
+            el('ccaDownloadBtn').addEventListener('click', downloadPreview);
 
             // Auto-preview: any control change (except file inputs and the library
             // picker) schedules a debounced live render.
@@ -601,9 +713,17 @@
             el('ccaBrowserModal').style.display = 'none';
         }
 
+        function gridMessage(grid, text) {
+            grid.innerHTML = '';
+            var div = document.createElement('div');
+            div.className = 'ccaGridEmpty';
+            div.textContent = text;
+            grid.appendChild(div);
+        }
+
         function loadBrowserItems() {
             var grid = el('ccaBrowserGrid');
-            grid.innerHTML = '<div class="ccaGridEmpty">Loading…</div>';
+            gridMessage(grid, t('dyn.loading'));
             var typeVal = el('ccaBrowserType').value;
             jsonFetch('CustomCoverArt/search/items', 'POST', {
                 Query: el('ccaBrowserSearch').value,
@@ -612,28 +732,24 @@
                 PageSize: browser.pageSize
             }).then(function (res) {
                 if (!pick(res, 'Success')) {
-                    grid.innerHTML = '<div class="ccaGridEmpty">Error loading items</div>';
+                    gridMessage(grid, t('dyn.errorItems'));
                     return;
                 }
                 var data = pick(res, 'Data') || {};
                 browser.totalPages = pick(data, 'TotalPages') || 1;
                 renderBrowserItems(pick(data, 'Items') || []);
-                el('ccaBrowserPage').textContent = 'Page ' + browser.page + ' of ' + browser.totalPages;
+                el('ccaBrowserPage').textContent = t('dyn.page', browser.page, browser.totalPages);
                 el('ccaBrowserPrev').disabled = browser.page <= 1;
                 el('ccaBrowserNext').disabled = browser.page >= browser.totalPages;
             }).catch(function (e) {
-                grid.innerHTML = '';
-                var errDiv = document.createElement('div');
-                errDiv.className = 'ccaGridEmpty';
-                errDiv.textContent = e.message;
-                grid.appendChild(errDiv);
+                gridMessage(grid, e.message);
             });
         }
 
         function renderBrowserItems(items) {
             var grid = el('ccaBrowserGrid');
             if (!items.length) {
-                grid.innerHTML = '<div class="ccaGridEmpty">No items found</div>';
+                gridMessage(grid, t('dyn.noItems'));
                 return;
             }
             grid.innerHTML = '';
@@ -675,7 +791,7 @@
                         schedulePreview();
                         closeBrowser();
                     } else {
-                        Dashboard.alert('Could not use that image: ' + (pick(res, 'ErrorMessage') || 'unknown error'));
+                        Dashboard.alert(t('dyn.useImgFail', pick(res, 'ErrorMessage') || t('dyn.unknown')));
                     }
                 }).catch(function (e) {
                     Dashboard.hideLoadingMsg();
@@ -685,6 +801,8 @@
 
         document.querySelector('#CustomCoverArtConfigPage').addEventListener('pageshow', function () {
             page = this;
+            LANG = detectLang();
+            applyI18n(page);
             if (!page.dataset.ccaInit) {
                 bindEvents();
                 page.dataset.ccaInit = 'true';

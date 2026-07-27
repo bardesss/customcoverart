@@ -19,12 +19,17 @@ public class CoverArtService : ICoverArtService
 {
     private readonly IImageProcessingService _imageProcessingService;
     private readonly IApplicationPaths _applicationPaths;
+    private readonly ILoggingService _loggingService;
     private readonly string _outputDirectory;
 
-    public CoverArtService(IImageProcessingService imageProcessingService, IApplicationPaths applicationPaths)
+    public CoverArtService(
+        IImageProcessingService imageProcessingService,
+        IApplicationPaths applicationPaths,
+        ILoggingService loggingService)
     {
         _imageProcessingService = imageProcessingService;
         _applicationPaths = applicationPaths;
+        _loggingService = loggingService;
 
         // Data location comes from Jellyfin's application paths (via DI) — no
         // more guessing filesystem locations or falling back to temp.
@@ -51,6 +56,10 @@ public class CoverArtService : ICoverArtService
             // otherwise ignore them (prevents reading arbitrary server files).
             if (!PluginPaths.IsInsideBase(_applicationPaths, settings.BackgroundImagePath))
             {
+                if (!string.IsNullOrEmpty(settings.BackgroundImagePath))
+                {
+                    _loggingService.LogWarning("Background path rejected (outside plugin data dir): {Path}", settings.BackgroundImagePath);
+                }
                 settings.BackgroundImagePath = string.Empty;
             }
 
@@ -100,22 +109,33 @@ public class CoverArtService : ICoverArtService
             Image? backgroundImage = null;
             try
             {
-                if (!string.IsNullOrEmpty(settings.BackgroundImagePath) && File.Exists(settings.BackgroundImagePath))
+                if (!string.IsNullOrEmpty(settings.BackgroundImagePath))
                 {
-                    try
+                    if (!File.Exists(settings.BackgroundImagePath))
                     {
-                        // Reject oversize source images before a full decode
-                        // (decompression-bomb guard).
-                        var info = Image.Identify(settings.BackgroundImagePath);
-                        const long maxSourcePixels = 8192L * 8192L;
-                        if ((long)info.Width * info.Height <= maxSourcePixels)
-                        {
-                            backgroundImage = await Image.LoadAsync(settings.BackgroundImagePath);
-                        }
+                        _loggingService.LogWarning("Background file not found: {Path}", settings.BackgroundImagePath);
                     }
-                    catch
+                    else
                     {
-                        // Could not identify/decode the background — use a gradient.
+                        try
+                        {
+                            // Reject oversize source images before a full decode
+                            // (decompression-bomb guard).
+                            var info = Image.Identify(settings.BackgroundImagePath);
+                            const long maxSourcePixels = 8192L * 8192L;
+                            if ((long)info.Width * info.Height <= maxSourcePixels)
+                            {
+                                backgroundImage = await Image.LoadAsync(settings.BackgroundImagePath);
+                            }
+                            else
+                            {
+                                _loggingService.LogWarning("Background image ignored, too large: {Width}x{Height}", info.Width, info.Height);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _loggingService.LogWarning("Failed to decode background {Path}: {Error}", settings.BackgroundImagePath, ex.Message);
+                        }
                     }
                 }
 
@@ -284,33 +304,19 @@ public class CoverArtService : ICoverArtService
 
     private static async Task ApplyBackgroundAsync(Image<Rgba32> image, Image backgroundImage, CoverArtSettings settings)
     {
-        // Check if we should preserve original aspect ratio
-        var preserveAspectRatio = settings.DimensionPreset == "custom";
-        
-        if (preserveAspectRatio)
-        {
-            // For custom dimensions, fit the background to cover the entire canvas while maintaining aspect ratio
-            var scaleX = (float)image.Width / backgroundImage.Width;
-            var scaleY = (float)image.Height / backgroundImage.Height;
-            var scale = Math.Max(scaleX, scaleY); // Use the larger scale to ensure full coverage
-            
-            var newWidth = (int)(backgroundImage.Width * scale);
-            var newHeight = (int)(backgroundImage.Height * scale);
-            
-            backgroundImage.Mutate(x => x.Resize(newWidth, newHeight));
-            
-            // Center the background image
-            var offsetX = (newWidth - image.Width) / 2;
-            var offsetY = (newHeight - image.Height) / 2;
-            
-            // Crop to fit the canvas
-            backgroundImage.Mutate(x => x.Crop(new Rectangle(offsetX, offsetY, image.Width, image.Height)));
-        }
-        else
-        {
-            // For presets, resize to exact dimensions (may distort aspect ratio)
-            backgroundImage.Mutate(x => x.Resize(image.Width, image.Height));
-        }
+        // Always cover-fit the background: scale to fill the canvas while keeping
+        // the source aspect ratio, then centre-crop (like CSS background-size: cover).
+        // This avoids distorting posters/backdrops when the canvas ratio differs.
+        var scale = Math.Max((float)image.Width / backgroundImage.Width,
+                             (float)image.Height / backgroundImage.Height);
+        var newWidth = Math.Max(image.Width, (int)Math.Ceiling(backgroundImage.Width * scale));
+        var newHeight = Math.Max(image.Height, (int)Math.Ceiling(backgroundImage.Height * scale));
+
+        backgroundImage.Mutate(x => x.Resize(newWidth, newHeight));
+
+        var offsetX = (newWidth - image.Width) / 2;
+        var offsetY = (newHeight - image.Height) / 2;
+        backgroundImage.Mutate(x => x.Crop(new Rectangle(offsetX, offsetY, image.Width, image.Height)));
 
         // Apply blur effect if specified
         if (settings.BackgroundBlur > 0)
@@ -452,29 +458,44 @@ public class CoverArtService : ICoverArtService
 
     // Bundled fonts (Noto Sans, SIL OFL-1.1 — the same family Jellyfin's web UI
     // uses), embedded so text ALWAYS renders, even on Jellyfin Docker images
-    // that ship no system fonts.
+    // that ship no system fonts. Every UI weight has its own face so the font
+    // weight control actually changes the rendered thickness.
     private static readonly FontCollection BundledFonts = new();
     private static readonly object FontLock = new();
-    private static FontFamily? _regular;
-    private static FontFamily? _bold;
+    private static readonly Dictionary<FontWeight, FontFamily> BundledFamilies = new();
 
-    private static FontFamily RegularFamily => LoadBundled(ref _regular, "CustomCoverArt.Resources.fonts.NotoSans-Regular.ttf");
-    private static FontFamily BoldFamily => LoadBundled(ref _bold, "CustomCoverArt.Resources.fonts.NotoSans-Bold.ttf");
-
-    private static FontFamily LoadBundled(ref FontFamily? cache, string resourceName)
+    private static FontFamily BundledFamily(FontWeight weight)
     {
         lock (FontLock)
         {
-            cache ??= BundledFonts.Add(
-                typeof(CoverArtService).Assembly.GetManifestResourceStream(resourceName)
-                ?? throw new InvalidOperationException($"Bundled font not found: {resourceName}"));
-            return cache.Value;
+            if (BundledFamilies.TryGetValue(weight, out var existing))
+            {
+                return existing;
+            }
+
+            var faceName = weight switch
+            {
+                FontWeight.Light => "NotoSans-Light",
+                FontWeight.Medium => "NotoSans-Medium",
+                FontWeight.SemiBold => "NotoSans-SemiBold",
+                FontWeight.Bold => "NotoSans-Bold",
+                FontWeight.ExtraBold => "NotoSans-ExtraBold",
+                _ => "NotoSans-Regular" // Normal and any unmapped value
+            };
+
+            var resource = $"CustomCoverArt.Resources.fonts.{faceName}.ttf";
+            using var stream = typeof(CoverArtService).Assembly.GetManifestResourceStream(resource)
+                ?? throw new InvalidOperationException($"Bundled font not found: {resource}");
+
+            var family = BundledFonts.Add(stream);
+            BundledFamilies[weight] = family;
+            return family;
         }
     }
 
     /// <summary>
     /// Creates a font: a client-uploaded custom font if one was provided,
-    /// otherwise the bundled Open Sans (guaranteed to exist).
+    /// otherwise the bundled Noto Sans face for the requested weight.
     /// </summary>
     private static Font CreateFont(CoverArtSettings settings)
     {
@@ -493,9 +514,7 @@ public class CoverArtService : ICoverArtService
             }
         }
 
-        // Bundled default. Bold weights use the bold face; everything else regular.
-        var family = settings.TextWeight >= FontWeight.SemiBold ? BoldFamily : RegularFamily;
-        return family.CreateFont(settings.TextSize);
+        return BundledFamily(settings.TextWeight).CreateFont(settings.TextSize);
     }
 
     /// <summary>
@@ -553,7 +572,7 @@ public class CoverArtService : ICoverArtService
             // Fallback: Create simple text overlay without advanced features
             try
             {
-                var font = RegularFamily.CreateFont(Math.Max(12, settings.TextSize * 0.5f));
+                var font = BundledFamily(FontWeight.Normal).CreateFont(Math.Max(12, settings.TextSize * 0.5f));
                 var textColor = SafeColor(settings.TextColor, Color.White);
                 var position = new PointF(image.Width / 2f, image.Height / 2f);
 
