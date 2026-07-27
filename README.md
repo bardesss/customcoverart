@@ -12,20 +12,6 @@ Text, gradients, blur, custom backgrounds and fonts — with a live preview, rig
 
 ---
 
-> ### 🤖 AI assistance disclaimer
->
-> This plugin was substantially rebuilt and refactored with the help of an AI assistant
-> (Anthropic's Claude). The code **compiles cleanly and passes an automated unit‑test suite**
-> (image generation, upload validation, the path‑traversal sandbox, and plugin wiring).
->
-> However, a few call sites that touch Jellyfin's internal server APIs — most notably
-> **applying the generated image to a library** — could not be exercised against a live
-> Jellyfin server in the development environment. Treat those paths as **needs‑testing** and
-> review the code before relying on it in production. See [`REBUILD_NOTES.md`](REBUILD_NOTES.md)
-> for the exact list.
-
----
-
 ## ✨ Features
 
 | | Feature | Details |
