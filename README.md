@@ -35,7 +35,7 @@ Text, gradients, blur, custom backgrounds and fonts — with a live preview, rig
 | 🌈 | **Gradients** | Linear and radial gradient backgrounds |
 | 🖼️ | **Custom backgrounds** | Upload your own image, or pick an existing poster from any library |
 | 🌫️ | **Blur & dimming** | Soften and darken backgrounds so text stands out |
-| 🔠 | **Custom fonts** | Upload `.ttf` / `.otf` / `.woff` / `.woff2`, with system‑font fallback |
+| 🔠 | **Fonts** | Bundled Noto Sans (matches Jellyfin's UI, so text always renders) — or upload your own `.ttf` / `.otf` / `.woff` / `.woff2` |
 | 📐 | **Presets & sizes** | Square cover, portrait poster, wide banner, or custom dimensions |
 | 👁️ | **Live preview** | Render a preview before applying anything |
 | 🌍 | **Localisation** | English and Dutch included; easy to add more |
@@ -122,6 +122,14 @@ sandbox, and plugin metadata/wiring). Because the plugin references the Jellyfin
 assemblies with `ExcludeAssets=runtime`, a test project should reference
 `Jellyfin.Common` / `Jellyfin.Controller` / `Jellyfin.Model` directly to supply them at test time.
 
+## 📦 Releasing
+
+The version lives in one place: `<Version>` in `CustomCoverArt.csproj`. To ship a release,
+bump it in a pull request and merge to `main`. The **Release** GitHub Action then builds the
+plugin, publishes a GitHub release with the packaged zip, and appends the new version to
+`manifest.json` — so servers subscribed to the repository auto-update. If the version has
+already been released, the workflow is a no-op.
+
 ## 🧩 Project layout
 
 | Path | Purpose |
@@ -141,3 +149,5 @@ MIT — see [`LICENSE`](LICENSE).
 
 - **Jellyfin** — the media server platform this plugin extends.
 - **SixLabors ImageSharp** — image rendering and text drawing.
+- **Noto Sans** by Google — bundled default font, licensed under the
+  [SIL Open Font License 1.1](https://openfontlicense.org/).
