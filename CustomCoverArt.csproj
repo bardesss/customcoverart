@@ -1,0 +1,50 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <RootNamespace>CustomCoverArt</RootNamespace>
+    <AssemblyName>CustomCoverArt</AssemblyName>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <IsPackable>false</IsPackable>
+    <!--
+      Copy runtime dependencies (SixLabors.*) into the build output so they can be
+      packaged with the plugin. The Jellyfin.* references use ExcludeAssets=runtime,
+      so they are NOT copied (the server provides them).
+    -->
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+
+  <!--
+    Jellyfin plugin references. ExcludeAssets=runtime is REQUIRED: these
+    assemblies are provided by the Jellyfin server at runtime, and shipping
+    our own copies would break plugin loading.
+    Versions must match the target server's major version (10.11.x here).
+  -->
+  <ItemGroup>
+    <PackageReference Include="Jellyfin.Controller" Version="10.11.3">
+      <ExcludeAssets>runtime</ExcludeAssets>
+    </PackageReference>
+    <PackageReference Include="Jellyfin.Model" Version="10.11.3">
+      <ExcludeAssets>runtime</ExcludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <!--
+    Image processing. NOTE: the drawing APIs used by this plugin (DrawText,
+    LinearGradientBrush, SolidBrush, FontCollection, SystemFonts) live in
+    SixLabors.ImageSharp.Drawing, NOT SixLabors.ImageSharp.Web. These ARE
+    shipped with the plugin (no ExcludeAssets).
+  -->
+  <ItemGroup>
+    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
+    <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="2.1.7" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Configuration\configPage.html" />
+    <EmbeddedResource Include="Resources\**\*.json" />
+  </ItemGroup>
+
+</Project>

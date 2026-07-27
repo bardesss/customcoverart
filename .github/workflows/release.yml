@@ -1,0 +1,93 @@
+name: Release
+
+# Push a tag like v1.0.1 to build the plugin, publish a GitHub release with the
+# packaged zip, and append the new version to manifest.json on main.
+on:
+  push:
+    tags: [ 'v*' ]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Compute version
+        id: ver
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          VER="${TAG#v}"
+          IFS='.' read -r a b c d <<< "$VER"
+          VER4="${a:-1}.${b:-0}.${c:-0}.${d:-0}"
+          echo "tag=$TAG"   >> "$GITHUB_OUTPUT"
+          echo "ver4=$VER4" >> "$GITHUB_OUTPUT"
+
+      - name: Build
+        run: dotnet build -c Release
+
+      - name: Package
+        id: pkg
+        run: |
+          VER4="${{ steps.ver.outputs.ver4 }}"
+          mkdir -p dist/stage
+          cp bin/Release/net9.0/CustomCoverArt.dll dist/stage/
+          cp bin/Release/net9.0/SixLabors.*.dll dist/stage/
+          cat > dist/stage/meta.json <<EOF
+          {
+            "category": "General",
+            "guid": "b8f4e2a1-7c3d-4e5f-9a2b-1d6c8e0f3a4b",
+            "name": "Custom Cover Art",
+            "description": "Create and manage custom cover art for Jellyfin libraries with advanced text effects and presets.",
+            "overview": "Generate custom library cover art with text, gradients, blur and custom backgrounds.",
+            "owner": "Bardesss",
+            "targetAbi": "10.11.0.0",
+            "framework": "net9.0",
+            "version": "$VER4",
+            "timestamp": "$(date -u +%FT%TZ)",
+            "status": "Active",
+            "autoUpdate": true
+          }
+          EOF
+          ZIP="customcoverart_${VER4}.zip"
+          (cd dist/stage && zip -r "../$ZIP" .)
+          CHK=$(md5sum "dist/$ZIP" | cut -d' ' -f1)
+          echo "zip=$ZIP" >> "$GITHUB_OUTPUT"
+          echo "chk=$CHK" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh release create "${{ steps.ver.outputs.tag }}"
+          "dist/${{ steps.pkg.outputs.zip }}"
+          --title "${{ steps.ver.outputs.tag }}"
+          --generate-notes
+
+      - name: Update manifest.json on main
+        run: |
+          VER4="${{ steps.ver.outputs.ver4 }}"
+          URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${{ steps.ver.outputs.tag }}/${{ steps.pkg.outputs.zip }}"
+          NEW=$(jq -n \
+            --arg v "$VER4" \
+            --arg abi "10.11.0.0" \
+            --arg url "$URL" \
+            --arg chk "${{ steps.pkg.outputs.chk }}" \
+            --arg ts "$(date -u +%FT%TZ)" \
+            '{version:$v, changelog:"", targetAbi:$abi, sourceUrl:$url, checksum:$chk, timestamp:$ts}')
+          jq --argjson e "$NEW" '.[0].versions = ([$e] + (.[0].versions // []))' manifest.json > manifest.tmp
+          mv manifest.tmp manifest.json
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add manifest.json
+          git commit -m "chore: add $VER4 to manifest [skip ci]" || echo "no manifest changes"
+          git push origin HEAD:main

@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Custom Cover Art</title>
+    <meta charset="utf-8" />
+</head>
+<body>
+<div id="CustomCoverArtConfigPage" data-role="page" class="page type-interior pluginConfigurationPage">
+    <div data-role="content">
+        <div class="content-primary">
+
+            <h1>Custom Cover Art</h1>
+            <p>Create custom cover art for your Jellyfin libraries.</p>
+
+            <div class="inputContainer">
+                <label for="ccaLibrarySelect">Library</label>
+                <select is="emby-select" id="ccaLibrarySelect" class="emby-select">
+                    <option value="">Select a library…</option>
+                </select>
+            </div>
+
+            <div id="ccaSettings">
+                <h2>Settings</h2>
+
+                <div class="inputContainer">
+                    <label for="ccaTitle">Title</label>
+                    <input is="emby-input" type="text" id="ccaTitle" value="Movies" />
+                </div>
+
+                <div class="inputContainer">
+                    <label for="ccaTextSize">Text size: <span id="ccaTextSizeVal">120</span></label>
+                    <input type="range" id="ccaTextSize" min="20" max="300" value="120" />
+                </div>
+
+                <div class="inputContainer">
+                    <label for="ccaTextWeight">Font weight</label>
+                    <select is="emby-select" id="ccaTextWeight" class="emby-select">
+                        <option value="300">Light</option>
+                        <option value="400" selected>Normal</option>
+                        <option value="500">Medium</option>
+                        <option value="600">SemiBold</option>
+                        <option value="700">Bold</option>
+                        <option value="800">ExtraBold</option>
+                    </select>
+                </div>
+
+                <div class="inputContainer">
+                    <label for="ccaTextColor">Text color</label>
+                    <input type="color" id="ccaTextColor" value="#ffffff" />
+                </div>
+
+                <div class="inputContainer">
+                    <label for="ccaTextAlign">Text alignment</label>
+                    <select is="emby-select" id="ccaTextAlign" class="emby-select">
+                        <option value="0">Left</option>
+                        <option value="1" selected>Center</option>
+                        <option value="2">Right</option>
+                    </select>
+                </div>
+
+                <div class="inputContainer">
+                    <label for="ccaDim">Background dimming: <span id="ccaDimVal">0.4</span></label>
+                    <input type="range" id="ccaDim" min="0" max="1" step="0.05" value="0.4" />
+                </div>
+
+                <div class="inputContainer">
+                    <label for="ccaBlur">Background blur: <span id="ccaBlurVal">0</span></label>
+                    <input type="range" id="ccaBlur" min="0" max="20" step="0.5" value="0" />
+                </div>
+
+                <div class="inputContainer">
+                    <label for="ccaDimColor">Dim / base color</label>
+                    <input type="color" id="ccaDimColor" value="#000000" />
+                </div>
+
+                <div class="checkboxContainer">
+                    <label><input is="emby-checkbox" type="checkbox" id="ccaShadow" /><span>Text shadow</span></label>
+                </div>
+                <div class="checkboxContainer">
+                    <label><input is="emby-checkbox" type="checkbox" id="ccaOutline" /><span>Text outline</span></label>
+                </div>
+
+                <div class="inputContainer">
+                    <label for="ccaPreset">Dimension preset</label>
+                    <select is="emby-select" id="ccaPreset" class="emby-select">
+                        <option value="cover" selected>Square Cover (1400×1400)</option>
+                        <option value="poster">Portrait Poster (1000×1500)</option>
+                        <option value="banner">Wide Banner (1920×540)</option>
+                        <option value="custom">Custom</option>
+                    </select>
+                </div>
+
+                <div id="ccaCustomDims" style="display:none;">
+                    <div class="inputContainer">
+                        <label for="ccaWidth">Width</label>
+                        <input is="emby-input" type="number" id="ccaWidth" min="100" max="2048" value="1400" />
+                    </div>
+                    <div class="inputContainer">
+                        <label for="ccaHeight">Height</label>
+                        <input is="emby-input" type="number" id="ccaHeight" min="100" max="2048" value="1400" />
+                    </div>
+                </div>
+
+                <div class="inputContainer">
+                    <label for="ccaFormat">Output format</label>
+                    <select is="emby-select" id="ccaFormat" class="emby-select">
+                        <option value="auto" selected>Auto (recommended)</option>
+                        <option value="png">PNG</option>
+                        <option value="gif">GIF</option>
+                    </select>
+                </div>
+
+                <h3>Background</h3>
+                <div class="checkboxContainer">
+                    <label><input is="emby-checkbox" type="checkbox" id="ccaGradient" /><span>Enable gradient background</span></label>
+                </div>
+                <div id="ccaGradientOpts" style="display:none;">
+                    <div class="inputContainer">
+                        <label for="ccaGradientType">Gradient type</label>
+                        <select is="emby-select" id="ccaGradientType" class="emby-select">
+                            <option value="0" selected>Linear</option>
+                            <option value="1">Radial</option>
+                        </select>
+                    </div>
+                    <div class="inputContainer">
+                        <label for="ccaGradientStart">Start color</label>
+                        <input type="color" id="ccaGradientStart" value="#000000" />
+                    </div>
+                    <div class="inputContainer">
+                        <label for="ccaGradientEnd">End color</label>
+                        <input type="color" id="ccaGradientEnd" value="#ffffff" />
+                    </div>
+                </div>
+
+                <div class="inputContainer">
+                    <label for="ccaBgImage">Background image (optional)</label>
+                    <input type="file" id="ccaBgImage" accept="image/*" />
+                </div>
+                <div class="inputContainer">
+                    <label>Or use an existing library poster</label>
+                    <button is="emby-button" type="button" id="ccaBrowseBtn" class="raised">
+                        <span>Browse library posters</span>
+                    </button>
+                    <div id="ccaSelectedBg" style="display:none;margin-top:0.5em;">
+                        Selected background: <strong id="ccaSelectedBgName"></strong>
+                    </div>
+                </div>
+                <div class="inputContainer">
+                    <label for="ccaFont">Custom font (optional)</label>
+                    <input type="file" id="ccaFont" accept=".ttf,.otf,.woff,.woff2" />
+                </div>
+            </div>
+
+            <h2>Preview</h2>
+            <div style="text-align:center;padding:1em;border:1px dashed #555;border-radius:6px;">
+                <img id="ccaPreview" alt="Preview" style="max-width:100%;height:auto;display:none;" />
+                <div id="ccaPreviewPlaceholder">Generate a preview to see your cover art.</div>
+            </div>
+
+            <br />
+            <button is="emby-button" type="button" id="ccaPreviewBtn" class="raised block">
+                <span>Generate Preview</span>
+            </button>
+            <button is="emby-button" type="button" id="ccaApplyBtn" class="raised block button-submit" disabled>
+                <span>Apply to Library</span>
+            </button>
+
+            <div id="ccaBrowserModal" class="ccaModal" style="display:none;">
+                <div class="ccaModalBox">
+                    <div class="ccaModalHead">
+                        <h3>Select a poster</h3>
+                        <button is="emby-button" type="button" id="ccaBrowserClose" class="ccaModalClose"><span>✕</span></button>
+                    </div>
+                    <div class="ccaModalFilters">
+                        <input is="emby-input" type="text" id="ccaBrowserSearch" placeholder="Search…" />
+                        <select is="emby-select" id="ccaBrowserType" class="emby-select">
+                            <option value="">All types</option>
+                            <option value="Movie">Movies</option>
+                            <option value="Series">Series</option>
+                            <option value="Season">Seasons</option>
+                        </select>
+                    </div>
+                    <div id="ccaBrowserGrid" class="ccaGrid"></div>
+                    <div class="ccaModalPager">
+                        <button is="emby-button" type="button" id="ccaBrowserPrev" class="raised"><span>Previous</span></button>
+                        <span id="ccaBrowserPage">Page 1</span>
+                        <button is="emby-button" type="button" id="ccaBrowserNext" class="raised"><span>Next</span></button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <style>
+        .ccaModal { position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 1000; display: flex; align-items: center; justify-content: center; }
+        .ccaModalBox { background: #101010; width: 92%; max-width: 960px; max-height: 85vh; border-radius: 8px; display: flex; flex-direction: column; overflow: hidden; }
+        .ccaModalHead { display: flex; justify-content: space-between; align-items: center; padding: .75em 1em; border-bottom: 1px solid #333; }
+        .ccaModalHead h3 { margin: 0; }
+        .ccaModalFilters { display: flex; gap: .75em; padding: .75em 1em; border-bottom: 1px solid #333; flex-wrap: wrap; }
+        .ccaModalFilters input { flex: 1; min-width: 180px; }
+        .ccaGrid { padding: 1em; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px; }
+        .ccaGridItem { cursor: pointer; border: 2px solid transparent; border-radius: 6px; overflow: hidden; background: #1c1c1c; }
+        .ccaGridItem:hover { border-color: #00a4dc; }
+        .ccaGridItem img { width: 100%; height: 190px; object-fit: cover; display: block; background: #000; }
+        .ccaGridItem .cap { padding: 6px; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .ccaModalPager { display: flex; gap: 1em; align-items: center; justify-content: center; padding: .75em; border-top: 1px solid #333; }
+        .ccaGridEmpty { padding: 2em; text-align: center; opacity: .7; grid-column: 1 / -1; }
+    </style>
+
+    <script type="text/javascript">
+    (function () {
+        'use strict';
+
+        var page;
+
+        // Casing-agnostic read: server may serialize PascalCase (Data) or camelCase (data).
+        function pick(obj, name) {
+            if (!obj) { return undefined; }
+            if (obj[name] !== undefined) { return obj[name]; }
+            var camel = name.charAt(0).toLowerCase() + name.slice(1);
+            return obj[camel];
+        }
+
+        function apiUrl(path) { return ApiClient.getUrl(path); }
+
+        function authFetch(path, options) {
+            options = options || {};
+            options.headers = Object.assign({ 'X-Emby-Token': ApiClient.accessToken() }, options.headers || {});
+            return fetch(apiUrl(path), options);
+        }
+
+        function jsonFetch(path, method, body) {
+            return authFetch(path, {
+                method: method || 'GET',
+                headers: { 'Content-Type': 'application/json' },
+                body: body ? JSON.stringify(body) : undefined
+            }).then(function (r) { return r.json(); });
+        }
+
+        function el(id) { return page.querySelector('#' + id); }
+
+        var state = { libraryId: '', aspectRatio: 1 };
+        var browser = { page: 1, pageSize: 24, totalPages: 1 };
+
+        function debounce(fn, wait) {
+            var t;
+            return function () {
+                var args = arguments, ctx = this;
+                clearTimeout(t);
+                t = setTimeout(function () { fn.apply(ctx, args); }, wait);
+            };
+        }
+
+        var PRESETS = {
+            cover: { w: 1400, h: 1400 },
+            poster: { w: 1000, h: 1500 },
+            banner: { w: 1920, h: 540 },
+            custom: { w: 1400, h: 1400 }
+        };
+
+        // Build the settings object using the EXACT C# property names (PascalCase)
+        // and numeric enum values so binding works regardless of serializer config.
+        function collectSettings() {
+            var preset = el('ccaPreset').value;
+            var width, height;
+            if (preset === 'custom') {
+                width = parseInt(el('ccaWidth').value, 10) || 1400;
+                height = parseInt(el('ccaHeight').value, 10) || 1400;
+            } else {
+                width = PRESETS[preset].w;
+                height = PRESETS[preset].h;
+            }
+
+            return {
+                Title: el('ccaTitle').value,
+                TextSize: parseInt(el('ccaTextSize').value, 10),
+                TextWeight: parseInt(el('ccaTextWeight').value, 10),
+                TextColor: el('ccaTextColor').value,
+                TextAlign: parseInt(el('ccaTextAlign').value, 10),
+                TextBaseline: 1,
+                BackgroundDim: parseFloat(el('ccaDim').value),
+                BackgroundBlur: parseFloat(el('ccaBlur').value),
+                DimColor: el('ccaDimColor').value,
+                TextShadow: el('ccaShadow').checked,
+                TextOutline: el('ccaOutline').checked,
+                BackgroundGradient: {
+                    IsEnabled: el('ccaGradient').checked,
+                    Type: parseInt(el('ccaGradientType').value, 10),
+                    StartColor: el('ccaGradientStart').value,
+                    EndColor: el('ccaGradientEnd').value,
+                    Angle: 0, CenterX: 0.5, CenterY: 0.5, Radius: 0.5
+                },
+                BackgroundImagePath: state.backgroundImagePath || '',
+                CustomFontPath: state.customFontPath || '',
+                ExportWidth: width,
+                ExportHeight: height,
+                ExportScale: 1.0,
+                OutputFormat: el('ccaFormat').value,
+                DimensionPreset: preset
+            };
+        }
+
+        // Enable/disable controls based on current selection.
+        function updateUI() {
+            el('ccaApplyBtn').disabled = !state.libraryId;
+            el('ccaCustomDims').style.display = el('ccaPreset').value === 'custom' ? '' : 'none';
+            el('ccaGradientOpts').style.display = el('ccaGradient').checked ? '' : 'none';
+        }
+
+        function loadLibraries() {
+            return jsonFetch('CustomCoverArt/libraries').then(function (res) {
+                if (!pick(res, 'Success')) { return; }
+                var select = el('ccaLibrarySelect');
+                select.innerHTML = '<option value="">Select a library…</option>';
+                (pick(res, 'Data') || []).forEach(function (lib) {
+                    var opt = document.createElement('option');
+                    opt.value = pick(lib, 'Id');
+                    opt.textContent = pick(lib, 'Name') + ' (' + pick(lib, 'Type') + ')';
+                    select.appendChild(opt);
+                });
+            });
+        }
+
+        function uploadFile(endpoint, file) {
+            var fd = new FormData();
+            fd.append('file', file);
+            return authFetch('CustomCoverArt/' + endpoint, { method: 'POST', body: fd })
+                .then(function (r) { return r.json(); });
+        }
+
+        function generatePreview() {
+            Dashboard.showLoadingMsg();
+            authFetch('CustomCoverArt/preview', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(collectSettings())
+            }).then(function (r) {
+                if (!r.ok) { throw new Error('Preview failed (' + r.status + ')'); }
+                return r.blob();
+            }).then(function (blob) {
+                var url = URL.createObjectURL(blob);
+                var img = el('ccaPreview');
+                img.src = url;
+                img.style.display = 'block';
+                el('ccaPreviewPlaceholder').style.display = 'none';
+                Dashboard.hideLoadingMsg();
+            }).catch(function (e) {
+                Dashboard.hideLoadingMsg();
+                Dashboard.alert('Could not generate preview: ' + e.message);
+            });
+        }
+
+        function applyCoverArt() {
+            if (!state.libraryId) { return; }
+            Dashboard.showLoadingMsg();
+            jsonFetch('CustomCoverArt/apply', 'POST', {
+                LibraryId: state.libraryId,
+                Settings: collectSettings()
+            }).then(function (res) {
+                Dashboard.hideLoadingMsg();
+                if (pick(res, 'Success')) {
+                    Dashboard.alert('Cover art applied successfully.');
+                } else {
+                    Dashboard.alert('Error: ' + (pick(res, 'ErrorMessage') || 'unknown error'));
+                }
+            }).catch(function (e) {
+                Dashboard.hideLoadingMsg();
+                Dashboard.alert('Could not apply cover art: ' + e.message);
+            });
+        }
+
+        function bindEvents() {
+            el('ccaLibrarySelect').addEventListener('change', function () {
+                state.libraryId = this.value;
+                updateUI();
+            });
+            el('ccaTextSize').addEventListener('input', function () { el('ccaTextSizeVal').textContent = this.value; });
+            el('ccaDim').addEventListener('input', function () { el('ccaDimVal').textContent = this.value; });
+            el('ccaBlur').addEventListener('input', function () { el('ccaBlurVal').textContent = this.value; });
+            el('ccaPreset').addEventListener('change', updateUI);
+            el('ccaGradient').addEventListener('change', updateUI);
+
+            el('ccaBgImage').addEventListener('change', function () {
+                if (!this.files || !this.files[0]) { return; }
+                Dashboard.showLoadingMsg();
+                uploadFile('upload', this.files[0]).then(function (res) {
+                    Dashboard.hideLoadingMsg();
+                    if (pick(res, 'Success')) {
+                        state.backgroundImagePath = pick(res, 'Data');
+                    } else {
+                        Dashboard.alert('Upload failed: ' + (pick(res, 'ErrorMessage') || 'unknown error'));
+                    }
+                }).catch(function (e) { Dashboard.hideLoadingMsg(); Dashboard.alert(e.message); });
+            });
+
+            el('ccaFont').addEventListener('change', function () {
+                if (!this.files || !this.files[0]) { return; }
+                Dashboard.showLoadingMsg();
+                uploadFile('uploadFont', this.files[0]).then(function (res) {
+                    Dashboard.hideLoadingMsg();
+                    if (pick(res, 'Success')) {
+                        state.customFontPath = pick(res, 'Data');
+                    } else {
+                        Dashboard.alert('Font upload failed: ' + (pick(res, 'ErrorMessage') || 'unknown error'));
+                    }
+                }).catch(function (e) { Dashboard.hideLoadingMsg(); Dashboard.alert(e.message); });
+            });
+
+            el('ccaPreviewBtn').addEventListener('click', generatePreview);
+            el('ccaApplyBtn').addEventListener('click', applyCoverArt);
+
+            el('ccaBrowseBtn').addEventListener('click', openBrowser);
+            el('ccaBrowserClose').addEventListener('click', closeBrowser);
+            el('ccaBrowserModal').addEventListener('click', function (e) {
+                if (e.target === this) { closeBrowser(); }
+            });
+            el('ccaBrowserSearch').addEventListener('input', debounce(function () {
+                browser.page = 1; loadBrowserItems();
+            }, 350));
+            el('ccaBrowserType').addEventListener('change', function () {
+                browser.page = 1; loadBrowserItems();
+            });
+            el('ccaBrowserPrev').addEventListener('click', function () {
+                if (browser.page > 1) { browser.page--; loadBrowserItems(); }
+            });
+            el('ccaBrowserNext').addEventListener('click', function () {
+                if (browser.page < browser.totalPages) { browser.page++; loadBrowserItems(); }
+            });
+        }
+
+        function openBrowser() {
+            el('ccaBrowserModal').style.display = 'flex';
+            browser.page = 1;
+            loadBrowserItems();
+        }
+
+        function closeBrowser() {
+            el('ccaBrowserModal').style.display = 'none';
+        }
+
+        function loadBrowserItems() {
+            var grid = el('ccaBrowserGrid');
+            grid.innerHTML = '<div class="ccaGridEmpty">Loading…</div>';
+            var typeVal = el('ccaBrowserType').value;
+            jsonFetch('CustomCoverArt/search/items', 'POST', {
+                Query: el('ccaBrowserSearch').value,
+                ItemTypes: typeVal ? [typeVal] : null,
+                Page: browser.page,
+                PageSize: browser.pageSize
+            }).then(function (res) {
+                if (!pick(res, 'Success')) {
+                    grid.innerHTML = '<div class="ccaGridEmpty">Error loading items</div>';
+                    return;
+                }
+                var data = pick(res, 'Data') || {};
+                browser.totalPages = pick(data, 'TotalPages') || 1;
+                renderBrowserItems(pick(data, 'Items') || []);
+                el('ccaBrowserPage').textContent = 'Page ' + browser.page + ' of ' + browser.totalPages;
+                el('ccaBrowserPrev').disabled = browser.page <= 1;
+                el('ccaBrowserNext').disabled = browser.page >= browser.totalPages;
+            }).catch(function (e) {
+                grid.innerHTML = '<div class="ccaGridEmpty">' + e.message + '</div>';
+            });
+        }
+
+        function renderBrowserItems(items) {
+            var grid = el('ccaBrowserGrid');
+            if (!items.length) {
+                grid.innerHTML = '<div class="ccaGridEmpty">No items found</div>';
+                return;
+            }
+            grid.innerHTML = '';
+            items.forEach(function (item) {
+                var id = pick(item, 'Id');
+                var name = pick(item, 'Name') || '';
+                var year = pick(item, 'Year');
+
+                var div = document.createElement('div');
+                div.className = 'ccaGridItem';
+
+                var img = document.createElement('img');
+                img.alt = name;
+                // Use Jellyfin's own image endpoint (token in query string) so the
+                // <img> loads without needing a custom auth header.
+                try { img.src = ApiClient.getImageUrl(id, { type: 'Primary', fillHeight: 220 }); } catch (e) { /* ignore */ }
+                img.addEventListener('error', function () { img.style.visibility = 'hidden'; });
+
+                var cap = document.createElement('div');
+                cap.className = 'cap';
+                cap.textContent = name + (year ? ' (' + year + ')' : '');
+
+                div.appendChild(img);
+                div.appendChild(cap);
+                div.addEventListener('click', function () { selectBrowserItem(id, name); });
+                grid.appendChild(div);
+            });
+        }
+
+        function selectBrowserItem(itemId, name) {
+            Dashboard.showLoadingMsg();
+            jsonFetch('CustomCoverArt/items/' + encodeURIComponent(itemId) + '/useAsBackground', 'POST')
+                .then(function (res) {
+                    Dashboard.hideLoadingMsg();
+                    if (pick(res, 'Success')) {
+                        state.backgroundImagePath = pick(res, 'Data');
+                        el('ccaSelectedBgName').textContent = name;
+                        el('ccaSelectedBg').style.display = '';
+                        closeBrowser();
+                    } else {
+                        Dashboard.alert('Could not use that image: ' + (pick(res, 'ErrorMessage') || 'unknown error'));
+                    }
+                }).catch(function (e) {
+                    Dashboard.hideLoadingMsg();
+                    Dashboard.alert(e.message);
+                });
+        }
+
+        document.querySelector('#CustomCoverArtConfigPage').addEventListener('pageshow', function () {
+            page = this;
+            if (!page.dataset.ccaInit) {
+                bindEvents();
+                page.dataset.ccaInit = 'true';
+            }
+            Dashboard.showLoadingMsg();
+            loadLibraries().then(function () {
+                updateUI();
+                Dashboard.hideLoadingMsg();
+            }).catch(function () { Dashboard.hideLoadingMsg(); });
+        });
+    })();
+    </script>
+</div>
+</body>
+</html>
