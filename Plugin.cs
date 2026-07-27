@@ -48,10 +48,16 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
         yield return new PluginPageInfo
         {
             Name = Name,
+            DisplayName = Name,
             EmbeddedResourcePath = string.Format(
                 CultureInfo.InvariantCulture,
                 "{0}.Configuration.configPage.html",
-                GetType().Namespace)
+                GetType().Namespace),
+
+            // Surface the page as its own entry in the dashboard's left navigation
+            // (not only via the Plugins list). MenuIcon is a Material Icons name.
+            EnableInMainMenu = true,
+            MenuIcon = "image"
         };
     }
 }
