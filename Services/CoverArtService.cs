@@ -353,13 +353,18 @@ public class CoverArtService : ICoverArtService
     /// </summary>
     private async Task<string> GenerateAnimatedAsync(CoverArtSettings settings, Image? background)
     {
-        var frameCount = System.Math.Clamp(settings.Animation!.FrameCount, 2, 30);
-        var delayCentis = System.Math.Max(2, settings.Animation.DelayMs / 10); // GIF delay is 1/100s
         var w = settings.ExportWidth;
         var h = settings.ExportHeight;
 
         // Passthrough when the source background is itself animated.
         var animatedSource = background is not null && background.Frames.Count > 1;
+
+        // An animated source drives its own frame count (so its motion isn't
+        // truncated or padded); Ken Burns / static sources use the requested count.
+        var frameCount = animatedSource
+            ? System.Math.Clamp(background!.Frames.Count, 2, 60)
+            : System.Math.Clamp(settings.Animation!.FrameCount, 2, 30);
+        var delayCentis = System.Math.Max(2, settings.Animation!.DelayMs / 10); // GIF delay is 1/100s
 
         Image<Rgba32>? output = null;
         try
@@ -367,6 +372,7 @@ public class CoverArtService : ICoverArtService
             for (int i = 0; i < frameCount; i++)
             {
                 var t = frameCount == 1 ? 0f : i / (float)(frameCount - 1);
+                var frameDelay = delayCentis;
 
                 using var frameCanvas = new Image<Rgba32>(w, h);
                 Image? frameBg = null;
@@ -378,6 +384,9 @@ public class CoverArtService : ICoverArtService
                         var srcIndex = i % background!.Frames.Count;
                         tempBg = background.Frames.CloneFrame(srcIndex).CloneAs<Rgba32>();
                         frameBg = tempBg;
+                        // Preserve the source GIF's own timing so playback speed matches.
+                        var srcDelay = background.Frames[srcIndex].Metadata.GetGifMetadata().FrameDelay;
+                        if (srcDelay > 0) { frameDelay = srcDelay; }
                     }
                     else if (settings.Animation.KenBurns && background is not null)
                     {
@@ -400,13 +409,12 @@ public class CoverArtService : ICoverArtService
                         output = frameCanvas.Clone();
                         var gm = output.Metadata.GetGifMetadata();
                         gm.RepeatCount = (ushort)(settings.Animation.Loop ? 0 : 1);
-                        var fm = output.Frames.RootFrame.Metadata.GetGifMetadata();
-                        fm.FrameDelay = delayCentis;
+                        output.Frames.RootFrame.Metadata.GetGifMetadata().FrameDelay = frameDelay;
                     }
                     else
                     {
                         var added = frameCanvas.Frames.RootFrame;
-                        added.Metadata.GetGifMetadata().FrameDelay = delayCentis;
+                        added.Metadata.GetGifMetadata().FrameDelay = frameDelay;
                         output.Frames.AddFrame(added);
                     }
                 }
