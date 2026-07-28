@@ -214,6 +214,20 @@ public class CoverArtService : ICoverArtService
         }
     }
 
+    // Clones settings with text-related pixel sizes scaled to a resized canvas, so
+    // a downscaled animated frame keeps the same visual proportions as the preview.
+    private static CoverArtSettings ScaleTextForCanvas(CoverArtSettings s, float scale)
+    {
+        var json = System.Text.Json.JsonSerializer.Serialize(s);
+        var c = System.Text.Json.JsonSerializer.Deserialize<CoverArtSettings>(json) ?? s;
+        c.TextSize = System.Math.Max(8, (int)System.Math.Round(s.TextSize * scale));
+        c.TextShadowBlur = (int)System.Math.Round(s.TextShadowBlur * scale);
+        c.TextShadowOffsetX = (int)System.Math.Round(s.TextShadowOffsetX * scale);
+        c.TextShadowOffsetY = (int)System.Math.Round(s.TextShadowOffsetY * scale);
+        c.TextOutlineWidth = (int)System.Math.Round(s.TextOutlineWidth * scale);
+        return c;
+    }
+
     /// <summary>Source crop rectangle for a Ken Burns frame at progress t (0..1).</summary>
     public static Rectangle KenBurnsCrop(int srcW, int srcH, float t, float zoomAmount, string direction)
     {
@@ -356,6 +370,21 @@ public class CoverArtService : ICoverArtService
         var w = settings.ExportWidth;
         var h = settings.ExportHeight;
 
+        // An animated GIF costs N× a static render and Jellyfin re-processes very
+        // large library images poorly (a full-size multi-frame GIF often fails to
+        // appear at all). Cap the working size so the render stays fast and the
+        // file stays applyable; text scales with the canvas so it looks the same.
+        const int maxGifSide = 1280;
+        var composeSettings = settings;
+        var longestSide = System.Math.Max(w, h);
+        if (longestSide > maxGifSide)
+        {
+            var canvasScale = maxGifSide / (float)longestSide;
+            w = System.Math.Max(1, (int)System.Math.Round(w * canvasScale));
+            h = System.Math.Max(1, (int)System.Math.Round(h * canvasScale));
+            composeSettings = ScaleTextForCanvas(settings, canvasScale);
+        }
+
         // Passthrough when the source background is itself animated.
         var animatedSource = background is not null && background.Frames.Count > 1;
 
@@ -402,7 +431,7 @@ public class CoverArtService : ICoverArtService
                         frameBg = tempBg;
                     }
 
-                    await ComposeFrameAsync(frameCanvas, frameBg, settings).ConfigureAwait(false);
+                    await ComposeFrameAsync(frameCanvas, frameBg, composeSettings).ConfigureAwait(false);
 
                     if (output is null)
                     {
