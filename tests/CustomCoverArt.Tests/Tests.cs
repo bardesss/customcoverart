@@ -124,7 +124,7 @@ public class CoverArtGenerationTests
         var paths = Substitute.For<IApplicationPaths>();
         paths.DataPath.Returns(Path.Combine(Path.GetTempPath(), "cca_test_" + Guid.NewGuid().ToString("N")));
 
-        var service = new CoverArtService(img, paths, Substitute.For<ILoggingService>());
+        var service = new CoverArtService(img, paths, Substitute.For<ILoggingService>(), Substitute.For<IMediaItemService>());
 
         var settings = new CoverArtSettings
         {
@@ -160,7 +160,7 @@ public class CoverArtGenerationTests
         var paths = Substitute.For<IApplicationPaths>();
         paths.DataPath.Returns(Path.Combine(Path.GetTempPath(), "cca_test_" + Guid.NewGuid().ToString("N")));
 
-        var service = new CoverArtService(img, paths, Substitute.For<ILoggingService>());
+        var service = new CoverArtService(img, paths, Substitute.For<ILoggingService>(), Substitute.For<IMediaItemService>());
         var settings = new CoverArtSettings
         {
             Title = "Hi",
