@@ -209,6 +209,21 @@ public static class DocumentRenderer
     /// </summary>
     internal static void RenderTextLayer(Image<Rgba32> canvas, CoverLayer layer, CoverDocument doc)
     {
+        // IMPORTANT: font size uses doc.Canvas.Height (the document's *declared*
+        // canvas size), NOT canvas.Height (the actual pixel buffer passed in).
+        // These two are usually the same, but CoverArtService.GenerateAnimatedAsync
+        // deliberately makes them diverge for animated GIFs whose longest side
+        // exceeds its working-size cap: ScaleTextForCanvas pre-shrinks TextSize by
+        // the downscale factor while leaving ExportHeight (-> doc.Canvas.Height)
+        // at the ORIGINAL, pre-downscale value, and then composes onto a smaller
+        // `canvas` buffer sized to the capped working dimensions. layer.Size is
+        // derived as TextSize / doc.Canvas.Height (see DocumentMigration), so
+        // multiplying back by doc.Canvas.Height here exactly reproduces the
+        // already-downscaled TextSize — the two indirections cancel out. If this
+        // is ever changed to use canvas.Height instead, that cancellation breaks
+        // and text on any downscaled animated frame silently shrinks further
+        // (by the same scale factor again). Keep this in sync with
+        // GenerateAnimatedAsync/ScaleTextForCanvas if either changes.
         var fontPixelSize = layer.Size * doc.Canvas.Height;
         var font = CreateFont(layer, fontPixelSize);
 
