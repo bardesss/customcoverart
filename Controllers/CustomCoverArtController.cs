@@ -565,6 +565,63 @@ public class CustomCoverArtController : ControllerBase
         }
     }
 
+    /// <summary>Strip title and target-specific fields so a template is reusable across targets.</summary>
+    public static SavedTemplate NormalizeTemplate(SavedTemplate template)
+    {
+        template.Name = (template.Name ?? string.Empty).Trim();
+        template.Settings.Title = string.Empty;
+        if (template.Settings.Collage is not null)
+        {
+            template.Settings.Collage.SourceId = string.Empty;
+        }
+        return template;
+    }
+
+    /// <summary>List saved design templates.</summary>
+    [HttpGet("templates")]
+    public ApiResponse<List<SavedTemplate>> GetTemplates()
+    {
+        var list = Plugin.Instance?.Configuration.Templates ?? new List<SavedTemplate>();
+        return Success(list);
+    }
+
+    /// <summary>Save (upsert by name) a design template.</summary>
+    [HttpPost("templates")]
+    public ApiResponse<bool> SaveTemplate([FromBody] SavedTemplate template)
+    {
+        if (template is null || string.IsNullOrWhiteSpace(template.Name))
+        {
+            return Fail<bool>("Template name is required.");
+        }
+
+        var cfg = Plugin.Instance?.Configuration;
+        if (cfg is null)
+        {
+            return Fail<bool>("Plugin not initialized.");
+        }
+
+        var normalized = NormalizeTemplate(template);
+        cfg.Templates.RemoveAll(t => string.Equals(t.Name, normalized.Name, StringComparison.OrdinalIgnoreCase));
+        cfg.Templates.Add(normalized);
+        Plugin.Instance!.SaveConfiguration();
+        return Success(true);
+    }
+
+    /// <summary>Delete a design template by name.</summary>
+    [HttpDelete("templates/{name}")]
+    public ApiResponse<bool> DeleteTemplate(string name)
+    {
+        var cfg = Plugin.Instance?.Configuration;
+        if (cfg is null)
+        {
+            return Fail<bool>("Plugin not initialized.");
+        }
+
+        cfg.Templates.RemoveAll(t => string.Equals(t.Name, name, StringComparison.OrdinalIgnoreCase));
+        Plugin.Instance!.SaveConfiguration();
+        return Success(true);
+    }
+
     private static ApiResponse<T> Success<T>(T data) => new() { Success = true, Data = data };
 
     private static ApiResponse<T> Fail<T>(string message) => new() { Success = false, ErrorMessage = message };
