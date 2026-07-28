@@ -125,4 +125,32 @@ public class AnimationTests
         try { System.IO.File.Delete(path); } catch { }
         try { System.IO.Directory.Delete(dataDir, true); } catch { }
     }
+
+    [Fact]
+    public async System.Threading.Tasks.Task AnimatedGif_CapsOversizedWorkingDimensions()
+    {
+        var settings = new CustomCoverArt.Models.CoverArtSettings
+        {
+            Title = "Big",
+            ExportWidth = 2000,
+            ExportHeight = 1000,
+            OutputFormat = "gif",
+            BackgroundSource = "upload",
+            Animation = new CustomCoverArt.Models.AnimationSettings
+            {
+                Enabled = true, KenBurns = true, FrameCount = 3, DelayMs = 80, ZoomAmount = 0.2f
+            }
+        };
+
+        var path = await AnimationTestHost.NewCoverArtService().GenerateCoverArtAsync(settings);
+
+        Assert.True(System.IO.File.Exists(path));
+        using var img = SixLabors.ImageSharp.Image.Load(path);
+        // Longest side is capped at 1280 (2000 → 1280, 1000 → 640).
+        Assert.Equal(1280, img.Width);
+        Assert.Equal(640, img.Height);
+        Assert.True(img.Frames.Count >= 2);
+
+        try { System.IO.File.Delete(path); } catch { }
+    }
 }
