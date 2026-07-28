@@ -239,9 +239,29 @@
                                     <option value="auto" selected data-i18n="fmt.auto">Auto (recommended)</option>
                                     <option value="png">PNG</option>
                                     <option value="gif">GIF</option>
+                                    <option value="animatedgif" data-i18n="fmt.animated">Animated GIF</option>
                                 </select>
                             </div>
                         </div>
+                        <div class="ccaGrid ccaSub" id="ccaAnimRow" style="display:none">
+                            <label class="ccaCheck ccaCheckBlock"><input is="emby-checkbox" type="checkbox" id="ccaKenBurns" checked /><span data-i18n="anim.kenburns">Ken Burns pan/zoom</span></label>
+                            <div class="inputContainer">
+                                <label for="ccaAnimFrames"><span data-i18n="anim.frames">Frames</span> <span class="ccaVal" id="ccaAnimFramesVal">20</span></label>
+                                <input type="range" class="ccaRange" id="ccaAnimFrames" min="2" max="30" step="1" value="20" />
+                            </div>
+                            <div class="inputContainer">
+                                <label for="ccaAnimDelay"><span data-i18n="anim.delay">Frame delay (ms)</span> <span class="ccaVal" id="ccaAnimDelayVal">80</span></label>
+                                <input type="range" class="ccaRange" id="ccaAnimDelay" min="20" max="300" step="10" value="80" />
+                            </div>
+                            <div class="inputContainer">
+                                <label for="ccaAnimDir" data-i18n="anim.dir">Zoom direction</label>
+                                <select is="emby-select" id="ccaAnimDir" class="emby-select">
+                                    <option value="in" data-i18n="anim.in">Zoom in</option>
+                                    <option value="out" data-i18n="anim.out">Zoom out</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="fieldDescription" id="ccaAnimHint" data-i18n="anim.hint" style="display:none">Animated GIFs are larger and only animate in views that render GIFs. Capped at 30 frames.</div>
                         <div id="ccaCustomDims" class="ccaGrid ccaSub" style="display:none;">
                             <div class="inputContainer">
                                 <label for="ccaWidth" data-i18n="out.width">Width</label>
@@ -481,7 +501,8 @@
                 'restore.button': 'Restore original cover', 'restore.none': 'No backup yet', 'restore.available': 'A backup exists', 'restore.done': 'Original cover restored.', 'restore.fail': 'No backup found to restore.',
                 'bg.source': 'Background source', 'bg.source.upload': 'Upload / poster', 'bg.source.collage': 'Poster collage from this target', 'bg.collage.density': 'Collage density', 'bg.collage.sparse': 'Sparse', 'bg.collage.medium': 'Medium', 'bg.collage.dense': 'Dense', 'bg.collage.shuffle': 'Shuffle', 'bg.collage.livetv': 'Live TV has no posters to collage.',
                 'card.templates': 'Templates', 'tpl.load': 'Load template', 'tpl.delete': 'Delete', 'tpl.save': 'Save current design', 'tpl.nameph': 'Template name', 'tpl.hint': 'Templates store the design but not the title — each target keeps its own name.', 'tpl.saved': 'Template saved.', 'tpl.named': 'Enter a template name first.',
-                'card.batch': 'Batch apply', 'batch.hint': 'Apply the current design (or loaded template) to several targets at once. Each cover is titled with its target\'s name.', 'batch.apply': 'Apply to selected', 'batch.none': 'Select at least one target.', 'batch.running': 'Applying…', 'batch.done': 'Done: {0} ok, {1} failed.'
+                'card.batch': 'Batch apply', 'batch.hint': 'Apply the current design (or loaded template) to several targets at once. Each cover is titled with its target\'s name.', 'batch.apply': 'Apply to selected', 'batch.none': 'Select at least one target.', 'batch.running': 'Applying…', 'batch.done': 'Done: {0} ok, {1} failed.',
+                'fmt.animated': 'Animated GIF', 'anim.kenburns': 'Ken Burns pan/zoom', 'anim.frames': 'Frames', 'anim.delay': 'Frame delay (ms)', 'anim.dir': 'Zoom direction', 'anim.in': 'Zoom in', 'anim.out': 'Zoom out', 'anim.hint': 'Animated GIFs are larger and only animate in views that render GIFs. Capped at 30 frames.'
             },
             nl: {
                 'lede': 'Ontwerp een cover voor een bibliotheek, bekijk het live en pas het toe.',
@@ -517,7 +538,8 @@
                 'restore.button': 'Originele cover herstellen', 'restore.none': 'Nog geen back-up', 'restore.available': 'Er is een back-up', 'restore.done': 'Originele cover hersteld.', 'restore.fail': 'Geen back-up gevonden om te herstellen.',
                 'bg.source': 'Achtergrondbron', 'bg.source.upload': 'Upload / poster', 'bg.source.collage': 'Postercollage van dit doel', 'bg.collage.density': 'Collagedichtheid', 'bg.collage.sparse': 'Dun', 'bg.collage.medium': 'Gemiddeld', 'bg.collage.dense': 'Dicht', 'bg.collage.shuffle': 'Schudden', 'bg.collage.livetv': 'Live TV heeft geen posters voor een collage.',
                 'card.templates': 'Sjablonen', 'tpl.load': 'Sjabloon laden', 'tpl.delete': 'Verwijderen', 'tpl.save': 'Huidig ontwerp opslaan', 'tpl.nameph': 'Sjabloonnaam', 'tpl.hint': 'Sjablonen bewaren het ontwerp maar niet de titel — elk doel houdt zijn eigen naam.', 'tpl.saved': 'Sjabloon opgeslagen.', 'tpl.named': 'Voer eerst een sjabloonnaam in.',
-                'card.batch': 'Bulk toepassen', 'batch.hint': 'Pas het huidige ontwerp (of geladen sjabloon) in één keer toe op meerdere doelen. Elke cover krijgt de naam van zijn doel als titel.', 'batch.apply': 'Toepassen op selectie', 'batch.none': 'Selecteer minstens één doel.', 'batch.running': 'Bezig met toepassen…', 'batch.done': 'Klaar: {0} gelukt, {1} mislukt.'
+                'card.batch': 'Bulk toepassen', 'batch.hint': 'Pas het huidige ontwerp (of geladen sjabloon) in één keer toe op meerdere doelen. Elke cover krijgt de naam van zijn doel als titel.', 'batch.apply': 'Toepassen op selectie', 'batch.none': 'Selecteer minstens één doel.', 'batch.running': 'Bezig met toepassen…', 'batch.done': 'Klaar: {0} gelukt, {1} mislukt.',
+                'fmt.animated': 'Geanimeerde GIF', 'anim.kenburns': 'Ken Burns pan/zoom', 'anim.frames': 'Frames', 'anim.delay': 'Framevertraging (ms)', 'anim.dir': 'Zoomrichting', 'anim.in': 'Inzoomen', 'anim.out': 'Uitzoomen', 'anim.hint': 'Geanimeerde GIFs zijn groter en bewegen alleen in weergaven die GIFs tonen. Max. 30 frames.'
             }
         };
 
@@ -660,7 +682,16 @@
                 ExportWidth: width,
                 ExportHeight: height,
                 ExportScale: 1.0,
-                OutputFormat: el('ccaFormat').value,
+                OutputFormat: el('ccaFormat').value === 'animatedgif' ? 'gif' : el('ccaFormat').value,
+                Animation: el('ccaFormat').value === 'animatedgif' ? {
+                    Enabled: true,
+                    KenBurns: el('ccaKenBurns').checked,
+                    ZoomAmount: 0.15,
+                    Direction: el('ccaAnimDir').value,
+                    FrameCount: parseInt(el('ccaAnimFrames').value, 10),
+                    DelayMs: parseInt(el('ccaAnimDelay').value, 10),
+                    Loop: true
+                } : null,
                 DimensionPreset: preset,
                 BackgroundSource: el('ccaBgSource').value,
                 Collage: {
@@ -690,6 +721,13 @@
             if (type === 'livetv' && isCollage) { el('ccaBgSource').value = 'upload'; isCollage = false; }
             el('ccaCollageRow').style.display = isCollage ? '' : 'none';
             updateUI();
+        }
+
+        // Shows/hides the animated-GIF controls when that output format is chosen.
+        function updateAnimVisibility() {
+            var on = el('ccaFormat').value === 'animatedgif';
+            el('ccaAnimRow').style.display = on ? '' : 'none';
+            el('ccaAnimHint').style.display = on ? '' : 'none';
         }
 
         // Refreshes the Restore button state for the currently selected target.
@@ -917,7 +955,8 @@
         function downloadPreview() {
             var img = el('ccaPreview');
             if (!img.src || img.style.display === 'none') { return; }
-            var ext = el('ccaFormat').value === 'gif' ? 'gif' : 'png';
+            var fmt = el('ccaFormat').value;
+            var ext = (fmt === 'gif' || fmt === 'animatedgif') ? 'gif' : 'png';
             var a = document.createElement('a');
             a.href = img.src;
             a.download = 'cover.' + ext;
@@ -964,6 +1003,9 @@
             el('ccaDim').addEventListener('input', function () { el('ccaDimVal').textContent = this.value; });
             el('ccaBlur').addEventListener('input', function () { el('ccaBlurVal').textContent = this.value; });
             el('ccaPreset').addEventListener('change', updateUI);
+            el('ccaFormat').addEventListener('change', function () { updateAnimVisibility(); runPreview(); });
+            el('ccaAnimFrames').addEventListener('input', function () { el('ccaAnimFramesVal').textContent = this.value; });
+            el('ccaAnimDelay').addEventListener('input', function () { el('ccaAnimDelayVal').textContent = this.value; });
             el('ccaGradient').addEventListener('change', updateUI);
             el('ccaGradientType').addEventListener('change', updateUI);
             el('ccaGradientAngle').addEventListener('input', function () { el('ccaGradientAngleVal').textContent = this.value + '°'; });
@@ -1198,6 +1240,7 @@
                 page.dataset.ccaInit = 'true';
             }
             Dashboard.showLoadingMsg();
+            updateAnimVisibility();
             loadTemplates();
             loadBatchList();
             loadLibraries().then(function () {
