@@ -2,9 +2,6 @@ using System.Collections.Concurrent;
 
 namespace CustomCoverArt.Services;
 
-/// <summary>
-/// Service for rate limiting API requests
-/// </summary>
 public interface IRateLimitingService
 {
     bool IsAllowed(string clientId, string endpoint, int maxRequests = 10, TimeSpan? timeWindow = null);
@@ -12,9 +9,6 @@ public interface IRateLimitingService
     void ClearExpiredEntries();
 }
 
-/// <summary>
-/// Implementation of rate limiting service using sliding window
-/// </summary>
 public class RateLimitingService : IRateLimitingService
 {
     private readonly ConcurrentDictionary<string, List<DateTime>> _requestHistory = new();

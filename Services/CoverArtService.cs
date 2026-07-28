@@ -45,7 +45,6 @@ public class CoverArtService : ICoverArtService
     {
         try
         {
-            // Validate settings
             if (settings == null)
                 throw new ArgumentNullException(nameof(settings));
 
@@ -75,6 +74,7 @@ public class CoverArtService : ICoverArtService
             // Clamp client-controlled effect sizes. The outline is drawn as an
             // O(n^2) grid of text passes, so an unbounded width could hang the
             // request; the others just guard against absurd input.
+            settings.TextSize = Math.Clamp(settings.TextSize, 8, 1024);
             settings.TextOutlineWidth = Math.Clamp(settings.TextOutlineWidth, 0, 10);
             settings.BackgroundBlur = Math.Clamp(settings.BackgroundBlur, 0f, 100f);
             settings.BackgroundDim = Math.Clamp(settings.BackgroundDim, 0f, 1f);
@@ -105,7 +105,6 @@ public class CoverArtService : ICoverArtService
             settings.OutputFormat = settings.OutputFormat?.ToLowerInvariant() == "gif" ? "gif" : "png";
             var extension = settings.OutputFormat;
 
-            // Create output filename with correct extension
             var fileName = $"cover_{Guid.NewGuid():N}.{extension}";
             var outputPath = Path.Combine(_outputDirectory, fileName);
 
@@ -163,7 +162,7 @@ public class CoverArtService : ICoverArtService
 
                 // Create new image with specified dimensions and composite one frame.
                 using var image = new Image<Rgba32>(settings.ExportWidth, settings.ExportHeight);
-                await ComposeFrameAsync(image, backgroundImage, settings).ConfigureAwait(false);
+                ComposeFrame(image, backgroundImage, settings);
 
                 // Save image with retry mechanism
                 await SaveImageWithRetryAsync(image, outputPath, settings);
@@ -299,65 +298,22 @@ public class CoverArtService : ICoverArtService
         }
     }
 
-    public async Task<byte[]?> GetCoverArtAsync(string libraryId)
-    {
-        try
-        {
-            var libraryDirectory = LibraryDir(libraryId);
-            if (!Directory.Exists(libraryDirectory))
-                return null;
-
-            // Search for both PNG and GIF files
-            var pngFiles = Directory.GetFiles(libraryDirectory, "*.png");
-            var gifFiles = Directory.GetFiles(libraryDirectory, "*.gif");
-            var allFiles = pngFiles.Concat(gifFiles).ToArray();
-            
-            if (allFiles.Length == 0)
-                return null;
-
-            // Get the most recent file
-            var latestFile = allFiles.OrderByDescending(f => File.GetCreationTime(f)).First();
-            return await File.ReadAllBytesAsync(latestFile);
-        }
-        catch
-        {
-            return null;
-        }
-    }
-
-    public async Task<bool> DeleteCoverArtAsync(string libraryId)
-    {
-        try
-        {
-            var libraryDirectory = LibraryDir(libraryId);
-            if (!Directory.Exists(libraryDirectory))
-                return true;
-
-            Directory.Delete(libraryDirectory, recursive: true);
-            return true;
-        }
-        catch
-        {
-            return false;
-        }
-    }
-
     /// <summary>
     /// Composites one frame (background + text) onto the supplied canvas. Shared
     /// by the single-image path and the animated-GIF path (which calls it per frame).
     /// </summary>
-    private async Task ComposeFrameAsync(Image<Rgba32> canvas, Image? background, CoverArtSettings settings)
+    private static void ComposeFrame(Image<Rgba32> canvas, Image? background, CoverArtSettings settings)
     {
         if (background is not null)
         {
-            await ApplyBackgroundAsync(canvas, background, settings).ConfigureAwait(false);
+            ApplyBackground(canvas, background, settings);
         }
         else
         {
-            await CreateGradientBackgroundAsync(canvas, settings).ConfigureAwait(false);
+            CreateGradientBackground(canvas, settings);
         }
 
-        await ApplyTextOverlayWithFallbackAsync(canvas, settings).ConfigureAwait(false);
+        ApplyTextOverlayWithFallback(canvas, settings);
     }
 
     /// <summary>
@@ -431,7 +387,7 @@ public class CoverArtService : ICoverArtService
                         frameBg = tempBg;
                     }
 
-                    await ComposeFrameAsync(frameCanvas, frameBg, composeSettings).ConfigureAwait(false);
+                    ComposeFrame(frameCanvas, frameBg, composeSettings);
 
                     if (output is null)
                     {
@@ -463,7 +419,7 @@ public class CoverArtService : ICoverArtService
         }
     }
 
-    private static async Task ApplyBackgroundAsync(Image<Rgba32> image, Image backgroundImage, CoverArtSettings settings)
+    private static void ApplyBackground(Image<Rgba32> image, Image backgroundImage, CoverArtSettings settings)
     {
         var fit = (settings.BackgroundFit ?? "cover").Trim().ToLowerInvariant();
         var baseColor = SafeColor(settings.DimColor, Color.Black);
@@ -534,11 +490,11 @@ public class CoverArtService : ICoverArtService
         }
     }
 
-    private static async Task CreateGradientBackgroundAsync(Image<Rgba32> image, CoverArtSettings settings)
+    private static void CreateGradientBackground(Image<Rgba32> image, CoverArtSettings settings)
     {
         if (settings.BackgroundGradient?.IsEnabled == true)
         {
-            await ApplyGradientBackgroundAsync(image, settings.BackgroundGradient);
+            ApplyGradientBackground(image, settings.BackgroundGradient);
         }
         else
         {
@@ -547,7 +503,7 @@ public class CoverArtService : ICoverArtService
         }
     }
 
-    private static async Task ApplyTextOverlayAsync(Image<Rgba32> image, CoverArtSettings settings)
+    private static void ApplyTextOverlay(Image<Rgba32> image, CoverArtSettings settings)
     {
         // Use custom font if provided, otherwise system fonts with fallback options
         var font = CreateFont(settings);
@@ -712,7 +668,7 @@ public class CoverArtService : ICoverArtService
     /// <summary>
     /// Applies a multi-stop gradient background (linear at a given angle, or radial).
     /// </summary>
-    private static async Task ApplyGradientBackgroundAsync(Image<Rgba32> image, GradientSettings gradient)
+    private static void ApplyGradientBackground(Image<Rgba32> image, GradientSettings gradient)
     {
         var stops = BuildColorStops(gradient);
 
@@ -768,15 +724,15 @@ public class CoverArtService : ICoverArtService
     /// <summary>
     /// Applies text overlay with fallback mechanisms
     /// </summary>
-    private static async Task ApplyTextOverlayWithFallbackAsync(Image<Rgba32> image, CoverArtSettings settings)
+    private static void ApplyTextOverlayWithFallback(Image<Rgba32> image, CoverArtSettings settings)
     {
         try
         {
-            await ApplyTextOverlayAsync(image, settings);
+            ApplyTextOverlay(image, settings);
         }
         catch
         {
-            // Fallback: Create simple text overlay without advanced features
+            // Fallback: simple text overlay without advanced effects.
             try
             {
                 var font = BundledFamily(FontWeight.Normal).CreateFont(Math.Max(12, settings.TextSize * 0.5f));
@@ -814,7 +770,7 @@ public class CoverArtService : ICoverArtService
                 {
                     await image.SaveAsync(outputPath, new SixLabors.ImageSharp.Formats.Png.PngEncoder());
                 }
-                return; // Success
+                return;
             }
             catch (IOException) when (attempt < maxRetries - 1)
             {
