@@ -472,6 +472,11 @@ public class CustomCoverArtController : ControllerBase
 
         if (template.Document is not null)
         {
+            // A client can POST a Document with null Layers/Background (System.Text.Json
+            // does not enforce non-null on non-nullable reference types); normalize it
+            // through the same helper GenerateFromDocumentAsync uses before dereferencing.
+            DocumentMigration.Normalize(template.Document);
+
             var titleLayer = template.Document.Layers.FirstOrDefault(l => l.Id == "title");
             if (titleLayer is not null)
             {

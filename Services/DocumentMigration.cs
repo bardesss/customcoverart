@@ -60,6 +60,27 @@ public static class DocumentMigration
         return doc;
     }
 
+    /// <summary>
+    /// Ensures the nested objects a client-built <see cref="CoverDocument"/> is expected to
+    /// have are non-null. System.Text.Json does not enforce non-null on non-nullable
+    /// reference types, so a client can POST a partial/malformed document (e.g.
+    /// <c>"background": null</c> or <c>"layers": null</c>). Every entry point that accepts a
+    /// client-supplied <see cref="CoverDocument"/> (document/preview, document/apply,
+    /// SaveTemplate's NormalizeTemplate) should call this first so a bad body degrades
+    /// gracefully instead of NRE-ing. Mutates and returns the same instance.
+    /// </summary>
+    public static CoverDocument Normalize(CoverDocument doc)
+    {
+        doc.Canvas ??= new CanvasSettings();
+        doc.Background ??= new BackgroundLayer();
+        doc.Background.Transform ??= new BackgroundTransform();
+        doc.Effects ??= new EffectSettings();
+        doc.Layers = (doc.Layers ?? new List<CoverLayer>())
+            .Where(l => l is not null)
+            .ToList();
+        return doc;
+    }
+
     private static (float X, float Y) AnchorFor(TextAlign align, TextBaseline baseline, float padding)
     {
         var x = align switch
