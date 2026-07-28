@@ -33,6 +33,11 @@ Text, gradients, blur, custom backgrounds and fonts — with a live preview, rig
 | 🔠 | **Fonts** | Bundled Noto Sans (matches Jellyfin's UI, so text always renders) — or upload your own `.ttf` / `.otf` / `.woff` / `.woff2` |
 | 📐 | **Presets & sizes** | Square cover, portrait poster, wide banner, or custom dimensions |
 | 👁️ | **Live preview** | Render a preview before applying anything |
+| 🧩 | **Poster collage** | Auto-build a grid-mosaic background from a target's own item posters |
+| 💾 | **Design templates** | Save a look and reuse it; each target keeps its own name as the title |
+| 📚 | **Batch apply** | Apply one design to many libraries/collections/playlists at once |
+| ↩️ | **Restore original** | One-click revert to a target's pre-plugin cover |
+| 🎞️ | **Animated GIF** | Export animated covers (animated-source passthrough or Ken Burns pan/zoom) |
 | 🌍 | **Localisation** | English and Dutch included; easy to add more |
 
 ## 📸 Screenshots
@@ -99,6 +104,29 @@ The output is in `bin/Release/net9.0/`. Copy `CustomCoverArt.dll` plus the
 Open **Browse library posters**, search/filter your media, and click any item. Its poster is
 copied into the plugin's own data folder and used as the background — a safe, sandboxed copy,
 never a direct reference to your media files.
+
+### Poster-collage backgrounds
+
+In the Background card, set **Background source** to *Poster collage from this target* to build a
+dimmed grid of that library's own posters. Use **Shuffle** to re-roll the arrangement. (Live TV
+has no posters, so collage is unavailable there.)
+
+### Templates and batch apply
+
+Design a cover, then **Save current design** in the Templates card. In **Batch apply**, tick
+several targets and apply your design (or a saved template) to all of them at once — each cover
+is titled with its target's own name.
+
+### Animated covers
+
+Set the output format to **Animated GIF** to export a moving cover — either passing through an
+animated-GIF background, or applying a gentle **Ken Burns** pan/zoom. GIFs are larger and only
+animate in the Jellyfin views that render GIFs.
+
+### Restoring the original
+
+Applying a cover automatically backs up the target's previous image once. Use **Restore original
+cover** on the Target card to revert.
 
 ## 🔒 Security & privacy
 
