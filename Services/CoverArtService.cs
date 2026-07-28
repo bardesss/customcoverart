@@ -3,8 +3,6 @@ using CustomCoverArt.Models;
 using MediaBrowser.Common.Configuration;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats.Gif;
-using SixLabors.ImageSharp.Drawing;
-using SixLabors.ImageSharp.Drawing.Processing;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
 // ImageSharp.Drawing also defines a `Path` type; this file only uses System.IO.Path.

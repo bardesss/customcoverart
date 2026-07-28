@@ -77,4 +77,37 @@ public class DocumentMigrationTests
         Assert.Equal(GradientType.Radial, d.Background.Gradient.Type);
         Assert.Equal(45f, d.Background.Gradient.Angle);
     }
+
+    // A client can POST a document with a layer whose Shadow/Outline are explicitly
+    // null (System.Text.Json does not enforce non-null on non-nullable reference
+    // types). Normalize must backfill both so downstream code that dereferences
+    // layer.Shadow.Blur / layer.Outline.Width (e.g. CoverArtService.ScaleDocumentForCanvas
+    // on the oversized-animated-GIF path) never NREs.
+    [Fact]
+    public void Normalize_BackfillsNullLayerShadowAndOutline()
+    {
+        var doc = new CoverDocument { Canvas = new CanvasSettings { Width = 200, Height = 200 } };
+        doc.Layers.Add(new CoverLayer { Type = "text", Content = "X", Shadow = null!, Outline = null! });
+
+        var result = DocumentMigration.Normalize(doc);
+
+        Assert.NotNull(result.Layers[0].Shadow);
+        Assert.NotNull(result.Layers[0].Outline);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task Normalize_NullShadowAndOutline_RendersWithoutThrowing()
+    {
+        var doc = new CoverDocument { Canvas = new CanvasSettings { Width = 200, Height = 200, Format = "png" } };
+        doc.Background.DimColor = "#222222";
+        doc.Layers.Add(new CoverLayer { Type = "text", Content = "Hi", Color = "#ffffff", Size = 0.2f, Shadow = null!, Outline = null! });
+
+        DocumentMigration.Normalize(doc);
+
+        var svc = AnimationTestHost.NewCoverArtService();
+        var path = await svc.GenerateFromDocumentAsync(doc);
+
+        Assert.True(System.IO.File.Exists(path));
+        try { System.IO.File.Delete(path); } catch { }
+    }
 }
