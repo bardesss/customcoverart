@@ -4,6 +4,9 @@ The text under each version heading is published to the plugin's manifest by the
 release workflow (and shown as the version's changelog inside Jellyfin). Add a
 new `## <version>` section when you bump `<Version>` in the csproj.
 
+## 2.1.0.0
+A code-quality and size pass. The plugin is now **much smaller** — the bundled Noto Sans fonts were subset to the glyphs cover titles use (Latin, Greek, Cyrillic, punctuation), cutting the plugin DLL from ~3.9 MB to ~1.6 MB with no visible change. **Dead code was removed** (an unused retry service, an unused exceptions module, and nine internal API endpoints the UI never called), and the render pipeline was tidied up (the image compositing is no longer needlessly async). A few **security hardening** touches: the Apply and batch-apply endpoints are now rate-limited and batch size is capped, text size is clamped, poster-collage sources get the same decompression-bomb guard as other images, and error messages no longer echo server paths back to the browser. Purely internal — no user-facing behaviour changes.
+
 ## 2.0.3.0
 Small UI fixes on the Target card: a **disabled button now clearly looks disabled** (dimmed, not-allowed cursor) — the Restore button no longer looks clickable when there's no backup yet — and the Restore row has proper spacing above it. Also added an animated preview to the README.
 

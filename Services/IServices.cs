@@ -3,9 +3,6 @@ using Microsoft.AspNetCore.Http;
 
 namespace CustomCoverArt.Services;
 
-/// <summary>
-/// Service for detecting and managing Jellyfin libraries
-/// </summary>
 public interface ILibraryDetectionService
 {
     Task<IEnumerable<LibraryInfo>> GetLibrariesAsync();
@@ -16,7 +13,6 @@ public interface ILibraryDetectionService
     Task<LibraryInfo?> GetLibraryByIdAsync(string libraryId);
     Task<bool> UpdateLibraryCoverArtAsync(string libraryId, string coverArtPath);
     Task<string?> BackupCurrentCoverArtAsync(string libraryId);
-    Task<bool> RestoreCoverArtAsync(string libraryId, string backupPath);
 
     /// <summary>Whether an original-cover restore point exists for a target.</summary>
     bool HasBackup(string libraryId);
@@ -25,9 +21,6 @@ public interface ILibraryDetectionService
     Task<bool> RestoreOriginalCoverArtAsync(string libraryId);
 }
 
-/// <summary>
-/// Service for managing cover art operations
-/// </summary>
 public interface ICoverArtService
 {
     Task<string> GenerateCoverArtAsync(CoverArtSettings settings);
@@ -35,19 +28,10 @@ public interface ICoverArtService
     /// <summary>Persists the cover into the per-library folder and returns that
     /// stable path (or null on failure) so it can be applied to the library.</summary>
     Task<string?> SaveCoverArtAsync(string libraryId, string coverArtPath);
-    Task<byte[]?> GetCoverArtAsync(string libraryId);
-    Task<bool> DeleteCoverArtAsync(string libraryId);
 }
 
-/// <summary>
-/// Service for image processing operations
-/// </summary>
 public interface IImageProcessingService
 {
-    Task<byte[]> ProcessImageAsync(byte[] imageData, CoverArtSettings settings);
-    Task<byte[]> ProcessGifAsync(byte[] gifData, CoverArtSettings settings);
-    Task<bool> IsGifImageAsync(byte[] imageData);
-    Task<(int width, int height)> GetImageDimensionsAsync(byte[] imageData);
     Task<string> DetermineOptimalFormatAsync(CoverArtSettings settings);
     Task<ValidationResult> ValidateFileAsync(IFormFile file);
 
@@ -56,20 +40,10 @@ public interface IImageProcessingService
     // they are intentionally NOT part of this interface.
 }
 
-/// <summary>
-/// Service for browsing and managing media items from Jellyfin libraries
-/// </summary>
 public interface IMediaItemService
 {
-    Task<IEnumerable<MediaItemInfo>> GetLibraryItemsAsync(string libraryId);
-    Task<MediaItemInfo?> GetItemByIdAsync(string itemId);
     Task<ItemSearchResponse> SearchItemsAsync(ItemSearchRequest request);
-    Task<byte[]?> GetItemCoverArtAsync(string itemId);
-    Task<string?> GetItemCoverArtUrlAsync(string itemId);
-    Task<string?> GetItemImageSourcePathAsync(string itemId);
-    Task<IEnumerable<MediaItemInfo>> GetRecentItemsAsync(int count = 20);
 
     /// <summary>Primary-image file paths of a target's child items (for poster collages).</summary>
     Task<IReadOnlyList<string>> GetPosterPathsAsync(string parentId, int max);
 }
-

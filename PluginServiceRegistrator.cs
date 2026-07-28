@@ -22,7 +22,6 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddSingleton<ILoggingService, LoggingService>();
         serviceCollection.AddSingleton<ILocalizationService, LocalizationService>();
         serviceCollection.AddSingleton<IRateLimitingService, RateLimitingService>();
-        serviceCollection.AddSingleton<IRetryService, RetryService>();
         serviceCollection.AddSingleton<IStartupValidationService, StartupValidationService>();
 
         // Per-request scoped services.

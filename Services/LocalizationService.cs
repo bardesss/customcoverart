@@ -3,20 +3,13 @@ using System.Text.Json;
 
 namespace CustomCoverArt.Services;
 
-/// <summary>
-/// Service for handling multi-language support
-/// </summary>
 public interface ILocalizationService
 {
     string GetString(string key, params object[] args);
     string GetCurrentLanguage();
     IEnumerable<string> GetSupportedLanguages();
-    void SetLanguage(string languageCode);
 }
 
-/// <summary>
-/// Implementation of localization service with JSON resource files
-/// </summary>
 public class LocalizationService : ILocalizationService
 {
     private readonly ILoggingService _loggingService;
@@ -72,19 +65,6 @@ public class LocalizationService : ILocalizationService
     public IEnumerable<string> GetSupportedLanguages()
     {
         return _translations.Keys.ToList();
-    }
-
-    public void SetLanguage(string languageCode)
-    {
-        if (_translations.ContainsKey(languageCode))
-        {
-            _currentLanguage = languageCode;
-            _loggingService.LogInformation("Language changed to: {Language}", languageCode);
-        }
-        else
-        {
-            _loggingService.LogWarning("Unsupported language code: {LanguageCode}", languageCode);
-        }
     }
 
     private void LoadTranslations()

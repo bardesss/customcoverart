@@ -2,9 +2,6 @@ using Microsoft.Extensions.Logging;
 
 namespace CustomCoverArt.Services;
 
-/// <summary>
-/// Service for logging operations
-/// </summary>
 public interface ILoggingService
 {
     void LogInformation(string message, params object[] args);
@@ -20,9 +17,6 @@ public interface ILoggingService
     void LogDebug(string message, params object[] args);
 }
 
-/// <summary>
-/// Implementation of logging service using Microsoft.Extensions.Logging
-/// </summary>
 public class LoggingService : ILoggingService
 {
     private readonly ILogger<LoggingService> _logger;

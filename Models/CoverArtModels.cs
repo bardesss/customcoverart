@@ -1,8 +1,5 @@
 namespace CustomCoverArt.Models;
 
-/// <summary>
-/// Represents a Jellyfin library
-/// </summary>
 public class LibraryInfo
 {
     public string Id { get; set; } = string.Empty;
@@ -13,9 +10,7 @@ public class LibraryInfo
     public DateTime? LastModified { get; set; }
 }
 
-/// <summary>
-/// Cover art generation settings
-/// </summary>
+/// <summary>Cover-art generation settings, sent per-request from the config page.</summary>
 public class CoverArtSettings
 {
     public string Title { get; set; } = "Movies";
@@ -53,20 +48,16 @@ public class CoverArtSettings
     public string OutputFormat { get; set; } = "auto";
     public string DimensionPreset { get; set; } = "cover";
 
-    // Background source: "upload" (default), "libraryPoster", or "collage".
+    // Background source: "upload" (default) or "collage".
     public string BackgroundSource { get; set; } = "upload";
     public CollageSettings? Collage { get; set; }
     public AnimationSettings? Animation { get; set; }
-
-    // Backward compatibility property
-    public bool IsGif => OutputFormat?.ToLowerInvariant() == "gif";
 }
 
 /// <summary>String constants for CoverArtSettings.BackgroundSource.</summary>
 public static class BackgroundSources
 {
     public const string Upload = "upload";
-    public const string LibraryPoster = "libraryPoster";
     public const string Collage = "collage";
 }
 
@@ -130,37 +121,6 @@ public class BatchApplyResult
     public string? Error { get; set; }
 }
 
-/// <summary>
-/// Dimension presets for different Jellyfin cover art types
-/// </summary>
-public static class DimensionPresets
-{
-    public static readonly Dictionary<string, (int width, int height, string description)> Presets = new()
-    {
-        ["cover"] = (1400, 1400, "Square Cover (Music Albums)"),
-        ["poster"] = (1000, 1500, "Portrait Poster (Movies/TV)"),
-        ["banner"] = (1920, 540, "Wide Banner (TV Shows)"),
-        ["custom"] = (960, 540, "Custom Dimensions")
-    };
-    
-    public static (int width, int height) GetPreset(string presetName)
-    {
-        return Presets.TryGetValue(presetName?.ToLowerInvariant() ?? "cover", out var preset) 
-            ? (preset.width, preset.height) 
-            : (1400, 1400);
-    }
-    
-    public static string GetDescription(string presetName)
-    {
-        return Presets.TryGetValue(presetName?.ToLowerInvariant() ?? "cover", out var preset) 
-            ? preset.description 
-            : "Square Cover (Music Albums)";
-    }
-}
-
-/// <summary>
-/// Text alignment options
-/// </summary>
 public enum TextAlign
 {
     Left,
@@ -168,9 +128,6 @@ public enum TextAlign
     Right
 }
 
-/// <summary>
-/// Text baseline options
-/// </summary>
 public enum TextBaseline
 {
     Top,
@@ -178,9 +135,6 @@ public enum TextBaseline
     Bottom
 }
 
-/// <summary>
-/// Font weight options
-/// </summary>
 public enum FontWeight
 {
     Light = 300,
@@ -191,9 +145,6 @@ public enum FontWeight
     ExtraBold = 800
 }
 
-/// <summary>
-/// Gradient settings for background
-/// </summary>
 public class GradientSettings
 {
     public bool IsEnabled { get; set; } = false;
@@ -216,18 +167,12 @@ public class GradientStop
     public float Position { get; set; } = 0f; // 0..1
 }
 
-/// <summary>
-/// Gradient type options
-/// </summary>
 public enum GradientType
 {
     Linear,
     Radial
 }
 
-/// <summary>
-/// API response wrapper
-/// </summary>
 public class ApiResponse<T>
 {
     public bool Success { get; set; }
@@ -235,28 +180,12 @@ public class ApiResponse<T>
     public T? Data { get; set; }
 }
 
-/// <summary>
-/// Request model for applying cover art
-/// </summary>
 public class ApplyCoverArtRequest
 {
     public string LibraryId { get; set; } = string.Empty;
     public CoverArtSettings Settings { get; set; } = new();
 }
 
-/// <summary>
-/// Image dimensions returned by the getImageDimensions endpoint.
-/// (A named DTO instead of a ValueTuple so it serializes as width/height.)
-/// </summary>
-public class ImageDimensionsDto
-{
-    public int Width { get; set; }
-    public int Height { get; set; }
-}
-
-/// <summary>
-/// File validation result
-/// </summary>
 public class ValidationResult
 {
     public bool IsValid { get; set; }
@@ -264,9 +193,6 @@ public class ValidationResult
     public string? WarningMessage { get; set; }
 }
 
-/// <summary>
-/// Information about a media item for cover art browsing
-/// </summary>
 public class MediaItemInfo
 {
     public string Id { get; set; } = string.Empty;
@@ -274,8 +200,6 @@ public class MediaItemInfo
     public string Type { get; set; } = string.Empty; // "Movie", "Series", "Season", "Episode"
     public string? Year { get; set; }
     public string? Overview { get; set; }
-    public string? ThumbnailUrl { get; set; }
-    public string? CoverArtUrl { get; set; }
     public string LibraryId { get; set; } = string.Empty;
     public string LibraryName { get; set; } = string.Empty;
     public string? SeriesName { get; set; } // For seasons/episodes
@@ -283,9 +207,6 @@ public class MediaItemInfo
     public int? EpisodeNumber { get; set; } // For episodes
 }
 
-/// <summary>
-/// Request for searching media items
-/// </summary>
 public class ItemSearchRequest
 {
     public string Query { get; set; } = string.Empty;
@@ -295,9 +216,6 @@ public class ItemSearchRequest
     public int Page { get; set; } = 1;
 }
 
-/// <summary>
-/// Response for item search with pagination
-/// </summary>
 public class ItemSearchResponse
 {
     public IEnumerable<MediaItemInfo> Items { get; set; } = Enumerable.Empty<MediaItemInfo>();
