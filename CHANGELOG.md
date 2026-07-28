@@ -4,6 +4,9 @@ The text under each version heading is published to the plugin's manifest by the
 release workflow (and shown as the version's changelog inside Jellyfin). Add a
 new `## <version>` section when you bump `<Version>` in the csproj.
 
+## 2.0.3.0
+Small UI fixes on the Target card: a **disabled button now clearly looks disabled** (dimmed, not-allowed cursor) — the Restore button no longer looks clickable when there's no backup yet — and the Restore row has proper spacing above it. Also added an animated preview to the README.
+
 ## 2.0.2.0
 The **poster browser now covers every library type** — music albums and artists, books, music videos and photos, not just movies and shows — so you can pick a cover from a music or book library too. A **loading spinner** now shows over the preview while it renders, which helps for slower operations like building a poster collage. The **Apply** button now shows an "Applying…" state and locks while it works, so a slow render (like an animated GIF) no longer looks like nothing is happening. **Animated GIF covers are more reliable**: the working size is capped so a full-size render no longer takes forever or fails to apply, and text scales with it so the look is unchanged. The default **Landscape** size is now a lighter 1280×720 (it was 1920×1080) — plenty for library tiles and much smaller files; 1920 is still available via Custom. And the Templates and collage cards were tidied up — the **Delete** and **Shuffle** buttons now sit neatly next to their dropdowns instead of as oversized blocks.
 

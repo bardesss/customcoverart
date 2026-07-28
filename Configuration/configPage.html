@@ -419,6 +419,10 @@
         #CustomCoverArtConfigPage .ccaHiddenFile { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); border: 0; }
         #CustomCoverArtConfigPage .ccaFileRow { display: flex; align-items: center; gap: .75em; flex-wrap: wrap; }
         #CustomCoverArtConfigPage .ccaFileRow .emby-button { margin: 0; }
+        /* Give a standalone action row (e.g. Restore) the same breathing room as an input. */
+        #CustomCoverArtConfigPage .ccaCard > .ccaFileRow { margin-top: 1.05em; }
+        /* A disabled button must read as disabled, not clickable. */
+        #CustomCoverArtConfigPage button[disabled] { opacity: .4; cursor: not-allowed; }
         #CustomCoverArtConfigPage .ccaFileName { opacity: .6; font-size: .9em; word-break: break-all; }
         #CustomCoverArtConfigPage .fieldDescription { margin-top: .4em; opacity: .55; font-size: .85em; }
         #CustomCoverArtConfigPage .ccaPreviewHint { text-align: center; margin-top: .35em; }

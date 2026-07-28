@@ -46,6 +46,8 @@ Text, gradients, blur, custom backgrounds and fonts — with a live preview, rig
 
 ![The Custom Cover Art configuration page inside the Jellyfin dashboard, with live preview](screenshots/1.png)
 
+![The live preview showing an animated cover](screenshots/2.gif)
+
 </div>
 
 ## 📋 Requirements
