@@ -1,11 +1,8 @@
 using CustomCoverArt.Common;
 using CustomCoverArt.Models;
 using MediaBrowser.Common.Configuration;
-using SixLabors.Fonts;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats.Gif;
-using SixLabors.ImageSharp.Drawing;
-using SixLabors.ImageSharp.Drawing.Processing;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
 // ImageSharp.Drawing also defines a `Path` type; this file only uses System.IO.Path.
@@ -41,14 +38,24 @@ public class CoverArtService : ICoverArtService
         Directory.CreateDirectory(_outputDirectory);
     }
 
-    public async Task<string> GenerateCoverArtAsync(CoverArtSettings settings)
+    public Task<string> GenerateCoverArtAsync(CoverArtSettings settings)
+        => GenerateFromDocumentAsync(DocumentMigration.FromSettings(settings));
+
+    public async Task<string> GenerateFromDocumentAsync(CoverDocument document)
     {
         try
         {
-            if (settings == null)
-                throw new ArgumentNullException(nameof(settings));
+            if (document == null)
+                throw new ArgumentNullException(nameof(document));
 
-            if (settings.ExportWidth <= 0 || settings.ExportHeight <= 0)
+            // Defensive input hygiene: a client can POST a partial/malformed document
+            // (e.g. "transform": null or "layers": [null, ...]). Normalize the nested
+            // objects this renderer dereferences unconditionally so a bad body degrades
+            // gracefully instead of a 500. Shared with NormalizeTemplate's Document
+            // handling so every client-facing CoverDocument entry point is protected.
+            DocumentMigration.Normalize(document);
+
+            if (document.Canvas.Width <= 0 || document.Canvas.Height <= 0)
                 throw new ArgumentException("Invalid dimensions");
 
             // Housekeeping: drop stale preview/generated files.
@@ -57,34 +64,35 @@ public class CoverArtService : ICoverArtService
             // Security: background image and font paths come from the client.
             // Only honour them if they resolve inside our own data directory,
             // otherwise ignore them (prevents reading arbitrary server files).
-            if (!PluginPaths.IsInsideBase(_applicationPaths, settings.BackgroundImagePath))
+            if (!PluginPaths.IsInsideBase(_applicationPaths, document.Background.ImagePath))
             {
-                if (!string.IsNullOrEmpty(settings.BackgroundImagePath))
+                if (!string.IsNullOrEmpty(document.Background.ImagePath))
                 {
-                    _loggingService.LogWarning("Background path rejected (outside plugin data dir): {Path}", settings.BackgroundImagePath);
+                    _loggingService.LogWarning("Background path rejected (outside plugin data dir): {Path}", document.Background.ImagePath);
                 }
-                settings.BackgroundImagePath = string.Empty;
+                document.Background.ImagePath = string.Empty;
             }
 
-            if (!PluginPaths.IsInsideBase(_applicationPaths, settings.CustomFontPath))
+            foreach (var layer in document.Layers)
             {
-                settings.CustomFontPath = string.Empty;
+                if (!PluginPaths.IsInsideBase(_applicationPaths, layer.FontPath))
+                {
+                    layer.FontPath = string.Empty;
+                }
             }
 
-            // Clamp client-controlled effect sizes. The outline is drawn as an
-            // O(n^2) grid of text passes, so an unbounded width could hang the
-            // request; the others just guard against absurd input.
-            settings.TextSize = Math.Clamp(settings.TextSize, 8, 1024);
-            settings.TextOutlineWidth = Math.Clamp(settings.TextOutlineWidth, 0, 10);
-            settings.BackgroundBlur = Math.Clamp(settings.BackgroundBlur, 0f, 100f);
-            settings.BackgroundDim = Math.Clamp(settings.BackgroundDim, 0f, 1f);
-            settings.TextShadowOffsetX = Math.Clamp(settings.TextShadowOffsetX, -50, 50);
-            settings.TextShadowOffsetY = Math.Clamp(settings.TextShadowOffsetY, -50, 50);
+            // Clamp client-controlled background effect sizes (guards against
+            // absurd input). Per-layer text/outline clamps (the outline is drawn
+            // as an O(n^2) grid of text passes, so an unbounded width could hang
+            // the request) already happen inside DocumentRenderer — do not
+            // double-clamp them here.
+            document.Background.Blur = Math.Clamp(document.Background.Blur, 0f, 100f);
+            document.Background.Dim = Math.Clamp(document.Background.Dim, 0f, 1f);
 
             // Validate dimensions and estimated file size
             var dimensionValidation = ImageProcessingService.ValidateCoverArtDimensions(
-                settings.ExportWidth, settings.ExportHeight, settings.OutputFormat);
-            
+                document.Canvas.Width, document.Canvas.Height, document.Canvas.Format);
+
             if (!dimensionValidation.IsValid)
             {
                 throw new ArgumentException(dimensionValidation.ErrorMessage);
@@ -93,42 +101,38 @@ public class CoverArtService : ICoverArtService
             // A large-file-size estimate (dimensionValidation.WarningMessage) is
             // non-fatal and intentionally ignored here.
 
-            // Auto-determine optimal format if not explicitly set
-            if (string.IsNullOrEmpty(settings.OutputFormat) || settings.OutputFormat == "auto")
-            {
-                settings.OutputFormat = await _imageProcessingService.DetermineOptimalFormatAsync(settings);
-            }
-
             // Whitelist the output format. The extension is NEVER derived from the
             // raw client string (which could contain path-traversal segments) —
-            // anything that is not "gif" becomes "png".
-            settings.OutputFormat = settings.OutputFormat?.ToLowerInvariant() == "gif" ? "gif" : "png";
-            var extension = settings.OutputFormat;
+            // anything that is not "gif" becomes "png". (This subsumes the old
+            // "auto"-format optimizer: DetermineOptimalFormatAsync always resolved
+            // to "png" unconditionally, so this mapping is exactly equivalent.)
+            var outputFormat = document.Canvas.Format?.ToLowerInvariant() == "gif" ? "gif" : "png";
+            document.Canvas.Format = outputFormat;
 
-            var fileName = $"cover_{Guid.NewGuid():N}.{extension}";
+            var fileName = $"cover_{Guid.NewGuid():N}.{outputFormat}";
             var outputPath = Path.Combine(_outputDirectory, fileName);
 
             // Load background image if provided (path already sandboxed above).
             Image? backgroundImage = null;
             try
             {
-                if (settings.BackgroundSource == BackgroundSources.Collage && settings.Collage is not null
-                    && !string.IsNullOrEmpty(settings.Collage.SourceId))
+                if (document.Background.Source == BackgroundSources.Collage && document.Background.Collage is not null
+                    && !string.IsNullOrEmpty(document.Background.Collage.SourceId))
                 {
                     // Build a full-bleed grid mosaic from the target's child posters.
                     var posters = await _mediaItemService
-                        .GetPosterPathsAsync(settings.Collage.SourceId, 60)
+                        .GetPosterPathsAsync(document.Background.Collage.SourceId, 60)
                         .ConfigureAwait(false);
 
                     backgroundImage = CollageComposer.BuildCollage(
-                        posters, settings.ExportWidth, settings.ExportHeight,
-                        settings.Collage.Density, settings.Collage.Seed);
+                        posters, document.Canvas.Width, document.Canvas.Height,
+                        document.Background.Collage.Density, document.Background.Collage.Seed);
                 }
-                else if (!string.IsNullOrEmpty(settings.BackgroundImagePath))
+                else if (!string.IsNullOrEmpty(document.Background.ImagePath))
                 {
-                    if (!File.Exists(settings.BackgroundImagePath))
+                    if (!File.Exists(document.Background.ImagePath))
                     {
-                        _loggingService.LogWarning("Background file not found: {Path}", settings.BackgroundImagePath);
+                        _loggingService.LogWarning("Background file not found: {Path}", document.Background.ImagePath);
                     }
                     else
                     {
@@ -136,11 +140,11 @@ public class CoverArtService : ICoverArtService
                         {
                             // Reject oversize source images before a full decode
                             // (decompression-bomb guard).
-                            var info = Image.Identify(settings.BackgroundImagePath);
+                            var info = Image.Identify(document.Background.ImagePath);
                             const long maxSourcePixels = 8192L * 8192L;
                             if ((long)info.Width * info.Height <= maxSourcePixels)
                             {
-                                backgroundImage = await Image.LoadAsync(settings.BackgroundImagePath);
+                                backgroundImage = await Image.LoadAsync(document.Background.ImagePath);
                             }
                             else
                             {
@@ -149,23 +153,23 @@ public class CoverArtService : ICoverArtService
                         }
                         catch (Exception ex)
                         {
-                            _loggingService.LogWarning("Failed to decode background {Path}: {Error}", settings.BackgroundImagePath, ex.Message);
+                            _loggingService.LogWarning("Failed to decode background {Path}: {Error}", document.Background.ImagePath, ex.Message);
                         }
                     }
                 }
 
                 // Animated GIF export: build multiple frames instead of one image.
-                if (settings.Animation?.Enabled == true)
+                if (document.Background.Animation?.Enabled == true)
                 {
-                    return await GenerateAnimatedAsync(settings, backgroundImage).ConfigureAwait(false);
+                    return await GenerateAnimatedAsync(document, backgroundImage).ConfigureAwait(false);
                 }
 
                 // Create new image with specified dimensions and composite one frame.
-                using var image = new Image<Rgba32>(settings.ExportWidth, settings.ExportHeight);
-                ComposeFrame(image, backgroundImage, settings);
+                using var image = new Image<Rgba32>(document.Canvas.Width, document.Canvas.Height);
+                ComposeFrame(image, backgroundImage, document);
 
                 // Save image with retry mechanism
-                await SaveImageWithRetryAsync(image, outputPath, settings);
+                await SaveImageWithRetryAsync(image, outputPath, outputFormat);
 
                 return outputPath;
             }
@@ -194,36 +198,27 @@ public class CoverArtService : ICoverArtService
         return Path.Combine(_outputDirectory, "Libraries", id.ToString("N"));
     }
 
-    // Parses a #rrggbb colour, falling back to a default instead of throwing so
-    // a malformed colour in the request body cannot abort the whole render.
-    private static Color SafeColor(string? hex, Color fallback)
+    // Clones a document for a downscaled animated working canvas. Layer.Size is
+    // already a fraction of Canvas.Height, so pointing Canvas.Width/Height at the
+    // actual (capped) working dimensions keeps text proportional automatically —
+    // no separate text-size scaling needed (unlike the legacy flat TextSize,
+    // which was an absolute pixel value tied to the ORIGINAL ExportHeight and
+    // required pre-shrinking to compensate). Shadow/outline pixel offsets are
+    // still absolute values on CoverLayer, so those are scaled explicitly to
+    // preserve their visual proportions on the smaller canvas.
+    private static CoverDocument ScaleDocumentForCanvas(CoverDocument doc, int width, int height, float scale)
     {
-        if (string.IsNullOrWhiteSpace(hex))
+        var json = System.Text.Json.JsonSerializer.Serialize(doc);
+        var c = System.Text.Json.JsonSerializer.Deserialize<CoverDocument>(json) ?? doc;
+        c.Canvas.Width = width;
+        c.Canvas.Height = height;
+        foreach (var layer in c.Layers)
         {
-            return fallback;
+            layer.Shadow.Blur = (int)System.Math.Round(layer.Shadow.Blur * scale);
+            layer.Shadow.OffsetX = (int)System.Math.Round(layer.Shadow.OffsetX * scale);
+            layer.Shadow.OffsetY = (int)System.Math.Round(layer.Shadow.OffsetY * scale);
+            layer.Outline.Width = (int)System.Math.Round(layer.Outline.Width * scale);
         }
-
-        try
-        {
-            return Color.ParseHex(hex);
-        }
-        catch
-        {
-            return fallback;
-        }
-    }
-
-    // Clones settings with text-related pixel sizes scaled to a resized canvas, so
-    // a downscaled animated frame keeps the same visual proportions as the preview.
-    private static CoverArtSettings ScaleTextForCanvas(CoverArtSettings s, float scale)
-    {
-        var json = System.Text.Json.JsonSerializer.Serialize(s);
-        var c = System.Text.Json.JsonSerializer.Deserialize<CoverArtSettings>(json) ?? s;
-        c.TextSize = System.Math.Max(8, (int)System.Math.Round(s.TextSize * scale));
-        c.TextShadowBlur = (int)System.Math.Round(s.TextShadowBlur * scale);
-        c.TextShadowOffsetX = (int)System.Math.Round(s.TextShadowOffsetX * scale);
-        c.TextShadowOffsetY = (int)System.Math.Round(s.TextShadowOffsetY * scale);
-        c.TextOutlineWidth = (int)System.Math.Round(s.TextOutlineWidth * scale);
         return c;
     }
 
@@ -299,21 +294,13 @@ public class CoverArtService : ICoverArtService
     }
 
     /// <summary>
-    /// Composites one frame (background + text) onto the supplied canvas. Shared
+    /// Composites one frame (background + layers) onto the supplied canvas. Shared
     /// by the single-image path and the animated-GIF path (which calls it per frame).
+    /// Delegates directly to the shared <see cref="DocumentRenderer"/> compositor.
     /// </summary>
-    private static void ComposeFrame(Image<Rgba32> canvas, Image? background, CoverArtSettings settings)
+    private static void ComposeFrame(Image<Rgba32> canvas, Image? background, CoverDocument document)
     {
-        if (background is not null)
-        {
-            ApplyBackground(canvas, background, settings);
-        }
-        else
-        {
-            CreateGradientBackground(canvas, settings);
-        }
-
-        ApplyTextOverlayWithFallback(canvas, settings);
+        DocumentRenderer.ComposeDocumentFrame(canvas, background, document);
     }
 
     /// <summary>
@@ -321,24 +308,24 @@ public class CoverArtService : ICoverArtService
     /// frame-by-frame, or applying a Ken Burns pan/zoom to a static background.
     /// Frame count is clamped to [2, 30]; loop uses the GIF repeat count.
     /// </summary>
-    private async Task<string> GenerateAnimatedAsync(CoverArtSettings settings, Image? background)
+    private async Task<string> GenerateAnimatedAsync(CoverDocument document, Image? background)
     {
-        var w = settings.ExportWidth;
-        var h = settings.ExportHeight;
+        var w = document.Canvas.Width;
+        var h = document.Canvas.Height;
 
         // An animated GIF costs N× a static render and Jellyfin re-processes very
         // large library images poorly (a full-size multi-frame GIF often fails to
         // appear at all). Cap the working size so the render stays fast and the
         // file stays applyable; text scales with the canvas so it looks the same.
         const int maxGifSide = 1280;
-        var composeSettings = settings;
+        var composeDocument = document;
         var longestSide = System.Math.Max(w, h);
         if (longestSide > maxGifSide)
         {
             var canvasScale = maxGifSide / (float)longestSide;
             w = System.Math.Max(1, (int)System.Math.Round(w * canvasScale));
             h = System.Math.Max(1, (int)System.Math.Round(h * canvasScale));
-            composeSettings = ScaleTextForCanvas(settings, canvasScale);
+            composeDocument = ScaleDocumentForCanvas(document, w, h, canvasScale);
         }
 
         // Passthrough when the source background is itself animated.
@@ -348,8 +335,8 @@ public class CoverArtService : ICoverArtService
         // truncated or padded); Ken Burns / static sources use the requested count.
         var frameCount = animatedSource
             ? System.Math.Clamp(background!.Frames.Count, 2, 60)
-            : System.Math.Clamp(settings.Animation!.FrameCount, 2, 30);
-        var delayCentis = System.Math.Max(2, settings.Animation!.DelayMs / 10); // GIF delay is 1/100s
+            : System.Math.Clamp(document.Background.Animation!.FrameCount, 2, 30);
+        var delayCentis = System.Math.Max(2, document.Background.Animation!.DelayMs / 10); // GIF delay is 1/100s
 
         Image<Rgba32>? output = null;
         try
@@ -373,10 +360,10 @@ public class CoverArtService : ICoverArtService
                         var srcDelay = background.Frames[srcIndex].Metadata.GetGifMetadata().FrameDelay;
                         if (srcDelay > 0) { frameDelay = srcDelay; }
                     }
-                    else if (settings.Animation.KenBurns && background is not null)
+                    else if (document.Background.Animation!.KenBurns && background is not null)
                     {
                         var crop = KenBurnsCrop(background.Width, background.Height, t,
-                            settings.Animation.ZoomAmount, settings.Animation.Direction);
+                            document.Background.Animation.ZoomAmount, document.Background.Animation.Direction);
                         tempBg = background.CloneAs<Rgba32>();
                         tempBg.Mutate(x => x.Crop(crop).Resize(w, h));
                         frameBg = tempBg;
@@ -387,13 +374,13 @@ public class CoverArtService : ICoverArtService
                         frameBg = tempBg;
                     }
 
-                    ComposeFrame(frameCanvas, frameBg, composeSettings);
+                    ComposeFrame(frameCanvas, frameBg, composeDocument);
 
                     if (output is null)
                     {
                         output = frameCanvas.Clone();
                         var gm = output.Metadata.GetGifMetadata();
-                        gm.RepeatCount = (ushort)(settings.Animation.Loop ? 0 : 1);
+                        gm.RepeatCount = (ushort)(document.Background.Animation!.Loop ? 0 : 1);
                         output.Frames.RootFrame.Metadata.GetGifMetadata().FrameDelay = frameDelay;
                     }
                     else
@@ -419,341 +406,10 @@ public class CoverArtService : ICoverArtService
         }
     }
 
-    private static void ApplyBackground(Image<Rgba32> image, Image backgroundImage, CoverArtSettings settings)
-    {
-        var fit = (settings.BackgroundFit ?? "cover").Trim().ToLowerInvariant();
-        var baseColor = SafeColor(settings.DimColor, Color.Black);
-
-        if (fit == "stretch")
-        {
-            // Distort to fill the whole canvas exactly.
-            backgroundImage.Mutate(x => x.Resize(image.Width, image.Height));
-            if (settings.BackgroundBlur > 0)
-            {
-                backgroundImage.Mutate(x => x.GaussianBlur(settings.BackgroundBlur));
-            }
-            image.Mutate(x => x.DrawImage(backgroundImage, Point.Empty, 1f));
-        }
-        else if (fit == "contain")
-        {
-            // Fit the whole image inside the canvas (like background-size: contain),
-            // letterboxing the remainder with the base colour.
-            image.Mutate(x => x.Fill(baseColor));
-
-            var scale = Math.Min((float)image.Width / backgroundImage.Width,
-                                 (float)image.Height / backgroundImage.Height);
-            var w = Math.Max(1, (int)Math.Round(backgroundImage.Width * scale));
-            var h = Math.Max(1, (int)Math.Round(backgroundImage.Height * scale));
-            backgroundImage.Mutate(x => x.Resize(w, h));
-            if (settings.BackgroundBlur > 0)
-            {
-                backgroundImage.Mutate(x => x.GaussianBlur(settings.BackgroundBlur));
-            }
-
-            var px = (image.Width - w) / 2;
-            var py = (image.Height - h) / 2;
-            image.Mutate(x => x.DrawImage(backgroundImage, new Point(px, py), 1f));
-        }
-        else
-        {
-            // "cover" (default): scale to fill the canvas keeping the source aspect
-            // ratio, then centre-crop (like CSS background-size: cover).
-            var scale = Math.Max((float)image.Width / backgroundImage.Width,
-                                 (float)image.Height / backgroundImage.Height);
-            var newWidth = Math.Max(image.Width, (int)Math.Ceiling(backgroundImage.Width * scale));
-            var newHeight = Math.Max(image.Height, (int)Math.Ceiling(backgroundImage.Height * scale));
-
-            backgroundImage.Mutate(x => x.Resize(newWidth, newHeight));
-
-            var offsetX = (newWidth - image.Width) / 2;
-            var offsetY = (newHeight - image.Height) / 2;
-            backgroundImage.Mutate(x => x.Crop(new Rectangle(offsetX, offsetY, image.Width, image.Height)));
-
-            if (settings.BackgroundBlur > 0)
-            {
-                backgroundImage.Mutate(x => x.GaussianBlur(settings.BackgroundBlur));
-            }
-            image.Mutate(x => x.DrawImage(backgroundImage, Point.Empty, 1f));
-        }
-
-        // Apply dimming by compositing a solid overlay at fractional opacity.
-        // IMPORTANT: do NOT use Fill() with a semi-transparent SolidBrush here —
-        // on backgrounds decoded without an alpha channel (JPEG posters load as
-        // Rgb24) Fill ignores the brush alpha and paints fully opaque, which
-        // blacked out the entire background for any non-zero dim. DrawImage with
-        // an opacity blends correctly on every pixel format. Text is drawn later,
-        // so only the background is dimmed.
-        if (settings.BackgroundDim > 0)
-        {
-            using var dimOverlay = new Image<Rgba32>(image.Width, image.Height, baseColor);
-            image.Mutate(x => x.DrawImage(dimOverlay, Point.Empty, settings.BackgroundDim));
-        }
-    }
-
-    private static void CreateGradientBackground(Image<Rgba32> image, CoverArtSettings settings)
-    {
-        if (settings.BackgroundGradient?.IsEnabled == true)
-        {
-            ApplyGradientBackground(image, settings.BackgroundGradient);
-        }
-        else
-        {
-            var backgroundColor = SafeColor(settings.DimColor, Color.Black);
-            image.Mutate(x => x.Fill(backgroundColor));
-        }
-    }
-
-    private static void ApplyTextOverlay(Image<Rgba32> image, CoverArtSettings settings)
-    {
-        // Use custom font if provided, otherwise system fonts with fallback options
-        var font = CreateFont(settings);
-
-        // Parse text color
-        var textColor = SafeColor(settings.TextColor, Color.White);
-
-        // Calculate text position
-        var textPosition = CalculateTextPosition(image, settings);
-
-        // Create text options
-        var textOptions = new RichTextOptions(font)
-        {
-            Origin = textPosition,
-            HorizontalAlignment = GetHorizontalAlignment(settings.TextAlign),
-            VerticalAlignment = GetVerticalAlignment(settings.TextBaseline)
-        };
-
-        // Apply text effects
-        if (settings.TextShadow)
-        {
-            var shadowColor = SafeColor(settings.TextShadowColor, Color.Black);
-            var shadowPosition = new PointF(
-                textPosition.X + settings.TextShadowOffsetX,
-                textPosition.Y + settings.TextShadowOffsetY
-            );
-
-            var shadowOptions = new RichTextOptions(font)
-            {
-                Origin = shadowPosition,
-                HorizontalAlignment = textOptions.HorizontalAlignment,
-                VerticalAlignment = textOptions.VerticalAlignment
-            };
-
-            image.Mutate(x => x.DrawText(shadowOptions, settings.Title, shadowColor));
-        }
-
-        if (settings.TextOutline)
-        {
-            var outlineColor = SafeColor(settings.TextOutlineColor, Color.Black);
-            // Draw outline by drawing text multiple times with slight offsets
-            for (int x = -settings.TextOutlineWidth; x <= settings.TextOutlineWidth; x++)
-            {
-                for (int y = -settings.TextOutlineWidth; y <= settings.TextOutlineWidth; y++)
-                {
-                    if (x == 0 && y == 0) continue;
-
-                    var outlinePosition = new PointF(textPosition.X + x, textPosition.Y + y);
-                    var outlineOptions = new RichTextOptions(font)
-                    {
-                        Origin = outlinePosition,
-                        HorizontalAlignment = textOptions.HorizontalAlignment,
-                        VerticalAlignment = textOptions.VerticalAlignment
-                    };
-
-                    image.Mutate(ctx => ctx.DrawText(outlineOptions, settings.Title, outlineColor));
-                }
-            }
-        }
-
-        // Draw main text
-        image.Mutate(x => x.DrawText(textOptions, settings.Title, textColor));
-    }
-
-    private static PointF CalculateTextPosition(Image<Rgba32> image, CoverArtSettings settings)
-    {
-        var paddingX = (int)(image.Width * settings.TextPadding);
-        var paddingY = (int)(image.Height * settings.TextPadding);
-
-        return settings.TextAlign switch
-        {
-            TextAlign.Left => new PointF(paddingX, image.Height / 2f),
-            TextAlign.Right => new PointF(image.Width - paddingX, image.Height / 2f),
-            TextAlign.Center => new PointF(image.Width / 2f, image.Height / 2f),
-            _ => new PointF(image.Width / 2f, image.Height / 2f)
-        };
-    }
-
-    private static HorizontalAlignment GetHorizontalAlignment(TextAlign textAlign)
-    {
-        return textAlign switch
-        {
-            TextAlign.Left => HorizontalAlignment.Left,
-            TextAlign.Right => HorizontalAlignment.Right,
-            TextAlign.Center => HorizontalAlignment.Center,
-            _ => HorizontalAlignment.Center
-        };
-    }
-
-    private static VerticalAlignment GetVerticalAlignment(TextBaseline textBaseline)
-    {
-        return textBaseline switch
-        {
-            TextBaseline.Top => VerticalAlignment.Top,
-            TextBaseline.Bottom => VerticalAlignment.Bottom,
-            TextBaseline.Middle => VerticalAlignment.Center,
-            _ => VerticalAlignment.Center
-        };
-    }
-
-    // Bundled fonts (Noto Sans, SIL OFL-1.1 — the same family Jellyfin's web UI
-    // uses), embedded so text ALWAYS renders, even on Jellyfin Docker images
-    // that ship no system fonts. Every UI weight has its own face so the font
-    // weight control actually changes the rendered thickness.
-    private static readonly FontCollection BundledFonts = new();
-    private static readonly object FontLock = new();
-    private static readonly Dictionary<FontWeight, FontFamily> BundledFamilies = new();
-
-    private static FontFamily BundledFamily(FontWeight weight)
-    {
-        lock (FontLock)
-        {
-            if (BundledFamilies.TryGetValue(weight, out var existing))
-            {
-                return existing;
-            }
-
-            var faceName = weight switch
-            {
-                FontWeight.Light => "NotoSans-Light",
-                FontWeight.Medium => "NotoSans-Medium",
-                FontWeight.SemiBold => "NotoSans-SemiBold",
-                FontWeight.Bold => "NotoSans-Bold",
-                FontWeight.ExtraBold => "NotoSans-ExtraBold",
-                _ => "NotoSans-Regular" // Normal and any unmapped value
-            };
-
-            var resource = $"CustomCoverArt.Resources.fonts.{faceName}.ttf";
-            using var stream = typeof(CoverArtService).Assembly.GetManifestResourceStream(resource)
-                ?? throw new InvalidOperationException($"Bundled font not found: {resource}");
-
-            var family = BundledFonts.Add(stream);
-            BundledFamilies[weight] = family;
-            return family;
-        }
-    }
-
-    /// <summary>
-    /// Creates a font: a client-uploaded custom font if one was provided,
-    /// otherwise the bundled Noto Sans face for the requested weight.
-    /// </summary>
-    private static Font CreateFont(CoverArtSettings settings)
-    {
-        // Custom uploaded font takes priority (its path is already sandboxed).
-        if (!string.IsNullOrEmpty(settings.CustomFontPath) && File.Exists(settings.CustomFontPath))
-        {
-            try
-            {
-                var fontCollection = new FontCollection();
-                var fontFamily = fontCollection.Add(settings.CustomFontPath);
-                return fontFamily.CreateFont(settings.TextSize);
-            }
-            catch
-            {
-                // Fall back to the bundled font if the custom one fails to load.
-            }
-        }
-
-        return BundledFamily(settings.TextWeight).CreateFont(settings.TextSize);
-    }
-
-    /// <summary>
-    /// Applies a multi-stop gradient background (linear at a given angle, or radial).
-    /// </summary>
-    private static void ApplyGradientBackground(Image<Rgba32> image, GradientSettings gradient)
-    {
-        var stops = BuildColorStops(gradient);
-
-        if (gradient.Type == GradientType.Radial)
-        {
-            var centerX = gradient.CenterX * image.Width;
-            var centerY = gradient.CenterY * image.Height;
-            var radius = Math.Max(1f, gradient.Radius * Math.Min(image.Width, image.Height));
-
-            var brush = new RadialGradientBrush(new PointF(centerX, centerY), radius, GradientRepetitionMode.None, stops);
-            image.Mutate(x => x.Fill(brush));
-        }
-        else
-        {
-            // Linear: a line through the centre at `Angle` degrees, long enough to
-            // span the whole canvas so the gradient covers it corner to corner.
-            var rad = gradient.Angle * Math.PI / 180.0;
-            var dx = (float)Math.Cos(rad);
-            var dy = (float)Math.Sin(rad);
-            var cx = image.Width / 2f;
-            var cy = image.Height / 2f;
-            var half = (Math.Abs(dx) * image.Width + Math.Abs(dy) * image.Height) / 2f;
-
-            var p0 = new PointF(cx - dx * half, cy - dy * half);
-            var p1 = new PointF(cx + dx * half, cy + dy * half);
-
-            var brush = new LinearGradientBrush(p0, p1, GradientRepetitionMode.None, stops);
-            image.Mutate(x => x.Fill(brush));
-        }
-    }
-
-    /// <summary>
-    /// Builds the colour stops from the settings — the explicit Stops list if it
-    /// has 2+ entries, otherwise the Start/End colours as a fallback.
-    /// </summary>
-    private static ColorStop[] BuildColorStops(GradientSettings gradient)
-    {
-        if (gradient.Stops is { Count: >= 2 })
-        {
-            return gradient.Stops
-                .OrderBy(s => s.Position)
-                .Select(s => new ColorStop(Math.Clamp(s.Position, 0f, 1f), SafeColor(s.Color, Color.Gray)))
-                .ToArray();
-        }
-
-        return new[]
-        {
-            new ColorStop(0f, SafeColor(gradient.StartColor, Color.Black)),
-            new ColorStop(1f, SafeColor(gradient.EndColor, Color.White))
-        };
-    }
-
-    /// <summary>
-    /// Applies text overlay with fallback mechanisms
-    /// </summary>
-    private static void ApplyTextOverlayWithFallback(Image<Rgba32> image, CoverArtSettings settings)
-    {
-        try
-        {
-            ApplyTextOverlay(image, settings);
-        }
-        catch
-        {
-            // Fallback: simple text overlay without advanced effects.
-            try
-            {
-                var font = BundledFamily(FontWeight.Normal).CreateFont(Math.Max(12, settings.TextSize * 0.5f));
-                var textColor = SafeColor(settings.TextColor, Color.White);
-                var position = new PointF(image.Width / 2f, image.Height / 2f);
-
-                image.Mutate(x => x.DrawText(settings.Title, font, textColor, position));
-            }
-            catch
-            {
-                // Ultimate fallback: Just fill with the dim/background color
-                var backgroundColor = SafeColor(settings.DimColor, Color.Black);
-                image.Mutate(x => x.Fill(backgroundColor));
-            }
-        }
-    }
-
     /// <summary>
     /// Saves image with retry mechanism for transient failures
     /// </summary>
-    private static async Task SaveImageWithRetryAsync(Image<Rgba32> image, string outputPath, CoverArtSettings settings)
+    private static async Task SaveImageWithRetryAsync(Image<Rgba32> image, string outputPath, string outputFormat)
     {
         const int maxRetries = 3;
         const int delayMs = 100;
@@ -762,7 +418,7 @@ public class CoverArtService : ICoverArtService
         {
             try
             {
-                if (settings.OutputFormat?.ToLowerInvariant() == "gif")
+                if (outputFormat?.ToLowerInvariant() == "gif")
                 {
                     await image.SaveAsync(outputPath, new SixLabors.ImageSharp.Formats.Gif.GifEncoder());
                 }

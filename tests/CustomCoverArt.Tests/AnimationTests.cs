@@ -153,4 +153,106 @@ public class AnimationTests
 
         try { System.IO.File.Delete(path); } catch { }
     }
+
+    /// <summary>
+    /// Regression guard for the font-sizing invariant in DocumentRenderer.RenderTextLayer:
+    /// font pixel size MUST be computed as `layer.Size * doc.Canvas.Height` (the
+    /// document's declared canvas size), not from the actual pixel buffer height.
+    ///
+    /// GenerateAnimatedAsync's working-size cap (maxGifSide = 1280) downscales the
+    /// working canvas and, via ScaleDocumentForCanvas, points the composed document's
+    /// Canvas.Width/Height at that same capped size. Because layer.Size is a fraction
+    /// of canvas height (not an absolute pixel value), this keeps the rendered font
+    /// proportionally correct automatically. If font sizing were changed to use the
+    /// raw pixel-buffer height passed to ComposeDocumentFrame instead of the document's
+    /// own declared Canvas.Height, any future caller that composes onto a buffer sized
+    /// differently than doc.Canvas would silently mis-size text.
+    ///
+    /// This test renders the same title/TextSize as a static (non-animated) PNG at
+    /// 2000x1000 — the "ground truth" proportion, unaffected by any downscale path —
+    /// and as an animated GIF at the same 2000x1000 request (which triggers the 1280
+    /// cap). It then measures the rendered glyph's pixel-height fraction of its own
+    /// frame in both outputs and asserts they match: the animated/downscaled frame's
+    /// text must occupy essentially the same fraction of frame height as the
+    /// uncapped static reference. A regression to raw-canvas-height sizing would
+    /// shrink the animated fraction by ~36% (1 - 1280/2000), which this test catches.
+    /// </summary>
+    [Fact]
+    public async System.Threading.Tasks.Task AnimatedGif_DownscaledFrame_PreservesProportionalTextSize()
+    {
+        const string title = "M";
+        const int textSize = 200;
+
+        // Ground truth: static (non-animated) render at the full 2000x1000 size.
+        // The static path never downscales, so doc.Canvas.Height always equals the
+        // actual canvas height here — this fraction is the "correct" proportion.
+        var staticSettings = new CustomCoverArt.Models.CoverArtSettings
+        {
+            Title = title,
+            TextSize = textSize,
+            TextColor = "#ffffff",
+            DimColor = "#000000",
+            ExportWidth = 2000,
+            ExportHeight = 1000,
+            OutputFormat = "png",
+        };
+        var staticPath = await AnimationTestHost.NewCoverArtService().GenerateCoverArtAsync(staticSettings);
+        var staticFraction = MeasureGlyphHeightFraction(staticPath);
+
+        // Same title/TextSize/ExportWidth/ExportHeight, but as an animated GIF —
+        // 2000x1000's longest side (2000) exceeds the 1280 cap, so the working
+        // frame is downscaled to 1280x640 while ExportHeight (-> doc.Canvas.Height)
+        // stays 1000 on the cloned/scaled settings.
+        var animatedSettings = new CustomCoverArt.Models.CoverArtSettings
+        {
+            Title = title,
+            TextSize = textSize,
+            TextColor = "#ffffff",
+            DimColor = "#000000",
+            ExportWidth = 2000,
+            ExportHeight = 1000,
+            OutputFormat = "gif",
+            Animation = new CustomCoverArt.Models.AnimationSettings
+            {
+                Enabled = true, KenBurns = false, FrameCount = 2, DelayMs = 80
+            }
+        };
+        var animatedPath = await AnimationTestHost.NewCoverArtService().GenerateCoverArtAsync(animatedSettings);
+        var animatedFraction = MeasureGlyphHeightFraction(animatedPath);
+
+        // Allow generous tolerance for font rendering/antialiasing noise, but a
+        // raw-canvas-height regression would shrink the animated fraction to about
+        // 0.64x the reference (36% smaller) — well outside this band.
+        Assert.True(
+            animatedFraction > staticFraction * 0.85,
+            $"Downscaled animated glyph fraction {animatedFraction:F3} vs static reference {staticFraction:F3} " +
+            "— text shrank more than expected on the capped working frame; font sizing may be using the raw " +
+            "canvas height instead of doc.Canvas.Height.");
+
+        try { System.IO.File.Delete(staticPath); } catch { }
+        try { System.IO.File.Delete(animatedPath); } catch { }
+    }
+
+    /// <summary>Bounding-box height of near-white pixels, as a fraction of image height.</summary>
+    private static float MeasureGlyphHeightFraction(string path)
+    {
+        using var img = SixLabors.ImageSharp.Image.Load<SixLabors.ImageSharp.PixelFormats.Rgba32>(path);
+
+        int minY = int.MaxValue, maxY = int.MinValue;
+        for (int y = 0; y < img.Height; y++)
+        {
+            for (int x = 0; x < img.Width; x++)
+            {
+                var p = img[x, y];
+                if (p.R > 200 && p.G > 200 && p.B > 200)
+                {
+                    if (y < minY) { minY = y; }
+                    if (y > maxY) { maxY = y; }
+                }
+            }
+        }
+
+        Assert.True(minY <= maxY, $"Expected to find rendered text pixels in {path}.");
+        return (maxY - minY + 1) / (float)img.Height;
+    }
 }
