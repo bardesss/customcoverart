@@ -78,6 +78,11 @@ public static class DocumentMigration
         doc.Layers = (doc.Layers ?? new List<CoverLayer>())
             .Where(l => l is not null)
             .ToList();
+        foreach (var layer in doc.Layers)
+        {
+            layer.Shadow ??= new TextShadowSettings();
+            layer.Outline ??= new TextOutlineSettings();
+        }
         return doc;
     }
 
