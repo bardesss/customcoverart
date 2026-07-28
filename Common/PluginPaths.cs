@@ -28,6 +28,10 @@ public static class PluginPaths
     public static string Fonts(IApplicationPaths paths) =>
         Path.Combine(Base(paths), "fonts");
 
+    /// <summary>Directory for original cover-art backups (per-target, restore points).</summary>
+    public static string Backups(IApplicationPaths paths) =>
+        Path.Combine(Base(paths), "backups");
+
     /// <summary>Creates all plugin directories if they do not exist.</summary>
     public static void EnsureCreated(IApplicationPaths paths)
     {

@@ -52,6 +52,14 @@ public class PathSandboxTests
         var paths = PathsWith(Path.Combine(Path.GetTempPath(), "jfdata"));
         Assert.False(PluginPaths.IsInsideBase(paths, ""));
     }
+
+    [Fact]
+    public void BackupsPathIsInsideDataDir()
+    {
+        var paths = PathsWith(Path.Combine(Path.GetTempPath(), "jfdata"));
+        var backup = Path.Combine(PluginPaths.Backups(paths), "abc", "original.png");
+        Assert.True(PluginPaths.IsInsideBase(paths, backup));
+    }
 }
 
 public class UploadValidationTests
@@ -116,7 +124,7 @@ public class CoverArtGenerationTests
         var paths = Substitute.For<IApplicationPaths>();
         paths.DataPath.Returns(Path.Combine(Path.GetTempPath(), "cca_test_" + Guid.NewGuid().ToString("N")));
 
-        var service = new CoverArtService(img, paths, Substitute.For<ILoggingService>());
+        var service = new CoverArtService(img, paths, Substitute.For<ILoggingService>(), Substitute.For<IMediaItemService>());
 
         var settings = new CoverArtSettings
         {
@@ -152,7 +160,7 @@ public class CoverArtGenerationTests
         var paths = Substitute.For<IApplicationPaths>();
         paths.DataPath.Returns(Path.Combine(Path.GetTempPath(), "cca_test_" + Guid.NewGuid().ToString("N")));
 
-        var service = new CoverArtService(img, paths, Substitute.For<ILoggingService>());
+        var service = new CoverArtService(img, paths, Substitute.For<ILoggingService>(), Substitute.For<IMediaItemService>());
         var settings = new CoverArtSettings
         {
             Title = "Hi",

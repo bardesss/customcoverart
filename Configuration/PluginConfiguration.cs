@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using CustomCoverArt.Models;
 using MediaBrowser.Model.Plugins;
 
 namespace CustomCoverArt.Configuration;
@@ -22,4 +24,9 @@ public class PluginConfiguration : BasePluginConfiguration
     /// Gets or sets the UI language override (empty = auto-detect).
     /// </summary>
     public string Language { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the saved design templates (title/target excluded from each).
+    /// </summary>
+    public List<SavedTemplate> Templates { get; set; } = new();
 }

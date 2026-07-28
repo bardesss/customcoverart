@@ -52,9 +52,82 @@ public class CoverArtSettings
     public float ExportScale { get; set; } = 1.0f;
     public string OutputFormat { get; set; } = "auto";
     public string DimensionPreset { get; set; } = "cover";
-    
+
+    // Background source: "upload" (default), "libraryPoster", or "collage".
+    public string BackgroundSource { get; set; } = "upload";
+    public CollageSettings? Collage { get; set; }
+    public AnimationSettings? Animation { get; set; }
+
     // Backward compatibility property
     public bool IsGif => OutputFormat?.ToLowerInvariant() == "gif";
+}
+
+/// <summary>String constants for CoverArtSettings.BackgroundSource.</summary>
+public static class BackgroundSources
+{
+    public const string Upload = "upload";
+    public const string LibraryPoster = "libraryPoster";
+    public const string Collage = "collage";
+}
+
+/// <summary>Auto poster-collage background settings.</summary>
+public class CollageSettings
+{
+    /// <summary>The target whose child items supply the posters (a library/collection/playlist id).</summary>
+    public string SourceId { get; set; } = string.Empty;
+    public string SourceType { get; set; } = "library";
+    /// <summary>Grid density preset: "sparse", "medium" or "dense".</summary>
+    public string Density { get; set; } = "medium";
+    /// <summary>Deterministic shuffle seed so preview and apply match; the Shuffle button changes it.</summary>
+    public int Seed { get; set; } = 0;
+}
+
+/// <summary>Animated-GIF export settings.</summary>
+public class AnimationSettings
+{
+    public bool Enabled { get; set; } = false;
+    /// <summary>Ken Burns pan/zoom on the (static) background. Ignored when the background is itself an animated GIF.</summary>
+    public bool KenBurns { get; set; } = false;
+    /// <summary>Fractional zoom over the whole animation (0.15 = 15%).</summary>
+    public float ZoomAmount { get; set; } = 0.15f;
+    /// <summary>"in" or "out".</summary>
+    public string Direction { get; set; } = "in";
+    public int FrameCount { get; set; } = 20;
+    /// <summary>Per-frame delay in milliseconds.</summary>
+    public int DelayMs { get; set; } = 80;
+    public bool Loop { get; set; } = true;
+}
+
+/// <summary>A saved design template. Title and target are intentionally excluded from the design.</summary>
+public class SavedTemplate
+{
+    public string Name { get; set; } = string.Empty;
+    public CoverArtSettings Settings { get; set; } = new();
+}
+
+/// <summary>A single batch-apply target reference.</summary>
+public class BatchTargetRef
+{
+    public string Id { get; set; } = string.Empty;
+    public string Type { get; set; } = "library";
+}
+
+/// <summary>Request to apply one design to many targets at once.</summary>
+public class BatchApplyRequest
+{
+    /// <summary>Name of a saved template to use; if null, <see cref="Settings"/> is used.</summary>
+    public string? TemplateName { get; set; }
+    public CoverArtSettings? Settings { get; set; }
+    public List<BatchTargetRef> Targets { get; set; } = new();
+}
+
+/// <summary>Per-target outcome from a batch apply.</summary>
+public class BatchApplyResult
+{
+    public string Id { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public bool Success { get; set; }
+    public string? Error { get; set; }
 }
 
 /// <summary>
