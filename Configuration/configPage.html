@@ -278,15 +278,21 @@
                 <div class="ccaPreviewCol">
                     <section class="ccaCard">
                         <div class="ccaCardHead" data-i18n="card.preview">Preview</div>
+                        <label class="ccaCheck ccaCheckBlock"><input is="emby-checkbox" type="checkbox" id="ccaBgAdjust" /><span data-i18n="bg.adjust">Reposition background (drag to pan, scroll or pinch to zoom)</span></label>
                         <div class="ccaPreviewWrap">
-                            <img id="ccaPreview" alt="Cover art preview" />
+                            <canvas id="ccaCanvas" class="ccaCanvas" width="1400" height="1400" aria-label="Cover art canvas"></canvas>
                             <div id="ccaPreviewPlaceholder" class="ccaPreviewPlaceholder" data-i18n="preview.placeholder">Generate a preview to see your cover art.</div>
                             <div id="ccaPreviewSpinner" class="ccaSpinner" style="display:none" aria-hidden="true"></div>
                         </div>
                         <div class="ccaActions">
                             <button is="emby-button" type="button" id="ccaApplyBtn" class="raised block button-submit" disabled><span data-i18n="action.apply">Apply to library</span></button>
+                            <button is="emby-button" type="button" id="ccaServerRender" class="raised block"><span data-i18n="action.serverRender">Show server render</span></button>
                             <button is="emby-button" type="button" id="ccaDownloadBtn" class="raised block" disabled><span data-i18n="action.download">Download image</span></button>
                             <div class="fieldDescription ccaPreviewHint" data-i18n="preview.hint">The preview updates automatically as you adjust settings.</div>
+                        </div>
+                        <div id="ccaServerRenderWrap" class="ccaServerRender" style="display:none">
+                            <div class="ccaServerRenderLabel" data-i18n="serverrender.label">Authoritative render (server)</div>
+                            <img id="ccaServerRenderImg" class="ccaServerRenderImg" alt="Server render" />
                         </div>
                     </section>
                 </div>
@@ -442,14 +448,15 @@
             background: rgba(0, 0, 0, .18);
             text-align: center;
         }
-        #CustomCoverArtConfigPage #ccaPreview {
-            display: none;
+        #CustomCoverArtConfigPage .ccaCanvas {
+            display: block;
             max-width: 100%;
             max-height: 62vh;
             height: auto;
             border-radius: 6px;
             box-shadow: 0 8px 28px rgba(0, 0, 0, .4);
             transition: opacity .15s ease;
+            touch-action: none;
         }
         #CustomCoverArtConfigPage .ccaPreviewPlaceholder { opacity: .5; }
         #CustomCoverArtConfigPage .ccaSpinner {
@@ -467,6 +474,11 @@
         }
         #CustomCoverArtConfigPage .ccaActions { display: flex; flex-direction: column; gap: .6em; margin-top: 1em; }
         #CustomCoverArtConfigPage .ccaActions .emby-button { margin: 0; }
+
+        /* Authoritative server render overlay */
+        #CustomCoverArtConfigPage .ccaServerRender { margin-top: 1em; text-align: center; }
+        #CustomCoverArtConfigPage .ccaServerRenderLabel { font-size: .78em; font-weight: 700; text-transform: uppercase; letter-spacing: .09em; opacity: .55; margin-bottom: .5em; }
+        #CustomCoverArtConfigPage .ccaServerRenderImg { display: block; max-width: 100%; height: auto; margin: 0 auto; border-radius: 6px; box-shadow: 0 8px 28px rgba(0, 0, 0, .4); }
 
         /* Poster picker modal */
         #CustomCoverArtConfigPage .ccaModal { position: fixed; inset: 0; background: rgba(0, 0, 0, .65); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 1em; }
@@ -519,7 +531,8 @@
                 'out.font': 'Custom font (optional)', 'f.chooseFont': 'Choose font…',
                 'hint.font': 'TTF, OTF, TTC, WOFF or WOFF2 · up to 5 MB. Leave empty to use the bundled Noto Sans.',
                 'card.preview': 'Preview', 'preview.placeholder': 'Generate a preview to see your cover art.',
-                'action.apply': 'Apply to library', 'action.applying': 'Applying…', 'action.download': 'Download image', 'preview.hint': 'The preview updates automatically as you adjust settings.',
+                'bg.adjust': 'Reposition background (drag to pan, scroll or pinch to zoom)',
+                'action.apply': 'Apply to library', 'action.applying': 'Applying…', 'action.download': 'Download image', 'action.serverRender': 'Show server render', 'serverrender.label': 'Authoritative render (server)', 'preview.hint': 'The preview updates automatically as you adjust settings.',
                 'modal.title': 'Select a poster', 'modal.search': 'Search…', 'modal.alltypes': 'All types',
                 'ty.movies': 'Movies', 'ty.series': 'Series', 'ty.seasons': 'Seasons', 'ty.albums': 'Albums', 'ty.artists': 'Artists', 'ty.books': 'Books', 'ty.musicvideos': 'Music videos', 'ty.photos': 'Photos', 'modal.prev': 'Previous', 'modal.next': 'Next',
                 'dyn.loading': 'Loading…', 'dyn.errorItems': 'Error loading items', 'dyn.noItems': 'No items found', 'dyn.page': 'Page {0} of {1}',
@@ -556,7 +569,8 @@
                 'out.font': 'Aangepast lettertype (optioneel)', 'f.chooseFont': 'Kies lettertype…',
                 'hint.font': 'TTF, OTF, TTC, WOFF of WOFF2 · max. 5 MB. Laat leeg voor de meegeleverde Noto Sans.',
                 'card.preview': 'Voorbeeld', 'preview.placeholder': 'Het voorbeeld verschijnt hier automatisch.',
-                'action.apply': 'Toepassen op bibliotheek', 'action.applying': 'Bezig met toepassen…', 'action.download': 'Afbeelding downloaden', 'preview.hint': 'Het voorbeeld wordt automatisch bijgewerkt terwijl je instellingen aanpast.',
+                'bg.adjust': 'Achtergrond verplaatsen (sleep om te verschuiven, scroll of knijp om te zoomen)',
+                'action.apply': 'Toepassen op bibliotheek', 'action.applying': 'Bezig met toepassen…', 'action.download': 'Afbeelding downloaden', 'action.serverRender': 'Serverweergave tonen', 'serverrender.label': 'Gezaghebbende weergave (server)', 'preview.hint': 'Het voorbeeld wordt automatisch bijgewerkt terwijl je instellingen aanpast.',
                 'modal.title': 'Selecteer een poster', 'modal.search': 'Zoeken…', 'modal.alltypes': 'Alle types',
                 'ty.movies': 'Films', 'ty.series': 'Series', 'ty.seasons': 'Seizoenen', 'ty.albums': 'Albums', 'ty.artists': 'Artiesten', 'ty.books': 'Boeken', 'ty.musicvideos': 'Videoclips', 'ty.photos': 'Foto\'s', 'modal.prev': 'Vorige', 'modal.next': 'Volgende',
                 'dyn.loading': 'Laden…', 'dyn.errorItems': 'Fout bij laden van items', 'dyn.noItems': 'Geen items gevonden', 'dyn.page': 'Pagina {0} van {1}',
@@ -672,6 +686,432 @@
             custom: { w: 1920, h: 1080 }
         };
 
+        // ==================================================================
+        // Canvas engine (Phase 1 · Task 7)
+        // Renders a client-side CoverDocument onto <canvas id="ccaCanvas">, live,
+        // to mirror the server ImageSharp compositor (Services/DocumentRenderer.cs).
+        // The server stays authoritative; this is a fast visual preview. Field
+        // names/casing on `doc` are PascalCase to match the C# CoverDocument model.
+        // ==================================================================
+
+        // The working document. PascalCase mirrors Models/CoverDocument.cs so the
+        // same object shape can later be POSTed for the authoritative server render.
+        function defaultDocument() {
+            return {
+                Version: 2,
+                Canvas: { Width: 1280, Height: 720, Format: 'auto', DimensionPreset: 'landscape' },
+                Background: {
+                    Source: 'upload', ImagePath: '', Fit: 'cover',
+                    Transform: { OffsetX: 0, OffsetY: 0, Scale: 1 },
+                    Blur: 0, Dim: 0.25, DimColor: '#000000',
+                    Gradient: {
+                        IsEnabled: true, Type: 0, Angle: 0,
+                        Stops: [{ Color: '#aa5cc3', Position: 0 }, { Color: '#00a4dc', Position: 1 }],
+                        CenterX: 0.5, CenterY: 0.5, Radius: 0.5
+                    },
+                    Collage: null, Animation: null
+                },
+                Effects: { Preset: null },
+                Layers: [{
+                    Id: 'title', Type: 'text', Visible: true, X: 0.5, Y: 0.5, Width: 0, Height: 0,
+                    Rotation: 0, Opacity: 1, Content: 'Movies', Size: 120 / 720, Weight: 400,
+                    Color: '#ffffff', Align: 1, FontPath: '',
+                    Shadow: { Enabled: false, Color: '#000000', Blur: 4, OffsetX: 2, OffsetY: 2 },
+                    Outline: { Enabled: false, Color: '#000000', Width: 2 }
+                }],
+                _selectedId: 'title'
+            };
+        }
+        var doc = defaultDocument();
+
+        // CRITICAL canvas-source invariant: bgImageEl must ONLY ever be assigned an
+        // <img> loaded from a blob: object-URL (URL.createObjectURL of a client File
+        // or a fetched Blob). A blob: URL adopts the document origin so the canvas is
+        // never tainted (Phase 3's getImageData/palette + client grain depend on it).
+        // NEVER point it at ApiClient.getImageUrl(...) or a server /upload path.
+        // Wiring the upload/poster Blob happens in Task 8; here it stays null and the
+        // gradient default renders.
+        var bgImageEl = null;
+
+        // Background pan/zoom mode (Task 9): when true, canvas drag/wheel/pinch
+        // mutate doc.Background.Transform instead of selecting/dragging a text
+        // layer. Toggled by the #ccaBgAdjust checkbox.
+        var bgAdjustMode = false;
+
+        // Coordinate contract: canvas backing store is doc.Canvas.Width×Height;
+        // normalized layer coordinates map 1:1 across that dimension.
+        function normToPx(n, dim) { return n * dim; }
+        function pxToNorm(px, dim) { return dim ? px / dim : 0; }
+
+        function selectedLayer() {
+            for (var i = 0; i < doc.Layers.length; i++) {
+                if (doc.Layers[i].Id === doc._selectedId) { return doc.Layers[i]; }
+            }
+            return null;
+        }
+
+        var _rafPending = false;
+        function scheduleRender() {
+            if (_rafPending) { return; }
+            _rafPending = true;
+            requestAnimationFrame(function () { _rafPending = false; renderDocument(); });
+        }
+
+        function renderDocument() {
+            var cv = el('ccaCanvas');
+            if (!cv) { return; }
+            if (cv.width !== doc.Canvas.Width || cv.height !== doc.Canvas.Height) {
+                cv.width = doc.Canvas.Width;
+                cv.height = doc.Canvas.Height;
+            }
+            var ctx = cv.getContext('2d');
+            var W = cv.width, H = cv.height;
+            ctx.clearRect(0, 0, W, H);
+
+            // Background: image (if a blob-loaded one is ready) honouring fit +
+            // transform, else the gradient, else a flat base-colour fill — the same
+            // precedence as DocumentRenderer.ComposeDocumentFrame /
+            // CreateGradientBackground.
+            var drewImage = false;
+            if (bgImageEl && bgImageEl.complete && bgImageEl.naturalWidth) {
+                drawBackgroundImage(ctx, bgImageEl, W, H);
+                drewImage = true;
+            } else if (doc.Background.Gradient && doc.Background.Gradient.IsEnabled) {
+                drawGradient(ctx, doc.Background.Gradient, W, H);
+            } else {
+                ctx.fillStyle = doc.Background.DimColor || '#000';
+                ctx.fillRect(0, 0, W, H);
+            }
+
+            // Dim overlay: a solid base-colour layer at fractional opacity over the
+            // background only (text is drawn after). Parity with the server: dim is
+            // applied ONLY on the image-background path (ApplyBackgroundLayer). The
+            // gradient/flat path (CreateGradientBackground) applies NO dim, so we
+            // must not either — otherwise the default gradient view (Dim 0.25, no
+            // image) would render darker than the authoritative server render.
+            if (drewImage && doc.Background.Dim > 0) {
+                ctx.save();
+                ctx.globalAlpha = Math.min(1, doc.Background.Dim);
+                ctx.fillStyle = doc.Background.DimColor || '#000';
+                ctx.fillRect(0, 0, W, H);
+                ctx.restore();
+            }
+
+            // Visible layers, in array order (draw order matches the server loop).
+            doc.Layers.forEach(function (layer) {
+                if (!layer.Visible) { return; }
+                if (layer.Type === 'text') { drawTextLayer(ctx, layer, W, H); }
+                // image layers: Phase 2
+            });
+
+            drawSelectionHandles(ctx, W, H); // filled in by Task 8
+
+            var ph = el('ccaPreviewPlaceholder');
+            if (ph) { ph.style.display = 'none'; }
+            // The canvas always renders, so the export target is always available.
+            var dl = el('ccaDownloadBtn');
+            if (dl) { dl.disabled = false; }
+        }
+
+        // Builds the canvas colour-stop list from gradient settings — the explicit
+        // Stops (sorted, clamped) when there are 2+, else a black→white fallback,
+        // mirroring DocumentRenderer.BuildColorStops.
+        function gradientStops(g) {
+            var stops = (g.Stops || []).slice().sort(function (a, b) { return a.Position - b.Position; });
+            if (stops.length >= 2) {
+                return stops.map(function (s) {
+                    return { pos: Math.max(0, Math.min(1, s.Position)), color: s.Color || '#808080' };
+                });
+            }
+            return [{ pos: 0, color: '#000000' }, { pos: 1, color: '#ffffff' }];
+        }
+
+        // Linear (a line through the centre at Angle degrees spanning the canvas) or
+        // radial (centred at Center*, radius = Radius*min(W,H)) — geometry copied
+        // from DocumentRenderer.ApplyGradientBackground so framing matches.
+        function drawGradient(ctx, g, W, H) {
+            var stops = gradientStops(g);
+            var grad;
+            if (g.Type === 1) { // radial
+                var cx = g.CenterX * W, cy = g.CenterY * H;
+                var radius = Math.max(1, g.Radius * Math.min(W, H));
+                grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+            } else { // linear
+                var rad = (g.Angle || 0) * Math.PI / 180;
+                var dx = Math.cos(rad), dy = Math.sin(rad);
+                var mx = W / 2, my = H / 2;
+                var half = (Math.abs(dx) * W + Math.abs(dy) * H) / 2;
+                grad = ctx.createLinearGradient(mx - dx * half, my - dy * half, mx + dx * half, my + dy * half);
+            }
+            stops.forEach(function (s) { grad.addColorStop(s.pos, s.color); });
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, W, H);
+        }
+
+        // Draws the background image with cover/contain/stretch fit plus the pan/zoom
+        // transform, mirroring ApplyBackgroundLayer + TransformedSourceRect: the fit
+        // maps a base source rect onto a destination footprint, then the transform
+        // crops that source rect by 1/Scale and pans it across the slack.
+        // NOTE: only ever called with a blob-loaded (untainted) image (see bgImageEl).
+        function drawBackgroundImage(ctx, img, W, H) {
+            var iw = img.naturalWidth, ih = img.naturalHeight;
+            var fit = (doc.Background.Fit || 'cover').toLowerCase();
+
+            var srcX, srcY, srcW, srcH;      // base source rect (image pixels)
+            var dstX, dstY, dstW, dstH;      // destination footprint (canvas pixels)
+
+            if (fit === 'stretch') {
+                srcX = 0; srcY = 0; srcW = iw; srcH = ih;
+                dstX = 0; dstY = 0; dstW = W; dstH = H;
+            } else if (fit === 'contain') {
+                // Letterbox the remainder with the base colour, like the server.
+                ctx.fillStyle = doc.Background.DimColor || '#000';
+                ctx.fillRect(0, 0, W, H);
+                var cs = Math.min(W / iw, H / ih);
+                srcX = 0; srcY = 0; srcW = iw; srcH = ih;
+                dstW = iw * cs; dstH = ih * cs;
+                dstX = (W - dstW) / 2; dstY = (H - dstH) / 2;
+            } else { // cover
+                var vs = Math.max(W / iw, H / ih);
+                srcW = W / vs; srcH = H / vs;
+                srcX = (iw - srcW) / 2; srcY = (ih - srcH) / 2;
+                dstX = 0; dstY = 0; dstW = W; dstH = H;
+            }
+
+            // Pan/zoom: shrink the source rect by 1/Scale, pan across the slack
+            // (Offset -1..1, 0 = centred). Identity transform leaves the rect intact.
+            var t = doc.Background.Transform || { OffsetX: 0, OffsetY: 0, Scale: 1 };
+            var sc = Math.max(1, t.Scale || 1);
+            if (sc !== 1 || t.OffsetX || t.OffsetY) {
+                var w2 = srcW / sc, h2 = srcH / sc;
+                var slackX = srcW - w2, slackY = srcH - h2;
+                var ox = Math.max(-1, Math.min(1, t.OffsetX || 0));
+                var oy = Math.max(-1, Math.min(1, t.OffsetY || 0));
+                srcX = srcX + slackX / 2 + ox * slackX / 2;
+                srcY = srcY + slackY / 2 + oy * slackY / 2;
+                srcW = w2; srcH = h2;
+            }
+
+            ctx.save();
+            if (doc.Background.Blur > 0) { ctx.filter = 'blur(' + doc.Background.Blur + 'px)'; }
+            ctx.drawImage(img, srcX, srcY, srcW, srcH, dstX, dstY, dstW, dstH);
+            ctx.restore();
+        }
+
+        // One text layer: outline (multi-pass strokeText), shadow (ctx.shadow*),
+        // then fill — mirroring RenderTextLayer. Font px keys off doc.Canvas.Height
+        // (the design's reference resolution), matching the server's font sizing.
+        function drawTextLayer(ctx, layer, W, H) {
+            var px = normToPx(layer.X, W), py = normToPx(layer.Y, H);
+            var fontPx = Math.max(8, Math.min(1024, layer.Size * doc.Canvas.Height));
+            ctx.save();
+            ctx.globalAlpha = layer.Opacity;
+            ctx.font = layer.Weight + ' ' + fontPx + 'px "Noto Sans", sans-serif';
+            ctx.textAlign = layer.Align === 0 ? 'left' : (layer.Align === 2 ? 'right' : 'center');
+            ctx.textBaseline = 'middle';
+
+            if (layer.Outline && layer.Outline.Enabled) {
+                ctx.lineWidth = layer.Outline.Width * 2;
+                ctx.strokeStyle = layer.Outline.Color;
+                ctx.lineJoin = 'round';
+                ctx.strokeText(layer.Content, px, py);
+            }
+            if (layer.Shadow && layer.Shadow.Enabled) {
+                ctx.shadowColor = layer.Shadow.Color;
+                ctx.shadowBlur = layer.Shadow.Blur;
+                ctx.shadowOffsetX = layer.Shadow.OffsetX;
+                ctx.shadowOffsetY = layer.Shadow.OffsetY;
+            }
+            ctx.fillStyle = layer.Color;
+            ctx.fillText(layer.Content, px, py);
+            ctx.restore();
+        }
+
+        // Measured bounding box (canvas px) of a text layer, honouring alignment and
+        // the middle baseline used by drawTextLayer. Used for hit-testing and the
+        // selection outline so the box tracks the rendered glyphs.
+        function textLayerBounds(ctx, layer, W, H) {
+            var fontPx = Math.max(8, Math.min(1024, layer.Size * doc.Canvas.Height));
+            ctx.save();
+            ctx.font = layer.Weight + ' ' + fontPx + 'px "Noto Sans", sans-serif';
+            var m = ctx.measureText(layer.Content || '');
+            ctx.restore();
+            var tw = m.width;
+            var th = fontPx;                 // approx line box height
+            var cx = normToPx(layer.X, W), cy = normToPx(layer.Y, H);
+            var left;
+            if (layer.Align === 0) { left = cx; }          // left edge
+            else if (layer.Align === 2) { left = cx - tw; } // right edge
+            else { left = cx - tw / 2; }                    // centred
+            return { x: left, y: cy - th / 2, w: tw, h: th };
+        }
+
+        // Selection overlay: a dashed outline around the selected text layer's bounds.
+        function drawSelectionHandles(ctx, W, H) {
+            var layer = selectedLayer();
+            if (!layer || !layer.Visible || layer.Type !== 'text') { return; }
+            var b = textLayerBounds(ctx, layer, W, H);
+            var pad = Math.max(6, b.h * 0.18);
+            ctx.save();
+            ctx.strokeStyle = 'rgba(0, 164, 220, 0.95)';
+            ctx.lineWidth = Math.max(1.5, H / 500);
+            ctx.setLineDash([Math.max(6, H / 120), Math.max(4, H / 200)]);
+            ctx.strokeRect(b.x - pad, b.y - pad, b.w + pad * 2, b.h + pad * 2);
+            ctx.restore();
+        }
+
+        // Client → canvas-pixel mapping (accounts for the CSS-scaled canvas).
+        function canvasPoint(ev) {
+            var cv = el('ccaCanvas'), r = cv.getBoundingClientRect();
+            return {
+                x: r.width ? (ev.clientX - r.left) / r.width * cv.width : 0,
+                y: r.height ? (ev.clientY - r.top) / r.height * cv.height : 0
+            };
+        }
+
+        // Topmost (last-drawn) visible text layer whose padded bounds contain the point.
+        function hitTestLayer(pt) {
+            var cv = el('ccaCanvas'); if (!cv) { return null; }
+            var ctx = cv.getContext('2d');
+            for (var i = doc.Layers.length - 1; i >= 0; i--) {
+                var layer = doc.Layers[i];
+                if (!layer.Visible || layer.Type !== 'text') { continue; }
+                var b = textLayerBounds(ctx, layer, cv.width, cv.height);
+                var pad = Math.max(8, b.h * 0.3);
+                if (pt.x >= b.x - pad && pt.x <= b.x + b.w + pad &&
+                    pt.y >= b.y - pad && pt.y <= b.y + b.h + pad) {
+                    return layer;
+                }
+            }
+            return null;
+        }
+
+        var _drag = null;     // text-layer drag (bgAdjustMode off)
+        var _bgDrag = null;   // background pan drag (bgAdjustMode on, single pointer)
+
+        // Two-pointer pinch tracking for background zoom (bgAdjustMode on, touch).
+        // Keyed by pointerId, client (not canvas) coordinates — only the RATIO
+        // between the start and current distance is used, so CSS scaling of the
+        // canvas cancels out and client coords are fine.
+        var _pointers = {};
+        var _pinchStartDist = 0;
+        var _pinchStartScale = 1;
+        function pointerDistance() {
+            var ids = Object.keys(_pointers);
+            if (ids.length < 2) { return 0; }
+            var a = _pointers[ids[0]], b = _pointers[ids[1]];
+            var dx = b.x - a.x, dy = b.y - a.y;
+            return Math.sqrt(dx * dx + dy * dy);
+        }
+
+        function onCanvasPointerDown(ev) {
+            _pointers[ev.pointerId] = { x: ev.clientX, y: ev.clientY };
+
+            if (bgAdjustMode) {
+                if (!bgImageEl) { return; } // nothing to reposition without a loaded image
+                if (Object.keys(_pointers).length >= 2) {
+                    // Second finger down: switch to pinch-zoom, cancel any pan in flight.
+                    _bgDrag = null;
+                    _pinchStartDist = pointerDistance();
+                    _pinchStartScale = doc.Background.Transform.Scale;
+                } else {
+                    var bgPt = canvasPoint(ev);
+                    _bgDrag = {
+                        startX: bgPt.x, startY: bgPt.y,
+                        origOffsetX: doc.Background.Transform.OffsetX,
+                        origOffsetY: doc.Background.Transform.OffsetY
+                    };
+                }
+                try { el('ccaCanvas').setPointerCapture(ev.pointerId); } catch (e) { /* ignore */ }
+                ev.preventDefault();
+                return;
+            }
+
+            var pt = canvasPoint(ev);
+            var hit = hitTestLayer(pt);
+            if (!hit) { return; }
+            if (doc._selectedId !== hit.Id) {
+                doc._selectedId = hit.Id;
+                syncControlsFromDocument();
+            }
+            _drag = { startX: pt.x, startY: pt.y, origX: hit.X, origY: hit.Y };
+            try { el('ccaCanvas').setPointerCapture(ev.pointerId); } catch (e) { /* ignore */ }
+            renderDocument();
+            ev.preventDefault();
+        }
+        function onCanvasPointerMove(ev) {
+            if (_pointers[ev.pointerId]) { _pointers[ev.pointerId] = { x: ev.clientX, y: ev.clientY }; }
+
+            if (bgAdjustMode) {
+                if (!bgImageEl) { return; }
+                if (Object.keys(_pointers).length >= 2 && _pinchStartDist > 0) {
+                    var dist = pointerDistance();
+                    var scale = _pinchStartScale * (dist / _pinchStartDist);
+                    doc.Background.Transform.Scale = Math.min(4, Math.max(1, scale));
+                    scheduleRender();
+                    ev.preventDefault();
+                    return;
+                }
+                if (!_bgDrag) { return; }
+                var cv = el('ccaCanvas');
+                var bgPt = canvasPoint(ev);
+                // Natural "grab and slide" direction: dragging right/down should
+                // make the image appear to follow the cursor, which means the
+                // sampled source rect (see drawBackgroundImage) must shift the
+                // OTHER way — so the offset moves opposite the drag delta.
+                doc.Background.Transform.OffsetX = Math.max(-1, Math.min(1,
+                    _bgDrag.origOffsetX - (bgPt.x - _bgDrag.startX) / (cv.width / 2)));
+                doc.Background.Transform.OffsetY = Math.max(-1, Math.min(1,
+                    _bgDrag.origOffsetY - (bgPt.y - _bgDrag.startY) / (cv.height / 2)));
+                scheduleRender();
+                ev.preventDefault();
+                return;
+            }
+
+            if (!_drag) { return; }
+            var layer = selectedLayer(); if (!layer) { return; }
+            var cv = el('ccaCanvas');
+            var pt = canvasPoint(ev);
+            layer.X = Math.max(0, Math.min(1, _drag.origX + (pt.x - _drag.startX) / cv.width));
+            layer.Y = Math.max(0, Math.min(1, _drag.origY + (pt.y - _drag.startY) / cv.height));
+            scheduleRender();
+            ev.preventDefault();
+        }
+        function onCanvasPointerUp(ev) {
+            delete _pointers[ev.pointerId];
+            if (Object.keys(_pointers).length < 2) { _pinchStartDist = 0; }
+
+            if (bgAdjustMode) {
+                try { el('ccaCanvas').releasePointerCapture(ev.pointerId); } catch (e) { /* ignore */ }
+                _bgDrag = null;
+                return;
+            }
+            if (!_drag) { return; }
+            try { el('ccaCanvas').releasePointerCapture(ev.pointerId); } catch (e) { /* ignore */ }
+            _drag = null;
+        }
+
+        // Loads the SAME bundled Noto weights the server renders with, via the
+        // authenticated font endpoint + the FontFace API (which — unlike CSS
+        // @font-face — accepts an ArrayBuffer fetched WITH the auth token). Tolerant
+        // of per-weight failure: a missing weight falls back to the browser's
+        // sans-serif for the canvas only; the applied cover is server-authoritative.
+        var FONT_WEIGHTS = [300, 400, 500, 600, 700, 800];
+        function loadCanvasFonts() {
+            return Promise.all(FONT_WEIGHTS.map(function (w) {
+                return authFetch('CustomCoverArt/font/' + w)
+                    .then(function (r) { return r.arrayBuffer(); })
+                    .then(function (buf) {
+                        var ff = new FontFace('Noto Sans', buf, { weight: String(w) });
+                        return ff.load().then(function (loaded) { document.fonts.add(loaded); });
+                    })
+                    .catch(function () { /* fall back to sans-serif for this weight */ });
+            }));
+        }
+        // ==================================================================
+        // End canvas engine
+        // ==================================================================
+
         // Build the settings object using the EXACT C# property names (PascalCase)
         // and numeric enum values so binding works regardless of serializer config.
         function collectSettings() {
@@ -730,6 +1170,148 @@
                 }
             };
         }
+
+        // --- Document <-> controls binding (Task 8) -----------------------
+        // collectSettings() (above) is RETAINED only to feed the legacy flat-Settings
+        // endpoints (batch apply + its projection); the live canvas, Apply, server
+        // render and templates are all document-native via collectDocument().
+
+        // Recursively deep-clone `doc`, dropping UI-only keys (any `_`-prefixed key,
+        // e.g. _selectedId) so nothing internal leaks onto the wire.
+        function stripUiKeys(v) {
+            if (Array.isArray(v)) { return v.map(stripUiKeys); }
+            if (v && typeof v === 'object') {
+                var out = {};
+                Object.keys(v).forEach(function (k) {
+                    if (k.charAt(0) === '_') { return; }
+                    out[k] = stripUiKeys(v[k]);
+                });
+                return out;
+            }
+            return v;
+        }
+
+        // Server-only fields that depend on live UI/target state and aren't drawn on
+        // the canvas — refreshed at send time so the POSTed document is current.
+        function buildAnimationFromControls() {
+            return {
+                Enabled: true,
+                KenBurns: el('ccaKenBurns').checked,
+                ZoomAmount: 0.15,
+                Direction: el('ccaAnimDir').value,
+                FrameCount: parseInt(el('ccaAnimFrames').value, 10),
+                DelayMs: parseInt(el('ccaAnimDelay').value, 10),
+                Loop: true
+            };
+        }
+        function buildCollageFromControls() {
+            return {
+                SourceId: state.libraryId || '',
+                SourceType: (el('ccaTargetType') ? el('ccaTargetType').value : 'library'),
+                Density: el('ccaCollageDensity').value,
+                Seed: state.collageSeed
+            };
+        }
+
+        // The document to POST: `doc` with derived server-only fields refreshed and
+        // UI-only keys stripped.
+        function collectDocument() {
+            if (doc.Background.Source === 'collage') {
+                doc.Background.Collage = buildCollageFromControls();
+            }
+            if (el('ccaFormat').value === 'animatedgif') {
+                doc.Canvas.Format = 'gif';
+                doc.Background.Animation = buildAnimationFromControls();
+            }
+            return stripUiKeys(doc);
+        }
+
+        // Reads the gradient-stop DOM rows into the document (keeps canvas + the
+        // legacy collectSettings projection consistent as stops are edited).
+        function syncGradientStopsToDoc() {
+            if (!doc.Background.Gradient) { return; }
+            doc.Background.Gradient.Stops = collectGradientStops();
+        }
+
+        // Rebuilds the gradient-stop DOM rows from a document stop list.
+        function rebuildGradientStopsUI(stops) {
+            var container = el('ccaGradientStops');
+            container.innerHTML = '';
+            (stops || []).forEach(function (st) {
+                addGradientStop(pick(st, 'Color') || '#888888', Math.round((pick(st, 'Position') || 0) * 100));
+            });
+            if (container.querySelectorAll('.ccaStop').length < 2) {
+                addGradientStop('#aa5cc3', 0);
+                addGradientStop('#00a4dc', 100);
+            }
+        }
+
+        // Applies the Format control to the document (auto|png|gif, or animatedgif =>
+        // gif + an Animation object). Shared by the change handler and GIF autodetect.
+        function applyFormatFromControl() {
+            var v = el('ccaFormat').value;
+            doc.Canvas.Format = (v === 'animatedgif') ? 'gif' : v;
+            doc.Background.Animation = (v === 'animatedgif') ? buildAnimationFromControls() : null;
+            updateAnimVisibility();
+            scheduleRender();
+        }
+
+        // Sets EVERY control from `doc` — the inverse of the old applySettingsToForm.
+        // The selected text layer drives the Text card; doc.Background/doc.Canvas drive
+        // the rest. Call after a selection change or a template load.
+        function syncControlsFromDocument() {
+            var l = selectedLayer() || {};
+
+            // Text card (selected layer)
+            el('ccaTitle').value = (l.Content != null) ? l.Content : '';
+            var sizePx = Math.round((l.Size || 0) * doc.Canvas.Height);
+            el('ccaTextSize').value = sizePx; el('ccaTextSizeVal').textContent = sizePx;
+            el('ccaTextWeight').value = String(l.Weight != null ? l.Weight : 400);
+            el('ccaTextColor').value = l.Color || '#ffffff';
+            el('ccaTextAlign').value = String(l.Align != null ? l.Align : 1);
+            el('ccaShadow').checked = !!(l.Shadow && l.Shadow.Enabled);
+            el('ccaOutline').checked = !!(l.Outline && l.Outline.Enabled);
+
+            // Background card
+            var bg = doc.Background;
+            el('ccaDim').value = bg.Dim; el('ccaDimVal').textContent = bg.Dim;
+            el('ccaBlur').value = bg.Blur; el('ccaBlurVal').textContent = bg.Blur;
+            el('ccaDimColor').value = bg.DimColor || '#000000';
+            el('ccaBgFit').value = bg.Fit || 'cover';
+            el('ccaBgSource').value = bg.Source || 'upload';
+            var g = bg.Gradient;
+            if (g) {
+                el('ccaGradient').checked = !!g.IsEnabled;
+                el('ccaGradientType').value = String(g.Type || 0);
+                el('ccaGradientAngle').value = g.Angle || 0;
+                el('ccaGradientAngleVal').textContent = (g.Angle || 0) + '°';
+                rebuildGradientStopsUI(g.Stops);
+            } else {
+                el('ccaGradient').checked = false;
+            }
+            if (bg.Collage) { el('ccaCollageDensity').value = bg.Collage.Density || 'medium'; }
+
+            // Output card
+            el('ccaPreset').value = doc.Canvas.DimensionPreset || 'custom';
+            el('ccaWidth').value = doc.Canvas.Width;
+            el('ccaHeight').value = doc.Canvas.Height;
+            var anim = bg.Animation;
+            if (doc.Canvas.Format === 'gif' && anim && anim.Enabled) {
+                el('ccaFormat').value = 'animatedgif';
+                el('ccaKenBurns').checked = !!anim.KenBurns;
+                if (anim.FrameCount != null) { el('ccaAnimFrames').value = anim.FrameCount; el('ccaAnimFramesVal').textContent = anim.FrameCount; }
+                if (anim.DelayMs != null) { el('ccaAnimDelay').value = anim.DelayMs; el('ccaAnimDelayVal').textContent = anim.DelayMs; }
+                el('ccaAnimDir').value = anim.Direction || 'in';
+            } else {
+                el('ccaFormat').value = doc.Canvas.Format || 'auto';
+            }
+
+            // Re-sync dependent visibility + labels.
+            updateUI();
+            updateCollageVisibility();
+            updateAnimVisibility();
+        }
+        // ------------------------------------------------------------------
 
         // Enable/disable controls based on current selection.
         function updateUI() {
@@ -799,6 +1381,81 @@
         }
 
         // --- Templates ----------------------------------------------------
+
+        // Pick helper for legacy CoverArtSettings that treats 0/false as present
+        // (unlike a plain `||` fallback, which would replace a real 0 dim/blur).
+        function pickNum(s, name, fallback) {
+            var v = pick(s, name);
+            return (v === undefined || v === null) ? fallback : v;
+        }
+
+        // Converts a legacy flat CoverArtSettings (templates saved before the
+        // canvas engine shipped, which carry Settings but no Document) into a
+        // one-text-layer CoverDocument — the client mirror of the server's
+        // Services/DocumentMigration.cs FromSettings, so old templates keep
+        // working. Per template semantics ("templates store the design but not
+        // the title"), the title layer's Content is stripped, same as a
+        // freshly-saved document-native template would have.
+        function migrateTemplateToDocument(s) {
+            var d = defaultDocument();
+
+            d.Canvas.Width = pickNum(s, 'ExportWidth', d.Canvas.Width);
+            d.Canvas.Height = pickNum(s, 'ExportHeight', d.Canvas.Height);
+            d.Canvas.Format = pick(s, 'OutputFormat') || d.Canvas.Format;
+            d.Canvas.DimensionPreset = pick(s, 'DimensionPreset') || d.Canvas.DimensionPreset;
+
+            var bg = d.Background;
+            bg.Source = pick(s, 'BackgroundSource') || bg.Source;
+            bg.ImagePath = pick(s, 'BackgroundImagePath') || '';
+            bg.Fit = pick(s, 'BackgroundFit') || 'cover';
+            bg.Blur = pickNum(s, 'BackgroundBlur', bg.Blur);
+            bg.Dim = pickNum(s, 'BackgroundDim', bg.Dim);
+            bg.DimColor = pick(s, 'DimColor') || bg.DimColor;
+            // Mirrors DocumentMigration.FromSettings: Gradient = s.BackgroundGradient,
+            // i.e. a missing gradient stays null — NOT the default purple/blue
+            // gradient from defaultDocument(). Falling back to that default would
+            // put a phantom gradient (IsEnabled:true) onto any legacy template
+            // that never had one (a plain image, or a flat/dim-only design), and
+            // that phantom gradient would then get baked onto the real applied
+            // cover by the server's CreateGradientBackground.
+            bg.Gradient = pick(s, 'BackgroundGradient') || null;
+            bg.Collage = pick(s, 'Collage') || null;
+            bg.Animation = pick(s, 'Animation') || null;
+            bg.Transform = { OffsetX: 0, OffsetY: 0, Scale: 1 }; // identity, as FromSettings does
+
+            var l = d.Layers[0];
+            l.Content = ''; // template title stripped — each target keeps its own name
+            var height = d.Canvas.Height || 1400;
+            l.Size = pickNum(s, 'TextSize', 120) / height;
+            l.Weight = pickNum(s, 'TextWeight', 400);
+            l.Color = pick(s, 'TextColor') || '#ffffff';
+            l.Align = pickNum(s, 'TextAlign', 1);
+            l.FontPath = pick(s, 'CustomFontPath') || '';
+
+            // Anchor position from align/baseline/padding, mirroring
+            // DocumentMigration.AnchorFor (TextAlign/TextBaseline: 0=start/top,
+            // 1=center/middle, 2=end/bottom).
+            var baseline = pickNum(s, 'TextBaseline', 1);
+            var padding = pickNum(s, 'TextPadding', 0.05);
+            l.X = l.Align === 0 ? padding : (l.Align === 2 ? 1 - padding : 0.5);
+            l.Y = baseline === 0 ? padding : (baseline === 2 ? 1 - padding : 0.5);
+
+            l.Shadow = {
+                Enabled: !!pick(s, 'TextShadow'),
+                Color: pick(s, 'TextShadowColor') || '#000000',
+                Blur: pickNum(s, 'TextShadowBlur', 4),
+                OffsetX: pickNum(s, 'TextShadowOffsetX', 2),
+                OffsetY: pickNum(s, 'TextShadowOffsetY', 2)
+            };
+            l.Outline = {
+                Enabled: !!pick(s, 'TextOutline'),
+                Color: pick(s, 'TextOutlineColor') || '#000000',
+                Width: pickNum(s, 'TextOutlineWidth', 2)
+            };
+
+            return d;
+        }
+
         function loadTemplates() {
             return jsonFetch('CustomCoverArt/templates').then(function (res) {
                 var sel = el('ccaTemplateSelect');
@@ -807,71 +1464,14 @@
                 (pick(res, 'Data') || []).forEach(function (tpl) {
                     var o = document.createElement('option');
                     o.value = pick(tpl, 'Name'); o.textContent = pick(tpl, 'Name');
+                    o._document = pick(tpl, 'Document');
+                    // Legacy templates (saved before the canvas engine) carry no
+                    // Document, only the flat Settings — kept here so the load
+                    // handler can migrate on demand.
                     o._settings = pick(tpl, 'Settings');
                     sel.appendChild(o);
                 });
             });
-        }
-
-        // Sets the form controls from a settings object (the inverse of
-        // collectSettings), EXCEPT Title and the target-specific collage source.
-        function applySettingsToForm(s) {
-            if (!s) { return; }
-            function setVal(id, v) { var e = el(id); if (e != null && v != null) { e.value = v; } }
-            function setChk(id, v) { var e = el(id); if (e != null) { e.checked = !!v; } }
-
-            var textSize = pick(s, 'TextSize');
-            if (textSize != null) { el('ccaTextSize').value = textSize; el('ccaTextSizeVal').textContent = textSize; }
-            setVal('ccaTextWeight', pick(s, 'TextWeight'));
-            setVal('ccaTextColor', pick(s, 'TextColor'));
-            setVal('ccaTextAlign', pick(s, 'TextAlign'));
-            var dim = pick(s, 'BackgroundDim');
-            if (dim != null) { el('ccaDim').value = dim; el('ccaDimVal').textContent = dim; }
-            var blur = pick(s, 'BackgroundBlur');
-            if (blur != null) { el('ccaBlur').value = blur; el('ccaBlurVal').textContent = blur; }
-            setVal('ccaDimColor', pick(s, 'DimColor'));
-            setChk('ccaShadow', pick(s, 'TextShadow'));
-            setChk('ccaOutline', pick(s, 'TextOutline'));
-            setVal('ccaBgFit', pick(s, 'BackgroundFit'));
-
-            var gr = pick(s, 'BackgroundGradient');
-            if (gr) {
-                setChk('ccaGradient', pick(gr, 'IsEnabled'));
-                setVal('ccaGradientType', pick(gr, 'Type'));
-                var ang = pick(gr, 'Angle');
-                if (ang != null) { el('ccaGradientAngle').value = ang; el('ccaGradientAngleVal').textContent = ang + '°'; }
-                var stops = pick(gr, 'Stops');
-                if (stops && stops.length >= 2) {
-                    el('ccaGradientStops').innerHTML = '';
-                    stops.forEach(function (st) {
-                        addGradientStop(pick(st, 'Color') || '#888888', Math.round((pick(st, 'Position') || 0) * 100));
-                    });
-                }
-            }
-
-            setVal('ccaBgSource', pick(s, 'BackgroundSource'));
-            var col = pick(s, 'Collage');
-            if (col) { setVal('ccaCollageDensity', pick(col, 'Density')); }
-
-            setVal('ccaPreset', pick(s, 'DimensionPreset'));
-            var anim = pick(s, 'Animation');
-            var fmtOpt = el('ccaFormat').querySelector('option[value="animatedgif"]');
-            if (anim && pick(anim, 'Enabled') && fmtOpt) {
-                el('ccaFormat').value = 'animatedgif';
-                setChk('ccaKenBurns', pick(anim, 'KenBurns'));
-                var fc = pick(anim, 'FrameCount');
-                if (fc != null && el('ccaAnimFrames')) { el('ccaAnimFrames').value = fc; if (el('ccaAnimFramesVal')) { el('ccaAnimFramesVal').textContent = fc; } }
-                var dl = pick(anim, 'DelayMs');
-                if (dl != null && el('ccaAnimDelay')) { el('ccaAnimDelay').value = dl; if (el('ccaAnimDelayVal')) { el('ccaAnimDelayVal').textContent = dl; } }
-                setVal('ccaAnimDir', pick(anim, 'Direction'));
-            } else {
-                setVal('ccaFormat', pick(s, 'OutputFormat'));
-            }
-
-            // Re-sync dependent visibility + labels.
-            updateUI();
-            updateCollageVisibility();
-            if (typeof updateAnimVisibility === 'function') { updateAnimVisibility(); }
         }
 
         // --- Batch apply --------------------------------------------------
@@ -923,7 +1523,8 @@
             rm.addEventListener('click', function () {
                 if (container.querySelectorAll('.ccaStop').length > 2) {
                     container.removeChild(row);
-                    schedulePreview();
+                    syncGradientStopsToDoc();
+                    scheduleRender();
                 }
             });
 
@@ -962,67 +1563,39 @@
             file.arrayBuffer().then(function (buf) {
                 if (isAnimatedGif(buf) && el('ccaFormat').value !== 'animatedgif') {
                     el('ccaFormat').value = 'animatedgif';
-                    updateAnimVisibility();
-                    runPreview();
+                    applyFormatFromControl();
                 }
             }).catch(function () { /* detection is best-effort */ });
         }
 
-        // Live preview: any change schedules a debounced render. Only one request
-        // is in flight at a time; if changes arrive while one is running, exactly
-        // one more runs afterwards. Failures are silent so the last good preview stays.
-        var previewInFlight = false, previewQueued = false;
-        var schedulePreview = debounce(runPreview, 450);
-
+        // Delegated fallback: the static controls each have an explicit handler that
+        // mutates `doc`; this catches the DYNAMIC gradient-stop rows (added at runtime)
+        // so editing a stop's colour/position flows into the document and re-renders.
         function onControlChange(e) {
             var target = e.target;
-            if (!target || target.type === 'file' || target.id === 'ccaLibrarySelect') { return; }
-            // Ticking batch targets or naming a template must not re-render the preview.
-            if (target.closest && target.closest('#ccaBatchList')) { return; }
-            if (target.id === 'ccaTemplateName' || target.id === 'ccaTemplateSelect') { return; }
-            schedulePreview();
-        }
-
-        function runPreview() {
-            if (previewInFlight) { previewQueued = true; return; }
-            previewInFlight = true;
-            var img = el('ccaPreview');
-            var spin = el('ccaPreviewSpinner');
-            img.style.opacity = '0.45';
-            if (spin) { spin.style.display = ''; }
-            authFetch('CustomCoverArt/preview', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(collectSettings())
-            }).then(function (r) {
-                if (!r.ok) { throw new Error('Preview failed (' + r.status + ')'); }
-                return r.blob();
-            }).then(function (blob) {
-                var url = URL.createObjectURL(blob);
-                var previous = img.getAttribute('src');
-                img.src = url;
-                img.style.display = 'block';
-                img.style.opacity = '1';
-                el('ccaPreviewPlaceholder').style.display = 'none';
-                el('ccaDownloadBtn').disabled = false;
-                if (previous && previous.indexOf('blob:') === 0) { URL.revokeObjectURL(previous); }
-            }).catch(function () {
-                img.style.opacity = '1';
-            }).then(function () {
-                previewInFlight = false;
-                if (previewQueued) { previewQueued = false; runPreview(); }
-                else if (spin) { spin.style.display = 'none'; }
-            });
+            if (!target || !target.closest) { return; }
+            if (target.closest('#ccaGradientStops')) {
+                syncGradientStopsToDoc();
+                scheduleRender();
+            }
         }
 
         function downloadPreview() {
-            var img = el('ccaPreview');
-            if (!img.src || img.style.display === 'none') { return; }
-            var fmt = el('ccaFormat').value;
-            var ext = (fmt === 'gif' || fmt === 'animatedgif') ? 'gif' : 'png';
+            // Download the client-rendered canvas directly. #ccaPreview is gone, so
+            // guard against a missing canvas and export the current backing store.
+            var cv = el('ccaCanvas');
+            if (!cv) { return; }
+            // Render one clean frame WITHOUT the selection overlay so the dashed box
+            // isn't baked into the exported PNG, then restore the on-screen selection.
+            var savedSel = doc._selectedId;
+            doc._selectedId = null;
+            renderDocument();
+            var dataUrl = cv.toDataURL('image/png');
+            doc._selectedId = savedSel;
+            renderDocument();
             var a = document.createElement('a');
-            a.href = img.src;
-            a.download = 'cover.' + ext;
+            a.href = dataUrl;
+            a.download = 'cover.png';
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -1039,9 +1612,9 @@
             btn.disabled = true;
             if (label) { label.textContent = t('action.applying'); }
             Dashboard.showLoadingMsg();
-            jsonFetch('CustomCoverArt/apply', 'POST', {
+            jsonFetch('CustomCoverArt/document/apply', 'POST', {
                 LibraryId: state.libraryId,
-                Settings: collectSettings()
+                Document: collectDocument()
             }).then(function (res) {
                 Dashboard.hideLoadingMsg();
                 if (pick(res, 'Success')) {
@@ -1055,6 +1628,39 @@
             }).then(function () {
                 if (label) { label.textContent = original; }
                 btn.disabled = !state.libraryId;
+            });
+        }
+
+        // On-demand authoritative render: POST the document to the server preview
+        // endpoint and show the returned PNG/GIF in a labelled overlay, so the user
+        // can compare the exact server output against the live canvas before applying.
+        var _serverRenderUrl = null;
+        function showServerRender() {
+            var btn = el('ccaServerRender');
+            if (btn.disabled) { return; }
+            var label = btn.querySelector('span');
+            var original = label ? label.textContent : '';
+            btn.disabled = true;
+            Dashboard.showLoadingMsg();
+            authFetch('CustomCoverArt/document/preview', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(collectDocument())
+            }).then(function (r) {
+                if (!r.ok) { throw new Error('render returned ' + r.status); }
+                return r.blob();
+            }).then(function (blob) {
+                if (_serverRenderUrl) { URL.revokeObjectURL(_serverRenderUrl); }
+                _serverRenderUrl = URL.createObjectURL(blob);
+                el('ccaServerRenderImg').src = _serverRenderUrl;
+                el('ccaServerRenderWrap').style.display = '';
+                Dashboard.hideLoadingMsg();
+            }).catch(function (e) {
+                Dashboard.hideLoadingMsg();
+                Dashboard.alert(t('dyn.error', e.message));
+            }).then(function () {
+                btn.disabled = false;
+                if (label) { label.textContent = original; }
             });
         }
 
@@ -1073,21 +1679,106 @@
                         Dashboard.alert(pick(res, 'Success') ? t('restore.done') : t('restore.fail'));
                     });
             });
-            el('ccaTextSize').addEventListener('input', function () { el('ccaTextSizeVal').textContent = this.value; });
-            el('ccaDim').addEventListener('input', function () { el('ccaDimVal').textContent = this.value; });
-            el('ccaBlur').addEventListener('input', function () { el('ccaBlurVal').textContent = this.value; });
-            el('ccaPreset').addEventListener('change', updateUI);
-            el('ccaFormat').addEventListener('change', function () { updateAnimVisibility(); runPreview(); });
-            el('ccaAnimFrames').addEventListener('input', function () { el('ccaAnimFramesVal').textContent = this.value; });
-            el('ccaAnimDelay').addEventListener('input', function () { el('ccaAnimDelayVal').textContent = this.value; });
-            el('ccaGradient').addEventListener('change', updateUI);
-            el('ccaGradientType').addEventListener('change', updateUI);
-            el('ccaGradientAngle').addEventListener('input', function () { el('ccaGradientAngleVal').textContent = this.value + '°'; });
-            el('ccaAddStop').addEventListener('click', function () { addGradientStop('#888888', 50); schedulePreview(); });
+            // --- Text card: drives the SELECTED text layer ----------------
+            el('ccaTitle').addEventListener('input', function () {
+                var l = selectedLayer(); if (l) { l.Content = this.value; scheduleRender(); }
+            });
+            el('ccaTextSize').addEventListener('input', function () {
+                el('ccaTextSizeVal').textContent = this.value;
+                var l = selectedLayer();
+                if (l) { l.Size = (parseInt(this.value, 10) || 0) / doc.Canvas.Height; scheduleRender(); }
+            });
+            el('ccaTextWeight').addEventListener('change', function () {
+                var l = selectedLayer(); if (l) { l.Weight = parseInt(this.value, 10); scheduleRender(); }
+            });
+            el('ccaTextAlign').addEventListener('change', function () {
+                var l = selectedLayer(); if (l) { l.Align = parseInt(this.value, 10); scheduleRender(); }
+            });
+            el('ccaTextColor').addEventListener('input', function () {
+                var l = selectedLayer(); if (l) { l.Color = this.value; scheduleRender(); }
+            });
+            el('ccaShadow').addEventListener('change', function () {
+                var l = selectedLayer(); if (l) { l.Shadow.Enabled = this.checked; scheduleRender(); }
+            });
+            el('ccaOutline').addEventListener('change', function () {
+                var l = selectedLayer(); if (l) { l.Outline.Enabled = this.checked; scheduleRender(); }
+            });
 
-            el('ccaBgSource').addEventListener('change', function () { updateCollageVisibility(); runPreview(); });
-            el('ccaCollageDensity').addEventListener('change', runPreview);
-            el('ccaCollageShuffle').addEventListener('click', function () { state.collageSeed = (state.collageSeed + 1) & 0x7fffffff; runPreview(); });
+            // --- Background card ------------------------------------------
+            el('ccaDim').addEventListener('input', function () {
+                el('ccaDimVal').textContent = this.value;
+                doc.Background.Dim = parseFloat(this.value); scheduleRender();
+            });
+            el('ccaBlur').addEventListener('input', function () {
+                el('ccaBlurVal').textContent = this.value;
+                doc.Background.Blur = parseFloat(this.value); scheduleRender();
+            });
+            el('ccaDimColor').addEventListener('input', function () {
+                doc.Background.DimColor = this.value; scheduleRender();
+            });
+            el('ccaBgFit').addEventListener('change', function () {
+                doc.Background.Fit = this.value; scheduleRender();
+            });
+            el('ccaGradient').addEventListener('change', function () {
+                if (doc.Background.Gradient) { doc.Background.Gradient.IsEnabled = this.checked; }
+                updateUI(); scheduleRender();
+            });
+            el('ccaGradientType').addEventListener('change', function () {
+                if (doc.Background.Gradient) { doc.Background.Gradient.Type = parseInt(this.value, 10); }
+                updateUI(); scheduleRender();
+            });
+            el('ccaGradientAngle').addEventListener('input', function () {
+                el('ccaGradientAngleVal').textContent = this.value + '°';
+                if (doc.Background.Gradient) { doc.Background.Gradient.Angle = parseFloat(this.value) || 0; }
+                scheduleRender();
+            });
+            el('ccaAddStop').addEventListener('click', function () {
+                addGradientStop('#888888', 50); syncGradientStopsToDoc(); scheduleRender();
+            });
+            el('ccaBgSource').addEventListener('change', function () {
+                doc.Background.Source = this.value;
+                if (this.value === 'collage') { doc.Background.Collage = buildCollageFromControls(); }
+                updateCollageVisibility(); scheduleRender();
+            });
+            el('ccaCollageDensity').addEventListener('change', function () {
+                if (doc.Background.Collage) { doc.Background.Collage.Density = this.value; } scheduleRender();
+            });
+            el('ccaCollageShuffle').addEventListener('click', function () {
+                state.collageSeed = (state.collageSeed + 1) & 0x7fffffff;
+                if (doc.Background.Collage) { doc.Background.Collage.Seed = state.collageSeed; }
+                scheduleRender();
+            });
+
+            // --- Output card ----------------------------------------------
+            el('ccaPreset').addEventListener('change', function () {
+                if (this.value !== 'custom' && PRESETS[this.value]) {
+                    doc.Canvas.Width = PRESETS[this.value].w;
+                    doc.Canvas.Height = PRESETS[this.value].h;
+                }
+                doc.Canvas.DimensionPreset = this.value;
+                updateUI(); scheduleRender();
+            });
+            el('ccaWidth').addEventListener('input', function () {
+                if (el('ccaPreset').value === 'custom') { doc.Canvas.Width = parseInt(this.value, 10) || doc.Canvas.Width; scheduleRender(); }
+            });
+            el('ccaHeight').addEventListener('input', function () {
+                if (el('ccaPreset').value === 'custom') { doc.Canvas.Height = parseInt(this.value, 10) || doc.Canvas.Height; scheduleRender(); }
+            });
+            el('ccaFormat').addEventListener('change', applyFormatFromControl);
+            el('ccaKenBurns').addEventListener('change', function () {
+                if (doc.Background.Animation) { doc.Background.Animation.KenBurns = this.checked; }
+            });
+            el('ccaAnimFrames').addEventListener('input', function () {
+                el('ccaAnimFramesVal').textContent = this.value;
+                if (doc.Background.Animation) { doc.Background.Animation.FrameCount = parseInt(this.value, 10); }
+            });
+            el('ccaAnimDelay').addEventListener('input', function () {
+                el('ccaAnimDelayVal').textContent = this.value;
+                if (doc.Background.Animation) { doc.Background.Animation.DelayMs = parseInt(this.value, 10); }
+            });
+            el('ccaAnimDir').addEventListener('change', function () {
+                if (doc.Background.Animation) { doc.Background.Animation.Direction = this.value; }
+            });
 
             el('ccaTargetType').addEventListener('change', function () {
                 Dashboard.showLoadingMsg();
@@ -1107,9 +1798,18 @@
                 uploadFile('upload', file).then(function (res) {
                     Dashboard.hideLoadingMsg();
                     if (pick(res, 'Success')) {
-                        state.backgroundImagePath = pick(res, 'Data');
+                        // Server path drives the authoritative render + apply; the
+                        // client canvas bitmap loads from the SAME client File via a
+                        // blob: URL so the canvas stays untainted (canvas-source
+                        // invariant). state.backgroundImagePath is kept for the legacy
+                        // batch/collectSettings projection.
+                        doc.Background.ImagePath = pick(res, 'Data');
+                        state.backgroundImagePath = doc.Background.ImagePath;
+                        var img = new Image();
+                        img.onload = function () { bgImageEl = img; scheduleRender(); };
+                        img.src = URL.createObjectURL(file);
                         maybeSwitchToAnimated(file);
-                        schedulePreview();
+                        scheduleRender();
                     } else {
                         Dashboard.alert(t('dyn.uploadFail', pick(res, 'ErrorMessage') || t('dyn.unknown')));
                     }
@@ -1124,7 +1824,9 @@
                     Dashboard.hideLoadingMsg();
                     if (pick(res, 'Success')) {
                         state.customFontPath = pick(res, 'Data');
-                        schedulePreview();
+                        var l = selectedLayer();
+                        if (l) { l.FontPath = state.customFontPath; }
+                        scheduleRender();
                     } else {
                         Dashboard.alert(t('dyn.fontFail', pick(res, 'ErrorMessage') || t('dyn.unknown')));
                     }
@@ -1132,16 +1834,71 @@
             });
 
             el('ccaApplyBtn').addEventListener('click', applyCoverArt);
+            el('ccaServerRender').addEventListener('click', showServerRender);
             el('ccaDownloadBtn').addEventListener('click', downloadPreview);
+
+            // Canvas selection + drag of text layers (or, in bgAdjustMode, pan/zoom
+            // of the background — see onCanvasPointerDown/Move/Up).
+            var cv = el('ccaCanvas');
+            cv.addEventListener('pointerdown', onCanvasPointerDown);
+            cv.addEventListener('pointermove', onCanvasPointerMove);
+            cv.addEventListener('pointerup', onCanvasPointerUp);
+            cv.addEventListener('pointercancel', onCanvasPointerUp);
+
+            // Mouse-wheel zoom of the background, only while repositioning it and
+            // only when an image is actually loaded (bgImageEl) — otherwise a no-op
+            // so the page can still scroll normally.
+            cv.addEventListener('wheel', function (ev) {
+                if (!bgAdjustMode || !bgImageEl) { return; }
+                ev.preventDefault();
+                var s = doc.Background.Transform.Scale * (ev.deltaY < 0 ? 1.05 : 0.95);
+                doc.Background.Transform.Scale = Math.min(4, Math.max(1, s));
+                scheduleRender();
+            }, { passive: false });
+
+            el('ccaBgAdjust').addEventListener('change', function () {
+                bgAdjustMode = this.checked;
+                // Toggling mid-gesture would otherwise leave a stale drag/pinch
+                // state around; clear it so the next pointer event starts clean.
+                _drag = null; _bgDrag = null; _pointers = {}; _pinchStartDist = 0;
+                cv.style.cursor = bgAdjustMode ? 'grab' : '';
+            });
 
             el('ccaTemplateSelect').addEventListener('change', function () {
                 var opt = this.options[this.selectedIndex];
-                if (opt && opt._settings) { applySettingsToForm(opt._settings); runPreview(); }
+                if (!opt) { return; }
+                var tplDoc = opt._document;
+                if (!tplDoc) {
+                    // Legacy template saved before the canvas engine: no Document,
+                    // only the flat Settings — migrate on the fly so it still loads.
+                    if (opt._settings) { tplDoc = migrateTemplateToDocument(opt._settings); }
+                    else { return; } // neither Document nor Settings (e.g. the "—" placeholder)
+                }
+                // Preserve THIS target's title if the template's title layer is blank
+                // (templates intentionally store the design, not the name).
+                var curLayer = selectedLayer();
+                var currentTitle = curLayer ? curLayer.Content : '';
+                doc = JSON.parse(JSON.stringify(tplDoc));
+                if (!doc.Layers) { doc.Layers = []; }
+                var titleLayer = null;
+                for (var i = 0; i < doc.Layers.length; i++) {
+                    if (doc.Layers[i].Id === 'title') { titleLayer = doc.Layers[i]; break; }
+                }
+                if (titleLayer && (!titleLayer.Content || !titleLayer.Content.trim()) && currentTitle) {
+                    titleLayer.Content = currentTitle;
+                }
+                doc._selectedId = titleLayer ? titleLayer.Id : (doc.Layers[0] ? doc.Layers[0].Id : null);
+                // A template carries only a server ImagePath, never a client blob, so
+                // drop any stale canvas bitmap (the invariant forbids loading the
+                // server path); the gradient/flat background renders instead.
+                bgImageEl = null;
+                syncControlsFromDocument();
+                scheduleRender();
             });
             el('ccaTemplateSave').addEventListener('click', function () {
                 var name = el('ccaTemplateName').value.trim();
                 if (!name) { Dashboard.alert(t('tpl.named')); return; }
-                jsonFetch('CustomCoverArt/templates', 'POST', { Name: name, Settings: collectSettings() })
+                jsonFetch('CustomCoverArt/templates', 'POST', { Name: name, Document: collectDocument() })
                     .then(function () { Dashboard.alert(t('tpl.saved')); loadTemplates(); });
             });
             el('ccaTemplateDelete').addEventListener('click', function () {
@@ -1164,8 +1921,8 @@
                     });
             });
 
-            // Auto-preview: any control change (except file inputs and the library
-            // picker) schedules a debounced live render.
+            // Delegated handler for the dynamically-added gradient-stop rows (the
+            // static controls each bind their own doc-mutating handler above).
             var controls = page.querySelector('.ccaControls');
             controls.addEventListener('input', onControlChange);
             controls.addEventListener('change', onControlChange);
@@ -1275,10 +2032,12 @@
             // since some servers require a token even for images) and upload it as a
             // normal background. Using FormData.append(blob, filename) avoids the
             // File constructor, which isn't reliable in every webview.
+            var posterBlob = null;
             fetch(imgUrl, { headers: { 'X-Emby-Token': ApiClient.accessToken() }, credentials: 'include' })
                 .then(function (r) { if (!r.ok) { throw new Error('image fetch returned ' + r.status); } return r.blob(); })
                 .then(function (blob) {
                     if (!blob || blob.size === 0) { throw new Error('the downloaded image was empty'); }
+                    posterBlob = blob;
                     var ext = blob.type === 'image/png' ? 'png' : (blob.type === 'image/webp' ? 'webp' : 'jpg');
                     var fd = new FormData();
                     fd.append('file', blob, 'poster.' + ext);
@@ -1288,10 +2047,17 @@
                     Dashboard.hideLoadingMsg();
                     var path = pick(res, 'Data');
                     if (pick(res, 'Success') && path) {
+                        // Server path for render/apply; canvas bitmap from the fetched
+                        // Blob via a blob: URL (canvas-source invariant — never the
+                        // server path / ApiClient.getImageUrl).
+                        doc.Background.ImagePath = path;
                         state.backgroundImagePath = path;
+                        var img = new Image();
+                        img.onload = function () { bgImageEl = img; scheduleRender(); };
+                        img.src = URL.createObjectURL(posterBlob);
                         el('ccaSelectedBgName').textContent = name;
                         el('ccaSelectedBg').style.display = '';
-                        schedulePreview();
+                        scheduleRender();
                         closeBrowser();
                     } else {
                         Dashboard.alert('Upload rejected: ' + (pick(res, 'ErrorMessage') || 'unknown reason'));
@@ -1309,16 +2075,16 @@
             applyI18n(page);
             if (!page.dataset.ccaInit) {
                 bindEvents();
-                if (!page.querySelector('#ccaGradientStops .ccaStop')) {
-                    // Default to Jellyfin's brand gradient (purple → blue) so the
-                    // first preview looks intentional instead of a black canvas.
-                    addGradientStop('#aa5cc3', 0);
-                    addGradientStop('#00a4dc', 100);
-                }
                 page.dataset.ccaInit = 'true';
             }
             Dashboard.showLoadingMsg();
-            updateAnimVisibility();
+            // Seed every control (incl. the brand gradient stops) from the default
+            // document, so the UI and the live canvas start in agreement.
+            syncControlsFromDocument();
+            // Render immediately with a sane fallback, then re-render once the
+            // bundled Noto weights register so canvas text metrics match the server.
+            scheduleRender();
+            loadCanvasFonts().then(scheduleRender);
             loadTemplates();
             loadBatchList();
             loadLibraries().then(function () {
@@ -1326,7 +2092,7 @@
                 updateCollageVisibility();
                 refreshRestoreState();
                 Dashboard.hideLoadingMsg();
-                schedulePreview();
+                scheduleRender();
             }).catch(function () { Dashboard.hideLoadingMsg(); });
         });
     })();
