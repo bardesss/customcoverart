@@ -284,6 +284,7 @@
                         <div class="ccaPreviewWrap">
                             <img id="ccaPreview" alt="Cover art preview" />
                             <div id="ccaPreviewPlaceholder" class="ccaPreviewPlaceholder" data-i18n="preview.placeholder">Generate a preview to see your cover art.</div>
+                            <div id="ccaPreviewSpinner" class="ccaSpinner" style="display:none" aria-hidden="true"></div>
                         </div>
                         <div class="ccaActions">
                             <button is="emby-button" type="button" id="ccaApplyBtn" class="raised block button-submit" disabled><span data-i18n="action.apply">Apply to library</span></button>
@@ -308,6 +309,11 @@
                             <option value="Movie" data-i18n="ty.movies">Movies</option>
                             <option value="Series" data-i18n="ty.series">Series</option>
                             <option value="Season" data-i18n="ty.seasons">Seasons</option>
+                            <option value="MusicAlbum" data-i18n="ty.albums">Albums</option>
+                            <option value="MusicArtist" data-i18n="ty.artists">Artists</option>
+                            <option value="Book" data-i18n="ty.books">Books</option>
+                            <option value="MusicVideo" data-i18n="ty.musicvideos">Music videos</option>
+                            <option value="Photo" data-i18n="ty.photos">Photos</option>
                         </select>
                     </div>
                     <div id="ccaBrowserGrid" class="ccaPosterGrid"></div>
@@ -425,6 +431,7 @@
             #CustomCoverArtConfigPage .ccaPreviewCol { position: static; }
         }
         #CustomCoverArtConfigPage .ccaPreviewWrap {
+            position: relative;
             display: flex; align-items: center; justify-content: center;
             min-height: 260px;
             border: 1px dashed rgba(127, 127, 127, .4);
@@ -443,6 +450,19 @@
             transition: opacity .15s ease;
         }
         #CustomCoverArtConfigPage .ccaPreviewPlaceholder { opacity: .5; }
+        #CustomCoverArtConfigPage .ccaSpinner {
+            position: absolute; inset: 0; margin: auto;
+            width: 2.6em; height: 2.6em;
+            border: 3px solid rgba(127, 127, 127, .3);
+            border-top-color: var(--theme-primary-color, #00a4dc);
+            border-radius: 50%;
+            animation: ccaSpin .8s linear infinite;
+            pointer-events: none;
+        }
+        @keyframes ccaSpin { to { transform: rotate(360deg); } }
+        @media (prefers-reduced-motion: reduce) {
+            #CustomCoverArtConfigPage .ccaSpinner { animation-duration: 2.4s; }
+        }
         #CustomCoverArtConfigPage .ccaActions { display: flex; flex-direction: column; gap: .6em; margin-top: 1em; }
         #CustomCoverArtConfigPage .ccaActions .emby-button { margin: 0; }
 
@@ -499,7 +519,7 @@
                 'card.preview': 'Preview', 'preview.placeholder': 'Generate a preview to see your cover art.',
                 'action.apply': 'Apply to library', 'action.download': 'Download image', 'preview.hint': 'The preview updates automatically as you adjust settings.',
                 'modal.title': 'Select a poster', 'modal.search': 'Search…', 'modal.alltypes': 'All types',
-                'ty.movies': 'Movies', 'ty.series': 'Series', 'ty.seasons': 'Seasons', 'modal.prev': 'Previous', 'modal.next': 'Next',
+                'ty.movies': 'Movies', 'ty.series': 'Series', 'ty.seasons': 'Seasons', 'ty.albums': 'Albums', 'ty.artists': 'Artists', 'ty.books': 'Books', 'ty.musicvideos': 'Music videos', 'ty.photos': 'Photos', 'modal.prev': 'Previous', 'modal.next': 'Next',
                 'dyn.loading': 'Loading…', 'dyn.errorItems': 'Error loading items', 'dyn.noItems': 'No items found', 'dyn.page': 'Page {0} of {1}',
                 'dyn.applied': 'Cover art applied successfully.', 'dyn.error': 'Error: {0}', 'dyn.applyFail': 'Could not apply cover art: {0}',
                 'dyn.uploadFail': 'Upload failed: {0}', 'dyn.fontFail': 'Font upload failed: {0}', 'dyn.useImgFail': 'Could not use that image: {0}',
@@ -536,7 +556,7 @@
                 'card.preview': 'Voorbeeld', 'preview.placeholder': 'Het voorbeeld verschijnt hier automatisch.',
                 'action.apply': 'Toepassen op bibliotheek', 'action.download': 'Afbeelding downloaden', 'preview.hint': 'Het voorbeeld wordt automatisch bijgewerkt terwijl je instellingen aanpast.',
                 'modal.title': 'Selecteer een poster', 'modal.search': 'Zoeken…', 'modal.alltypes': 'Alle types',
-                'ty.movies': 'Films', 'ty.series': 'Series', 'ty.seasons': 'Seizoenen', 'modal.prev': 'Vorige', 'modal.next': 'Volgende',
+                'ty.movies': 'Films', 'ty.series': 'Series', 'ty.seasons': 'Seizoenen', 'ty.albums': 'Albums', 'ty.artists': 'Artiesten', 'ty.books': 'Boeken', 'ty.musicvideos': 'Videoclips', 'ty.photos': 'Foto\'s', 'modal.prev': 'Vorige', 'modal.next': 'Volgende',
                 'dyn.loading': 'Laden…', 'dyn.errorItems': 'Fout bij laden van items', 'dyn.noItems': 'Geen items gevonden', 'dyn.page': 'Pagina {0} van {1}',
                 'dyn.applied': 'Cover art succesvol toegepast.', 'dyn.error': 'Fout: {0}', 'dyn.applyFail': 'Kon cover art niet toepassen: {0}',
                 'dyn.uploadFail': 'Uploaden mislukt: {0}', 'dyn.fontFail': 'Lettertype uploaden mislukt: {0}', 'dyn.useImgFail': 'Kon die afbeelding niet gebruiken: {0}',
@@ -965,7 +985,9 @@
             if (previewInFlight) { previewQueued = true; return; }
             previewInFlight = true;
             var img = el('ccaPreview');
+            var spin = el('ccaPreviewSpinner');
             img.style.opacity = '0.45';
+            if (spin) { spin.style.display = ''; }
             authFetch('CustomCoverArt/preview', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -987,6 +1009,7 @@
             }).then(function () {
                 previewInFlight = false;
                 if (previewQueued) { previewQueued = false; runPreview(); }
+                else if (spin) { spin.style.display = 'none'; }
             });
         }
 
