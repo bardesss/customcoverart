@@ -285,8 +285,13 @@
                         </div>
                         <div class="ccaActions">
                             <button is="emby-button" type="button" id="ccaApplyBtn" class="raised block button-submit" disabled><span data-i18n="action.apply">Apply to library</span></button>
+                            <button is="emby-button" type="button" id="ccaServerRender" class="raised block"><span data-i18n="action.serverRender">Show server render</span></button>
                             <button is="emby-button" type="button" id="ccaDownloadBtn" class="raised block" disabled><span data-i18n="action.download">Download image</span></button>
                             <div class="fieldDescription ccaPreviewHint" data-i18n="preview.hint">The preview updates automatically as you adjust settings.</div>
+                        </div>
+                        <div id="ccaServerRenderWrap" class="ccaServerRender" style="display:none">
+                            <div class="ccaServerRenderLabel" data-i18n="serverrender.label">Authoritative render (server)</div>
+                            <img id="ccaServerRenderImg" class="ccaServerRenderImg" alt="Server render" />
                         </div>
                     </section>
                 </div>
@@ -469,6 +474,11 @@
         #CustomCoverArtConfigPage .ccaActions { display: flex; flex-direction: column; gap: .6em; margin-top: 1em; }
         #CustomCoverArtConfigPage .ccaActions .emby-button { margin: 0; }
 
+        /* Authoritative server render overlay */
+        #CustomCoverArtConfigPage .ccaServerRender { margin-top: 1em; text-align: center; }
+        #CustomCoverArtConfigPage .ccaServerRenderLabel { font-size: .78em; font-weight: 700; text-transform: uppercase; letter-spacing: .09em; opacity: .55; margin-bottom: .5em; }
+        #CustomCoverArtConfigPage .ccaServerRenderImg { display: block; max-width: 100%; height: auto; margin: 0 auto; border-radius: 6px; box-shadow: 0 8px 28px rgba(0, 0, 0, .4); }
+
         /* Poster picker modal */
         #CustomCoverArtConfigPage .ccaModal { position: fixed; inset: 0; background: rgba(0, 0, 0, .65); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 1em; }
         #CustomCoverArtConfigPage .ccaModalBox { background: #1b1b1b; width: 100%; max-width: 960px; max-height: 85vh; border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; border: 1px solid rgba(127, 127, 127, .25); }
@@ -520,7 +530,7 @@
                 'out.font': 'Custom font (optional)', 'f.chooseFont': 'Choose font…',
                 'hint.font': 'TTF, OTF, TTC, WOFF or WOFF2 · up to 5 MB. Leave empty to use the bundled Noto Sans.',
                 'card.preview': 'Preview', 'preview.placeholder': 'Generate a preview to see your cover art.',
-                'action.apply': 'Apply to library', 'action.applying': 'Applying…', 'action.download': 'Download image', 'preview.hint': 'The preview updates automatically as you adjust settings.',
+                'action.apply': 'Apply to library', 'action.applying': 'Applying…', 'action.download': 'Download image', 'action.serverRender': 'Show server render', 'serverrender.label': 'Authoritative render (server)', 'preview.hint': 'The preview updates automatically as you adjust settings.',
                 'modal.title': 'Select a poster', 'modal.search': 'Search…', 'modal.alltypes': 'All types',
                 'ty.movies': 'Movies', 'ty.series': 'Series', 'ty.seasons': 'Seasons', 'ty.albums': 'Albums', 'ty.artists': 'Artists', 'ty.books': 'Books', 'ty.musicvideos': 'Music videos', 'ty.photos': 'Photos', 'modal.prev': 'Previous', 'modal.next': 'Next',
                 'dyn.loading': 'Loading…', 'dyn.errorItems': 'Error loading items', 'dyn.noItems': 'No items found', 'dyn.page': 'Page {0} of {1}',
@@ -557,7 +567,7 @@
                 'out.font': 'Aangepast lettertype (optioneel)', 'f.chooseFont': 'Kies lettertype…',
                 'hint.font': 'TTF, OTF, TTC, WOFF of WOFF2 · max. 5 MB. Laat leeg voor de meegeleverde Noto Sans.',
                 'card.preview': 'Voorbeeld', 'preview.placeholder': 'Het voorbeeld verschijnt hier automatisch.',
-                'action.apply': 'Toepassen op bibliotheek', 'action.applying': 'Bezig met toepassen…', 'action.download': 'Afbeelding downloaden', 'preview.hint': 'Het voorbeeld wordt automatisch bijgewerkt terwijl je instellingen aanpast.',
+                'action.apply': 'Toepassen op bibliotheek', 'action.applying': 'Bezig met toepassen…', 'action.download': 'Afbeelding downloaden', 'action.serverRender': 'Serverweergave tonen', 'serverrender.label': 'Gezaghebbende weergave (server)', 'preview.hint': 'Het voorbeeld wordt automatisch bijgewerkt terwijl je instellingen aanpast.',
                 'modal.title': 'Selecteer een poster', 'modal.search': 'Zoeken…', 'modal.alltypes': 'Alle types',
                 'ty.movies': 'Films', 'ty.series': 'Series', 'ty.seasons': 'Seizoenen', 'ty.albums': 'Albums', 'ty.artists': 'Artiesten', 'ty.books': 'Boeken', 'ty.musicvideos': 'Videoclips', 'ty.photos': 'Foto\'s', 'modal.prev': 'Vorige', 'modal.next': 'Volgende',
                 'dyn.loading': 'Laden…', 'dyn.errorItems': 'Fout bij laden van items', 'dyn.noItems': 'Geen items gevonden', 'dyn.page': 'Pagina {0} van {1}',
@@ -909,8 +919,94 @@
             ctx.restore();
         }
 
-        // Selection overlay (drag handles) — stub; implemented in Task 8.
-        function drawSelectionHandles(ctx, W, H) { /* Task 8 */ }
+        // Measured bounding box (canvas px) of a text layer, honouring alignment and
+        // the middle baseline used by drawTextLayer. Used for hit-testing and the
+        // selection outline so the box tracks the rendered glyphs.
+        function textLayerBounds(ctx, layer, W, H) {
+            var fontPx = Math.max(8, Math.min(1024, layer.Size * doc.Canvas.Height));
+            ctx.save();
+            ctx.font = layer.Weight + ' ' + fontPx + 'px "Noto Sans", sans-serif';
+            var m = ctx.measureText(layer.Content || '');
+            ctx.restore();
+            var tw = m.width;
+            var th = fontPx;                 // approx line box height
+            var cx = normToPx(layer.X, W), cy = normToPx(layer.Y, H);
+            var left;
+            if (layer.Align === 0) { left = cx; }          // left edge
+            else if (layer.Align === 2) { left = cx - tw; } // right edge
+            else { left = cx - tw / 2; }                    // centred
+            return { x: left, y: cy - th / 2, w: tw, h: th };
+        }
+
+        // Selection overlay: a dashed outline around the selected text layer's bounds.
+        function drawSelectionHandles(ctx, W, H) {
+            var layer = selectedLayer();
+            if (!layer || !layer.Visible || layer.Type !== 'text') { return; }
+            var b = textLayerBounds(ctx, layer, W, H);
+            var pad = Math.max(6, b.h * 0.18);
+            ctx.save();
+            ctx.strokeStyle = 'rgba(0, 164, 220, 0.95)';
+            ctx.lineWidth = Math.max(1.5, H / 500);
+            ctx.setLineDash([Math.max(6, H / 120), Math.max(4, H / 200)]);
+            ctx.strokeRect(b.x - pad, b.y - pad, b.w + pad * 2, b.h + pad * 2);
+            ctx.restore();
+        }
+
+        // Client → canvas-pixel mapping (accounts for the CSS-scaled canvas).
+        function canvasPoint(ev) {
+            var cv = el('ccaCanvas'), r = cv.getBoundingClientRect();
+            return {
+                x: r.width ? (ev.clientX - r.left) / r.width * cv.width : 0,
+                y: r.height ? (ev.clientY - r.top) / r.height * cv.height : 0
+            };
+        }
+
+        // Topmost (last-drawn) visible text layer whose padded bounds contain the point.
+        function hitTestLayer(pt) {
+            var cv = el('ccaCanvas'); if (!cv) { return null; }
+            var ctx = cv.getContext('2d');
+            for (var i = doc.Layers.length - 1; i >= 0; i--) {
+                var layer = doc.Layers[i];
+                if (!layer.Visible || layer.Type !== 'text') { continue; }
+                var b = textLayerBounds(ctx, layer, cv.width, cv.height);
+                var pad = Math.max(8, b.h * 0.3);
+                if (pt.x >= b.x - pad && pt.x <= b.x + b.w + pad &&
+                    pt.y >= b.y - pad && pt.y <= b.y + b.h + pad) {
+                    return layer;
+                }
+            }
+            return null;
+        }
+
+        var _drag = null;
+        function onCanvasPointerDown(ev) {
+            var pt = canvasPoint(ev);
+            var hit = hitTestLayer(pt);
+            if (!hit) { return; }
+            if (doc._selectedId !== hit.Id) {
+                doc._selectedId = hit.Id;
+                syncControlsFromDocument();
+            }
+            _drag = { startX: pt.x, startY: pt.y, origX: hit.X, origY: hit.Y };
+            try { el('ccaCanvas').setPointerCapture(ev.pointerId); } catch (e) { /* ignore */ }
+            renderDocument();
+            ev.preventDefault();
+        }
+        function onCanvasPointerMove(ev) {
+            if (!_drag) { return; }
+            var layer = selectedLayer(); if (!layer) { return; }
+            var cv = el('ccaCanvas');
+            var pt = canvasPoint(ev);
+            layer.X = Math.max(0, Math.min(1, _drag.origX + (pt.x - _drag.startX) / cv.width));
+            layer.Y = Math.max(0, Math.min(1, _drag.origY + (pt.y - _drag.startY) / cv.height));
+            scheduleRender();
+            ev.preventDefault();
+        }
+        function onCanvasPointerUp(ev) {
+            if (!_drag) { return; }
+            try { el('ccaCanvas').releasePointerCapture(ev.pointerId); } catch (e) { /* ignore */ }
+            _drag = null;
+        }
 
         // Loads the SAME bundled Noto weights the server renders with, via the
         // authenticated font endpoint + the FontFace API (which — unlike CSS
@@ -992,6 +1088,148 @@
             };
         }
 
+        // --- Document <-> controls binding (Task 8) -----------------------
+        // collectSettings() (above) is RETAINED only to feed the legacy flat-Settings
+        // endpoints (batch apply + its projection); the live canvas, Apply, server
+        // render and templates are all document-native via collectDocument().
+
+        // Recursively deep-clone `doc`, dropping UI-only keys (any `_`-prefixed key,
+        // e.g. _selectedId) so nothing internal leaks onto the wire.
+        function stripUiKeys(v) {
+            if (Array.isArray(v)) { return v.map(stripUiKeys); }
+            if (v && typeof v === 'object') {
+                var out = {};
+                Object.keys(v).forEach(function (k) {
+                    if (k.charAt(0) === '_') { return; }
+                    out[k] = stripUiKeys(v[k]);
+                });
+                return out;
+            }
+            return v;
+        }
+
+        // Server-only fields that depend on live UI/target state and aren't drawn on
+        // the canvas — refreshed at send time so the POSTed document is current.
+        function buildAnimationFromControls() {
+            return {
+                Enabled: true,
+                KenBurns: el('ccaKenBurns').checked,
+                ZoomAmount: 0.15,
+                Direction: el('ccaAnimDir').value,
+                FrameCount: parseInt(el('ccaAnimFrames').value, 10),
+                DelayMs: parseInt(el('ccaAnimDelay').value, 10),
+                Loop: true
+            };
+        }
+        function buildCollageFromControls() {
+            return {
+                SourceId: state.libraryId || '',
+                SourceType: (el('ccaTargetType') ? el('ccaTargetType').value : 'library'),
+                Density: el('ccaCollageDensity').value,
+                Seed: state.collageSeed
+            };
+        }
+
+        // The document to POST: `doc` with derived server-only fields refreshed and
+        // UI-only keys stripped.
+        function collectDocument() {
+            if (doc.Background.Source === 'collage') {
+                doc.Background.Collage = buildCollageFromControls();
+            }
+            if (el('ccaFormat').value === 'animatedgif') {
+                doc.Canvas.Format = 'gif';
+                doc.Background.Animation = buildAnimationFromControls();
+            }
+            return stripUiKeys(doc);
+        }
+
+        // Reads the gradient-stop DOM rows into the document (keeps canvas + the
+        // legacy collectSettings projection consistent as stops are edited).
+        function syncGradientStopsToDoc() {
+            if (!doc.Background.Gradient) { return; }
+            doc.Background.Gradient.Stops = collectGradientStops();
+        }
+
+        // Rebuilds the gradient-stop DOM rows from a document stop list.
+        function rebuildGradientStopsUI(stops) {
+            var container = el('ccaGradientStops');
+            container.innerHTML = '';
+            (stops || []).forEach(function (st) {
+                addGradientStop(pick(st, 'Color') || '#888888', Math.round((pick(st, 'Position') || 0) * 100));
+            });
+            if (container.querySelectorAll('.ccaStop').length < 2) {
+                addGradientStop('#aa5cc3', 0);
+                addGradientStop('#00a4dc', 100);
+            }
+        }
+
+        // Applies the Format control to the document (auto|png|gif, or animatedgif =>
+        // gif + an Animation object). Shared by the change handler and GIF autodetect.
+        function applyFormatFromControl() {
+            var v = el('ccaFormat').value;
+            doc.Canvas.Format = (v === 'animatedgif') ? 'gif' : v;
+            doc.Background.Animation = (v === 'animatedgif') ? buildAnimationFromControls() : null;
+            updateAnimVisibility();
+            scheduleRender();
+        }
+
+        // Sets EVERY control from `doc` — the inverse of the old applySettingsToForm.
+        // The selected text layer drives the Text card; doc.Background/doc.Canvas drive
+        // the rest. Call after a selection change or a template load.
+        function syncControlsFromDocument() {
+            var l = selectedLayer() || {};
+
+            // Text card (selected layer)
+            el('ccaTitle').value = (l.Content != null) ? l.Content : '';
+            var sizePx = Math.round((l.Size || 0) * doc.Canvas.Height);
+            el('ccaTextSize').value = sizePx; el('ccaTextSizeVal').textContent = sizePx;
+            el('ccaTextWeight').value = String(l.Weight != null ? l.Weight : 400);
+            el('ccaTextColor').value = l.Color || '#ffffff';
+            el('ccaTextAlign').value = String(l.Align != null ? l.Align : 1);
+            el('ccaShadow').checked = !!(l.Shadow && l.Shadow.Enabled);
+            el('ccaOutline').checked = !!(l.Outline && l.Outline.Enabled);
+
+            // Background card
+            var bg = doc.Background;
+            el('ccaDim').value = bg.Dim; el('ccaDimVal').textContent = bg.Dim;
+            el('ccaBlur').value = bg.Blur; el('ccaBlurVal').textContent = bg.Blur;
+            el('ccaDimColor').value = bg.DimColor || '#000000';
+            el('ccaBgFit').value = bg.Fit || 'cover';
+            el('ccaBgSource').value = bg.Source || 'upload';
+            var g = bg.Gradient;
+            if (g) {
+                el('ccaGradient').checked = !!g.IsEnabled;
+                el('ccaGradientType').value = String(g.Type || 0);
+                el('ccaGradientAngle').value = g.Angle || 0;
+                el('ccaGradientAngleVal').textContent = (g.Angle || 0) + '°';
+                rebuildGradientStopsUI(g.Stops);
+            } else {
+                el('ccaGradient').checked = false;
+            }
+            if (bg.Collage) { el('ccaCollageDensity').value = bg.Collage.Density || 'medium'; }
+
+            // Output card
+            el('ccaPreset').value = doc.Canvas.DimensionPreset || 'custom';
+            el('ccaWidth').value = doc.Canvas.Width;
+            el('ccaHeight').value = doc.Canvas.Height;
+            var anim = bg.Animation;
+            if (doc.Canvas.Format === 'gif' && anim && anim.Enabled) {
+                el('ccaFormat').value = 'animatedgif';
+                el('ccaKenBurns').checked = !!anim.KenBurns;
+                if (anim.FrameCount != null) { el('ccaAnimFrames').value = anim.FrameCount; el('ccaAnimFramesVal').textContent = anim.FrameCount; }
+                if (anim.DelayMs != null) { el('ccaAnimDelay').value = anim.DelayMs; el('ccaAnimDelayVal').textContent = anim.DelayMs; }
+                el('ccaAnimDir').value = anim.Direction || 'in';
+            } else {
+                el('ccaFormat').value = doc.Canvas.Format || 'auto';
+            }
+
+            // Re-sync dependent visibility + labels.
+            updateUI();
+            updateCollageVisibility();
+            updateAnimVisibility();
+        }
+        // ------------------------------------------------------------------
+
         // Enable/disable controls based on current selection.
         function updateUI() {
             el('ccaApplyBtn').disabled = !state.libraryId;
@@ -1068,71 +1306,10 @@
                 (pick(res, 'Data') || []).forEach(function (tpl) {
                     var o = document.createElement('option');
                     o.value = pick(tpl, 'Name'); o.textContent = pick(tpl, 'Name');
-                    o._settings = pick(tpl, 'Settings');
+                    o._document = pick(tpl, 'Document');
                     sel.appendChild(o);
                 });
             });
-        }
-
-        // Sets the form controls from a settings object (the inverse of
-        // collectSettings), EXCEPT Title and the target-specific collage source.
-        function applySettingsToForm(s) {
-            if (!s) { return; }
-            function setVal(id, v) { var e = el(id); if (e != null && v != null) { e.value = v; } }
-            function setChk(id, v) { var e = el(id); if (e != null) { e.checked = !!v; } }
-
-            var textSize = pick(s, 'TextSize');
-            if (textSize != null) { el('ccaTextSize').value = textSize; el('ccaTextSizeVal').textContent = textSize; }
-            setVal('ccaTextWeight', pick(s, 'TextWeight'));
-            setVal('ccaTextColor', pick(s, 'TextColor'));
-            setVal('ccaTextAlign', pick(s, 'TextAlign'));
-            var dim = pick(s, 'BackgroundDim');
-            if (dim != null) { el('ccaDim').value = dim; el('ccaDimVal').textContent = dim; }
-            var blur = pick(s, 'BackgroundBlur');
-            if (blur != null) { el('ccaBlur').value = blur; el('ccaBlurVal').textContent = blur; }
-            setVal('ccaDimColor', pick(s, 'DimColor'));
-            setChk('ccaShadow', pick(s, 'TextShadow'));
-            setChk('ccaOutline', pick(s, 'TextOutline'));
-            setVal('ccaBgFit', pick(s, 'BackgroundFit'));
-
-            var gr = pick(s, 'BackgroundGradient');
-            if (gr) {
-                setChk('ccaGradient', pick(gr, 'IsEnabled'));
-                setVal('ccaGradientType', pick(gr, 'Type'));
-                var ang = pick(gr, 'Angle');
-                if (ang != null) { el('ccaGradientAngle').value = ang; el('ccaGradientAngleVal').textContent = ang + '°'; }
-                var stops = pick(gr, 'Stops');
-                if (stops && stops.length >= 2) {
-                    el('ccaGradientStops').innerHTML = '';
-                    stops.forEach(function (st) {
-                        addGradientStop(pick(st, 'Color') || '#888888', Math.round((pick(st, 'Position') || 0) * 100));
-                    });
-                }
-            }
-
-            setVal('ccaBgSource', pick(s, 'BackgroundSource'));
-            var col = pick(s, 'Collage');
-            if (col) { setVal('ccaCollageDensity', pick(col, 'Density')); }
-
-            setVal('ccaPreset', pick(s, 'DimensionPreset'));
-            var anim = pick(s, 'Animation');
-            var fmtOpt = el('ccaFormat').querySelector('option[value="animatedgif"]');
-            if (anim && pick(anim, 'Enabled') && fmtOpt) {
-                el('ccaFormat').value = 'animatedgif';
-                setChk('ccaKenBurns', pick(anim, 'KenBurns'));
-                var fc = pick(anim, 'FrameCount');
-                if (fc != null && el('ccaAnimFrames')) { el('ccaAnimFrames').value = fc; if (el('ccaAnimFramesVal')) { el('ccaAnimFramesVal').textContent = fc; } }
-                var dl = pick(anim, 'DelayMs');
-                if (dl != null && el('ccaAnimDelay')) { el('ccaAnimDelay').value = dl; if (el('ccaAnimDelayVal')) { el('ccaAnimDelayVal').textContent = dl; } }
-                setVal('ccaAnimDir', pick(anim, 'Direction'));
-            } else {
-                setVal('ccaFormat', pick(s, 'OutputFormat'));
-            }
-
-            // Re-sync dependent visibility + labels.
-            updateUI();
-            updateCollageVisibility();
-            if (typeof updateAnimVisibility === 'function') { updateAnimVisibility(); }
         }
 
         // --- Batch apply --------------------------------------------------
@@ -1184,7 +1361,8 @@
             rm.addEventListener('click', function () {
                 if (container.querySelectorAll('.ccaStop').length > 2) {
                     container.removeChild(row);
-                    schedulePreview();
+                    syncGradientStopsToDoc();
+                    scheduleRender();
                 }
             });
 
@@ -1223,34 +1401,21 @@
             file.arrayBuffer().then(function (buf) {
                 if (isAnimatedGif(buf) && el('ccaFormat').value !== 'animatedgif') {
                     el('ccaFormat').value = 'animatedgif';
-                    updateAnimVisibility();
-                    runPreview();
+                    applyFormatFromControl();
                 }
             }).catch(function () { /* detection is best-effort */ });
         }
 
-        // Live preview: any change schedules a client-side canvas re-render (the old
-        // server <img> preview was replaced by the canvas engine in Task 7). The
-        // legacy names schedulePreview()/runPreview() are kept and repointed at the
-        // canvas so existing control handlers keep working until Task 8 rewires them
-        // to mutate `doc` directly.
-        var schedulePreview = scheduleRender;
-
+        // Delegated fallback: the static controls each have an explicit handler that
+        // mutates `doc`; this catches the DYNAMIC gradient-stop rows (added at runtime)
+        // so editing a stop's colour/position flows into the document and re-renders.
         function onControlChange(e) {
             var target = e.target;
-            if (!target || target.type === 'file' || target.id === 'ccaLibrarySelect') { return; }
-            // Ticking batch targets or naming a template must not re-render the preview.
-            if (target.closest && target.closest('#ccaBatchList')) { return; }
-            if (target.id === 'ccaTemplateName' || target.id === 'ccaTemplateSelect') { return; }
-            schedulePreview();
-        }
-
-        // Repointed at the canvas engine. The old server-preview <img> (#ccaPreview)
-        // no longer exists; existing handlers still call runPreview(), so it simply
-        // schedules a client re-render. Task 8 will bind the controls to `doc`
-        // directly and (re)introduce an on-demand authoritative "server render".
-        function runPreview() {
-            scheduleRender();
+            if (!target || !target.closest) { return; }
+            if (target.closest('#ccaGradientStops')) {
+                syncGradientStopsToDoc();
+                scheduleRender();
+            }
         }
 
         function downloadPreview() {
@@ -1258,8 +1423,16 @@
             // guard against a missing canvas and export the current backing store.
             var cv = el('ccaCanvas');
             if (!cv) { return; }
+            // Render one clean frame WITHOUT the selection overlay so the dashed box
+            // isn't baked into the exported PNG, then restore the on-screen selection.
+            var savedSel = doc._selectedId;
+            doc._selectedId = null;
+            renderDocument();
+            var dataUrl = cv.toDataURL('image/png');
+            doc._selectedId = savedSel;
+            renderDocument();
             var a = document.createElement('a');
-            a.href = cv.toDataURL('image/png');
+            a.href = dataUrl;
             a.download = 'cover.png';
             document.body.appendChild(a);
             a.click();
@@ -1277,9 +1450,9 @@
             btn.disabled = true;
             if (label) { label.textContent = t('action.applying'); }
             Dashboard.showLoadingMsg();
-            jsonFetch('CustomCoverArt/apply', 'POST', {
+            jsonFetch('CustomCoverArt/document/apply', 'POST', {
                 LibraryId: state.libraryId,
-                Settings: collectSettings()
+                Document: collectDocument()
             }).then(function (res) {
                 Dashboard.hideLoadingMsg();
                 if (pick(res, 'Success')) {
@@ -1293,6 +1466,39 @@
             }).then(function () {
                 if (label) { label.textContent = original; }
                 btn.disabled = !state.libraryId;
+            });
+        }
+
+        // On-demand authoritative render: POST the document to the server preview
+        // endpoint and show the returned PNG/GIF in a labelled overlay, so the user
+        // can compare the exact server output against the live canvas before applying.
+        var _serverRenderUrl = null;
+        function showServerRender() {
+            var btn = el('ccaServerRender');
+            if (btn.disabled) { return; }
+            var label = btn.querySelector('span');
+            var original = label ? label.textContent : '';
+            btn.disabled = true;
+            Dashboard.showLoadingMsg();
+            authFetch('CustomCoverArt/document/preview', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(collectDocument())
+            }).then(function (r) {
+                if (!r.ok) { throw new Error('render returned ' + r.status); }
+                return r.blob();
+            }).then(function (blob) {
+                if (_serverRenderUrl) { URL.revokeObjectURL(_serverRenderUrl); }
+                _serverRenderUrl = URL.createObjectURL(blob);
+                el('ccaServerRenderImg').src = _serverRenderUrl;
+                el('ccaServerRenderWrap').style.display = '';
+                Dashboard.hideLoadingMsg();
+            }).catch(function (e) {
+                Dashboard.hideLoadingMsg();
+                Dashboard.alert(t('dyn.error', e.message));
+            }).then(function () {
+                btn.disabled = false;
+                if (label) { label.textContent = original; }
             });
         }
 
@@ -1311,21 +1517,106 @@
                         Dashboard.alert(pick(res, 'Success') ? t('restore.done') : t('restore.fail'));
                     });
             });
-            el('ccaTextSize').addEventListener('input', function () { el('ccaTextSizeVal').textContent = this.value; });
-            el('ccaDim').addEventListener('input', function () { el('ccaDimVal').textContent = this.value; });
-            el('ccaBlur').addEventListener('input', function () { el('ccaBlurVal').textContent = this.value; });
-            el('ccaPreset').addEventListener('change', updateUI);
-            el('ccaFormat').addEventListener('change', function () { updateAnimVisibility(); runPreview(); });
-            el('ccaAnimFrames').addEventListener('input', function () { el('ccaAnimFramesVal').textContent = this.value; });
-            el('ccaAnimDelay').addEventListener('input', function () { el('ccaAnimDelayVal').textContent = this.value; });
-            el('ccaGradient').addEventListener('change', updateUI);
-            el('ccaGradientType').addEventListener('change', updateUI);
-            el('ccaGradientAngle').addEventListener('input', function () { el('ccaGradientAngleVal').textContent = this.value + '°'; });
-            el('ccaAddStop').addEventListener('click', function () { addGradientStop('#888888', 50); schedulePreview(); });
+            // --- Text card: drives the SELECTED text layer ----------------
+            el('ccaTitle').addEventListener('input', function () {
+                var l = selectedLayer(); if (l) { l.Content = this.value; scheduleRender(); }
+            });
+            el('ccaTextSize').addEventListener('input', function () {
+                el('ccaTextSizeVal').textContent = this.value;
+                var l = selectedLayer();
+                if (l) { l.Size = (parseInt(this.value, 10) || 0) / doc.Canvas.Height; scheduleRender(); }
+            });
+            el('ccaTextWeight').addEventListener('change', function () {
+                var l = selectedLayer(); if (l) { l.Weight = parseInt(this.value, 10); scheduleRender(); }
+            });
+            el('ccaTextAlign').addEventListener('change', function () {
+                var l = selectedLayer(); if (l) { l.Align = parseInt(this.value, 10); scheduleRender(); }
+            });
+            el('ccaTextColor').addEventListener('input', function () {
+                var l = selectedLayer(); if (l) { l.Color = this.value; scheduleRender(); }
+            });
+            el('ccaShadow').addEventListener('change', function () {
+                var l = selectedLayer(); if (l) { l.Shadow.Enabled = this.checked; scheduleRender(); }
+            });
+            el('ccaOutline').addEventListener('change', function () {
+                var l = selectedLayer(); if (l) { l.Outline.Enabled = this.checked; scheduleRender(); }
+            });
 
-            el('ccaBgSource').addEventListener('change', function () { updateCollageVisibility(); runPreview(); });
-            el('ccaCollageDensity').addEventListener('change', runPreview);
-            el('ccaCollageShuffle').addEventListener('click', function () { state.collageSeed = (state.collageSeed + 1) & 0x7fffffff; runPreview(); });
+            // --- Background card ------------------------------------------
+            el('ccaDim').addEventListener('input', function () {
+                el('ccaDimVal').textContent = this.value;
+                doc.Background.Dim = parseFloat(this.value); scheduleRender();
+            });
+            el('ccaBlur').addEventListener('input', function () {
+                el('ccaBlurVal').textContent = this.value;
+                doc.Background.Blur = parseFloat(this.value); scheduleRender();
+            });
+            el('ccaDimColor').addEventListener('input', function () {
+                doc.Background.DimColor = this.value; scheduleRender();
+            });
+            el('ccaBgFit').addEventListener('change', function () {
+                doc.Background.Fit = this.value; scheduleRender();
+            });
+            el('ccaGradient').addEventListener('change', function () {
+                if (doc.Background.Gradient) { doc.Background.Gradient.IsEnabled = this.checked; }
+                updateUI(); scheduleRender();
+            });
+            el('ccaGradientType').addEventListener('change', function () {
+                if (doc.Background.Gradient) { doc.Background.Gradient.Type = parseInt(this.value, 10); }
+                updateUI(); scheduleRender();
+            });
+            el('ccaGradientAngle').addEventListener('input', function () {
+                el('ccaGradientAngleVal').textContent = this.value + '°';
+                if (doc.Background.Gradient) { doc.Background.Gradient.Angle = parseFloat(this.value) || 0; }
+                scheduleRender();
+            });
+            el('ccaAddStop').addEventListener('click', function () {
+                addGradientStop('#888888', 50); syncGradientStopsToDoc(); scheduleRender();
+            });
+            el('ccaBgSource').addEventListener('change', function () {
+                doc.Background.Source = this.value;
+                if (this.value === 'collage') { doc.Background.Collage = buildCollageFromControls(); }
+                updateCollageVisibility(); scheduleRender();
+            });
+            el('ccaCollageDensity').addEventListener('change', function () {
+                if (doc.Background.Collage) { doc.Background.Collage.Density = this.value; } scheduleRender();
+            });
+            el('ccaCollageShuffle').addEventListener('click', function () {
+                state.collageSeed = (state.collageSeed + 1) & 0x7fffffff;
+                if (doc.Background.Collage) { doc.Background.Collage.Seed = state.collageSeed; }
+                scheduleRender();
+            });
+
+            // --- Output card ----------------------------------------------
+            el('ccaPreset').addEventListener('change', function () {
+                if (this.value !== 'custom' && PRESETS[this.value]) {
+                    doc.Canvas.Width = PRESETS[this.value].w;
+                    doc.Canvas.Height = PRESETS[this.value].h;
+                }
+                doc.Canvas.DimensionPreset = this.value;
+                updateUI(); scheduleRender();
+            });
+            el('ccaWidth').addEventListener('input', function () {
+                if (el('ccaPreset').value === 'custom') { doc.Canvas.Width = parseInt(this.value, 10) || doc.Canvas.Width; scheduleRender(); }
+            });
+            el('ccaHeight').addEventListener('input', function () {
+                if (el('ccaPreset').value === 'custom') { doc.Canvas.Height = parseInt(this.value, 10) || doc.Canvas.Height; scheduleRender(); }
+            });
+            el('ccaFormat').addEventListener('change', applyFormatFromControl);
+            el('ccaKenBurns').addEventListener('change', function () {
+                if (doc.Background.Animation) { doc.Background.Animation.KenBurns = this.checked; }
+            });
+            el('ccaAnimFrames').addEventListener('input', function () {
+                el('ccaAnimFramesVal').textContent = this.value;
+                if (doc.Background.Animation) { doc.Background.Animation.FrameCount = parseInt(this.value, 10); }
+            });
+            el('ccaAnimDelay').addEventListener('input', function () {
+                el('ccaAnimDelayVal').textContent = this.value;
+                if (doc.Background.Animation) { doc.Background.Animation.DelayMs = parseInt(this.value, 10); }
+            });
+            el('ccaAnimDir').addEventListener('change', function () {
+                if (doc.Background.Animation) { doc.Background.Animation.Direction = this.value; }
+            });
 
             el('ccaTargetType').addEventListener('change', function () {
                 Dashboard.showLoadingMsg();
@@ -1345,9 +1636,18 @@
                 uploadFile('upload', file).then(function (res) {
                     Dashboard.hideLoadingMsg();
                     if (pick(res, 'Success')) {
-                        state.backgroundImagePath = pick(res, 'Data');
+                        // Server path drives the authoritative render + apply; the
+                        // client canvas bitmap loads from the SAME client File via a
+                        // blob: URL so the canvas stays untainted (canvas-source
+                        // invariant). state.backgroundImagePath is kept for the legacy
+                        // batch/collectSettings projection.
+                        doc.Background.ImagePath = pick(res, 'Data');
+                        state.backgroundImagePath = doc.Background.ImagePath;
+                        var img = new Image();
+                        img.onload = function () { bgImageEl = img; scheduleRender(); };
+                        img.src = URL.createObjectURL(file);
                         maybeSwitchToAnimated(file);
-                        schedulePreview();
+                        scheduleRender();
                     } else {
                         Dashboard.alert(t('dyn.uploadFail', pick(res, 'ErrorMessage') || t('dyn.unknown')));
                     }
@@ -1362,7 +1662,9 @@
                     Dashboard.hideLoadingMsg();
                     if (pick(res, 'Success')) {
                         state.customFontPath = pick(res, 'Data');
-                        schedulePreview();
+                        var l = selectedLayer();
+                        if (l) { l.FontPath = state.customFontPath; }
+                        scheduleRender();
                     } else {
                         Dashboard.alert(t('dyn.fontFail', pick(res, 'ErrorMessage') || t('dyn.unknown')));
                     }
@@ -1370,16 +1672,48 @@
             });
 
             el('ccaApplyBtn').addEventListener('click', applyCoverArt);
+            el('ccaServerRender').addEventListener('click', showServerRender);
             el('ccaDownloadBtn').addEventListener('click', downloadPreview);
+
+            // Canvas selection + drag of text layers.
+            var cv = el('ccaCanvas');
+            cv.addEventListener('pointerdown', onCanvasPointerDown);
+            cv.addEventListener('pointermove', onCanvasPointerMove);
+            cv.addEventListener('pointerup', onCanvasPointerUp);
+            cv.addEventListener('pointercancel', onCanvasPointerUp);
 
             el('ccaTemplateSelect').addEventListener('change', function () {
                 var opt = this.options[this.selectedIndex];
-                if (opt && opt._settings) { applySettingsToForm(opt._settings); runPreview(); }
+                if (!opt) { return; }
+                var tplDoc = opt._document;
+                // Legacy templates saved before the canvas engine carry no Document;
+                // migrating those from Settings is Task 9 — for now, skip (don't throw).
+                if (!tplDoc) { return; }
+                // Preserve THIS target's title if the template's title layer is blank
+                // (templates intentionally store the design, not the name).
+                var curLayer = selectedLayer();
+                var currentTitle = curLayer ? curLayer.Content : '';
+                doc = JSON.parse(JSON.stringify(tplDoc));
+                if (!doc.Layers) { doc.Layers = []; }
+                var titleLayer = null;
+                for (var i = 0; i < doc.Layers.length; i++) {
+                    if (doc.Layers[i].Id === 'title') { titleLayer = doc.Layers[i]; break; }
+                }
+                if (titleLayer && (!titleLayer.Content || !titleLayer.Content.trim()) && currentTitle) {
+                    titleLayer.Content = currentTitle;
+                }
+                doc._selectedId = titleLayer ? titleLayer.Id : (doc.Layers[0] ? doc.Layers[0].Id : null);
+                // A template carries only a server ImagePath, never a client blob, so
+                // drop any stale canvas bitmap (the invariant forbids loading the
+                // server path); the gradient/flat background renders instead.
+                bgImageEl = null;
+                syncControlsFromDocument();
+                scheduleRender();
             });
             el('ccaTemplateSave').addEventListener('click', function () {
                 var name = el('ccaTemplateName').value.trim();
                 if (!name) { Dashboard.alert(t('tpl.named')); return; }
-                jsonFetch('CustomCoverArt/templates', 'POST', { Name: name, Settings: collectSettings() })
+                jsonFetch('CustomCoverArt/templates', 'POST', { Name: name, Document: collectDocument() })
                     .then(function () { Dashboard.alert(t('tpl.saved')); loadTemplates(); });
             });
             el('ccaTemplateDelete').addEventListener('click', function () {
@@ -1402,8 +1736,8 @@
                     });
             });
 
-            // Auto-preview: any control change (except file inputs and the library
-            // picker) schedules a debounced live render.
+            // Delegated handler for the dynamically-added gradient-stop rows (the
+            // static controls each bind their own doc-mutating handler above).
             var controls = page.querySelector('.ccaControls');
             controls.addEventListener('input', onControlChange);
             controls.addEventListener('change', onControlChange);
@@ -1513,10 +1847,12 @@
             // since some servers require a token even for images) and upload it as a
             // normal background. Using FormData.append(blob, filename) avoids the
             // File constructor, which isn't reliable in every webview.
+            var posterBlob = null;
             fetch(imgUrl, { headers: { 'X-Emby-Token': ApiClient.accessToken() }, credentials: 'include' })
                 .then(function (r) { if (!r.ok) { throw new Error('image fetch returned ' + r.status); } return r.blob(); })
                 .then(function (blob) {
                     if (!blob || blob.size === 0) { throw new Error('the downloaded image was empty'); }
+                    posterBlob = blob;
                     var ext = blob.type === 'image/png' ? 'png' : (blob.type === 'image/webp' ? 'webp' : 'jpg');
                     var fd = new FormData();
                     fd.append('file', blob, 'poster.' + ext);
@@ -1526,10 +1862,17 @@
                     Dashboard.hideLoadingMsg();
                     var path = pick(res, 'Data');
                     if (pick(res, 'Success') && path) {
+                        // Server path for render/apply; canvas bitmap from the fetched
+                        // Blob via a blob: URL (canvas-source invariant — never the
+                        // server path / ApiClient.getImageUrl).
+                        doc.Background.ImagePath = path;
                         state.backgroundImagePath = path;
+                        var img = new Image();
+                        img.onload = function () { bgImageEl = img; scheduleRender(); };
+                        img.src = URL.createObjectURL(posterBlob);
                         el('ccaSelectedBgName').textContent = name;
                         el('ccaSelectedBg').style.display = '';
-                        schedulePreview();
+                        scheduleRender();
                         closeBrowser();
                     } else {
                         Dashboard.alert('Upload rejected: ' + (pick(res, 'ErrorMessage') || 'unknown reason'));
@@ -1547,16 +1890,12 @@
             applyI18n(page);
             if (!page.dataset.ccaInit) {
                 bindEvents();
-                if (!page.querySelector('#ccaGradientStops .ccaStop')) {
-                    // Default to Jellyfin's brand gradient (purple → blue) so the
-                    // first preview looks intentional instead of a black canvas.
-                    addGradientStop('#aa5cc3', 0);
-                    addGradientStop('#00a4dc', 100);
-                }
                 page.dataset.ccaInit = 'true';
             }
             Dashboard.showLoadingMsg();
-            updateAnimVisibility();
+            // Seed every control (incl. the brand gradient stops) from the default
+            // document, so the UI and the live canvas start in agreement.
+            syncControlsFromDocument();
             // Render immediately with a sane fallback, then re-render once the
             // bundled Noto weights register so canvas text metrics match the server.
             scheduleRender();
@@ -1568,7 +1907,7 @@
                 updateCollageVisibility();
                 refreshRestoreState();
                 Dashboard.hideLoadingMsg();
-                schedulePreview();
+                scheduleRender();
             }).catch(function () { Dashboard.hideLoadingMsg(); });
         });
     })();
