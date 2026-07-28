@@ -42,6 +42,44 @@ public class ControllerDocumentTests
     }
 
     [Fact]
+    public void NormalizeTemplate_DocumentWithNullLayers_DoesNotThrow()
+    {
+        // Mirrors a real client payload: {"name":"x","document":{"layers":null}} (ASP.NET
+        // Core's MVC JSON options are case-insensitive; PascalCase is used here since a bare
+        // JsonSerializer.Deserialize call, unlike the real controller pipeline, is
+        // case-sensitive by default). Deserializing through System.Text.Json (rather than a
+        // C# object initializer) is what actually reproduces the malformed body a client can
+        // send, since STJ does not enforce non-null on non-nullable reference types.
+        var json = "{\"Name\":\"x\",\"Document\":{\"Layers\":null}}";
+        var template = System.Text.Json.JsonSerializer.Deserialize<SavedTemplate>(json);
+        Assert.NotNull(template);
+        Assert.Null(template!.Document!.Layers);
+
+        var exception = Record.Exception(() => CustomCoverArtController.NormalizeTemplate(template));
+
+        Assert.Null(exception);
+        Assert.NotNull(template.Document!.Layers);
+        Assert.Empty(template.Document.Layers);
+    }
+
+    [Fact]
+    public void NormalizeTemplate_DocumentWithNullBackground_DoesNotThrowAndStripsTitleWhenPresent()
+    {
+        // Mirrors a real client payload: {"name":"x","document":{"background":null,"layers":[...]}}.
+        var json = "{\"Name\":\"x\",\"Document\":{\"Background\":null,\"Layers\":[" +
+                   "{\"Id\":\"title\",\"Type\":\"text\",\"Content\":\"My Movies\"}]}}";
+        var template = System.Text.Json.JsonSerializer.Deserialize<SavedTemplate>(json);
+        Assert.NotNull(template);
+        Assert.Null(template!.Document!.Background);
+
+        var exception = Record.Exception(() => CustomCoverArtController.NormalizeTemplate(template));
+
+        Assert.Null(exception);
+        Assert.NotNull(template.Document!.Background);
+        Assert.Equal(string.Empty, template.Document.Layers.First(l => l.Id == "title").Content);
+    }
+
+    [Fact]
     public void NormalizeTemplate_WithoutDocument_StillBlanksLegacySettings()
     {
         var template = new SavedTemplate { Name = "T", Settings = new CoverArtSettings { Title = "Movies" } };
