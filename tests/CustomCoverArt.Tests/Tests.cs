@@ -52,6 +52,14 @@ public class PathSandboxTests
         var paths = PathsWith(Path.Combine(Path.GetTempPath(), "jfdata"));
         Assert.False(PluginPaths.IsInsideBase(paths, ""));
     }
+
+    [Fact]
+    public void BackupsPathIsInsideDataDir()
+    {
+        var paths = PathsWith(Path.Combine(Path.GetTempPath(), "jfdata"));
+        var backup = Path.Combine(PluginPaths.Backups(paths), "abc", "original.png");
+        Assert.True(PluginPaths.IsInsideBase(paths, backup));
+    }
 }
 
 public class UploadValidationTests
