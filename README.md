@@ -32,7 +32,8 @@ Text, gradients, blur, custom backgrounds and fonts — with a live preview, rig
 | 🌫️ | **Blur & dimming** | Soften and darken backgrounds so text stands out |
 | 🔠 | **Fonts** | Bundled Noto Sans (matches Jellyfin's UI, so text always renders) — or upload your own `.ttf` / `.otf` / `.woff` / `.woff2` |
 | 📐 | **Presets & sizes** | Square cover, portrait poster, wide banner, or custom dimensions |
-| 👁️ | **Live preview** | Render a preview before applying anything |
+| 🖱️ | **Interactive canvas** | The preview is a live canvas — drag the title to position it, drag/scroll/pinch to reposition and zoom the background |
+| 🎯 | **Authoritative server render** | The canvas is a fast approximation; "Show server render" renders the exact same design on the server before you apply |
 | 🧩 | **Poster collage** | Auto-build a grid-mosaic background from a target's own item posters |
 | 💾 | **Design templates** | Save a look and reuse it; each target keeps its own name as the title |
 | 📚 | **Batch apply** | Apply one design to many libraries/collections/playlists at once |
@@ -98,9 +99,10 @@ The output is in `bin/Release/net9.0/`. Copy `CustomCoverArt.dll` plus the
 
 1. Go to **Dashboard → Plugins → Custom Cover Art**.
 2. Pick a **library** from the dropdown.
-3. Adjust the **settings** — title, colours, effects, gradient or background image, dimensions.
-4. Click **Generate Preview** to see the result.
-5. Click **Apply to Library** to set it as the library's cover.
+3. Design directly on the **canvas**: adjust the settings on the left, or click the title text and **drag** it to reposition. The canvas updates live as you go.
+4. Toggle **Reposition background** to drag-pan the background image, and scroll (or pinch, on touch) to zoom it — up to 4×.
+5. Click **Show server render** to confirm the exact server-rendered output (the canvas is a fast approximation; the server render is authoritative).
+6. Click **Apply to library** to set it as the library's cover.
 
 ### Using an existing poster as a background
 
@@ -118,7 +120,8 @@ has no posters, so collage is unavailable there.)
 
 Design a cover, then **Save current design** in the Templates card. In **Batch apply**, tick
 several targets and apply your design (or a saved template) to all of them at once — each cover
-is titled with its target's own name.
+is titled with its target's own name. Templates saved before the canvas editor still load fine —
+they're migrated to the new design format automatically the first time you pick them.
 
 ### Animated covers
 

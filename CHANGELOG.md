@@ -4,6 +4,9 @@ The text under each version heading is published to the plugin's manifest by the
 release workflow (and shown as the version's changelog inside Jellyfin). Add a
 new `## <version>` section when you bump `<Version>` in the csproj.
 
+## 3.0.0.0
+The config page preview is now a **live interactive canvas**, not a static image: click the title to select it and **drag it** to position, and toggle **Reposition background** to **drag-pan** and **scroll/pinch-zoom** the background image directly on the canvas. A new **Show server render** button renders the exact same design on the server — the authoritative output, since the canvas is a fast approximation — so you can compare before applying. Designs are now stored internally in a new **layered document format** (title text is one layer, more layer types land in a later release); **existing saved templates migrate automatically** the first time you load them, so nothing is lost.
+
 ## 2.1.0.0
 A code-quality and size pass. The plugin is now **much smaller** — the bundled Noto Sans fonts were subset to the glyphs cover titles use (Latin, Greek, Cyrillic, punctuation), cutting the plugin DLL from ~3.9 MB to ~1.6 MB with no visible change. **Dead code was removed** (an unused retry service, an unused exceptions module, and nine internal API endpoints the UI never called), and the render pipeline was tidied up (the image compositing is no longer needlessly async). A few **security hardening** touches: the Apply and batch-apply endpoints are now rate-limited and batch size is capped, text size is clamped, poster-collage sources get the same decompression-bomb guard as other images, and error messages no longer echo server paths back to the browser. Purely internal — no user-facing behaviour changes.
 

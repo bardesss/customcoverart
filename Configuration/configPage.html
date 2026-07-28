@@ -278,6 +278,7 @@
                 <div class="ccaPreviewCol">
                     <section class="ccaCard">
                         <div class="ccaCardHead" data-i18n="card.preview">Preview</div>
+                        <label class="ccaCheck ccaCheckBlock"><input is="emby-checkbox" type="checkbox" id="ccaBgAdjust" /><span data-i18n="bg.adjust">Reposition background (drag to pan, scroll or pinch to zoom)</span></label>
                         <div class="ccaPreviewWrap">
                             <canvas id="ccaCanvas" class="ccaCanvas" width="1400" height="1400" aria-label="Cover art canvas"></canvas>
                             <div id="ccaPreviewPlaceholder" class="ccaPreviewPlaceholder" data-i18n="preview.placeholder">Generate a preview to see your cover art.</div>
@@ -530,6 +531,7 @@
                 'out.font': 'Custom font (optional)', 'f.chooseFont': 'Choose font…',
                 'hint.font': 'TTF, OTF, TTC, WOFF or WOFF2 · up to 5 MB. Leave empty to use the bundled Noto Sans.',
                 'card.preview': 'Preview', 'preview.placeholder': 'Generate a preview to see your cover art.',
+                'bg.adjust': 'Reposition background (drag to pan, scroll or pinch to zoom)',
                 'action.apply': 'Apply to library', 'action.applying': 'Applying…', 'action.download': 'Download image', 'action.serverRender': 'Show server render', 'serverrender.label': 'Authoritative render (server)', 'preview.hint': 'The preview updates automatically as you adjust settings.',
                 'modal.title': 'Select a poster', 'modal.search': 'Search…', 'modal.alltypes': 'All types',
                 'ty.movies': 'Movies', 'ty.series': 'Series', 'ty.seasons': 'Seasons', 'ty.albums': 'Albums', 'ty.artists': 'Artists', 'ty.books': 'Books', 'ty.musicvideos': 'Music videos', 'ty.photos': 'Photos', 'modal.prev': 'Previous', 'modal.next': 'Next',
@@ -567,6 +569,7 @@
                 'out.font': 'Aangepast lettertype (optioneel)', 'f.chooseFont': 'Kies lettertype…',
                 'hint.font': 'TTF, OTF, TTC, WOFF of WOFF2 · max. 5 MB. Laat leeg voor de meegeleverde Noto Sans.',
                 'card.preview': 'Voorbeeld', 'preview.placeholder': 'Het voorbeeld verschijnt hier automatisch.',
+                'bg.adjust': 'Achtergrond verplaatsen (sleep om te verschuiven, scroll of knijp om te zoomen)',
                 'action.apply': 'Toepassen op bibliotheek', 'action.applying': 'Bezig met toepassen…', 'action.download': 'Afbeelding downloaden', 'action.serverRender': 'Serverweergave tonen', 'serverrender.label': 'Gezaghebbende weergave (server)', 'preview.hint': 'Het voorbeeld wordt automatisch bijgewerkt terwijl je instellingen aanpast.',
                 'modal.title': 'Selecteer een poster', 'modal.search': 'Zoeken…', 'modal.alltypes': 'Alle types',
                 'ty.movies': 'Films', 'ty.series': 'Series', 'ty.seasons': 'Seizoenen', 'ty.albums': 'Albums', 'ty.artists': 'Artiesten', 'ty.books': 'Boeken', 'ty.musicvideos': 'Videoclips', 'ty.photos': 'Foto\'s', 'modal.prev': 'Vorige', 'modal.next': 'Volgende',
@@ -729,6 +732,11 @@
         // Wiring the upload/poster Blob happens in Task 8; here it stays null and the
         // gradient default renders.
         var bgImageEl = null;
+
+        // Background pan/zoom mode (Task 9): when true, canvas drag/wheel/pinch
+        // mutate doc.Background.Transform instead of selecting/dragging a text
+        // layer. Toggled by the #ccaBgAdjust checkbox.
+        var bgAdjustMode = false;
 
         // Coordinate contract: canvas backing store is doc.Canvas.Width×Height;
         // normalized layer coordinates map 1:1 across that dimension.
@@ -978,8 +986,47 @@
             return null;
         }
 
-        var _drag = null;
+        var _drag = null;     // text-layer drag (bgAdjustMode off)
+        var _bgDrag = null;   // background pan drag (bgAdjustMode on, single pointer)
+
+        // Two-pointer pinch tracking for background zoom (bgAdjustMode on, touch).
+        // Keyed by pointerId, client (not canvas) coordinates — only the RATIO
+        // between the start and current distance is used, so CSS scaling of the
+        // canvas cancels out and client coords are fine.
+        var _pointers = {};
+        var _pinchStartDist = 0;
+        var _pinchStartScale = 1;
+        function pointerDistance() {
+            var ids = Object.keys(_pointers);
+            if (ids.length < 2) { return 0; }
+            var a = _pointers[ids[0]], b = _pointers[ids[1]];
+            var dx = b.x - a.x, dy = b.y - a.y;
+            return Math.sqrt(dx * dx + dy * dy);
+        }
+
         function onCanvasPointerDown(ev) {
+            _pointers[ev.pointerId] = { x: ev.clientX, y: ev.clientY };
+
+            if (bgAdjustMode) {
+                if (!bgImageEl) { return; } // nothing to reposition without a loaded image
+                if (Object.keys(_pointers).length >= 2) {
+                    // Second finger down: switch to pinch-zoom, cancel any pan in flight.
+                    _bgDrag = null;
+                    _pinchStartDist = pointerDistance();
+                    _pinchStartScale = doc.Background.Transform.Scale;
+                } else {
+                    var bgPt = canvasPoint(ev);
+                    _bgDrag = {
+                        startX: bgPt.x, startY: bgPt.y,
+                        origOffsetX: doc.Background.Transform.OffsetX,
+                        origOffsetY: doc.Background.Transform.OffsetY
+                    };
+                }
+                try { el('ccaCanvas').setPointerCapture(ev.pointerId); } catch (e) { /* ignore */ }
+                ev.preventDefault();
+                return;
+            }
+
             var pt = canvasPoint(ev);
             var hit = hitTestLayer(pt);
             if (!hit) { return; }
@@ -993,6 +1040,34 @@
             ev.preventDefault();
         }
         function onCanvasPointerMove(ev) {
+            if (_pointers[ev.pointerId]) { _pointers[ev.pointerId] = { x: ev.clientX, y: ev.clientY }; }
+
+            if (bgAdjustMode) {
+                if (!bgImageEl) { return; }
+                if (Object.keys(_pointers).length >= 2 && _pinchStartDist > 0) {
+                    var dist = pointerDistance();
+                    var scale = _pinchStartScale * (dist / _pinchStartDist);
+                    doc.Background.Transform.Scale = Math.min(4, Math.max(1, scale));
+                    scheduleRender();
+                    ev.preventDefault();
+                    return;
+                }
+                if (!_bgDrag) { return; }
+                var cv = el('ccaCanvas');
+                var bgPt = canvasPoint(ev);
+                // Natural "grab and slide" direction: dragging right/down should
+                // make the image appear to follow the cursor, which means the
+                // sampled source rect (see drawBackgroundImage) must shift the
+                // OTHER way — so the offset moves opposite the drag delta.
+                doc.Background.Transform.OffsetX = Math.max(-1, Math.min(1,
+                    _bgDrag.origOffsetX - (bgPt.x - _bgDrag.startX) / (cv.width / 2)));
+                doc.Background.Transform.OffsetY = Math.max(-1, Math.min(1,
+                    _bgDrag.origOffsetY - (bgPt.y - _bgDrag.startY) / (cv.height / 2)));
+                scheduleRender();
+                ev.preventDefault();
+                return;
+            }
+
             if (!_drag) { return; }
             var layer = selectedLayer(); if (!layer) { return; }
             var cv = el('ccaCanvas');
@@ -1003,6 +1078,14 @@
             ev.preventDefault();
         }
         function onCanvasPointerUp(ev) {
+            delete _pointers[ev.pointerId];
+            if (Object.keys(_pointers).length < 2) { _pinchStartDist = 0; }
+
+            if (bgAdjustMode) {
+                try { el('ccaCanvas').releasePointerCapture(ev.pointerId); } catch (e) { /* ignore */ }
+                _bgDrag = null;
+                return;
+            }
             if (!_drag) { return; }
             try { el('ccaCanvas').releasePointerCapture(ev.pointerId); } catch (e) { /* ignore */ }
             _drag = null;
@@ -1298,6 +1381,74 @@
         }
 
         // --- Templates ----------------------------------------------------
+
+        // Pick helper for legacy CoverArtSettings that treats 0/false as present
+        // (unlike a plain `||` fallback, which would replace a real 0 dim/blur).
+        function pickNum(s, name, fallback) {
+            var v = pick(s, name);
+            return (v === undefined || v === null) ? fallback : v;
+        }
+
+        // Converts a legacy flat CoverArtSettings (templates saved before the
+        // canvas engine shipped, which carry Settings but no Document) into a
+        // one-text-layer CoverDocument — the client mirror of the server's
+        // Services/DocumentMigration.cs FromSettings, so old templates keep
+        // working. Per template semantics ("templates store the design but not
+        // the title"), the title layer's Content is stripped, same as a
+        // freshly-saved document-native template would have.
+        function migrateTemplateToDocument(s) {
+            var d = defaultDocument();
+
+            d.Canvas.Width = pickNum(s, 'ExportWidth', d.Canvas.Width);
+            d.Canvas.Height = pickNum(s, 'ExportHeight', d.Canvas.Height);
+            d.Canvas.Format = pick(s, 'OutputFormat') || d.Canvas.Format;
+            d.Canvas.DimensionPreset = pick(s, 'DimensionPreset') || d.Canvas.DimensionPreset;
+
+            var bg = d.Background;
+            bg.Source = pick(s, 'BackgroundSource') || bg.Source;
+            bg.ImagePath = pick(s, 'BackgroundImagePath') || '';
+            bg.Fit = pick(s, 'BackgroundFit') || 'cover';
+            bg.Blur = pickNum(s, 'BackgroundBlur', bg.Blur);
+            bg.Dim = pickNum(s, 'BackgroundDim', bg.Dim);
+            bg.DimColor = pick(s, 'DimColor') || bg.DimColor;
+            bg.Gradient = pick(s, 'BackgroundGradient') || bg.Gradient;
+            bg.Collage = pick(s, 'Collage') || null;
+            bg.Animation = pick(s, 'Animation') || null;
+            bg.Transform = { OffsetX: 0, OffsetY: 0, Scale: 1 }; // identity, as FromSettings does
+
+            var l = d.Layers[0];
+            l.Content = ''; // template title stripped — each target keeps its own name
+            var height = d.Canvas.Height || 1400;
+            l.Size = pickNum(s, 'TextSize', 120) / height;
+            l.Weight = pickNum(s, 'TextWeight', 400);
+            l.Color = pick(s, 'TextColor') || '#ffffff';
+            l.Align = pickNum(s, 'TextAlign', 1);
+            l.FontPath = pick(s, 'CustomFontPath') || '';
+
+            // Anchor position from align/baseline/padding, mirroring
+            // DocumentMigration.AnchorFor (TextAlign/TextBaseline: 0=start/top,
+            // 1=center/middle, 2=end/bottom).
+            var baseline = pickNum(s, 'TextBaseline', 1);
+            var padding = pickNum(s, 'TextPadding', 0.05);
+            l.X = l.Align === 0 ? padding : (l.Align === 2 ? 1 - padding : 0.5);
+            l.Y = baseline === 0 ? padding : (baseline === 2 ? 1 - padding : 0.5);
+
+            l.Shadow = {
+                Enabled: !!pick(s, 'TextShadow'),
+                Color: pick(s, 'TextShadowColor') || '#000000',
+                Blur: pickNum(s, 'TextShadowBlur', 4),
+                OffsetX: pickNum(s, 'TextShadowOffsetX', 2),
+                OffsetY: pickNum(s, 'TextShadowOffsetY', 2)
+            };
+            l.Outline = {
+                Enabled: !!pick(s, 'TextOutline'),
+                Color: pick(s, 'TextOutlineColor') || '#000000',
+                Width: pickNum(s, 'TextOutlineWidth', 2)
+            };
+
+            return d;
+        }
+
         function loadTemplates() {
             return jsonFetch('CustomCoverArt/templates').then(function (res) {
                 var sel = el('ccaTemplateSelect');
@@ -1307,6 +1458,10 @@
                     var o = document.createElement('option');
                     o.value = pick(tpl, 'Name'); o.textContent = pick(tpl, 'Name');
                     o._document = pick(tpl, 'Document');
+                    // Legacy templates (saved before the canvas engine) carry no
+                    // Document, only the flat Settings — kept here so the load
+                    // handler can migrate on demand.
+                    o._settings = pick(tpl, 'Settings');
                     sel.appendChild(o);
                 });
             });
@@ -1675,20 +1830,43 @@
             el('ccaServerRender').addEventListener('click', showServerRender);
             el('ccaDownloadBtn').addEventListener('click', downloadPreview);
 
-            // Canvas selection + drag of text layers.
+            // Canvas selection + drag of text layers (or, in bgAdjustMode, pan/zoom
+            // of the background — see onCanvasPointerDown/Move/Up).
             var cv = el('ccaCanvas');
             cv.addEventListener('pointerdown', onCanvasPointerDown);
             cv.addEventListener('pointermove', onCanvasPointerMove);
             cv.addEventListener('pointerup', onCanvasPointerUp);
             cv.addEventListener('pointercancel', onCanvasPointerUp);
 
+            // Mouse-wheel zoom of the background, only while repositioning it and
+            // only when an image is actually loaded (bgImageEl) — otherwise a no-op
+            // so the page can still scroll normally.
+            cv.addEventListener('wheel', function (ev) {
+                if (!bgAdjustMode || !bgImageEl) { return; }
+                ev.preventDefault();
+                var s = doc.Background.Transform.Scale * (ev.deltaY < 0 ? 1.05 : 0.95);
+                doc.Background.Transform.Scale = Math.min(4, Math.max(1, s));
+                scheduleRender();
+            }, { passive: false });
+
+            el('ccaBgAdjust').addEventListener('change', function () {
+                bgAdjustMode = this.checked;
+                // Toggling mid-gesture would otherwise leave a stale drag/pinch
+                // state around; clear it so the next pointer event starts clean.
+                _drag = null; _bgDrag = null; _pointers = {}; _pinchStartDist = 0;
+                cv.style.cursor = bgAdjustMode ? 'grab' : '';
+            });
+
             el('ccaTemplateSelect').addEventListener('change', function () {
                 var opt = this.options[this.selectedIndex];
                 if (!opt) { return; }
                 var tplDoc = opt._document;
-                // Legacy templates saved before the canvas engine carry no Document;
-                // migrating those from Settings is Task 9 — for now, skip (don't throw).
-                if (!tplDoc) { return; }
+                if (!tplDoc) {
+                    // Legacy template saved before the canvas engine: no Document,
+                    // only the flat Settings — migrate on the fly so it still loads.
+                    if (opt._settings) { tplDoc = migrateTemplateToDocument(opt._settings); }
+                    else { return; } // neither Document nor Settings (e.g. the "—" placeholder)
+                }
                 // Preserve THIS target's title if the template's title layer is blank
                 // (templates intentionally store the design, not the name).
                 var curLayer = selectedLayer();
