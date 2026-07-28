@@ -68,5 +68,8 @@ public interface IMediaItemService
     Task<string?> GetItemCoverArtUrlAsync(string itemId);
     Task<string?> GetItemImageSourcePathAsync(string itemId);
     Task<IEnumerable<MediaItemInfo>> GetRecentItemsAsync(int count = 20);
+
+    /// <summary>Primary-image file paths of a target's child items (for poster collages).</summary>
+    Task<IReadOnlyList<string>> GetPosterPathsAsync(string parentId, int max);
 }
 
