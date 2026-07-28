@@ -198,8 +198,8 @@ public class GradientSettings
 {
     public bool IsEnabled { get; set; } = false;
     public GradientType Type { get; set; } = GradientType.Linear;
-    public string StartColor { get; set; } = "#000000";
-    public string EndColor { get; set; } = "#ffffff";
+    public string StartColor { get; set; } = "#aa5cc3"; // Jellyfin brand purple
+    public string EndColor { get; set; } = "#00a4dc";   // Jellyfin brand blue
     public float Angle { get; set; } = 0f; // For linear gradients (0-360 degrees)
     public float CenterX { get; set; } = 0.5f; // For radial gradients (0-1)
     public float CenterY { get; set; } = 0.5f; // For radial gradients (0-1)
