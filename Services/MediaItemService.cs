@@ -181,6 +181,45 @@ public class MediaItemService : IMediaItemService
         }
     }
 
+    public Task<IReadOnlyList<string>> GetPosterPathsAsync(string parentId, int max)
+    {
+        try
+        {
+            if (!Guid.TryParse(parentId, out var id))
+            {
+                return Task.FromResult<IReadOnlyList<string>>(Array.Empty<string>());
+            }
+
+            var query = new InternalItemsQuery
+            {
+                ParentId = id,
+                ImageTypes = new[] { ImageType.Primary },
+                Recursive = true,
+                Limit = max
+            };
+
+            var paths = new List<string>();
+            foreach (var item in _libraryManager.GetItemList(query))
+            {
+                if (item.HasImage(ImageType.Primary))
+                {
+                    var p = item.GetImagePath(ImageType.Primary, 0);
+                    if (!string.IsNullOrEmpty(p) && File.Exists(p))
+                    {
+                        paths.Add(p);
+                    }
+                }
+            }
+
+            return Task.FromResult<IReadOnlyList<string>>(paths);
+        }
+        catch (Exception ex)
+        {
+            _loggingService.LogError("Failed to get poster paths for {ParentId}", ex, parentId);
+            return Task.FromResult<IReadOnlyList<string>>(Array.Empty<string>());
+        }
+    }
+
     private string? GetPrimaryImagePath(string itemId)
     {
         if (!Guid.TryParse(itemId, out var id))
