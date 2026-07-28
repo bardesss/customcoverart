@@ -209,18 +209,29 @@ public static class DocumentRenderer
     /// </summary>
     internal static void RenderTextLayer(Image<Rgba32> canvas, CoverLayer layer, CoverDocument doc)
     {
-        // IMPORTANT: font size uses doc.Canvas.Height (the document's *declared*
-        // canvas size), NOT canvas.Height (the actual pixel buffer passed in). A
-        // caller is free to compose onto a buffer sized differently than the
-        // document's own Canvas.Width/Height (e.g. CoverArtService.GenerateAnimatedAsync
-        // downscales the working buffer for oversized animated GIFs via
-        // ScaleDocumentForCanvas, which points a cloned document's Canvas.Width/Height
-        // at the capped working size so layer.Size — a fraction of canvas height —
-        // stays proportionally correct without any extra scaling math). Keying font
-        // size off doc.Canvas.Height (not canvas.Height) is what makes that possible:
-        // it lets a caller resize the actual buffer independently of the document's
-        // own declared dimensions and still get proportionally correct text.
-        var fontPixelSize = layer.Size * doc.Canvas.Height;
+        // IMPORTANT: font size uses doc.Canvas.Height (the document's declared
+        // *reference* resolution), NOT canvas.Height (the actual pixel buffer
+        // passed in). doc.Canvas is the design's reference resolution; the
+        // compositor may draw onto a differently-sized buffer — e.g.
+        // CoverArtService.GenerateAnimatedAsync downscales the working buffer
+        // for oversized animated GIFs via ScaleDocumentForCanvas, which points a
+        // cloned document's Canvas.Width/Height at the capped working size so
+        // layer.Size (a fraction of canvas height) stays proportionally correct
+        // without any extra scaling math. Keying font size off doc.Canvas.Height
+        // (not canvas.Height) is what makes that possible: it lets a caller
+        // resize the actual buffer independently of the document's own declared
+        // dimensions and still get proportionally correct text. See
+        // DocumentRenderTests.ComposeDocumentFrame_BufferHeightDiffersFromCanvas_FontSizeFollowsDocCanvasHeight
+        // for a direct regression guard against swapping in canvas.Height here.
+        //
+        // Clamp to [8, 1024]px: this is the render-time parity equivalent of the
+        // legacy CoverArtSettings.TextSize [8,1024] clamp (removed from
+        // GenerateFromDocumentAsync since the document model has no absolute
+        // TextSize field to clamp pre-render). An unbounded fontPixelSize would
+        // drive unbounded glyph rasterization — a render-thread DoS — so this
+        // guards every document-native caller (including future Task 6+
+        // endpoints), not just the legacy migrated path.
+        var fontPixelSize = Math.Clamp(layer.Size * doc.Canvas.Height, 8f, 1024f);
         var font = CreateFont(layer, fontPixelSize);
 
         // Parse text color
@@ -241,9 +252,13 @@ public static class DocumentRenderer
         if (layer.Shadow.Enabled)
         {
             var shadowColor = SafeColor(layer.Shadow.Color, Color.Black);
+            // Clamp to [-50, 50]px: the render-time parity equivalent of the
+            // legacy CoverArtSettings.TextShadowOffsetX/Y clamp.
+            var shadowOffsetX = Math.Clamp(layer.Shadow.OffsetX, -50, 50);
+            var shadowOffsetY = Math.Clamp(layer.Shadow.OffsetY, -50, 50);
             var shadowPosition = new PointF(
-                textPosition.X + layer.Shadow.OffsetX,
-                textPosition.Y + layer.Shadow.OffsetY
+                textPosition.X + shadowOffsetX,
+                textPosition.Y + shadowOffsetY
             );
 
             var shadowOptions = new RichTextOptions(font)
