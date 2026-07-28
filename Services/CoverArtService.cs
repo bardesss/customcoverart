@@ -3,6 +3,7 @@ using CustomCoverArt.Models;
 using MediaBrowser.Common.Configuration;
 using SixLabors.Fonts;
 using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Gif;
 using SixLabors.ImageSharp.Drawing;
 using SixLabors.ImageSharp.Drawing.Processing;
 using SixLabors.ImageSharp.PixelFormats;
@@ -20,16 +21,19 @@ public class CoverArtService : ICoverArtService
     private readonly IImageProcessingService _imageProcessingService;
     private readonly IApplicationPaths _applicationPaths;
     private readonly ILoggingService _loggingService;
+    private readonly IMediaItemService _mediaItemService;
     private readonly string _outputDirectory;
 
     public CoverArtService(
         IImageProcessingService imageProcessingService,
         IApplicationPaths applicationPaths,
-        ILoggingService loggingService)
+        ILoggingService loggingService,
+        IMediaItemService mediaItemService)
     {
         _imageProcessingService = imageProcessingService;
         _applicationPaths = applicationPaths;
         _loggingService = loggingService;
+        _mediaItemService = mediaItemService;
 
         // Data location comes from Jellyfin's application paths (via DI) — no
         // more guessing filesystem locations or falling back to temp.
@@ -109,7 +113,19 @@ public class CoverArtService : ICoverArtService
             Image? backgroundImage = null;
             try
             {
-                if (!string.IsNullOrEmpty(settings.BackgroundImagePath))
+                if (settings.BackgroundSource == BackgroundSources.Collage && settings.Collage is not null
+                    && !string.IsNullOrEmpty(settings.Collage.SourceId))
+                {
+                    // Build a full-bleed grid mosaic from the target's child posters.
+                    var posters = await _mediaItemService
+                        .GetPosterPathsAsync(settings.Collage.SourceId, 60)
+                        .ConfigureAwait(false);
+
+                    backgroundImage = CollageComposer.BuildCollage(
+                        posters, settings.ExportWidth, settings.ExportHeight,
+                        settings.Collage.Density, settings.Collage.Seed);
+                }
+                else if (!string.IsNullOrEmpty(settings.BackgroundImagePath))
                 {
                     if (!File.Exists(settings.BackgroundImagePath))
                     {
@@ -139,22 +155,15 @@ public class CoverArtService : ICoverArtService
                     }
                 }
 
-                // Create new image with specified dimensions
+                // Animated GIF export: build multiple frames instead of one image.
+                if (settings.Animation?.Enabled == true)
+                {
+                    return await GenerateAnimatedAsync(settings, backgroundImage).ConfigureAwait(false);
+                }
+
+                // Create new image with specified dimensions and composite one frame.
                 using var image = new Image<Rgba32>(settings.ExportWidth, settings.ExportHeight);
-
-                // Apply background
-                if (backgroundImage != null)
-                {
-                    await ApplyBackgroundAsync(image, backgroundImage, settings);
-                }
-                else
-                {
-                    // Create gradient background if no image provided
-                    await CreateGradientBackgroundAsync(image, settings);
-                }
-
-                // Apply text overlay with fallback
-                await ApplyTextOverlayWithFallbackAsync(image, settings);
+                await ComposeFrameAsync(image, backgroundImage, settings).ConfigureAwait(false);
 
                 // Save image with retry mechanism
                 await SaveImageWithRetryAsync(image, outputPath, settings);
@@ -203,6 +212,23 @@ public class CoverArtService : ICoverArtService
         {
             return fallback;
         }
+    }
+
+    /// <summary>Source crop rectangle for a Ken Burns frame at progress t (0..1).</summary>
+    public static Rectangle KenBurnsCrop(int srcW, int srcH, float t, float zoomAmount, string direction)
+    {
+        var z = System.Math.Clamp(zoomAmount, 0f, 1f);
+        // progress from wide (0) to tight (1)
+        var p = (direction ?? "in").ToLowerInvariant() == "out" ? 1f - t : t;
+        p = System.Math.Clamp(p, 0f, 1f);
+
+        // scale goes 1.0 (full) → 1/(1+z) (tight)
+        var scale = 1f - p * (1f - 1f / (1f + z));
+        var w = (int)System.Math.Round(srcW * scale);
+        var h = (int)System.Math.Round(srcH * scale);
+        var x = (srcW - w) / 2;
+        var y = (srcH - h) / 2;
+        return new Rectangle(x, y, w, h);
     }
 
     // Best-effort cleanup of stale generated/preview files so the folder does
@@ -299,6 +325,104 @@ public class CoverArtService : ICoverArtService
         catch
         {
             return false;
+        }
+    }
+
+    /// <summary>
+    /// Composites one frame (background + text) onto the supplied canvas. Shared
+    /// by the single-image path and the animated-GIF path (which calls it per frame).
+    /// </summary>
+    private async Task ComposeFrameAsync(Image<Rgba32> canvas, Image? background, CoverArtSettings settings)
+    {
+        if (background is not null)
+        {
+            await ApplyBackgroundAsync(canvas, background, settings).ConfigureAwait(false);
+        }
+        else
+        {
+            await CreateGradientBackgroundAsync(canvas, settings).ConfigureAwait(false);
+        }
+
+        await ApplyTextOverlayWithFallbackAsync(canvas, settings).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Builds an animated GIF: either passing through an animated-source background
+    /// frame-by-frame, or applying a Ken Burns pan/zoom to a static background.
+    /// Frame count is clamped to [2, 30]; loop uses the GIF repeat count.
+    /// </summary>
+    private async Task<string> GenerateAnimatedAsync(CoverArtSettings settings, Image? background)
+    {
+        var frameCount = System.Math.Clamp(settings.Animation!.FrameCount, 2, 30);
+        var delayCentis = System.Math.Max(2, settings.Animation.DelayMs / 10); // GIF delay is 1/100s
+        var w = settings.ExportWidth;
+        var h = settings.ExportHeight;
+
+        // Passthrough when the source background is itself animated.
+        var animatedSource = background is not null && background.Frames.Count > 1;
+
+        Image<Rgba32>? output = null;
+        try
+        {
+            for (int i = 0; i < frameCount; i++)
+            {
+                var t = frameCount == 1 ? 0f : i / (float)(frameCount - 1);
+
+                using var frameCanvas = new Image<Rgba32>(w, h);
+                Image? frameBg = null;
+                Image<Rgba32>? tempBg = null;
+                try
+                {
+                    if (animatedSource)
+                    {
+                        var srcIndex = i % background!.Frames.Count;
+                        tempBg = background.Frames.CloneFrame(srcIndex).CloneAs<Rgba32>();
+                        frameBg = tempBg;
+                    }
+                    else if (settings.Animation.KenBurns && background is not null)
+                    {
+                        var crop = KenBurnsCrop(background.Width, background.Height, t,
+                            settings.Animation.ZoomAmount, settings.Animation.Direction);
+                        tempBg = background.CloneAs<Rgba32>();
+                        tempBg.Mutate(x => x.Crop(crop).Resize(w, h));
+                        frameBg = tempBg;
+                    }
+                    else if (background is not null)
+                    {
+                        tempBg = background.CloneAs<Rgba32>();
+                        frameBg = tempBg;
+                    }
+
+                    await ComposeFrameAsync(frameCanvas, frameBg, settings).ConfigureAwait(false);
+
+                    if (output is null)
+                    {
+                        output = frameCanvas.Clone();
+                        var gm = output.Metadata.GetGifMetadata();
+                        gm.RepeatCount = (ushort)(settings.Animation.Loop ? 0 : 1);
+                        var fm = output.Frames.RootFrame.Metadata.GetGifMetadata();
+                        fm.FrameDelay = delayCentis;
+                    }
+                    else
+                    {
+                        var added = frameCanvas.Frames.RootFrame;
+                        added.Metadata.GetGifMetadata().FrameDelay = delayCentis;
+                        output.Frames.AddFrame(added);
+                    }
+                }
+                finally
+                {
+                    tempBg?.Dispose();
+                }
+            }
+
+            var outputPath = Path.Combine(_outputDirectory, $"cover_{Guid.NewGuid():N}.gif");
+            await output!.SaveAsync(outputPath, new GifEncoder()).ConfigureAwait(false);
+            return outputPath;
+        }
+        finally
+        {
+            output?.Dispose();
         }
     }
 

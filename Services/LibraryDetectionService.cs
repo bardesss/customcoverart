@@ -1,6 +1,8 @@
 using System.Threading;
+using CustomCoverArt.Common;
 using CustomCoverArt.Models;
 using Jellyfin.Data.Enums;
+using MediaBrowser.Common.Configuration;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Model.Entities;
@@ -14,13 +16,16 @@ public class LibraryDetectionService : ILibraryDetectionService
 {
     private readonly ILibraryManager _libraryManager;
     private readonly ILoggingService _loggingService;
+    private readonly IApplicationPaths _applicationPaths;
 
     public LibraryDetectionService(
         ILibraryManager libraryManager,
-        ILoggingService loggingService)
+        ILoggingService loggingService,
+        IApplicationPaths applicationPaths)
     {
         _libraryManager = libraryManager;
         _loggingService = loggingService;
+        _applicationPaths = applicationPaths;
     }
 
     public Task<IEnumerable<LibraryInfo>> GetLibrariesAsync()
@@ -209,38 +214,72 @@ public class LibraryDetectionService : ILibraryDetectionService
         }
     }
 
-    public async Task<string?> BackupCurrentCoverArtAsync(string libraryId)
+    private string BackupPathFor(string targetId, string extension)
+        => Path.Combine(PluginPaths.Backups(_applicationPaths), targetId, "original" + extension);
+
+    private string? ExistingBackupPath(string targetId)
+    {
+        var dir = Path.Combine(PluginPaths.Backups(_applicationPaths), targetId);
+        if (!Directory.Exists(dir))
+        {
+            return null;
+        }
+
+        var files = Directory.GetFiles(dir, "original.*");
+        return files.Length > 0 ? files[0] : null;
+    }
+
+    public bool HasBackup(string libraryId) => ExistingBackupPath(libraryId) is not null;
+
+    public Task<string?> BackupCurrentCoverArtAsync(string libraryId)
     {
         try
         {
             if (!Guid.TryParse(libraryId, out var id))
             {
-                return null;
+                return Task.FromResult<string?>(null);
+            }
+
+            // Never overwrite an existing backup: the first one is the true original.
+            var existing = ExistingBackupPath(libraryId);
+            if (existing is not null)
+            {
+                return Task.FromResult<string?>(existing);
             }
 
             var item = _libraryManager.GetItemById<BaseItem>(id);
             if (item is null || !item.HasImage(ImageType.Primary))
             {
-                return null;
+                return Task.FromResult<string?>(null);
             }
 
             var currentPath = item.GetImagePath(ImageType.Primary, 0);
             if (string.IsNullOrEmpty(currentPath) || !File.Exists(currentPath))
             {
-                return null;
+                return Task.FromResult<string?>(null);
             }
 
-            var backupPath = Path.Combine(
-                Path.GetDirectoryName(currentPath) ?? string.Empty,
-                $"backup_{Path.GetFileNameWithoutExtension(currentPath)}_{Guid.NewGuid():N}{Path.GetExtension(currentPath)}");
-
-            File.Copy(currentPath, backupPath);
-            return backupPath;
+            var backupPath = BackupPathFor(libraryId, Path.GetExtension(currentPath));
+            Directory.CreateDirectory(Path.GetDirectoryName(backupPath)!);
+            File.Copy(currentPath, backupPath, overwrite: false);
+            return Task.FromResult<string?>(backupPath);
         }
-        catch
+        catch (Exception ex)
         {
-            return null;
+            _loggingService.LogError("Failed to back up cover art for {LibraryId}", ex, libraryId);
+            return Task.FromResult<string?>(null);
         }
+    }
+
+    public async Task<bool> RestoreOriginalCoverArtAsync(string libraryId)
+    {
+        var backup = ExistingBackupPath(libraryId);
+        if (backup is null)
+        {
+            return false;
+        }
+
+        return await RestoreCoverArtAsync(libraryId, backup).ConfigureAwait(false);
     }
 
     public async Task<bool> RestoreCoverArtAsync(string libraryId, string backupPath)

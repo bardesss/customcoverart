@@ -37,6 +37,12 @@
                                 </select>
                             </div>
                         </div>
+                        <div class="ccaFileRow">
+                            <button is="emby-button" type="button" id="ccaRestoreBtn" class="raised" disabled>
+                                <span data-i18n="restore.button">Restore original cover</span>
+                            </button>
+                            <span class="ccaFileName" id="ccaRestoreHint" data-i18n="restore.none">No backup yet</span>
+                        </div>
                     </section>
 
                     <section class="ccaCard" id="ccaSettings">
@@ -96,6 +102,29 @@
 
                     <section class="ccaCard">
                         <div class="ccaCardHead" data-i18n="card.background">Background</div>
+                        <div class="inputContainer">
+                            <label for="ccaBgSource" data-i18n="bg.source">Background source</label>
+                            <select is="emby-select" id="ccaBgSource" class="emby-select">
+                                <option value="upload" selected data-i18n="bg.source.upload">Upload / poster</option>
+                                <option value="collage" data-i18n="bg.source.collage">Poster collage from this target</option>
+                            </select>
+                        </div>
+                        <div class="ccaGrid" id="ccaCollageRow" style="display:none">
+                            <div class="inputContainer">
+                                <label for="ccaCollageDensity" data-i18n="bg.collage.density">Collage density</label>
+                                <select is="emby-select" id="ccaCollageDensity" class="emby-select">
+                                    <option value="sparse" data-i18n="bg.collage.sparse">Sparse</option>
+                                    <option value="medium" selected data-i18n="bg.collage.medium">Medium</option>
+                                    <option value="dense" data-i18n="bg.collage.dense">Dense</option>
+                                </select>
+                            </div>
+                            <div class="inputContainer">
+                                <label>&nbsp;</label>
+                                <button is="emby-button" type="button" id="ccaCollageShuffle" class="raised">
+                                    <span data-i18n="bg.collage.shuffle">Shuffle</span>
+                                </button>
+                            </div>
+                        </div>
                         <div class="ccaGrid">
                             <div class="inputContainer">
                                 <label for="ccaDim"><span data-i18n="bg.dim">Dimming</span> <span class="ccaVal" id="ccaDimVal">0.25</span></label>
@@ -111,6 +140,7 @@
                             <input type="color" id="ccaDimColor" value="#000000" />
                         </div>
 
+                        <div id="ccaUploadControls">
                         <label class="ccaCheck ccaCheckBlock"><input is="emby-checkbox" type="checkbox" id="ccaGradient" /><span data-i18n="bg.gradient">Enable gradient background</span></label>
                         <div id="ccaGradientOpts" class="ccaSub" style="display:none;">
                             <div class="inputContainer">
@@ -154,6 +184,7 @@
                             <button is="emby-button" type="button" id="ccaBrowseBtn" class="raised ccaBtnWide"><span data-i18n="bg.browse">Browse library posters</span></button>
                             <div id="ccaSelectedBg" class="ccaSelected" style="display:none;"><span data-i18n="bg.selected">Selected background:</span> <strong id="ccaSelectedBgName"></strong></div>
                         </div>
+                        </div>
                     </section>
 
                     <section class="ccaCard">
@@ -175,9 +206,29 @@
                                     <option value="auto" selected data-i18n="fmt.auto">Auto (recommended)</option>
                                     <option value="png">PNG</option>
                                     <option value="gif">GIF</option>
+                                    <option value="animatedgif" data-i18n="fmt.animated">Animated GIF</option>
                                 </select>
                             </div>
                         </div>
+                        <div class="ccaGrid ccaSub" id="ccaAnimRow" style="display:none">
+                            <label class="ccaCheck ccaCheckBlock"><input is="emby-checkbox" type="checkbox" id="ccaKenBurns" checked /><span data-i18n="anim.kenburns">Ken Burns pan/zoom</span></label>
+                            <div class="inputContainer">
+                                <label for="ccaAnimFrames"><span data-i18n="anim.frames">Frames</span> <span class="ccaVal" id="ccaAnimFramesVal">20</span></label>
+                                <input type="range" class="ccaRange" id="ccaAnimFrames" min="2" max="30" step="1" value="20" />
+                            </div>
+                            <div class="inputContainer">
+                                <label for="ccaAnimDelay"><span data-i18n="anim.delay">Frame delay (ms)</span> <span class="ccaVal" id="ccaAnimDelayVal">80</span></label>
+                                <input type="range" class="ccaRange" id="ccaAnimDelay" min="20" max="300" step="10" value="80" />
+                            </div>
+                            <div class="inputContainer">
+                                <label for="ccaAnimDir" data-i18n="anim.dir">Zoom direction</label>
+                                <select is="emby-select" id="ccaAnimDir" class="emby-select">
+                                    <option value="in" data-i18n="anim.in">Zoom in</option>
+                                    <option value="out" data-i18n="anim.out">Zoom out</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="fieldDescription" id="ccaAnimHint" data-i18n="anim.hint" style="display:none">Animated GIFs are larger and only animate in views that render GIFs. Capped at 30 frames.</div>
                         <div id="ccaCustomDims" class="ccaGrid ccaSub" style="display:none;">
                             <div class="inputContainer">
                                 <label for="ccaWidth" data-i18n="out.width">Width</label>
@@ -187,6 +238,41 @@
                                 <label for="ccaHeight" data-i18n="out.height">Height</label>
                                 <input is="emby-input" type="number" id="ccaHeight" min="100" max="2048" value="1400" />
                             </div>
+                        </div>
+                    </section>
+
+                    <section class="ccaCard">
+                        <div class="ccaCardHead" data-i18n="card.templates">Templates</div>
+                        <div class="ccaGrid">
+                            <div class="inputContainer">
+                                <label for="ccaTemplateSelect" data-i18n="tpl.load">Load template</label>
+                                <select is="emby-select" id="ccaTemplateSelect" class="emby-select"></select>
+                            </div>
+                            <div class="inputContainer">
+                                <label>&nbsp;</label>
+                                <button is="emby-button" type="button" id="ccaTemplateDelete" class="raised">
+                                    <span data-i18n="tpl.delete">Delete</span>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="ccaFileRow">
+                            <input type="text" id="ccaTemplateName" class="emby-input" placeholder="Template name" data-i18n-ph="tpl.nameph" />
+                            <button is="emby-button" type="button" id="ccaTemplateSave" class="raised">
+                                <span data-i18n="tpl.save">Save current design</span>
+                            </button>
+                        </div>
+                        <div class="fieldDescription" data-i18n="tpl.hint">Templates store the design but not the title — each target keeps its own name.</div>
+                    </section>
+
+                    <section class="ccaCard">
+                        <div class="ccaCardHead" data-i18n="card.batch">Batch apply</div>
+                        <div class="fieldDescription" data-i18n="batch.hint">Apply the current design (or loaded template) to several targets at once. Each cover is titled with its target's name.</div>
+                        <div id="ccaBatchList" class="ccaBatchList"></div>
+                        <div class="ccaFileRow">
+                            <button is="emby-button" type="button" id="ccaBatchApply" class="raised">
+                                <span data-i18n="batch.apply">Apply to selected</span>
+                            </button>
+                            <span class="ccaFileName" id="ccaBatchStatus"></span>
                         </div>
                     </section>
 
@@ -299,6 +385,8 @@
         #CustomCoverArtConfigPage .ccaChecks { display: flex; flex-wrap: wrap; gap: .3em 1.25em; padding-top: .45em; }
         #CustomCoverArtConfigPage .ccaCheck { display: inline-flex; align-items: center; gap: .5em; }
         #CustomCoverArtConfigPage .ccaCheckBlock { display: flex; margin: .3em 0 .5em; }
+        #CustomCoverArtConfigPage .ccaBatchList { max-height: 220px; overflow-y: auto; margin: .3em 0 1em; display: flex; flex-direction: column; gap: .15em; }
+        #CustomCoverArtConfigPage .ccaBatchList:empty { display: none; }
 
         #CustomCoverArtConfigPage .ccaSub {
             margin: .4em 0 1.05em;
@@ -411,7 +499,12 @@
                 'dyn.loading': 'Loading…', 'dyn.errorItems': 'Error loading items', 'dyn.noItems': 'No items found', 'dyn.page': 'Page {0} of {1}',
                 'dyn.applied': 'Cover art applied successfully.', 'dyn.error': 'Error: {0}', 'dyn.applyFail': 'Could not apply cover art: {0}',
                 'dyn.uploadFail': 'Upload failed: {0}', 'dyn.fontFail': 'Font upload failed: {0}', 'dyn.useImgFail': 'Could not use that image: {0}',
-                'dyn.unknown': 'unknown error'
+                'dyn.unknown': 'unknown error',
+                'restore.button': 'Restore original cover', 'restore.none': 'No backup yet', 'restore.available': 'A backup exists', 'restore.done': 'Original cover restored.', 'restore.fail': 'No backup found to restore.',
+                'bg.source': 'Background source', 'bg.source.upload': 'Upload / poster', 'bg.source.collage': 'Poster collage from this target', 'bg.collage.density': 'Collage density', 'bg.collage.sparse': 'Sparse', 'bg.collage.medium': 'Medium', 'bg.collage.dense': 'Dense', 'bg.collage.shuffle': 'Shuffle', 'bg.collage.livetv': 'Live TV has no posters to collage.',
+                'card.templates': 'Templates', 'tpl.load': 'Load template', 'tpl.delete': 'Delete', 'tpl.save': 'Save current design', 'tpl.nameph': 'Template name', 'tpl.hint': 'Templates store the design but not the title — each target keeps its own name.', 'tpl.saved': 'Template saved.', 'tpl.named': 'Enter a template name first.',
+                'card.batch': 'Batch apply', 'batch.hint': 'Apply the current design (or loaded template) to several targets at once. Each cover is titled with its target\'s name.', 'batch.apply': 'Apply to selected', 'batch.none': 'Select at least one target.', 'batch.running': 'Applying…', 'batch.done': 'Done: {0} ok, {1} failed.',
+                'fmt.animated': 'Animated GIF', 'anim.kenburns': 'Ken Burns pan/zoom', 'anim.frames': 'Frames', 'anim.delay': 'Frame delay (ms)', 'anim.dir': 'Zoom direction', 'anim.in': 'Zoom in', 'anim.out': 'Zoom out', 'anim.hint': 'Animated GIFs are larger and only animate in views that render GIFs. Capped at 30 frames.'
             },
             nl: {
                 'lede': 'Ontwerp een cover voor een bibliotheek, bekijk het live en pas het toe.',
@@ -443,7 +536,12 @@
                 'dyn.loading': 'Laden…', 'dyn.errorItems': 'Fout bij laden van items', 'dyn.noItems': 'Geen items gevonden', 'dyn.page': 'Pagina {0} van {1}',
                 'dyn.applied': 'Cover art succesvol toegepast.', 'dyn.error': 'Fout: {0}', 'dyn.applyFail': 'Kon cover art niet toepassen: {0}',
                 'dyn.uploadFail': 'Uploaden mislukt: {0}', 'dyn.fontFail': 'Lettertype uploaden mislukt: {0}', 'dyn.useImgFail': 'Kon die afbeelding niet gebruiken: {0}',
-                'dyn.unknown': 'onbekende fout'
+                'dyn.unknown': 'onbekende fout',
+                'restore.button': 'Originele cover herstellen', 'restore.none': 'Nog geen back-up', 'restore.available': 'Er is een back-up', 'restore.done': 'Originele cover hersteld.', 'restore.fail': 'Geen back-up gevonden om te herstellen.',
+                'bg.source': 'Achtergrondbron', 'bg.source.upload': 'Upload / poster', 'bg.source.collage': 'Postercollage van dit doel', 'bg.collage.density': 'Collagedichtheid', 'bg.collage.sparse': 'Dun', 'bg.collage.medium': 'Gemiddeld', 'bg.collage.dense': 'Dicht', 'bg.collage.shuffle': 'Schudden', 'bg.collage.livetv': 'Live TV heeft geen posters voor een collage.',
+                'card.templates': 'Sjablonen', 'tpl.load': 'Sjabloon laden', 'tpl.delete': 'Verwijderen', 'tpl.save': 'Huidig ontwerp opslaan', 'tpl.nameph': 'Sjabloonnaam', 'tpl.hint': 'Sjablonen bewaren het ontwerp maar niet de titel — elk doel houdt zijn eigen naam.', 'tpl.saved': 'Sjabloon opgeslagen.', 'tpl.named': 'Voer eerst een sjabloonnaam in.',
+                'card.batch': 'Bulk toepassen', 'batch.hint': 'Pas het huidige ontwerp (of geladen sjabloon) in één keer toe op meerdere doelen. Elke cover krijgt de naam van zijn doel als titel.', 'batch.apply': 'Toepassen op selectie', 'batch.none': 'Selecteer minstens één doel.', 'batch.running': 'Bezig met toepassen…', 'batch.done': 'Klaar: {0} gelukt, {1} mislukt.',
+                'fmt.animated': 'Geanimeerde GIF', 'anim.kenburns': 'Ken Burns pan/zoom', 'anim.frames': 'Frames', 'anim.delay': 'Framevertraging (ms)', 'anim.dir': 'Zoomrichting', 'anim.in': 'Inzoomen', 'anim.out': 'Uitzoomen', 'anim.hint': 'Geanimeerde GIFs zijn groter en bewegen alleen in weergaven die GIFs tonen. Max. 30 frames.'
             }
         };
 
@@ -528,7 +626,7 @@
 
         function el(id) { return page.querySelector('#' + id); }
 
-        var state = { libraryId: '', aspectRatio: 1 };
+        var state = { libraryId: '', aspectRatio: 1, collageSeed: 1 };
         var browser = { page: 1, pageSize: 24, totalPages: 1 };
 
         function debounce(fn, wait) {
@@ -586,8 +684,24 @@
                 ExportWidth: width,
                 ExportHeight: height,
                 ExportScale: 1.0,
-                OutputFormat: el('ccaFormat').value,
-                DimensionPreset: preset
+                OutputFormat: el('ccaFormat').value === 'animatedgif' ? 'gif' : el('ccaFormat').value,
+                Animation: el('ccaFormat').value === 'animatedgif' ? {
+                    Enabled: true,
+                    KenBurns: el('ccaKenBurns').checked,
+                    ZoomAmount: 0.15,
+                    Direction: el('ccaAnimDir').value,
+                    FrameCount: parseInt(el('ccaAnimFrames').value, 10),
+                    DelayMs: parseInt(el('ccaAnimDelay').value, 10),
+                    Loop: true
+                } : null,
+                DimensionPreset: preset,
+                BackgroundSource: el('ccaBgSource').value,
+                Collage: {
+                    SourceId: state.libraryId || '',
+                    SourceType: (el('ccaTargetType') ? el('ccaTargetType').value : 'library'),
+                    Density: el('ccaCollageDensity').value,
+                    Seed: state.collageSeed
+                }
             };
         }
 
@@ -597,6 +711,42 @@
             el('ccaCustomDims').style.display = el('ccaPreset').value === 'custom' ? '' : 'none';
             el('ccaGradientOpts').style.display = el('ccaGradient').checked ? '' : 'none';
             el('ccaGradientAngleRow').style.display = el('ccaGradientType').value === '0' ? '' : 'none';
+        }
+
+        // Shows/hides the collage controls and disables collage for Live TV
+        // (which has no child posters to build a mosaic from).
+        function updateCollageVisibility() {
+            var isCollage = el('ccaBgSource').value === 'collage';
+            var type = el('ccaTargetType') ? el('ccaTargetType').value : 'library';
+            var opt = el('ccaBgSource').querySelector('option[value="collage"]');
+            if (opt) { opt.disabled = (type === 'livetv'); }
+            if (type === 'livetv' && isCollage) { el('ccaBgSource').value = 'upload'; isCollage = false; }
+            el('ccaCollageRow').style.display = isCollage ? '' : 'none';
+            // A collage supplies the whole background, so the upload/gradient/fit
+            // controls don't apply — hide them to keep the card focused.
+            var up = el('ccaUploadControls');
+            if (up) { up.style.display = isCollage ? 'none' : ''; }
+            updateUI();
+        }
+
+        // Shows/hides the animated-GIF controls when that output format is chosen.
+        function updateAnimVisibility() {
+            var on = el('ccaFormat').value === 'animatedgif';
+            el('ccaAnimRow').style.display = on ? '' : 'none';
+            el('ccaAnimHint').style.display = on ? '' : 'none';
+        }
+
+        // Refreshes the Restore button state for the currently selected target.
+        function refreshRestoreState() {
+            var btn = el('ccaRestoreBtn');
+            var hint = el('ccaRestoreHint');
+            if (!btn) { return; }
+            if (!state.libraryId) { btn.disabled = true; hint.textContent = t('restore.none'); return; }
+            jsonFetch('CustomCoverArt/targets/' + encodeURIComponent(state.libraryId) + '/backup').then(function (res) {
+                var has = pick(res, 'Success') && pick(res, 'Data');
+                btn.disabled = !has;
+                hint.textContent = has ? t('restore.available') : t('restore.none');
+            });
         }
 
         // Loads the targets (libraries / collections / playlists) for the selected type.
@@ -619,6 +769,98 @@
                     });
                 }
                 updateUI();
+            });
+        }
+
+        // --- Templates ----------------------------------------------------
+        function loadTemplates() {
+            return jsonFetch('CustomCoverArt/templates').then(function (res) {
+                var sel = el('ccaTemplateSelect');
+                sel.innerHTML = '';
+                var none = document.createElement('option'); none.value = ''; none.textContent = '—'; sel.appendChild(none);
+                (pick(res, 'Data') || []).forEach(function (tpl) {
+                    var o = document.createElement('option');
+                    o.value = pick(tpl, 'Name'); o.textContent = pick(tpl, 'Name');
+                    o._settings = pick(tpl, 'Settings');
+                    sel.appendChild(o);
+                });
+            });
+        }
+
+        // Sets the form controls from a settings object (the inverse of
+        // collectSettings), EXCEPT Title and the target-specific collage source.
+        function applySettingsToForm(s) {
+            if (!s) { return; }
+            function setVal(id, v) { var e = el(id); if (e != null && v != null) { e.value = v; } }
+            function setChk(id, v) { var e = el(id); if (e != null) { e.checked = !!v; } }
+
+            var textSize = pick(s, 'TextSize');
+            if (textSize != null) { el('ccaTextSize').value = textSize; el('ccaTextSizeVal').textContent = textSize; }
+            setVal('ccaTextWeight', pick(s, 'TextWeight'));
+            setVal('ccaTextColor', pick(s, 'TextColor'));
+            setVal('ccaTextAlign', pick(s, 'TextAlign'));
+            var dim = pick(s, 'BackgroundDim');
+            if (dim != null) { el('ccaDim').value = dim; el('ccaDimVal').textContent = dim; }
+            var blur = pick(s, 'BackgroundBlur');
+            if (blur != null) { el('ccaBlur').value = blur; el('ccaBlurVal').textContent = blur; }
+            setVal('ccaDimColor', pick(s, 'DimColor'));
+            setChk('ccaShadow', pick(s, 'TextShadow'));
+            setChk('ccaOutline', pick(s, 'TextOutline'));
+            setVal('ccaBgFit', pick(s, 'BackgroundFit'));
+
+            var gr = pick(s, 'BackgroundGradient');
+            if (gr) {
+                setChk('ccaGradient', pick(gr, 'IsEnabled'));
+                setVal('ccaGradientType', pick(gr, 'Type'));
+                var ang = pick(gr, 'Angle');
+                if (ang != null) { el('ccaGradientAngle').value = ang; el('ccaGradientAngleVal').textContent = ang + '°'; }
+                var stops = pick(gr, 'Stops');
+                if (stops && stops.length >= 2) {
+                    el('ccaGradientStops').innerHTML = '';
+                    stops.forEach(function (st) {
+                        addGradientStop(pick(st, 'Color') || '#888888', Math.round((pick(st, 'Position') || 0) * 100));
+                    });
+                }
+            }
+
+            setVal('ccaBgSource', pick(s, 'BackgroundSource'));
+            var col = pick(s, 'Collage');
+            if (col) { setVal('ccaCollageDensity', pick(col, 'Density')); }
+
+            setVal('ccaPreset', pick(s, 'DimensionPreset'));
+            var anim = pick(s, 'Animation');
+            var fmtOpt = el('ccaFormat').querySelector('option[value="animatedgif"]');
+            if (anim && pick(anim, 'Enabled') && fmtOpt) {
+                el('ccaFormat').value = 'animatedgif';
+                setChk('ccaKenBurns', pick(anim, 'KenBurns'));
+                var fc = pick(anim, 'FrameCount');
+                if (fc != null && el('ccaAnimFrames')) { el('ccaAnimFrames').value = fc; if (el('ccaAnimFramesVal')) { el('ccaAnimFramesVal').textContent = fc; } }
+                var dl = pick(anim, 'DelayMs');
+                if (dl != null && el('ccaAnimDelay')) { el('ccaAnimDelay').value = dl; if (el('ccaAnimDelayVal')) { el('ccaAnimDelayVal').textContent = dl; } }
+                setVal('ccaAnimDir', pick(anim, 'Direction'));
+            } else {
+                setVal('ccaFormat', pick(s, 'OutputFormat'));
+            }
+
+            // Re-sync dependent visibility + labels.
+            updateUI();
+            updateCollageVisibility();
+            if (typeof updateAnimVisibility === 'function') { updateAnimVisibility(); }
+        }
+
+        // --- Batch apply --------------------------------------------------
+        function loadBatchList() {
+            var type = el('ccaTargetType') ? el('ccaTargetType').value : 'library';
+            return jsonFetch('CustomCoverArt/targets/' + type).then(function (res) {
+                var box = el('ccaBatchList'); box.innerHTML = '';
+                (pick(res, 'Data') || []).forEach(function (lib) {
+                    var id = pick(lib, 'Id'), name = pick(lib, 'Name');
+                    var row = document.createElement('label'); row.className = 'ccaCheck ccaCheckBlock';
+                    var cb = document.createElement('input'); cb.type = 'checkbox'; cb.setAttribute('is', 'emby-checkbox');
+                    cb.value = id; cb.dataset.type = type;
+                    var span = document.createElement('span'); span.textContent = name;
+                    row.appendChild(cb); row.appendChild(span); box.appendChild(row);
+                });
             });
         }
 
@@ -681,6 +923,9 @@
         function onControlChange(e) {
             var target = e.target;
             if (!target || target.type === 'file' || target.id === 'ccaLibrarySelect') { return; }
+            // Ticking batch targets or naming a template must not re-render the preview.
+            if (target.closest && target.closest('#ccaBatchList')) { return; }
+            if (target.id === 'ccaTemplateName' || target.id === 'ccaTemplateSelect') { return; }
             schedulePreview();
         }
 
@@ -716,7 +961,8 @@
         function downloadPreview() {
             var img = el('ccaPreview');
             if (!img.src || img.style.display === 'none') { return; }
-            var ext = el('ccaFormat').value === 'gif' ? 'gif' : 'png';
+            var fmt = el('ccaFormat').value;
+            var ext = (fmt === 'gif' || fmt === 'animatedgif') ? 'gif' : 'png';
             var a = document.createElement('a');
             a.href = img.src;
             a.download = 'cover.' + ext;
@@ -748,20 +994,37 @@
             el('ccaLibrarySelect').addEventListener('change', function () {
                 state.libraryId = this.value;
                 updateUI();
+                refreshRestoreState();
+            });
+
+            el('ccaRestoreBtn').addEventListener('click', function () {
+                if (!state.libraryId) { return; }
+                var type = el('ccaTargetType') ? el('ccaTargetType').value : 'library';
+                jsonFetch('CustomCoverArt/targets/' + type + '/' + encodeURIComponent(state.libraryId) + '/restore', 'POST')
+                    .then(function (res) {
+                        Dashboard.alert(pick(res, 'Success') ? t('restore.done') : t('restore.fail'));
+                    });
             });
             el('ccaTextSize').addEventListener('input', function () { el('ccaTextSizeVal').textContent = this.value; });
             el('ccaDim').addEventListener('input', function () { el('ccaDimVal').textContent = this.value; });
             el('ccaBlur').addEventListener('input', function () { el('ccaBlurVal').textContent = this.value; });
             el('ccaPreset').addEventListener('change', updateUI);
+            el('ccaFormat').addEventListener('change', function () { updateAnimVisibility(); runPreview(); });
+            el('ccaAnimFrames').addEventListener('input', function () { el('ccaAnimFramesVal').textContent = this.value; });
+            el('ccaAnimDelay').addEventListener('input', function () { el('ccaAnimDelayVal').textContent = this.value; });
             el('ccaGradient').addEventListener('change', updateUI);
             el('ccaGradientType').addEventListener('change', updateUI);
             el('ccaGradientAngle').addEventListener('input', function () { el('ccaGradientAngleVal').textContent = this.value + '°'; });
             el('ccaAddStop').addEventListener('click', function () { addGradientStop('#888888', 50); schedulePreview(); });
 
+            el('ccaBgSource').addEventListener('change', function () { updateCollageVisibility(); runPreview(); });
+            el('ccaCollageDensity').addEventListener('change', runPreview);
+            el('ccaCollageShuffle').addEventListener('click', function () { state.collageSeed = (state.collageSeed + 1) & 0x7fffffff; runPreview(); });
+
             el('ccaTargetType').addEventListener('change', function () {
                 Dashboard.showLoadingMsg();
                 loadLibraries()
-                    .then(function () { updateUI(); Dashboard.hideLoadingMsg(); })
+                    .then(function () { updateUI(); updateCollageVisibility(); refreshRestoreState(); loadBatchList(); Dashboard.hideLoadingMsg(); })
                     .catch(function () { Dashboard.hideLoadingMsg(); });
             });
 
@@ -800,6 +1063,36 @@
 
             el('ccaApplyBtn').addEventListener('click', applyCoverArt);
             el('ccaDownloadBtn').addEventListener('click', downloadPreview);
+
+            el('ccaTemplateSelect').addEventListener('change', function () {
+                var opt = this.options[this.selectedIndex];
+                if (opt && opt._settings) { applySettingsToForm(opt._settings); runPreview(); }
+            });
+            el('ccaTemplateSave').addEventListener('click', function () {
+                var name = el('ccaTemplateName').value.trim();
+                if (!name) { Dashboard.alert(t('tpl.named')); return; }
+                jsonFetch('CustomCoverArt/templates', 'POST', { Name: name, Settings: collectSettings() })
+                    .then(function () { Dashboard.alert(t('tpl.saved')); loadTemplates(); });
+            });
+            el('ccaTemplateDelete').addEventListener('click', function () {
+                var name = el('ccaTemplateSelect').value;
+                if (!name) { return; }
+                jsonFetch('CustomCoverArt/templates/' + encodeURIComponent(name), 'DELETE').then(loadTemplates);
+            });
+
+            el('ccaBatchApply').addEventListener('click', function () {
+                var checks = el('ccaBatchList').querySelectorAll('input[type=checkbox]:checked');
+                if (!checks.length) { Dashboard.alert(t('batch.none')); return; }
+                var targets = Array.prototype.map.call(checks, function (c) { return { Id: c.value, Type: c.dataset.type }; });
+                el('ccaBatchStatus').textContent = t('batch.running');
+                jsonFetch('CustomCoverArt/batchApply', 'POST', { Settings: collectSettings(), Targets: targets })
+                    .then(function (res) {
+                        var data = pick(res, 'Data') || [];
+                        var ok = data.filter(function (r) { return pick(r, 'Success'); }).length;
+                        var fail = data.length - ok;
+                        el('ccaBatchStatus').textContent = t('batch.done').replace('{0}', ok).replace('{1}', fail);
+                    });
+            });
 
             // Auto-preview: any control change (except file inputs and the library
             // picker) schedules a debounced live render.
@@ -953,8 +1246,13 @@
                 page.dataset.ccaInit = 'true';
             }
             Dashboard.showLoadingMsg();
+            updateAnimVisibility();
+            loadTemplates();
+            loadBatchList();
             loadLibraries().then(function () {
                 updateUI();
+                updateCollageVisibility();
+                refreshRestoreState();
                 Dashboard.hideLoadingMsg();
                 schedulePreview();
             }).catch(function () { Dashboard.hideLoadingMsg(); });

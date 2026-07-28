@@ -201,6 +201,9 @@ public class CustomCoverArtController : ControllerBase
                 return Fail<bool>("Failed to save cover art");
             }
 
+            // Preserve the target's current image once, so Restore can undo later.
+            await _libraryService.BackupCurrentCoverArtAsync(libraryId).ConfigureAwait(false);
+
             var updated = await _libraryService.UpdateLibraryCoverArtAsync(libraryId, savedPath).ConfigureAwait(false);
             if (!updated)
             {
@@ -213,6 +216,39 @@ public class CustomCoverArtController : ControllerBase
         {
             _loggingService.LogError("Failed to apply cover art to library {LibraryId}", ex, libraryId);
             return Fail<bool>("Failed to apply cover art.");
+        }
+    }
+
+    /// <summary>Whether a restore point (original cover backup) exists for a target.</summary>
+    [HttpGet("targets/{id}/backup")]
+    public ApiResponse<bool> HasBackup(string id)
+    {
+        if (!Guid.TryParse(id, out _))
+        {
+            return Fail<bool>("Invalid target id");
+        }
+
+        return Success(_libraryService.HasBackup(id));
+    }
+
+    /// <summary>Restore a target's original (pre-plugin) primary image.</summary>
+    [HttpPost("targets/{type}/{id}/restore")]
+    public async Task<ApiResponse<bool>> RestoreOriginal(string type, string id)
+    {
+        if (!Guid.TryParse(id, out _))
+        {
+            return Fail<bool>("Invalid target id");
+        }
+
+        try
+        {
+            var ok = await _libraryService.RestoreOriginalCoverArtAsync(id).ConfigureAwait(false);
+            return ok ? Success(true) : Fail<bool>("No original cover backup found for this target.");
+        }
+        catch (Exception ex)
+        {
+            _loggingService.LogError("Failed to restore original cover for {Id}", ex, id);
+            return Fail<bool>("Failed to restore original cover.");
         }
     }
 
@@ -527,6 +563,130 @@ public class CustomCoverArtController : ControllerBase
             _loggingService.LogError("Failed to get language info", ex);
             return Fail<object>(ex.Message);
         }
+    }
+
+    /// <summary>Strip title and target-specific fields so a template is reusable across targets.</summary>
+    public static SavedTemplate NormalizeTemplate(SavedTemplate template)
+    {
+        template.Name = (template.Name ?? string.Empty).Trim();
+        template.Settings.Title = string.Empty;
+        if (template.Settings.Collage is not null)
+        {
+            template.Settings.Collage.SourceId = string.Empty;
+        }
+        return template;
+    }
+
+    /// <summary>Clone base settings for one batch target: title = target name, collage source = target id.</summary>
+    public static CoverArtSettings BuildBatchSettings(CoverArtSettings baseSettings, string targetName, string targetId)
+    {
+        // Shallow JSON clone to avoid mutating the shared base settings.
+        var json = System.Text.Json.JsonSerializer.Serialize(baseSettings);
+        var clone = System.Text.Json.JsonSerializer.Deserialize<CoverArtSettings>(json) ?? new CoverArtSettings();
+        clone.Title = targetName;
+        if (clone.BackgroundSource == BackgroundSources.Collage && clone.Collage is not null)
+        {
+            clone.Collage.SourceId = targetId;
+        }
+        return clone;
+    }
+
+    /// <summary>Apply one design to many targets, auto-titling each from the target's name.</summary>
+    [HttpPost("batchApply")]
+    public async Task<ApiResponse<List<BatchApplyResult>>> BatchApply([FromBody] BatchApplyRequest request)
+    {
+        if (request is null || request.Targets.Count == 0)
+        {
+            return Fail<List<BatchApplyResult>>("No targets selected.");
+        }
+
+        // Resolve the base design: a named template, or inline settings.
+        CoverArtSettings? baseSettings = request.Settings;
+        if (!string.IsNullOrWhiteSpace(request.TemplateName))
+        {
+            var tpl = Plugin.Instance?.Configuration.Templates
+                .FirstOrDefault(t => string.Equals(t.Name, request.TemplateName, StringComparison.OrdinalIgnoreCase));
+            if (tpl is null)
+            {
+                return Fail<List<BatchApplyResult>>("Template not found: " + request.TemplateName);
+            }
+            baseSettings = tpl.Settings;
+        }
+
+        if (baseSettings is null)
+        {
+            return Fail<List<BatchApplyResult>>("No template or settings provided.");
+        }
+
+        var results = new List<BatchApplyResult>();
+        foreach (var target in request.Targets)
+        {
+            var result = new BatchApplyResult { Id = target.Id };
+            if (!Guid.TryParse(target.Id, out _))
+            {
+                result.Success = false;
+                result.Error = "Invalid id";
+                results.Add(result);
+                continue;
+            }
+
+            var info = await _libraryService.GetLibraryByIdAsync(target.Id).ConfigureAwait(false);
+            var name = info?.Name ?? "Cover";
+            result.Name = name;
+
+            var settings = BuildBatchSettings(baseSettings, name, target.Id);
+            var applied = await ApplyInternal(target.Id, settings).ConfigureAwait(false);
+            result.Success = applied.Success;
+            result.Error = applied.ErrorMessage;
+            results.Add(result);
+        }
+
+        return Success(results);
+    }
+
+    /// <summary>List saved design templates.</summary>
+    [HttpGet("templates")]
+    public ApiResponse<List<SavedTemplate>> GetTemplates()
+    {
+        var list = Plugin.Instance?.Configuration.Templates ?? new List<SavedTemplate>();
+        return Success(list);
+    }
+
+    /// <summary>Save (upsert by name) a design template.</summary>
+    [HttpPost("templates")]
+    public ApiResponse<bool> SaveTemplate([FromBody] SavedTemplate template)
+    {
+        if (template is null || string.IsNullOrWhiteSpace(template.Name))
+        {
+            return Fail<bool>("Template name is required.");
+        }
+
+        var cfg = Plugin.Instance?.Configuration;
+        if (cfg is null)
+        {
+            return Fail<bool>("Plugin not initialized.");
+        }
+
+        var normalized = NormalizeTemplate(template);
+        cfg.Templates.RemoveAll(t => string.Equals(t.Name, normalized.Name, StringComparison.OrdinalIgnoreCase));
+        cfg.Templates.Add(normalized);
+        Plugin.Instance!.SaveConfiguration();
+        return Success(true);
+    }
+
+    /// <summary>Delete a design template by name.</summary>
+    [HttpDelete("templates/{name}")]
+    public ApiResponse<bool> DeleteTemplate(string name)
+    {
+        var cfg = Plugin.Instance?.Configuration;
+        if (cfg is null)
+        {
+            return Fail<bool>("Plugin not initialized.");
+        }
+
+        cfg.Templates.RemoveAll(t => string.Equals(t.Name, name, StringComparison.OrdinalIgnoreCase));
+        Plugin.Instance!.SaveConfiguration();
+        return Success(true);
     }
 
     private static ApiResponse<T> Success<T>(T data) => new() { Success = true, Data = data };
