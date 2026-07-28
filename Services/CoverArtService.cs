@@ -50,6 +50,19 @@ public class CoverArtService : ICoverArtService
             if (document == null)
                 throw new ArgumentNullException(nameof(document));
 
+            // Defensive input hygiene: System.Text.Json does not enforce non-null on
+            // non-nullable reference types, so a client can POST a partial/malformed
+            // document (e.g. "transform": null or "layers": [null, ...]). Normalize the
+            // nested objects this renderer dereferences unconditionally so a bad body
+            // degrades gracefully instead of a 500.
+            document.Canvas ??= new CanvasSettings();
+            document.Background ??= new BackgroundLayer();
+            document.Background.Transform ??= new BackgroundTransform();
+            document.Effects ??= new EffectSettings();
+            document.Layers = (document.Layers ?? new List<CoverLayer>())
+                .Where(l => l is not null)
+                .ToList();
+
             if (document.Canvas.Width <= 0 || document.Canvas.Height <= 0)
                 throw new ArgumentException("Invalid dimensions");
 

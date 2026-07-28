@@ -94,6 +94,10 @@ public class SavedTemplate
 {
     public string Name { get; set; } = string.Empty;
     public CoverArtSettings Settings { get; set; } = new();
+
+    /// <summary>Document-native design (Phase 1+). Null for templates saved before the canvas
+    /// engine shipped; the client migrates those from <see cref="Settings"/> (Task 9).</summary>
+    public CoverDocument? Document { get; set; }
 }
 
 /// <summary>A single batch-apply target reference.</summary>
@@ -184,6 +188,13 @@ public class ApplyCoverArtRequest
 {
     public string LibraryId { get; set; } = string.Empty;
     public CoverArtSettings Settings { get; set; } = new();
+}
+
+/// <summary>Request to render and apply a document-native design to a library.</summary>
+public class ApplyDocumentRequest
+{
+    public string LibraryId { get; set; } = string.Empty;
+    public CoverDocument Document { get; set; } = new();
 }
 
 public class ValidationResult
