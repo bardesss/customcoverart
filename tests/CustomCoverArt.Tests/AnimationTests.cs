@@ -8,15 +8,19 @@ namespace CustomCoverArt.Tests;
 
 internal static class AnimationTestHost
 {
-    public static CoverArtService NewCoverArtService()
+    public static (CoverArtService Service, string DataDir) New()
     {
         var img = Substitute.For<IImageProcessingService>();
         var paths = Substitute.For<IApplicationPaths>();
-        paths.DataPath.Returns(System.IO.Path.Combine(
-            System.IO.Path.GetTempPath(), "cca_anim_" + System.Guid.NewGuid().ToString("N")));
-        return new CoverArtService(
+        var dataDir = System.IO.Path.Combine(
+            System.IO.Path.GetTempPath(), "cca_anim_" + System.Guid.NewGuid().ToString("N"));
+        paths.DataPath.Returns(dataDir);
+        var svc = new CoverArtService(
             img, paths, Substitute.For<ILoggingService>(), Substitute.For<IMediaItemService>());
+        return (svc, dataDir);
     }
+
+    public static CoverArtService NewCoverArtService() => New().Service;
 }
 
 public class AnimationTests
@@ -75,5 +79,50 @@ public class AnimationTests
         Assert.True(img.Frames.Count >= 2);
 
         try { System.IO.File.Delete(path); } catch { }
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task AnimatedGifBackground_PassesThroughItsFrames()
+    {
+        var (svc, dataDir) = AnimationTestHost.New();
+
+        // The background must live inside the plugin's sandbox to be honoured.
+        var uploads = System.IO.Path.Combine(dataDir, "customcoverart", "uploads");
+        System.IO.Directory.CreateDirectory(uploads);
+        var gifPath = System.IO.Path.Combine(uploads, "src.gif");
+
+        using (var f2 = new SixLabors.ImageSharp.Image<SixLabors.ImageSharp.PixelFormats.Rgba32>(80, 80, Color.Green))
+        using (var f3 = new SixLabors.ImageSharp.Image<SixLabors.ImageSharp.PixelFormats.Rgba32>(80, 80, Color.Blue))
+        using (var gif = new SixLabors.ImageSharp.Image<SixLabors.ImageSharp.PixelFormats.Rgba32>(80, 80, Color.Red))
+        {
+            gif.Frames.AddFrame(f2.Frames.RootFrame);
+            gif.Frames.AddFrame(f3.Frames.RootFrame);
+            gif.SaveAsGif(gifPath);
+        }
+
+        var settings = new CustomCoverArt.Models.CoverArtSettings
+        {
+            Title = "X",
+            ExportWidth = 100,
+            ExportHeight = 100,
+            OutputFormat = "gif",
+            BackgroundSource = "upload",
+            BackgroundImagePath = gifPath,
+            // Request 20 frames — a true passthrough should ignore that and use the
+            // source's own 3 frames instead of truncating/padding.
+            Animation = new CustomCoverArt.Models.AnimationSettings
+            {
+                Enabled = true, KenBurns = false, FrameCount = 20, DelayMs = 80, Loop = true
+            }
+        };
+
+        var path = await svc.GenerateCoverArtAsync(settings);
+
+        Assert.True(System.IO.File.Exists(path));
+        using var outImg = SixLabors.ImageSharp.Image.Load(path);
+        Assert.Equal(3, outImg.Frames.Count);
+
+        try { System.IO.File.Delete(path); } catch { }
+        try { System.IO.Directory.Delete(dataDir, true); } catch { }
     }
 }
