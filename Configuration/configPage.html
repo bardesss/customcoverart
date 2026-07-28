@@ -279,7 +279,7 @@
                     <section class="ccaCard">
                         <div class="ccaCardHead" data-i18n="card.preview">Preview</div>
                         <div class="ccaPreviewWrap">
-                            <img id="ccaPreview" alt="Cover art preview" />
+                            <canvas id="ccaCanvas" class="ccaCanvas" width="1400" height="1400" aria-label="Cover art canvas"></canvas>
                             <div id="ccaPreviewPlaceholder" class="ccaPreviewPlaceholder" data-i18n="preview.placeholder">Generate a preview to see your cover art.</div>
                             <div id="ccaPreviewSpinner" class="ccaSpinner" style="display:none" aria-hidden="true"></div>
                         </div>
@@ -442,14 +442,15 @@
             background: rgba(0, 0, 0, .18);
             text-align: center;
         }
-        #CustomCoverArtConfigPage #ccaPreview {
-            display: none;
+        #CustomCoverArtConfigPage .ccaCanvas {
+            display: block;
             max-width: 100%;
             max-height: 62vh;
             height: auto;
             border-radius: 6px;
             box-shadow: 0 8px 28px rgba(0, 0, 0, .4);
             transition: opacity .15s ease;
+            touch-action: none;
         }
         #CustomCoverArtConfigPage .ccaPreviewPlaceholder { opacity: .5; }
         #CustomCoverArtConfigPage .ccaSpinner {
@@ -671,6 +672,258 @@
             banner: { w: 1920, h: 540 },
             custom: { w: 1920, h: 1080 }
         };
+
+        // ==================================================================
+        // Canvas engine (Phase 1 · Task 7)
+        // Renders a client-side CoverDocument onto <canvas id="ccaCanvas">, live,
+        // to mirror the server ImageSharp compositor (Services/DocumentRenderer.cs).
+        // The server stays authoritative; this is a fast visual preview. Field
+        // names/casing on `doc` are PascalCase to match the C# CoverDocument model.
+        // ==================================================================
+
+        // The working document. PascalCase mirrors Models/CoverDocument.cs so the
+        // same object shape can later be POSTed for the authoritative server render.
+        function defaultDocument() {
+            return {
+                Version: 2,
+                Canvas: { Width: 1280, Height: 720, Format: 'auto', DimensionPreset: 'landscape' },
+                Background: {
+                    Source: 'upload', ImagePath: '', Fit: 'cover',
+                    Transform: { OffsetX: 0, OffsetY: 0, Scale: 1 },
+                    Blur: 0, Dim: 0.25, DimColor: '#000000',
+                    Gradient: {
+                        IsEnabled: true, Type: 0, Angle: 0,
+                        Stops: [{ Color: '#aa5cc3', Position: 0 }, { Color: '#00a4dc', Position: 1 }],
+                        CenterX: 0.5, CenterY: 0.5, Radius: 0.5
+                    },
+                    Collage: null, Animation: null
+                },
+                Effects: { Preset: null },
+                Layers: [{
+                    Id: 'title', Type: 'text', Visible: true, X: 0.5, Y: 0.5, Width: 0, Height: 0,
+                    Rotation: 0, Opacity: 1, Content: 'Movies', Size: 120 / 720, Weight: 400,
+                    Color: '#ffffff', Align: 1, FontPath: '',
+                    Shadow: { Enabled: false, Color: '#000000', Blur: 4, OffsetX: 2, OffsetY: 2 },
+                    Outline: { Enabled: false, Color: '#000000', Width: 2 }
+                }],
+                _selectedId: 'title'
+            };
+        }
+        var doc = defaultDocument();
+
+        // CRITICAL canvas-source invariant: bgImageEl must ONLY ever be assigned an
+        // <img> loaded from a blob: object-URL (URL.createObjectURL of a client File
+        // or a fetched Blob). A blob: URL adopts the document origin so the canvas is
+        // never tainted (Phase 3's getImageData/palette + client grain depend on it).
+        // NEVER point it at ApiClient.getImageUrl(...) or a server /upload path.
+        // Wiring the upload/poster Blob happens in Task 8; here it stays null and the
+        // gradient default renders.
+        var bgImageEl = null;
+
+        // Coordinate contract: canvas backing store is doc.Canvas.Width×Height;
+        // normalized layer coordinates map 1:1 across that dimension.
+        function normToPx(n, dim) { return n * dim; }
+        function pxToNorm(px, dim) { return dim ? px / dim : 0; }
+
+        function selectedLayer() {
+            for (var i = 0; i < doc.Layers.length; i++) {
+                if (doc.Layers[i].Id === doc._selectedId) { return doc.Layers[i]; }
+            }
+            return null;
+        }
+
+        var _rafPending = false;
+        function scheduleRender() {
+            if (_rafPending) { return; }
+            _rafPending = true;
+            requestAnimationFrame(function () { _rafPending = false; renderDocument(); });
+        }
+
+        function renderDocument() {
+            var cv = el('ccaCanvas');
+            if (!cv) { return; }
+            if (cv.width !== doc.Canvas.Width || cv.height !== doc.Canvas.Height) {
+                cv.width = doc.Canvas.Width;
+                cv.height = doc.Canvas.Height;
+            }
+            var ctx = cv.getContext('2d');
+            var W = cv.width, H = cv.height;
+            ctx.clearRect(0, 0, W, H);
+
+            // Background: image (if a blob-loaded one is ready) honouring fit +
+            // transform, else the gradient, else a flat base-colour fill — the same
+            // precedence as DocumentRenderer.ComposeDocumentFrame /
+            // CreateGradientBackground.
+            if (bgImageEl && bgImageEl.complete && bgImageEl.naturalWidth) {
+                drawBackgroundImage(ctx, bgImageEl, W, H);
+            } else if (doc.Background.Gradient && doc.Background.Gradient.IsEnabled) {
+                drawGradient(ctx, doc.Background.Gradient, W, H);
+            } else {
+                ctx.fillStyle = doc.Background.DimColor || '#000';
+                ctx.fillRect(0, 0, W, H);
+            }
+
+            // Dim overlay: a solid base-colour layer at fractional opacity over the
+            // background only (text is drawn after) — mirrors the DrawImage-with-
+            // opacity dim in ApplyBackgroundLayer.
+            if (doc.Background.Dim > 0) {
+                ctx.save();
+                ctx.globalAlpha = Math.min(1, doc.Background.Dim);
+                ctx.fillStyle = doc.Background.DimColor || '#000';
+                ctx.fillRect(0, 0, W, H);
+                ctx.restore();
+            }
+
+            // Visible layers, in array order (draw order matches the server loop).
+            doc.Layers.forEach(function (layer) {
+                if (!layer.Visible) { return; }
+                if (layer.Type === 'text') { drawTextLayer(ctx, layer, W, H); }
+                // image layers: Phase 2
+            });
+
+            drawSelectionHandles(ctx, W, H); // filled in by Task 8
+
+            var ph = el('ccaPreviewPlaceholder');
+            if (ph) { ph.style.display = 'none'; }
+        }
+
+        // Builds the canvas colour-stop list from gradient settings — the explicit
+        // Stops (sorted, clamped) when there are 2+, else a black→white fallback,
+        // mirroring DocumentRenderer.BuildColorStops.
+        function gradientStops(g) {
+            var stops = (g.Stops || []).slice().sort(function (a, b) { return a.Position - b.Position; });
+            if (stops.length >= 2) {
+                return stops.map(function (s) {
+                    return { pos: Math.max(0, Math.min(1, s.Position)), color: s.Color || '#808080' };
+                });
+            }
+            return [{ pos: 0, color: '#000000' }, { pos: 1, color: '#ffffff' }];
+        }
+
+        // Linear (a line through the centre at Angle degrees spanning the canvas) or
+        // radial (centred at Center*, radius = Radius*min(W,H)) — geometry copied
+        // from DocumentRenderer.ApplyGradientBackground so framing matches.
+        function drawGradient(ctx, g, W, H) {
+            var stops = gradientStops(g);
+            var grad;
+            if (g.Type === 1) { // radial
+                var cx = g.CenterX * W, cy = g.CenterY * H;
+                var radius = Math.max(1, g.Radius * Math.min(W, H));
+                grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+            } else { // linear
+                var rad = (g.Angle || 0) * Math.PI / 180;
+                var dx = Math.cos(rad), dy = Math.sin(rad);
+                var mx = W / 2, my = H / 2;
+                var half = (Math.abs(dx) * W + Math.abs(dy) * H) / 2;
+                grad = ctx.createLinearGradient(mx - dx * half, my - dy * half, mx + dx * half, my + dy * half);
+            }
+            stops.forEach(function (s) { grad.addColorStop(s.pos, s.color); });
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, W, H);
+        }
+
+        // Draws the background image with cover/contain/stretch fit plus the pan/zoom
+        // transform, mirroring ApplyBackgroundLayer + TransformedSourceRect: the fit
+        // maps a base source rect onto a destination footprint, then the transform
+        // crops that source rect by 1/Scale and pans it across the slack.
+        // NOTE: only ever called with a blob-loaded (untainted) image (see bgImageEl).
+        function drawBackgroundImage(ctx, img, W, H) {
+            var iw = img.naturalWidth, ih = img.naturalHeight;
+            var fit = (doc.Background.Fit || 'cover').toLowerCase();
+
+            var srcX, srcY, srcW, srcH;      // base source rect (image pixels)
+            var dstX, dstY, dstW, dstH;      // destination footprint (canvas pixels)
+
+            if (fit === 'stretch') {
+                srcX = 0; srcY = 0; srcW = iw; srcH = ih;
+                dstX = 0; dstY = 0; dstW = W; dstH = H;
+            } else if (fit === 'contain') {
+                // Letterbox the remainder with the base colour, like the server.
+                ctx.fillStyle = doc.Background.DimColor || '#000';
+                ctx.fillRect(0, 0, W, H);
+                var cs = Math.min(W / iw, H / ih);
+                srcX = 0; srcY = 0; srcW = iw; srcH = ih;
+                dstW = iw * cs; dstH = ih * cs;
+                dstX = (W - dstW) / 2; dstY = (H - dstH) / 2;
+            } else { // cover
+                var vs = Math.max(W / iw, H / ih);
+                srcW = W / vs; srcH = H / vs;
+                srcX = (iw - srcW) / 2; srcY = (ih - srcH) / 2;
+                dstX = 0; dstY = 0; dstW = W; dstH = H;
+            }
+
+            // Pan/zoom: shrink the source rect by 1/Scale, pan across the slack
+            // (Offset -1..1, 0 = centred). Identity transform leaves the rect intact.
+            var t = doc.Background.Transform || { OffsetX: 0, OffsetY: 0, Scale: 1 };
+            var sc = Math.max(1, t.Scale || 1);
+            if (sc !== 1 || t.OffsetX || t.OffsetY) {
+                var w2 = srcW / sc, h2 = srcH / sc;
+                var slackX = srcW - w2, slackY = srcH - h2;
+                var ox = Math.max(-1, Math.min(1, t.OffsetX || 0));
+                var oy = Math.max(-1, Math.min(1, t.OffsetY || 0));
+                srcX = srcX + slackX / 2 + ox * slackX / 2;
+                srcY = srcY + slackY / 2 + oy * slackY / 2;
+                srcW = w2; srcH = h2;
+            }
+
+            ctx.save();
+            if (doc.Background.Blur > 0) { ctx.filter = 'blur(' + doc.Background.Blur + 'px)'; }
+            ctx.drawImage(img, srcX, srcY, srcW, srcH, dstX, dstY, dstW, dstH);
+            ctx.restore();
+        }
+
+        // One text layer: outline (multi-pass strokeText), shadow (ctx.shadow*),
+        // then fill — mirroring RenderTextLayer. Font px keys off doc.Canvas.Height
+        // (the design's reference resolution), matching the server's font sizing.
+        function drawTextLayer(ctx, layer, W, H) {
+            var px = normToPx(layer.X, W), py = normToPx(layer.Y, H);
+            var fontPx = Math.max(8, Math.min(1024, layer.Size * doc.Canvas.Height));
+            ctx.save();
+            ctx.globalAlpha = layer.Opacity;
+            ctx.font = layer.Weight + ' ' + fontPx + 'px "Noto Sans", sans-serif';
+            ctx.textAlign = layer.Align === 0 ? 'left' : (layer.Align === 2 ? 'right' : 'center');
+            ctx.textBaseline = 'middle';
+
+            if (layer.Outline && layer.Outline.Enabled) {
+                ctx.lineWidth = layer.Outline.Width * 2;
+                ctx.strokeStyle = layer.Outline.Color;
+                ctx.lineJoin = 'round';
+                ctx.strokeText(layer.Content, px, py);
+            }
+            if (layer.Shadow && layer.Shadow.Enabled) {
+                ctx.shadowColor = layer.Shadow.Color;
+                ctx.shadowBlur = layer.Shadow.Blur;
+                ctx.shadowOffsetX = layer.Shadow.OffsetX;
+                ctx.shadowOffsetY = layer.Shadow.OffsetY;
+            }
+            ctx.fillStyle = layer.Color;
+            ctx.fillText(layer.Content, px, py);
+            ctx.restore();
+        }
+
+        // Selection overlay (drag handles) — stub; implemented in Task 8.
+        function drawSelectionHandles(ctx, W, H) { /* Task 8 */ }
+
+        // Loads the SAME bundled Noto weights the server renders with, via the
+        // authenticated font endpoint + the FontFace API (which — unlike CSS
+        // @font-face — accepts an ArrayBuffer fetched WITH the auth token). Tolerant
+        // of per-weight failure: a missing weight falls back to the browser's
+        // sans-serif for the canvas only; the applied cover is server-authoritative.
+        var FONT_WEIGHTS = [300, 400, 500, 600, 700, 800];
+        function loadCanvasFonts() {
+            return Promise.all(FONT_WEIGHTS.map(function (w) {
+                return authFetch('CustomCoverArt/font/' + w)
+                    .then(function (r) { return r.arrayBuffer(); })
+                    .then(function (buf) {
+                        var ff = new FontFace('Noto Sans', buf, { weight: String(w) });
+                        return ff.load().then(function (loaded) { document.fonts.add(loaded); });
+                    })
+                    .catch(function () { /* fall back to sans-serif for this weight */ });
+            }));
+        }
+        // ==================================================================
+        // End canvas engine
+        // ==================================================================
 
         // Build the settings object using the EXACT C# property names (PascalCase)
         // and numeric enum values so binding works regardless of serializer config.
@@ -968,11 +1221,12 @@
             }).catch(function () { /* detection is best-effort */ });
         }
 
-        // Live preview: any change schedules a debounced render. Only one request
-        // is in flight at a time; if changes arrive while one is running, exactly
-        // one more runs afterwards. Failures are silent so the last good preview stays.
-        var previewInFlight = false, previewQueued = false;
-        var schedulePreview = debounce(runPreview, 450);
+        // Live preview: any change schedules a client-side canvas re-render (the old
+        // server <img> preview was replaced by the canvas engine in Task 7). The
+        // legacy names schedulePreview()/runPreview() are kept and repointed at the
+        // canvas so existing control handlers keep working until Task 8 rewires them
+        // to mutate `doc` directly.
+        var schedulePreview = scheduleRender;
 
         function onControlChange(e) {
             var target = e.target;
@@ -983,46 +1237,22 @@
             schedulePreview();
         }
 
+        // Repointed at the canvas engine. The old server-preview <img> (#ccaPreview)
+        // no longer exists; existing handlers still call runPreview(), so it simply
+        // schedules a client re-render. Task 8 will bind the controls to `doc`
+        // directly and (re)introduce an on-demand authoritative "server render".
         function runPreview() {
-            if (previewInFlight) { previewQueued = true; return; }
-            previewInFlight = true;
-            var img = el('ccaPreview');
-            var spin = el('ccaPreviewSpinner');
-            img.style.opacity = '0.45';
-            if (spin) { spin.style.display = ''; }
-            authFetch('CustomCoverArt/preview', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(collectSettings())
-            }).then(function (r) {
-                if (!r.ok) { throw new Error('Preview failed (' + r.status + ')'); }
-                return r.blob();
-            }).then(function (blob) {
-                var url = URL.createObjectURL(blob);
-                var previous = img.getAttribute('src');
-                img.src = url;
-                img.style.display = 'block';
-                img.style.opacity = '1';
-                el('ccaPreviewPlaceholder').style.display = 'none';
-                el('ccaDownloadBtn').disabled = false;
-                if (previous && previous.indexOf('blob:') === 0) { URL.revokeObjectURL(previous); }
-            }).catch(function () {
-                img.style.opacity = '1';
-            }).then(function () {
-                previewInFlight = false;
-                if (previewQueued) { previewQueued = false; runPreview(); }
-                else if (spin) { spin.style.display = 'none'; }
-            });
+            scheduleRender();
         }
 
         function downloadPreview() {
-            var img = el('ccaPreview');
-            if (!img.src || img.style.display === 'none') { return; }
-            var fmt = el('ccaFormat').value;
-            var ext = (fmt === 'gif' || fmt === 'animatedgif') ? 'gif' : 'png';
+            // Download the client-rendered canvas directly. #ccaPreview is gone, so
+            // guard against a missing canvas and export the current backing store.
+            var cv = el('ccaCanvas');
+            if (!cv) { return; }
             var a = document.createElement('a');
-            a.href = img.src;
-            a.download = 'cover.' + ext;
+            a.href = cv.toDataURL('image/png');
+            a.download = 'cover.png';
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -1319,6 +1549,10 @@
             }
             Dashboard.showLoadingMsg();
             updateAnimVisibility();
+            // Render immediately with a sane fallback, then re-render once the
+            // bundled Noto weights register so canvas text metrics match the server.
+            scheduleRender();
+            loadCanvasFonts().then(scheduleRender);
             loadTemplates();
             loadBatchList();
             loadLibraries().then(function () {
