@@ -9,6 +9,14 @@
     "imageUrl": "",
     "versions": [
       {
+        "version": "2.0.2.0",
+        "changelog": "The **poster browser now covers every library type** — music albums and artists, books, music videos and photos, not just movies and shows — so you can pick a cover from a music or book library too. A **loading spinner** now shows over the preview while it renders, which helps for slower operations like building a poster collage. The **Apply** button now shows an \"Applying…\" state and locks while it works, so a slow render (like an animated GIF) no longer looks like nothing is happening. **Animated GIF covers are more reliable**: the working size is capped so a full-size render no longer takes forever or fails to apply, and text scales with it so the look is unchanged. The default **Landscape** size is now a lighter 1280×720 (it was 1920×1080) — plenty for library tiles and much smaller files; 1920 is still available via Custom. And the Templates and collage cards were tidied up — the **Delete** and **Shuffle** buttons now sit neatly next to their dropdowns instead of as oversized blocks.",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://github.com/Bardesss/customcoverart/releases/download/v2.0.2.0/customcoverart_2.0.2.0.zip",
+        "checksum": "4010c899dc0a84382aea25c4ef6af9a9",
+        "timestamp": "2026-07-28T11:33:59Z"
+      },
+      {
         "version": "2.0.1.0",
         "changelog": "Polish on the v2 release. The config page now matches Jellyfin more closely — compact colour pickers (they used to stretch the full width), and action buttons that align with the selects beside them. The preview no longer starts on a black canvas: it opens with Jellyfin's **brand gradient** (purple → blue) by default. And uploading an **animated GIF** as a background now animates the preview automatically — it switches to Animated GIF output and passes the source's frames through at their own timing, instead of showing a single still frame.",
         "targetAbi": "10.11.0.0",
