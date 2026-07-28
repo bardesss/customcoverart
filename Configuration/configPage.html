@@ -109,17 +109,14 @@
                                 <option value="collage" data-i18n="bg.source.collage">Poster collage from this target</option>
                             </select>
                         </div>
-                        <div class="ccaGrid" id="ccaCollageRow" style="display:none">
-                            <div class="inputContainer">
-                                <label for="ccaCollageDensity" data-i18n="bg.collage.density">Collage density</label>
-                                <select is="emby-select" id="ccaCollageDensity" class="emby-select">
+                        <div class="inputContainer" id="ccaCollageRow" style="display:none">
+                            <label for="ccaCollageDensity" data-i18n="bg.collage.density">Collage density</label>
+                            <div class="ccaFileRow">
+                                <select is="emby-select" id="ccaCollageDensity" class="emby-select ccaGrow">
                                     <option value="sparse" data-i18n="bg.collage.sparse">Sparse</option>
                                     <option value="medium" selected data-i18n="bg.collage.medium">Medium</option>
                                     <option value="dense" data-i18n="bg.collage.dense">Dense</option>
                                 </select>
-                            </div>
-                            <div class="inputContainer">
-                                <label>&nbsp;</label>
                                 <button is="emby-button" type="button" id="ccaCollageShuffle" class="raised">
                                     <span data-i18n="bg.collage.shuffle">Shuffle</span>
                                 </button>
@@ -193,7 +190,7 @@
                             <div class="inputContainer">
                                 <label for="ccaPreset" data-i18n="out.dims">Dimensions</label>
                                 <select is="emby-select" id="ccaPreset" class="emby-select">
-                                    <option value="landscape" selected data-i18n="d.landscape">Landscape 16:9 (1920×1080)</option>
+                                    <option value="landscape" selected data-i18n="d.landscape">Landscape 16:9 (1280×720)</option>
                                     <option value="cover" data-i18n="d.cover">Square (1400×1400)</option>
                                     <option value="poster" data-i18n="d.poster">Portrait Poster (1000×1500)</option>
                                     <option value="banner" data-i18n="d.banner">Wide Banner (1920×540)</option>
@@ -243,23 +240,23 @@
 
                     <section class="ccaCard">
                         <div class="ccaCardHead" data-i18n="card.templates">Templates</div>
-                        <div class="ccaGrid">
-                            <div class="inputContainer">
-                                <label for="ccaTemplateSelect" data-i18n="tpl.load">Load template</label>
-                                <select is="emby-select" id="ccaTemplateSelect" class="emby-select"></select>
-                            </div>
-                            <div class="inputContainer">
-                                <label>&nbsp;</label>
+                        <div class="inputContainer">
+                            <label for="ccaTemplateSelect" data-i18n="tpl.load">Load template</label>
+                            <div class="ccaFileRow">
+                                <select is="emby-select" id="ccaTemplateSelect" class="emby-select ccaGrow"></select>
                                 <button is="emby-button" type="button" id="ccaTemplateDelete" class="raised">
                                     <span data-i18n="tpl.delete">Delete</span>
                                 </button>
                             </div>
                         </div>
-                        <div class="ccaFileRow">
-                            <input type="text" id="ccaTemplateName" class="emby-input" placeholder="Template name" data-i18n-ph="tpl.nameph" />
-                            <button is="emby-button" type="button" id="ccaTemplateSave" class="raised">
-                                <span data-i18n="tpl.save">Save current design</span>
-                            </button>
+                        <div class="inputContainer">
+                            <label for="ccaTemplateName" data-i18n="tpl.save">Save current design</label>
+                            <div class="ccaFileRow">
+                                <input type="text" id="ccaTemplateName" class="emby-input ccaGrow" placeholder="Template name" data-i18n-ph="tpl.nameph" />
+                                <button is="emby-button" type="button" id="ccaTemplateSave" class="raised">
+                                    <span data-i18n="tpl.savebtn">Save</span>
+                                </button>
+                            </div>
                         </div>
                         <div class="fieldDescription" data-i18n="tpl.hint">Templates store the design but not the title — each target keeps its own name.</div>
                     </section>
@@ -389,8 +386,9 @@
         }
         #CustomCoverArtConfigPage .ccaFile { width: 100%; }
         #CustomCoverArtConfigPage .ccaBtnWide { width: 100%; margin: 0; }
-        /* Buttons that share a two-up grid row with a select should match its width. */
-        #CustomCoverArtConfigPage .ccaGrid .emby-button { width: 100%; margin: 0; }
+        /* A control that shares an inline row with a compact button takes the rest. */
+        #CustomCoverArtConfigPage .ccaGrow { flex: 1 1 auto; min-width: 0; }
+        #CustomCoverArtConfigPage .ccaFileRow .ccaGrow { width: auto; }
 
         #CustomCoverArtConfigPage .ccaChecks { display: flex; flex-wrap: wrap; gap: .3em 1.25em; padding-top: .45em; }
         #CustomCoverArtConfigPage .ccaCheck { display: inline-flex; align-items: center; gap: .5em; }
@@ -512,12 +510,12 @@
                 'hint.fit': 'Fill crops to cover the cover; Fit keeps the whole image and pads the rest with the base colour.',
                 'bg.orposter': 'Or use an existing library poster', 'bg.browse': 'Browse library posters', 'bg.selected': 'Selected background:',
                 'card.output': 'Output', 'out.dims': 'Dimensions',
-                'd.landscape': 'Landscape 16:9 (1920×1080)', 'd.cover': 'Square (1400×1400)', 'd.poster': 'Portrait Poster (1000×1500)', 'd.banner': 'Wide Banner (1920×540)', 'd.custom': 'Custom',
+                'd.landscape': 'Landscape 16:9 (1280×720)', 'd.cover': 'Square (1400×1400)', 'd.poster': 'Portrait Poster (1000×1500)', 'd.banner': 'Wide Banner (1920×540)', 'd.custom': 'Custom',
                 'out.format': 'Format', 'fmt.auto': 'Auto (recommended)', 'out.width': 'Width', 'out.height': 'Height',
                 'out.font': 'Custom font (optional)', 'f.chooseFont': 'Choose font…',
                 'hint.font': 'TTF, OTF, TTC, WOFF or WOFF2 · up to 5 MB. Leave empty to use the bundled Noto Sans.',
                 'card.preview': 'Preview', 'preview.placeholder': 'Generate a preview to see your cover art.',
-                'action.apply': 'Apply to library', 'action.download': 'Download image', 'preview.hint': 'The preview updates automatically as you adjust settings.',
+                'action.apply': 'Apply to library', 'action.applying': 'Applying…', 'action.download': 'Download image', 'preview.hint': 'The preview updates automatically as you adjust settings.',
                 'modal.title': 'Select a poster', 'modal.search': 'Search…', 'modal.alltypes': 'All types',
                 'ty.movies': 'Movies', 'ty.series': 'Series', 'ty.seasons': 'Seasons', 'ty.albums': 'Albums', 'ty.artists': 'Artists', 'ty.books': 'Books', 'ty.musicvideos': 'Music videos', 'ty.photos': 'Photos', 'modal.prev': 'Previous', 'modal.next': 'Next',
                 'dyn.loading': 'Loading…', 'dyn.errorItems': 'Error loading items', 'dyn.noItems': 'No items found', 'dyn.page': 'Page {0} of {1}',
@@ -526,7 +524,7 @@
                 'dyn.unknown': 'unknown error',
                 'restore.button': 'Restore original cover', 'restore.none': 'No backup yet', 'restore.available': 'A backup exists', 'restore.done': 'Original cover restored.', 'restore.fail': 'No backup found to restore.',
                 'bg.source': 'Background source', 'bg.source.upload': 'Upload / poster', 'bg.source.collage': 'Poster collage from this target', 'bg.collage.density': 'Collage density', 'bg.collage.sparse': 'Sparse', 'bg.collage.medium': 'Medium', 'bg.collage.dense': 'Dense', 'bg.collage.shuffle': 'Shuffle', 'bg.collage.livetv': 'Live TV has no posters to collage.',
-                'card.templates': 'Templates', 'tpl.load': 'Load template', 'tpl.delete': 'Delete', 'tpl.save': 'Save current design', 'tpl.nameph': 'Template name', 'tpl.hint': 'Templates store the design but not the title — each target keeps its own name.', 'tpl.saved': 'Template saved.', 'tpl.named': 'Enter a template name first.',
+                'card.templates': 'Templates', 'tpl.load': 'Load template', 'tpl.delete': 'Delete', 'tpl.save': 'Save current design', 'tpl.savebtn': 'Save', 'tpl.nameph': 'Template name', 'tpl.hint': 'Templates store the design but not the title — each target keeps its own name.', 'tpl.saved': 'Template saved.', 'tpl.named': 'Enter a template name first.',
                 'card.batch': 'Batch apply', 'batch.hint': 'Apply the current design (or loaded template) to several targets at once. Each cover is titled with its target\'s name.', 'batch.apply': 'Apply to selected', 'batch.none': 'Select at least one target.', 'batch.running': 'Applying…', 'batch.done': 'Done: {0} ok, {1} failed.',
                 'fmt.animated': 'Animated GIF', 'anim.kenburns': 'Ken Burns pan/zoom', 'anim.frames': 'Frames', 'anim.delay': 'Frame delay (ms)', 'anim.dir': 'Zoom direction', 'anim.in': 'Zoom in', 'anim.out': 'Zoom out', 'anim.hint': 'Animated GIFs are larger and only animate in views that render GIFs. Capped at 30 frames.'
             },
@@ -549,12 +547,12 @@
                 'hint.fit': 'Vullen snijdt bij om de cover te vullen; Passen toont de hele afbeelding en vult de rest met de basiskleur.',
                 'bg.orposter': 'Of gebruik een bestaande bibliotheekposter', 'bg.browse': 'Bibliotheekposters bladeren', 'bg.selected': 'Geselecteerde achtergrond:',
                 'card.output': 'Uitvoer', 'out.dims': 'Afmetingen',
-                'd.landscape': 'Liggend 16:9 (1920×1080)', 'd.cover': 'Vierkant (1400×1400)', 'd.poster': 'Staande poster (1000×1500)', 'd.banner': 'Brede banner (1920×540)', 'd.custom': 'Aangepast',
+                'd.landscape': 'Liggend 16:9 (1280×720)', 'd.cover': 'Vierkant (1400×1400)', 'd.poster': 'Staande poster (1000×1500)', 'd.banner': 'Brede banner (1920×540)', 'd.custom': 'Aangepast',
                 'out.format': 'Formaat', 'fmt.auto': 'Automatisch (aanbevolen)', 'out.width': 'Breedte', 'out.height': 'Hoogte',
                 'out.font': 'Aangepast lettertype (optioneel)', 'f.chooseFont': 'Kies lettertype…',
                 'hint.font': 'TTF, OTF, TTC, WOFF of WOFF2 · max. 5 MB. Laat leeg voor de meegeleverde Noto Sans.',
                 'card.preview': 'Voorbeeld', 'preview.placeholder': 'Het voorbeeld verschijnt hier automatisch.',
-                'action.apply': 'Toepassen op bibliotheek', 'action.download': 'Afbeelding downloaden', 'preview.hint': 'Het voorbeeld wordt automatisch bijgewerkt terwijl je instellingen aanpast.',
+                'action.apply': 'Toepassen op bibliotheek', 'action.applying': 'Bezig met toepassen…', 'action.download': 'Afbeelding downloaden', 'preview.hint': 'Het voorbeeld wordt automatisch bijgewerkt terwijl je instellingen aanpast.',
                 'modal.title': 'Selecteer een poster', 'modal.search': 'Zoeken…', 'modal.alltypes': 'Alle types',
                 'ty.movies': 'Films', 'ty.series': 'Series', 'ty.seasons': 'Seizoenen', 'ty.albums': 'Albums', 'ty.artists': 'Artiesten', 'ty.books': 'Boeken', 'ty.musicvideos': 'Videoclips', 'ty.photos': 'Foto\'s', 'modal.prev': 'Vorige', 'modal.next': 'Volgende',
                 'dyn.loading': 'Laden…', 'dyn.errorItems': 'Fout bij laden van items', 'dyn.noItems': 'Geen items gevonden', 'dyn.page': 'Pagina {0} van {1}',
@@ -563,7 +561,7 @@
                 'dyn.unknown': 'onbekende fout',
                 'restore.button': 'Originele cover herstellen', 'restore.none': 'Nog geen back-up', 'restore.available': 'Er is een back-up', 'restore.done': 'Originele cover hersteld.', 'restore.fail': 'Geen back-up gevonden om te herstellen.',
                 'bg.source': 'Achtergrondbron', 'bg.source.upload': 'Upload / poster', 'bg.source.collage': 'Postercollage van dit doel', 'bg.collage.density': 'Collagedichtheid', 'bg.collage.sparse': 'Dun', 'bg.collage.medium': 'Gemiddeld', 'bg.collage.dense': 'Dicht', 'bg.collage.shuffle': 'Schudden', 'bg.collage.livetv': 'Live TV heeft geen posters voor een collage.',
-                'card.templates': 'Sjablonen', 'tpl.load': 'Sjabloon laden', 'tpl.delete': 'Verwijderen', 'tpl.save': 'Huidig ontwerp opslaan', 'tpl.nameph': 'Sjabloonnaam', 'tpl.hint': 'Sjablonen bewaren het ontwerp maar niet de titel — elk doel houdt zijn eigen naam.', 'tpl.saved': 'Sjabloon opgeslagen.', 'tpl.named': 'Voer eerst een sjabloonnaam in.',
+                'card.templates': 'Sjablonen', 'tpl.load': 'Sjabloon laden', 'tpl.delete': 'Verwijderen', 'tpl.save': 'Huidig ontwerp opslaan', 'tpl.savebtn': 'Opslaan', 'tpl.nameph': 'Sjabloonnaam', 'tpl.hint': 'Sjablonen bewaren het ontwerp maar niet de titel — elk doel houdt zijn eigen naam.', 'tpl.saved': 'Sjabloon opgeslagen.', 'tpl.named': 'Voer eerst een sjabloonnaam in.',
                 'card.batch': 'Bulk toepassen', 'batch.hint': 'Pas het huidige ontwerp (of geladen sjabloon) in één keer toe op meerdere doelen. Elke cover krijgt de naam van zijn doel als titel.', 'batch.apply': 'Toepassen op selectie', 'batch.none': 'Selecteer minstens één doel.', 'batch.running': 'Bezig met toepassen…', 'batch.done': 'Klaar: {0} gelukt, {1} mislukt.',
                 'fmt.animated': 'Geanimeerde GIF', 'anim.kenburns': 'Ken Burns pan/zoom', 'anim.frames': 'Frames', 'anim.delay': 'Framevertraging (ms)', 'anim.dir': 'Zoomrichting', 'anim.in': 'Inzoomen', 'anim.out': 'Uitzoomen', 'anim.hint': 'Geanimeerde GIFs zijn groter en bewegen alleen in weergaven die GIFs tonen. Max. 30 frames.'
             }
@@ -663,7 +661,7 @@
         }
 
         var PRESETS = {
-            landscape: { w: 1920, h: 1080 },
+            landscape: { w: 1280, h: 720 },
             cover: { w: 1400, h: 1400 },
             poster: { w: 1000, h: 1500 },
             banner: { w: 1920, h: 540 },
@@ -1028,6 +1026,14 @@
 
         function applyCoverArt() {
             if (!state.libraryId) { return; }
+            var btn = el('ccaApplyBtn');
+            if (btn.disabled) { return; } // an apply is already running
+            var label = btn.querySelector('span');
+            var original = label ? label.textContent : '';
+            // Applying can be slow (an animated GIF renders many frames), so lock
+            // the button and show progress — otherwise it looks like nothing happens.
+            btn.disabled = true;
+            if (label) { label.textContent = t('action.applying'); }
             Dashboard.showLoadingMsg();
             jsonFetch('CustomCoverArt/apply', 'POST', {
                 LibraryId: state.libraryId,
@@ -1042,6 +1048,9 @@
             }).catch(function (e) {
                 Dashboard.hideLoadingMsg();
                 Dashboard.alert(t('dyn.applyFail', e.message));
+            }).then(function () {
+                if (label) { label.textContent = original; }
+                btn.disabled = !state.libraryId;
             });
         }
 
