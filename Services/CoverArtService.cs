@@ -3,6 +3,7 @@ using CustomCoverArt.Models;
 using MediaBrowser.Common.Configuration;
 using SixLabors.Fonts;
 using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Gif;
 using SixLabors.ImageSharp.Drawing;
 using SixLabors.ImageSharp.Drawing.Processing;
 using SixLabors.ImageSharp.PixelFormats;
@@ -152,6 +153,12 @@ public class CoverArtService : ICoverArtService
                             _loggingService.LogWarning("Failed to decode background {Path}: {Error}", settings.BackgroundImagePath, ex.Message);
                         }
                     }
+                }
+
+                // Animated GIF export: build multiple frames instead of one image.
+                if (settings.Animation?.Enabled == true)
+                {
+                    return await GenerateAnimatedAsync(settings, backgroundImage).ConfigureAwait(false);
                 }
 
                 // Create new image with specified dimensions and composite one frame.
@@ -337,6 +344,86 @@ public class CoverArtService : ICoverArtService
         }
 
         await ApplyTextOverlayWithFallbackAsync(canvas, settings).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Builds an animated GIF: either passing through an animated-source background
+    /// frame-by-frame, or applying a Ken Burns pan/zoom to a static background.
+    /// Frame count is clamped to [2, 30]; loop uses the GIF repeat count.
+    /// </summary>
+    private async Task<string> GenerateAnimatedAsync(CoverArtSettings settings, Image? background)
+    {
+        var frameCount = System.Math.Clamp(settings.Animation!.FrameCount, 2, 30);
+        var delayCentis = System.Math.Max(2, settings.Animation.DelayMs / 10); // GIF delay is 1/100s
+        var w = settings.ExportWidth;
+        var h = settings.ExportHeight;
+
+        // Passthrough when the source background is itself animated.
+        var animatedSource = background is not null && background.Frames.Count > 1;
+
+        Image<Rgba32>? output = null;
+        try
+        {
+            for (int i = 0; i < frameCount; i++)
+            {
+                var t = frameCount == 1 ? 0f : i / (float)(frameCount - 1);
+
+                using var frameCanvas = new Image<Rgba32>(w, h);
+                Image? frameBg = null;
+                Image<Rgba32>? tempBg = null;
+                try
+                {
+                    if (animatedSource)
+                    {
+                        var srcIndex = i % background!.Frames.Count;
+                        tempBg = background.Frames.CloneFrame(srcIndex).CloneAs<Rgba32>();
+                        frameBg = tempBg;
+                    }
+                    else if (settings.Animation.KenBurns && background is not null)
+                    {
+                        var crop = KenBurnsCrop(background.Width, background.Height, t,
+                            settings.Animation.ZoomAmount, settings.Animation.Direction);
+                        tempBg = background.CloneAs<Rgba32>();
+                        tempBg.Mutate(x => x.Crop(crop).Resize(w, h));
+                        frameBg = tempBg;
+                    }
+                    else if (background is not null)
+                    {
+                        tempBg = background.CloneAs<Rgba32>();
+                        frameBg = tempBg;
+                    }
+
+                    await ComposeFrameAsync(frameCanvas, frameBg, settings).ConfigureAwait(false);
+
+                    if (output is null)
+                    {
+                        output = frameCanvas.Clone();
+                        var gm = output.Metadata.GetGifMetadata();
+                        gm.RepeatCount = (ushort)(settings.Animation.Loop ? 0 : 1);
+                        var fm = output.Frames.RootFrame.Metadata.GetGifMetadata();
+                        fm.FrameDelay = delayCentis;
+                    }
+                    else
+                    {
+                        var added = frameCanvas.Frames.RootFrame;
+                        added.Metadata.GetGifMetadata().FrameDelay = delayCentis;
+                        output.Frames.AddFrame(added);
+                    }
+                }
+                finally
+                {
+                    tempBg?.Dispose();
+                }
+            }
+
+            var outputPath = Path.Combine(_outputDirectory, $"cover_{Guid.NewGuid():N}.gif");
+            await output!.SaveAsync(outputPath, new GifEncoder()).ConfigureAwait(false);
+            return outputPath;
+        }
+        finally
+        {
+            output?.Dispose();
+        }
     }
 
     private static async Task ApplyBackgroundAsync(Image<Rgba32> image, Image backgroundImage, CoverArtSettings settings)

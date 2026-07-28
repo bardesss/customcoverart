@@ -1,8 +1,23 @@
 using CustomCoverArt.Services;
+using MediaBrowser.Common.Configuration;
+using NSubstitute;
 using SixLabors.ImageSharp;
 using Xunit;
 
 namespace CustomCoverArt.Tests;
+
+internal static class AnimationTestHost
+{
+    public static CoverArtService NewCoverArtService()
+    {
+        var img = Substitute.For<IImageProcessingService>();
+        var paths = Substitute.For<IApplicationPaths>();
+        paths.DataPath.Returns(System.IO.Path.Combine(
+            System.IO.Path.GetTempPath(), "cca_anim_" + System.Guid.NewGuid().ToString("N")));
+        return new CoverArtService(
+            img, paths, Substitute.For<ILoggingService>(), Substitute.For<IMediaItemService>());
+    }
+}
 
 public class AnimationTests
 {
@@ -33,5 +48,32 @@ public class AnimationTests
         var inStart = CoverArtService.KenBurnsCrop(1000, 1000, 0f, 0.2f, "out");
         // "out" at t=0 is the tight end.
         Assert.InRange(inStart.Width, 820, 840);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task GeneratesMultiFrameGif_WithKenBurns()
+    {
+        // Build settings with a gradient background (no file needed) + Ken Burns.
+        var settings = new CustomCoverArt.Models.CoverArtSettings
+        {
+            Title = "Test",
+            ExportWidth = 200,
+            ExportHeight = 200,
+            OutputFormat = "gif",
+            BackgroundSource = "upload",
+            Animation = new CustomCoverArt.Models.AnimationSettings
+            {
+                Enabled = true, KenBurns = true, FrameCount = 6, DelayMs = 80, Loop = true, ZoomAmount = 0.2f
+            }
+        };
+
+        var svc = AnimationTestHost.NewCoverArtService();
+        var path = await svc.GenerateCoverArtAsync(settings);
+
+        Assert.True(System.IO.File.Exists(path));
+        using var img = SixLabors.ImageSharp.Image.Load(path);
+        Assert.True(img.Frames.Count >= 2);
+
+        try { System.IO.File.Delete(path); } catch { }
     }
 }
