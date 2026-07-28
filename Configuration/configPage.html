@@ -102,6 +102,29 @@
 
                     <section class="ccaCard">
                         <div class="ccaCardHead" data-i18n="card.background">Background</div>
+                        <div class="inputContainer">
+                            <label for="ccaBgSource" data-i18n="bg.source">Background source</label>
+                            <select is="emby-select" id="ccaBgSource" class="emby-select">
+                                <option value="upload" selected data-i18n="bg.source.upload">Upload / poster</option>
+                                <option value="collage" data-i18n="bg.source.collage">Poster collage from this target</option>
+                            </select>
+                        </div>
+                        <div class="ccaGrid" id="ccaCollageRow" style="display:none">
+                            <div class="inputContainer">
+                                <label for="ccaCollageDensity" data-i18n="bg.collage.density">Collage density</label>
+                                <select is="emby-select" id="ccaCollageDensity" class="emby-select">
+                                    <option value="sparse" data-i18n="bg.collage.sparse">Sparse</option>
+                                    <option value="medium" selected data-i18n="bg.collage.medium">Medium</option>
+                                    <option value="dense" data-i18n="bg.collage.dense">Dense</option>
+                                </select>
+                            </div>
+                            <div class="inputContainer">
+                                <label>&nbsp;</label>
+                                <button is="emby-button" type="button" id="ccaCollageShuffle" class="raised">
+                                    <span data-i18n="bg.collage.shuffle">Shuffle</span>
+                                </button>
+                            </div>
+                        </div>
                         <div class="ccaGrid">
                             <div class="inputContainer">
                                 <label for="ccaDim"><span data-i18n="bg.dim">Dimming</span> <span class="ccaVal" id="ccaDimVal">0.25</span></label>
@@ -418,7 +441,8 @@
                 'dyn.applied': 'Cover art applied successfully.', 'dyn.error': 'Error: {0}', 'dyn.applyFail': 'Could not apply cover art: {0}',
                 'dyn.uploadFail': 'Upload failed: {0}', 'dyn.fontFail': 'Font upload failed: {0}', 'dyn.useImgFail': 'Could not use that image: {0}',
                 'dyn.unknown': 'unknown error',
-                'restore.button': 'Restore original cover', 'restore.none': 'No backup yet', 'restore.available': 'A backup exists', 'restore.done': 'Original cover restored.', 'restore.fail': 'No backup found to restore.'
+                'restore.button': 'Restore original cover', 'restore.none': 'No backup yet', 'restore.available': 'A backup exists', 'restore.done': 'Original cover restored.', 'restore.fail': 'No backup found to restore.',
+                'bg.source': 'Background source', 'bg.source.upload': 'Upload / poster', 'bg.source.collage': 'Poster collage from this target', 'bg.collage.density': 'Collage density', 'bg.collage.sparse': 'Sparse', 'bg.collage.medium': 'Medium', 'bg.collage.dense': 'Dense', 'bg.collage.shuffle': 'Shuffle', 'bg.collage.livetv': 'Live TV has no posters to collage.'
             },
             nl: {
                 'lede': 'Ontwerp een cover voor een bibliotheek, bekijk het live en pas het toe.',
@@ -451,7 +475,8 @@
                 'dyn.applied': 'Cover art succesvol toegepast.', 'dyn.error': 'Fout: {0}', 'dyn.applyFail': 'Kon cover art niet toepassen: {0}',
                 'dyn.uploadFail': 'Uploaden mislukt: {0}', 'dyn.fontFail': 'Lettertype uploaden mislukt: {0}', 'dyn.useImgFail': 'Kon die afbeelding niet gebruiken: {0}',
                 'dyn.unknown': 'onbekende fout',
-                'restore.button': 'Originele cover herstellen', 'restore.none': 'Nog geen back-up', 'restore.available': 'Er is een back-up', 'restore.done': 'Originele cover hersteld.', 'restore.fail': 'Geen back-up gevonden om te herstellen.'
+                'restore.button': 'Originele cover herstellen', 'restore.none': 'Nog geen back-up', 'restore.available': 'Er is een back-up', 'restore.done': 'Originele cover hersteld.', 'restore.fail': 'Geen back-up gevonden om te herstellen.',
+                'bg.source': 'Achtergrondbron', 'bg.source.upload': 'Upload / poster', 'bg.source.collage': 'Postercollage van dit doel', 'bg.collage.density': 'Collagedichtheid', 'bg.collage.sparse': 'Dun', 'bg.collage.medium': 'Gemiddeld', 'bg.collage.dense': 'Dicht', 'bg.collage.shuffle': 'Schudden', 'bg.collage.livetv': 'Live TV heeft geen posters voor een collage.'
             }
         };
 
@@ -536,7 +561,7 @@
 
         function el(id) { return page.querySelector('#' + id); }
 
-        var state = { libraryId: '', aspectRatio: 1 };
+        var state = { libraryId: '', aspectRatio: 1, collageSeed: 1 };
         var browser = { page: 1, pageSize: 24, totalPages: 1 };
 
         function debounce(fn, wait) {
@@ -595,7 +620,14 @@
                 ExportHeight: height,
                 ExportScale: 1.0,
                 OutputFormat: el('ccaFormat').value,
-                DimensionPreset: preset
+                DimensionPreset: preset,
+                BackgroundSource: el('ccaBgSource').value,
+                Collage: {
+                    SourceId: state.libraryId || '',
+                    SourceType: (el('ccaTargetType') ? el('ccaTargetType').value : 'library'),
+                    Density: el('ccaCollageDensity').value,
+                    Seed: state.collageSeed
+                }
             };
         }
 
@@ -605,6 +637,18 @@
             el('ccaCustomDims').style.display = el('ccaPreset').value === 'custom' ? '' : 'none';
             el('ccaGradientOpts').style.display = el('ccaGradient').checked ? '' : 'none';
             el('ccaGradientAngleRow').style.display = el('ccaGradientType').value === '0' ? '' : 'none';
+        }
+
+        // Shows/hides the collage controls and disables collage for Live TV
+        // (which has no child posters to build a mosaic from).
+        function updateCollageVisibility() {
+            var isCollage = el('ccaBgSource').value === 'collage';
+            var type = el('ccaTargetType') ? el('ccaTargetType').value : 'library';
+            var opt = el('ccaBgSource').querySelector('option[value="collage"]');
+            if (opt) { opt.disabled = (type === 'livetv'); }
+            if (type === 'livetv' && isCollage) { el('ccaBgSource').value = 'upload'; isCollage = false; }
+            el('ccaCollageRow').style.display = isCollage ? '' : 'none';
+            updateUI();
         }
 
         // Refreshes the Restore button state for the currently selected target.
@@ -789,10 +833,14 @@
             el('ccaGradientAngle').addEventListener('input', function () { el('ccaGradientAngleVal').textContent = this.value + '°'; });
             el('ccaAddStop').addEventListener('click', function () { addGradientStop('#888888', 50); schedulePreview(); });
 
+            el('ccaBgSource').addEventListener('change', function () { updateCollageVisibility(); runPreview(); });
+            el('ccaCollageDensity').addEventListener('change', runPreview);
+            el('ccaCollageShuffle').addEventListener('click', function () { state.collageSeed = (state.collageSeed + 1) & 0x7fffffff; runPreview(); });
+
             el('ccaTargetType').addEventListener('change', function () {
                 Dashboard.showLoadingMsg();
                 loadLibraries()
-                    .then(function () { updateUI(); refreshRestoreState(); Dashboard.hideLoadingMsg(); })
+                    .then(function () { updateUI(); updateCollageVisibility(); refreshRestoreState(); Dashboard.hideLoadingMsg(); })
                     .catch(function () { Dashboard.hideLoadingMsg(); });
             });
 
@@ -986,6 +1034,7 @@
             Dashboard.showLoadingMsg();
             loadLibraries().then(function () {
                 updateUI();
+                updateCollageVisibility();
                 refreshRestoreState();
                 Dashboard.hideLoadingMsg();
                 schedulePreview();
