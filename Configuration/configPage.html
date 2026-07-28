@@ -186,6 +186,41 @@
                     </section>
 
                     <section class="ccaCard">
+                        <div class="ccaCardHead" data-i18n="card.templates">Templates</div>
+                        <div class="ccaGrid">
+                            <div class="inputContainer">
+                                <label for="ccaTemplateSelect" data-i18n="tpl.load">Load template</label>
+                                <select is="emby-select" id="ccaTemplateSelect" class="emby-select"></select>
+                            </div>
+                            <div class="inputContainer">
+                                <label>&nbsp;</label>
+                                <button is="emby-button" type="button" id="ccaTemplateDelete" class="raised">
+                                    <span data-i18n="tpl.delete">Delete</span>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="ccaFileRow">
+                            <input type="text" id="ccaTemplateName" class="emby-input" placeholder="Template name" data-i18n-ph="tpl.nameph" />
+                            <button is="emby-button" type="button" id="ccaTemplateSave" class="raised">
+                                <span data-i18n="tpl.save">Save current design</span>
+                            </button>
+                        </div>
+                        <div class="fieldDescription" data-i18n="tpl.hint">Templates store the design but not the title — each target keeps its own name.</div>
+                    </section>
+
+                    <section class="ccaCard">
+                        <div class="ccaCardHead" data-i18n="card.batch">Batch apply</div>
+                        <div class="fieldDescription" data-i18n="batch.hint">Apply the current design (or loaded template) to several targets at once. Each cover is titled with its target's name.</div>
+                        <div id="ccaBatchList" class="ccaBatchList"></div>
+                        <div class="ccaFileRow">
+                            <button is="emby-button" type="button" id="ccaBatchApply" class="raised">
+                                <span data-i18n="batch.apply">Apply to selected</span>
+                            </button>
+                            <span class="ccaFileName" id="ccaBatchStatus"></span>
+                        </div>
+                    </section>
+
+                    <section class="ccaCard">
                         <div class="ccaCardHead" data-i18n="card.output">Output</div>
                         <div class="ccaGrid">
                             <div class="inputContainer">
@@ -328,6 +363,8 @@
         #CustomCoverArtConfigPage .ccaChecks { display: flex; flex-wrap: wrap; gap: .3em 1.25em; padding-top: .45em; }
         #CustomCoverArtConfigPage .ccaCheck { display: inline-flex; align-items: center; gap: .5em; }
         #CustomCoverArtConfigPage .ccaCheckBlock { display: flex; margin: .3em 0 .5em; }
+        #CustomCoverArtConfigPage .ccaBatchList { max-height: 220px; overflow-y: auto; margin: .3em 0 1em; display: flex; flex-direction: column; gap: .15em; }
+        #CustomCoverArtConfigPage .ccaBatchList:empty { display: none; }
 
         #CustomCoverArtConfigPage .ccaSub {
             margin: .4em 0 1.05em;
@@ -442,7 +479,9 @@
                 'dyn.uploadFail': 'Upload failed: {0}', 'dyn.fontFail': 'Font upload failed: {0}', 'dyn.useImgFail': 'Could not use that image: {0}',
                 'dyn.unknown': 'unknown error',
                 'restore.button': 'Restore original cover', 'restore.none': 'No backup yet', 'restore.available': 'A backup exists', 'restore.done': 'Original cover restored.', 'restore.fail': 'No backup found to restore.',
-                'bg.source': 'Background source', 'bg.source.upload': 'Upload / poster', 'bg.source.collage': 'Poster collage from this target', 'bg.collage.density': 'Collage density', 'bg.collage.sparse': 'Sparse', 'bg.collage.medium': 'Medium', 'bg.collage.dense': 'Dense', 'bg.collage.shuffle': 'Shuffle', 'bg.collage.livetv': 'Live TV has no posters to collage.'
+                'bg.source': 'Background source', 'bg.source.upload': 'Upload / poster', 'bg.source.collage': 'Poster collage from this target', 'bg.collage.density': 'Collage density', 'bg.collage.sparse': 'Sparse', 'bg.collage.medium': 'Medium', 'bg.collage.dense': 'Dense', 'bg.collage.shuffle': 'Shuffle', 'bg.collage.livetv': 'Live TV has no posters to collage.',
+                'card.templates': 'Templates', 'tpl.load': 'Load template', 'tpl.delete': 'Delete', 'tpl.save': 'Save current design', 'tpl.nameph': 'Template name', 'tpl.hint': 'Templates store the design but not the title — each target keeps its own name.', 'tpl.saved': 'Template saved.', 'tpl.named': 'Enter a template name first.',
+                'card.batch': 'Batch apply', 'batch.hint': 'Apply the current design (or loaded template) to several targets at once. Each cover is titled with its target\'s name.', 'batch.apply': 'Apply to selected', 'batch.none': 'Select at least one target.', 'batch.running': 'Applying…', 'batch.done': 'Done: {0} ok, {1} failed.'
             },
             nl: {
                 'lede': 'Ontwerp een cover voor een bibliotheek, bekijk het live en pas het toe.',
@@ -476,7 +515,9 @@
                 'dyn.uploadFail': 'Uploaden mislukt: {0}', 'dyn.fontFail': 'Lettertype uploaden mislukt: {0}', 'dyn.useImgFail': 'Kon die afbeelding niet gebruiken: {0}',
                 'dyn.unknown': 'onbekende fout',
                 'restore.button': 'Originele cover herstellen', 'restore.none': 'Nog geen back-up', 'restore.available': 'Er is een back-up', 'restore.done': 'Originele cover hersteld.', 'restore.fail': 'Geen back-up gevonden om te herstellen.',
-                'bg.source': 'Achtergrondbron', 'bg.source.upload': 'Upload / poster', 'bg.source.collage': 'Postercollage van dit doel', 'bg.collage.density': 'Collagedichtheid', 'bg.collage.sparse': 'Dun', 'bg.collage.medium': 'Gemiddeld', 'bg.collage.dense': 'Dicht', 'bg.collage.shuffle': 'Schudden', 'bg.collage.livetv': 'Live TV heeft geen posters voor een collage.'
+                'bg.source': 'Achtergrondbron', 'bg.source.upload': 'Upload / poster', 'bg.source.collage': 'Postercollage van dit doel', 'bg.collage.density': 'Collagedichtheid', 'bg.collage.sparse': 'Dun', 'bg.collage.medium': 'Gemiddeld', 'bg.collage.dense': 'Dicht', 'bg.collage.shuffle': 'Schudden', 'bg.collage.livetv': 'Live TV heeft geen posters voor een collage.',
+                'card.templates': 'Sjablonen', 'tpl.load': 'Sjabloon laden', 'tpl.delete': 'Verwijderen', 'tpl.save': 'Huidig ontwerp opslaan', 'tpl.nameph': 'Sjabloonnaam', 'tpl.hint': 'Sjablonen bewaren het ontwerp maar niet de titel — elk doel houdt zijn eigen naam.', 'tpl.saved': 'Sjabloon opgeslagen.', 'tpl.named': 'Voer eerst een sjabloonnaam in.',
+                'card.batch': 'Bulk toepassen', 'batch.hint': 'Pas het huidige ontwerp (of geladen sjabloon) in één keer toe op meerdere doelen. Elke cover krijgt de naam van zijn doel als titel.', 'batch.apply': 'Toepassen op selectie', 'batch.none': 'Selecteer minstens één doel.', 'batch.running': 'Bezig met toepassen…', 'batch.done': 'Klaar: {0} gelukt, {1} mislukt.'
             }
         };
 
@@ -687,6 +728,98 @@
             });
         }
 
+        // --- Templates ----------------------------------------------------
+        function loadTemplates() {
+            return jsonFetch('CustomCoverArt/templates').then(function (res) {
+                var sel = el('ccaTemplateSelect');
+                sel.innerHTML = '';
+                var none = document.createElement('option'); none.value = ''; none.textContent = '—'; sel.appendChild(none);
+                (pick(res, 'Data') || []).forEach(function (tpl) {
+                    var o = document.createElement('option');
+                    o.value = pick(tpl, 'Name'); o.textContent = pick(tpl, 'Name');
+                    o._settings = pick(tpl, 'Settings');
+                    sel.appendChild(o);
+                });
+            });
+        }
+
+        // Sets the form controls from a settings object (the inverse of
+        // collectSettings), EXCEPT Title and the target-specific collage source.
+        function applySettingsToForm(s) {
+            if (!s) { return; }
+            function setVal(id, v) { var e = el(id); if (e != null && v != null) { e.value = v; } }
+            function setChk(id, v) { var e = el(id); if (e != null) { e.checked = !!v; } }
+
+            var textSize = pick(s, 'TextSize');
+            if (textSize != null) { el('ccaTextSize').value = textSize; el('ccaTextSizeVal').textContent = textSize; }
+            setVal('ccaTextWeight', pick(s, 'TextWeight'));
+            setVal('ccaTextColor', pick(s, 'TextColor'));
+            setVal('ccaTextAlign', pick(s, 'TextAlign'));
+            var dim = pick(s, 'BackgroundDim');
+            if (dim != null) { el('ccaDim').value = dim; el('ccaDimVal').textContent = dim; }
+            var blur = pick(s, 'BackgroundBlur');
+            if (blur != null) { el('ccaBlur').value = blur; el('ccaBlurVal').textContent = blur; }
+            setVal('ccaDimColor', pick(s, 'DimColor'));
+            setChk('ccaShadow', pick(s, 'TextShadow'));
+            setChk('ccaOutline', pick(s, 'TextOutline'));
+            setVal('ccaBgFit', pick(s, 'BackgroundFit'));
+
+            var gr = pick(s, 'BackgroundGradient');
+            if (gr) {
+                setChk('ccaGradient', pick(gr, 'IsEnabled'));
+                setVal('ccaGradientType', pick(gr, 'Type'));
+                var ang = pick(gr, 'Angle');
+                if (ang != null) { el('ccaGradientAngle').value = ang; el('ccaGradientAngleVal').textContent = ang + '°'; }
+                var stops = pick(gr, 'Stops');
+                if (stops && stops.length >= 2) {
+                    el('ccaGradientStops').innerHTML = '';
+                    stops.forEach(function (st) {
+                        addGradientStop(pick(st, 'Color') || '#888888', Math.round((pick(st, 'Position') || 0) * 100));
+                    });
+                }
+            }
+
+            setVal('ccaBgSource', pick(s, 'BackgroundSource'));
+            var col = pick(s, 'Collage');
+            if (col) { setVal('ccaCollageDensity', pick(col, 'Density')); }
+
+            setVal('ccaPreset', pick(s, 'DimensionPreset'));
+            var anim = pick(s, 'Animation');
+            var fmtOpt = el('ccaFormat').querySelector('option[value="animatedgif"]');
+            if (anim && pick(anim, 'Enabled') && fmtOpt) {
+                el('ccaFormat').value = 'animatedgif';
+                setChk('ccaKenBurns', pick(anim, 'KenBurns'));
+                var fc = pick(anim, 'FrameCount');
+                if (fc != null && el('ccaAnimFrames')) { el('ccaAnimFrames').value = fc; if (el('ccaAnimFramesVal')) { el('ccaAnimFramesVal').textContent = fc; } }
+                var dl = pick(anim, 'DelayMs');
+                if (dl != null && el('ccaAnimDelay')) { el('ccaAnimDelay').value = dl; if (el('ccaAnimDelayVal')) { el('ccaAnimDelayVal').textContent = dl; } }
+                setVal('ccaAnimDir', pick(anim, 'Direction'));
+            } else {
+                setVal('ccaFormat', pick(s, 'OutputFormat'));
+            }
+
+            // Re-sync dependent visibility + labels.
+            updateUI();
+            updateCollageVisibility();
+            if (typeof updateAnimVisibility === 'function') { updateAnimVisibility(); }
+        }
+
+        // --- Batch apply --------------------------------------------------
+        function loadBatchList() {
+            var type = el('ccaTargetType') ? el('ccaTargetType').value : 'library';
+            return jsonFetch('CustomCoverArt/targets/' + type).then(function (res) {
+                var box = el('ccaBatchList'); box.innerHTML = '';
+                (pick(res, 'Data') || []).forEach(function (lib) {
+                    var id = pick(lib, 'Id'), name = pick(lib, 'Name');
+                    var row = document.createElement('label'); row.className = 'ccaCheck ccaCheckBlock';
+                    var cb = document.createElement('input'); cb.type = 'checkbox'; cb.setAttribute('is', 'emby-checkbox');
+                    cb.value = id; cb.dataset.type = type;
+                    var span = document.createElement('span'); span.textContent = name;
+                    row.appendChild(cb); row.appendChild(span); box.appendChild(row);
+                });
+            });
+        }
+
         function collectGradientStops() {
             var stops = [];
             page.querySelectorAll('#ccaGradientStops .ccaStop').forEach(function (row) {
@@ -746,6 +879,9 @@
         function onControlChange(e) {
             var target = e.target;
             if (!target || target.type === 'file' || target.id === 'ccaLibrarySelect') { return; }
+            // Ticking batch targets or naming a template must not re-render the preview.
+            if (target.closest && target.closest('#ccaBatchList')) { return; }
+            if (target.id === 'ccaTemplateName' || target.id === 'ccaTemplateSelect') { return; }
             schedulePreview();
         }
 
@@ -840,7 +976,7 @@
             el('ccaTargetType').addEventListener('change', function () {
                 Dashboard.showLoadingMsg();
                 loadLibraries()
-                    .then(function () { updateUI(); updateCollageVisibility(); refreshRestoreState(); Dashboard.hideLoadingMsg(); })
+                    .then(function () { updateUI(); updateCollageVisibility(); refreshRestoreState(); loadBatchList(); Dashboard.hideLoadingMsg(); })
                     .catch(function () { Dashboard.hideLoadingMsg(); });
             });
 
@@ -879,6 +1015,36 @@
 
             el('ccaApplyBtn').addEventListener('click', applyCoverArt);
             el('ccaDownloadBtn').addEventListener('click', downloadPreview);
+
+            el('ccaTemplateSelect').addEventListener('change', function () {
+                var opt = this.options[this.selectedIndex];
+                if (opt && opt._settings) { applySettingsToForm(opt._settings); runPreview(); }
+            });
+            el('ccaTemplateSave').addEventListener('click', function () {
+                var name = el('ccaTemplateName').value.trim();
+                if (!name) { Dashboard.alert(t('tpl.named')); return; }
+                jsonFetch('CustomCoverArt/templates', 'POST', { Name: name, Settings: collectSettings() })
+                    .then(function () { Dashboard.alert(t('tpl.saved')); loadTemplates(); });
+            });
+            el('ccaTemplateDelete').addEventListener('click', function () {
+                var name = el('ccaTemplateSelect').value;
+                if (!name) { return; }
+                jsonFetch('CustomCoverArt/templates/' + encodeURIComponent(name), 'DELETE').then(loadTemplates);
+            });
+
+            el('ccaBatchApply').addEventListener('click', function () {
+                var checks = el('ccaBatchList').querySelectorAll('input[type=checkbox]:checked');
+                if (!checks.length) { Dashboard.alert(t('batch.none')); return; }
+                var targets = Array.prototype.map.call(checks, function (c) { return { Id: c.value, Type: c.dataset.type }; });
+                el('ccaBatchStatus').textContent = t('batch.running');
+                jsonFetch('CustomCoverArt/batchApply', 'POST', { Settings: collectSettings(), Targets: targets })
+                    .then(function (res) {
+                        var data = pick(res, 'Data') || [];
+                        var ok = data.filter(function (r) { return pick(r, 'Success'); }).length;
+                        var fail = data.length - ok;
+                        el('ccaBatchStatus').textContent = t('batch.done').replace('{0}', ok).replace('{1}', fail);
+                    });
+            });
 
             // Auto-preview: any control change (except file inputs and the library
             // picker) schedules a debounced live render.
@@ -1032,6 +1198,8 @@
                 page.dataset.ccaInit = 'true';
             }
             Dashboard.showLoadingMsg();
+            loadTemplates();
+            loadBatchList();
             loadLibraries().then(function () {
                 updateUI();
                 updateCollageVisibility();
