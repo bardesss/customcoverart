@@ -577,6 +577,73 @@ public class CustomCoverArtController : ControllerBase
         return template;
     }
 
+    /// <summary>Clone base settings for one batch target: title = target name, collage source = target id.</summary>
+    public static CoverArtSettings BuildBatchSettings(CoverArtSettings baseSettings, string targetName, string targetId)
+    {
+        // Shallow JSON clone to avoid mutating the shared base settings.
+        var json = System.Text.Json.JsonSerializer.Serialize(baseSettings);
+        var clone = System.Text.Json.JsonSerializer.Deserialize<CoverArtSettings>(json) ?? new CoverArtSettings();
+        clone.Title = targetName;
+        if (clone.BackgroundSource == BackgroundSources.Collage && clone.Collage is not null)
+        {
+            clone.Collage.SourceId = targetId;
+        }
+        return clone;
+    }
+
+    /// <summary>Apply one design to many targets, auto-titling each from the target's name.</summary>
+    [HttpPost("batchApply")]
+    public async Task<ApiResponse<List<BatchApplyResult>>> BatchApply([FromBody] BatchApplyRequest request)
+    {
+        if (request is null || request.Targets.Count == 0)
+        {
+            return Fail<List<BatchApplyResult>>("No targets selected.");
+        }
+
+        // Resolve the base design: a named template, or inline settings.
+        CoverArtSettings? baseSettings = request.Settings;
+        if (!string.IsNullOrWhiteSpace(request.TemplateName))
+        {
+            var tpl = Plugin.Instance?.Configuration.Templates
+                .FirstOrDefault(t => string.Equals(t.Name, request.TemplateName, StringComparison.OrdinalIgnoreCase));
+            if (tpl is null)
+            {
+                return Fail<List<BatchApplyResult>>("Template not found: " + request.TemplateName);
+            }
+            baseSettings = tpl.Settings;
+        }
+
+        if (baseSettings is null)
+        {
+            return Fail<List<BatchApplyResult>>("No template or settings provided.");
+        }
+
+        var results = new List<BatchApplyResult>();
+        foreach (var target in request.Targets)
+        {
+            var result = new BatchApplyResult { Id = target.Id };
+            if (!Guid.TryParse(target.Id, out _))
+            {
+                result.Success = false;
+                result.Error = "Invalid id";
+                results.Add(result);
+                continue;
+            }
+
+            var info = await _libraryService.GetLibraryByIdAsync(target.Id).ConfigureAwait(false);
+            var name = info?.Name ?? "Cover";
+            result.Name = name;
+
+            var settings = BuildBatchSettings(baseSettings, name, target.Id);
+            var applied = await ApplyInternal(target.Id, settings).ConfigureAwait(false);
+            result.Success = applied.Success;
+            result.Error = applied.ErrorMessage;
+            results.Add(result);
+        }
+
+        return Success(results);
+    }
+
     /// <summary>List saved design templates.</summary>
     [HttpGet("templates")]
     public ApiResponse<List<SavedTemplate>> GetTemplates()

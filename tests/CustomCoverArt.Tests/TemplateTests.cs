@@ -31,4 +31,31 @@ public class TemplateTests
         Assert.Equal(string.Empty, n.Settings.Collage!.SourceId);
         Assert.Equal("dense", n.Settings.Collage!.Density);
     }
+
+    [Fact]
+    public void BuildBatchSettings_SetsTitleAndCollageSource()
+    {
+        var baseSettings = new CoverArtSettings
+        {
+            Title = "",
+            BackgroundSource = "collage",
+            Collage = new CollageSettings { SourceId = "", Density = "medium" }
+        };
+
+        var built = CustomCoverArtController.BuildBatchSettings(baseSettings, "Kids", "target-9");
+
+        Assert.Equal("Kids", built.Title);
+        Assert.Equal("target-9", built.Collage!.SourceId);
+        // Original is not mutated (clone).
+        Assert.Equal("", baseSettings.Title);
+    }
+
+    [Fact]
+    public void BuildBatchSettings_NonCollageLeavesCollageNull()
+    {
+        var baseSettings = new CoverArtSettings { BackgroundSource = "upload" };
+        var built = CustomCoverArtController.BuildBatchSettings(baseSettings, "Movies", "id-1");
+        Assert.Equal("Movies", built.Title);
+        Assert.Null(built.Collage);
+    }
 }
