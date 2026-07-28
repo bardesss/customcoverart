@@ -32,14 +32,6 @@ public static class PluginPaths
     public static string Backups(IApplicationPaths paths) =>
         Path.Combine(Base(paths), "backups");
 
-    /// <summary>Creates all plugin directories if they do not exist.</summary>
-    public static void EnsureCreated(IApplicationPaths paths)
-    {
-        Directory.CreateDirectory(Generated(paths));
-        Directory.CreateDirectory(Uploads(paths));
-        Directory.CreateDirectory(Fonts(paths));
-    }
-
     /// <summary>
     /// Returns true if <paramref name="candidatePath"/> resolves to a location
     /// inside the plugin's base data directory. Used to reject client-supplied

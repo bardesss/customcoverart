@@ -39,6 +39,7 @@ Text, gradients, blur, custom backgrounds and fonts — with a live preview, rig
 | ↩️ | **Restore original** | One-click revert to a target's pre-plugin cover |
 | 🎞️ | **Animated GIF** | Export animated covers (animated-source passthrough or Ken Burns pan/zoom) |
 | 🌍 | **Localisation** | English and Dutch included; easy to add more |
+| 🪶 | **Lightweight** | Small footprint — the plugin DLL is ~1.6 MB (fonts are subset-embedded), so it stays easy on the server |
 
 ## 📸 Screenshots
 
@@ -186,7 +187,7 @@ MIT — see [`LICENSE`](LICENSE).
 
 ## 🙏 Credits
 
-- **Jellyfin** — the media server platform this plugin extends.
-- **SixLabors ImageSharp** — image rendering and text drawing.
-- **Noto Sans** by Google — bundled default font, licensed under the
+- [**Jellyfin**](https://jellyfin.org/) — the media server platform this plugin extends.
+- [**SixLabors ImageSharp**](https://github.com/SixLabors/ImageSharp) — image rendering and text drawing.
+- [**Noto Sans**](https://fonts.google.com/noto/specimen/Noto+Sans) by Google — bundled default font, licensed under the
   [SIL Open Font License 1.1](https://openfontlicense.org/).

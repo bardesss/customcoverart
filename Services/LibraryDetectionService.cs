@@ -214,11 +214,18 @@ public class LibraryDetectionService : ILibraryDetectionService
         }
     }
 
+    // A GUID subfolder is the only valid backup location; validating here means a
+    // non-GUID targetId can never inject path segments even if a caller forgets to.
     private string BackupPathFor(string targetId, string extension)
-        => Path.Combine(PluginPaths.Backups(_applicationPaths), targetId, "original" + extension);
+        => Path.Combine(PluginPaths.Backups(_applicationPaths), NormalizeTargetId(targetId), "original" + extension);
 
     private string? ExistingBackupPath(string targetId)
     {
+        if (!Guid.TryParse(targetId, out _))
+        {
+            return null;
+        }
+
         var dir = Path.Combine(PluginPaths.Backups(_applicationPaths), targetId);
         if (!Directory.Exists(dir))
         {
@@ -228,6 +235,9 @@ public class LibraryDetectionService : ILibraryDetectionService
         var files = Directory.GetFiles(dir, "original.*");
         return files.Length > 0 ? files[0] : null;
     }
+
+    private static string NormalizeTargetId(string targetId)
+        => Guid.TryParse(targetId, out var id) ? id.ToString() : throw new ArgumentException("Invalid target id", nameof(targetId));
 
     public bool HasBackup(string libraryId) => ExistingBackupPath(libraryId) is not null;
 
@@ -282,7 +292,7 @@ public class LibraryDetectionService : ILibraryDetectionService
         return await RestoreCoverArtAsync(libraryId, backup).ConfigureAwait(false);
     }
 
-    public async Task<bool> RestoreCoverArtAsync(string libraryId, string backupPath)
+    private async Task<bool> RestoreCoverArtAsync(string libraryId, string backupPath)
     {
         try
         {
@@ -329,26 +339,5 @@ public class LibraryDetectionService : ILibraryDetectionService
     // than referencing individual enum members, so it is resilient to enum
     // member-name/casing differences across Jellyfin versions.
     private static string GetLibraryType(BaseItem folder)
-    {
-        if (folder is not CollectionFolder collectionFolder)
-        {
-            return "Other";
-        }
-
-        var type = collectionFolder.CollectionType?.ToString()?.ToLowerInvariant();
-
-        return type switch
-        {
-            "movies" => "Movies",
-            "tvshows" => "TV Shows",
-            "music" => "Music",
-            "musicvideos" => "Music Videos",
-            "homevideos" => "Home Videos",
-            "books" => "Books",
-            "photos" => "Photos",
-            "boxsets" => "Collections",
-            "mixed" => "Mixed",
-            _ => "Other"
-        };
-    }
+        => folder is CollectionFolder cf ? MapCollectionType(cf.CollectionType?.ToString()) : "Other";
 }
