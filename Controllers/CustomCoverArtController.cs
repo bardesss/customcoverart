@@ -460,6 +460,35 @@ public class CustomCoverArtController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Streams a bundled Noto Sans weight so the config-page canvas can register
+    /// the SAME faces the server renders with (via the FontFace API), keeping the
+    /// live client preview visually aligned with the authoritative server output.
+    /// Inherits the class-level RequiresElevation policy — no anonymous access.
+    /// </summary>
+    [HttpGet("font/{weight:int}")]
+    public IActionResult GetFont(int weight)
+    {
+        var face = weight switch
+        {
+            300 => "NotoSans-Light",
+            500 => "NotoSans-Medium",
+            600 => "NotoSans-SemiBold",
+            700 => "NotoSans-Bold",
+            800 => "NotoSans-ExtraBold",
+            _ => "NotoSans-Regular"
+        };
+
+        var res = $"CustomCoverArt.Resources.fonts.{face}.ttf";
+        var stream = typeof(Plugin).Assembly.GetManifestResourceStream(res);
+        if (stream is null)
+        {
+            return NotFound();
+        }
+
+        return File(stream, "font/ttf");
+    }
+
     /// <summary>Strip title and target-specific fields so a template is reusable across targets.</summary>
     public static SavedTemplate NormalizeTemplate(SavedTemplate template)
     {
