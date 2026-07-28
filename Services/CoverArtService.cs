@@ -1,7 +1,6 @@
 using CustomCoverArt.Common;
 using CustomCoverArt.Models;
 using MediaBrowser.Common.Configuration;
-using SixLabors.Fonts;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats.Gif;
 using SixLabors.ImageSharp.Drawing;
