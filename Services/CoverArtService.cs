@@ -207,6 +207,23 @@ public class CoverArtService : ICoverArtService
         }
     }
 
+    /// <summary>Source crop rectangle for a Ken Burns frame at progress t (0..1).</summary>
+    public static Rectangle KenBurnsCrop(int srcW, int srcH, float t, float zoomAmount, string direction)
+    {
+        var z = System.Math.Clamp(zoomAmount, 0f, 1f);
+        // progress from wide (0) to tight (1)
+        var p = (direction ?? "in").ToLowerInvariant() == "out" ? 1f - t : t;
+        p = System.Math.Clamp(p, 0f, 1f);
+
+        // scale goes 1.0 (full) → 1/(1+z) (tight)
+        var scale = 1f - p * (1f - 1f / (1f + z));
+        var w = (int)System.Math.Round(srcW * scale);
+        var h = (int)System.Math.Round(srcH * scale);
+        var x = (srcW - w) / 2;
+        var y = (srcH - h) / 2;
+        return new Rectangle(x, y, w, h);
+    }
+
     // Best-effort cleanup of stale generated/preview files so the folder does
     // not grow without bound (preview fires on every UI tweak). Only prunes the
     // flat generated root; the per-library copies under Libraries/ are kept.
