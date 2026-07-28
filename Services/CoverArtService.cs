@@ -20,16 +20,19 @@ public class CoverArtService : ICoverArtService
     private readonly IImageProcessingService _imageProcessingService;
     private readonly IApplicationPaths _applicationPaths;
     private readonly ILoggingService _loggingService;
+    private readonly IMediaItemService _mediaItemService;
     private readonly string _outputDirectory;
 
     public CoverArtService(
         IImageProcessingService imageProcessingService,
         IApplicationPaths applicationPaths,
-        ILoggingService loggingService)
+        ILoggingService loggingService,
+        IMediaItemService mediaItemService)
     {
         _imageProcessingService = imageProcessingService;
         _applicationPaths = applicationPaths;
         _loggingService = loggingService;
+        _mediaItemService = mediaItemService;
 
         // Data location comes from Jellyfin's application paths (via DI) — no
         // more guessing filesystem locations or falling back to temp.
@@ -109,7 +112,19 @@ public class CoverArtService : ICoverArtService
             Image? backgroundImage = null;
             try
             {
-                if (!string.IsNullOrEmpty(settings.BackgroundImagePath))
+                if (settings.BackgroundSource == BackgroundSources.Collage && settings.Collage is not null
+                    && !string.IsNullOrEmpty(settings.Collage.SourceId))
+                {
+                    // Build a full-bleed grid mosaic from the target's child posters.
+                    var posters = await _mediaItemService
+                        .GetPosterPathsAsync(settings.Collage.SourceId, 60)
+                        .ConfigureAwait(false);
+
+                    backgroundImage = CollageComposer.BuildCollage(
+                        posters, settings.ExportWidth, settings.ExportHeight,
+                        settings.Collage.Density, settings.Collage.Seed);
+                }
+                else if (!string.IsNullOrEmpty(settings.BackgroundImagePath))
                 {
                     if (!File.Exists(settings.BackgroundImagePath))
                     {
