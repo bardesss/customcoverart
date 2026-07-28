@@ -17,6 +17,12 @@ public interface ILibraryDetectionService
     Task<bool> UpdateLibraryCoverArtAsync(string libraryId, string coverArtPath);
     Task<string?> BackupCurrentCoverArtAsync(string libraryId);
     Task<bool> RestoreCoverArtAsync(string libraryId, string backupPath);
+
+    /// <summary>Whether an original-cover restore point exists for a target.</summary>
+    bool HasBackup(string libraryId);
+
+    /// <summary>Restore a target's original (pre-plugin) primary image, if backed up.</summary>
+    Task<bool> RestoreOriginalCoverArtAsync(string libraryId);
 }
 
 /// <summary>
