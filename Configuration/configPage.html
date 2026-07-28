@@ -37,6 +37,12 @@
                                 </select>
                             </div>
                         </div>
+                        <div class="ccaFileRow">
+                            <button is="emby-button" type="button" id="ccaRestoreBtn" class="raised" disabled>
+                                <span data-i18n="restore.button">Restore original cover</span>
+                            </button>
+                            <span class="ccaFileName" id="ccaRestoreHint" data-i18n="restore.none">No backup yet</span>
+                        </div>
                     </section>
 
                     <section class="ccaCard" id="ccaSettings">
@@ -411,7 +417,8 @@
                 'dyn.loading': 'Loading…', 'dyn.errorItems': 'Error loading items', 'dyn.noItems': 'No items found', 'dyn.page': 'Page {0} of {1}',
                 'dyn.applied': 'Cover art applied successfully.', 'dyn.error': 'Error: {0}', 'dyn.applyFail': 'Could not apply cover art: {0}',
                 'dyn.uploadFail': 'Upload failed: {0}', 'dyn.fontFail': 'Font upload failed: {0}', 'dyn.useImgFail': 'Could not use that image: {0}',
-                'dyn.unknown': 'unknown error'
+                'dyn.unknown': 'unknown error',
+                'restore.button': 'Restore original cover', 'restore.none': 'No backup yet', 'restore.available': 'A backup exists', 'restore.done': 'Original cover restored.', 'restore.fail': 'No backup found to restore.'
             },
             nl: {
                 'lede': 'Ontwerp een cover voor een bibliotheek, bekijk het live en pas het toe.',
@@ -443,7 +450,8 @@
                 'dyn.loading': 'Laden…', 'dyn.errorItems': 'Fout bij laden van items', 'dyn.noItems': 'Geen items gevonden', 'dyn.page': 'Pagina {0} van {1}',
                 'dyn.applied': 'Cover art succesvol toegepast.', 'dyn.error': 'Fout: {0}', 'dyn.applyFail': 'Kon cover art niet toepassen: {0}',
                 'dyn.uploadFail': 'Uploaden mislukt: {0}', 'dyn.fontFail': 'Lettertype uploaden mislukt: {0}', 'dyn.useImgFail': 'Kon die afbeelding niet gebruiken: {0}',
-                'dyn.unknown': 'onbekende fout'
+                'dyn.unknown': 'onbekende fout',
+                'restore.button': 'Originele cover herstellen', 'restore.none': 'Nog geen back-up', 'restore.available': 'Er is een back-up', 'restore.done': 'Originele cover hersteld.', 'restore.fail': 'Geen back-up gevonden om te herstellen.'
             }
         };
 
@@ -599,6 +607,19 @@
             el('ccaGradientAngleRow').style.display = el('ccaGradientType').value === '0' ? '' : 'none';
         }
 
+        // Refreshes the Restore button state for the currently selected target.
+        function refreshRestoreState() {
+            var btn = el('ccaRestoreBtn');
+            var hint = el('ccaRestoreHint');
+            if (!btn) { return; }
+            if (!state.libraryId) { btn.disabled = true; hint.textContent = t('restore.none'); return; }
+            jsonFetch('CustomCoverArt/targets/' + encodeURIComponent(state.libraryId) + '/backup').then(function (res) {
+                var has = pick(res, 'Success') && pick(res, 'Data');
+                btn.disabled = !has;
+                hint.textContent = has ? t('restore.available') : t('restore.none');
+            });
+        }
+
         // Loads the targets (libraries / collections / playlists) for the selected type.
         function loadLibraries() {
             var type = el('ccaTargetType') ? el('ccaTargetType').value : 'library';
@@ -748,6 +769,16 @@
             el('ccaLibrarySelect').addEventListener('change', function () {
                 state.libraryId = this.value;
                 updateUI();
+                refreshRestoreState();
+            });
+
+            el('ccaRestoreBtn').addEventListener('click', function () {
+                if (!state.libraryId) { return; }
+                var type = el('ccaTargetType') ? el('ccaTargetType').value : 'library';
+                jsonFetch('CustomCoverArt/targets/' + type + '/' + encodeURIComponent(state.libraryId) + '/restore', 'POST')
+                    .then(function (res) {
+                        Dashboard.alert(pick(res, 'Success') ? t('restore.done') : t('restore.fail'));
+                    });
             });
             el('ccaTextSize').addEventListener('input', function () { el('ccaTextSizeVal').textContent = this.value; });
             el('ccaDim').addEventListener('input', function () { el('ccaDimVal').textContent = this.value; });
@@ -761,7 +792,7 @@
             el('ccaTargetType').addEventListener('change', function () {
                 Dashboard.showLoadingMsg();
                 loadLibraries()
-                    .then(function () { updateUI(); Dashboard.hideLoadingMsg(); })
+                    .then(function () { updateUI(); refreshRestoreState(); Dashboard.hideLoadingMsg(); })
                     .catch(function () { Dashboard.hideLoadingMsg(); });
             });
 
@@ -955,6 +986,7 @@
             Dashboard.showLoadingMsg();
             loadLibraries().then(function () {
                 updateUI();
+                refreshRestoreState();
                 Dashboard.hideLoadingMsg();
                 schedulePreview();
             }).catch(function () { Dashboard.hideLoadingMsg(); });
