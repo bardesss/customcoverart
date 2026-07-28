@@ -111,6 +111,78 @@ public class CustomCoverArtController : ControllerBase
         }
     }
 
+    /// <summary>Generate and stream a preview image from a document-native design.</summary>
+    [HttpPost("document/preview")]
+    public async Task<IActionResult> GeneratePreviewDocument([FromBody] CoverDocument document)
+    {
+        // Higher limit: the canvas renders a live preview on every adjustment.
+        if (RateLimited("preview", maxRequests: 240, TimeSpan.FromMinutes(1)))
+        {
+            return StatusCode(429, new { error = "Too many requests" });
+        }
+
+        try
+        {
+            var coverArtPath = await _coverArtService.GenerateFromDocumentAsync(document).ConfigureAwait(false);
+            var imageBytes = await System.IO.File.ReadAllBytesAsync(coverArtPath).ConfigureAwait(false);
+            var contentType = document.Canvas.Format?.ToLowerInvariant() == "gif" ? "image/gif" : "image/png";
+            return File(imageBytes, contentType);
+        }
+        catch (Exception ex)
+        {
+            _loggingService.LogError("Failed to generate document preview", ex);
+            return BadRequest(new { error = "Failed to generate preview." });
+        }
+    }
+
+    /// <summary>Apply a document-native design to a library.</summary>
+    [HttpPost("document/apply")]
+    public async Task<ApiResponse<bool>> ApplyDocument([FromBody] ApplyDocumentRequest request)
+    {
+        // Applying renders a full cover (up to a 30-frame GIF) and writes to disk.
+        if (RateLimited("apply", maxRequests: 30, TimeSpan.FromMinutes(1)))
+        {
+            return Fail<bool>(_localizationService.GetString("errors.too_many_uploads"));
+        }
+
+        // Validate the library id up front, before it is used anywhere.
+        if (!Guid.TryParse(request.LibraryId, out _))
+        {
+            return Fail<bool>("Invalid library id");
+        }
+
+        try
+        {
+            var userName = _userContextService.GetCurrentUserName() ?? "unknown";
+            _loggingService.LogInformation("User {UserName} applying document cover art to library {LibraryId}", userName, request.LibraryId);
+
+            var coverArtPath = await _coverArtService.GenerateFromDocumentAsync(request.Document).ConfigureAwait(false);
+
+            // Persist into the per-library folder; apply THAT stable path.
+            var savedPath = await _coverArtService.SaveCoverArtAsync(request.LibraryId, coverArtPath).ConfigureAwait(false);
+            if (savedPath is null)
+            {
+                return Fail<bool>("Failed to save cover art");
+            }
+
+            // Preserve the target's current image once, so Restore can undo later.
+            await _libraryService.BackupCurrentCoverArtAsync(request.LibraryId).ConfigureAwait(false);
+
+            var updated = await _libraryService.UpdateLibraryCoverArtAsync(request.LibraryId, savedPath).ConfigureAwait(false);
+            if (!updated)
+            {
+                return Fail<bool>("Failed to update library cover art");
+            }
+
+            return Success(true);
+        }
+        catch (Exception ex)
+        {
+            _loggingService.LogError("Failed to apply document to {LibraryId}", ex, request.LibraryId);
+            return Fail<bool>("Failed to apply cover art.");
+        }
+    }
+
     /// <summary>Apply cover art to a library (used by the config page).</summary>
     [HttpPost("apply")]
     public async Task<ApiResponse<bool>> Apply([FromBody] ApplyCoverArtRequest request)
@@ -397,6 +469,21 @@ public class CustomCoverArtController : ControllerBase
         {
             template.Settings.Collage.SourceId = string.Empty;
         }
+
+        if (template.Document is not null)
+        {
+            var titleLayer = template.Document.Layers.FirstOrDefault(l => l.Id == "title");
+            if (titleLayer is not null)
+            {
+                titleLayer.Content = string.Empty;
+            }
+
+            if (template.Document.Background.Collage is not null)
+            {
+                template.Document.Background.Collage.SourceId = string.Empty;
+            }
+        }
+
         return template;
     }
 
