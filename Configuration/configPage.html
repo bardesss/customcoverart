@@ -1411,7 +1411,14 @@
             bg.Blur = pickNum(s, 'BackgroundBlur', bg.Blur);
             bg.Dim = pickNum(s, 'BackgroundDim', bg.Dim);
             bg.DimColor = pick(s, 'DimColor') || bg.DimColor;
-            bg.Gradient = pick(s, 'BackgroundGradient') || bg.Gradient;
+            // Mirrors DocumentMigration.FromSettings: Gradient = s.BackgroundGradient,
+            // i.e. a missing gradient stays null — NOT the default purple/blue
+            // gradient from defaultDocument(). Falling back to that default would
+            // put a phantom gradient (IsEnabled:true) onto any legacy template
+            // that never had one (a plain image, or a flat/dim-only design), and
+            // that phantom gradient would then get baked onto the real applied
+            // cover by the server's CreateGradientBackground.
+            bg.Gradient = pick(s, 'BackgroundGradient') || null;
             bg.Collage = pick(s, 'Collage') || null;
             bg.Animation = pick(s, 'Animation') || null;
             bg.Transform = { OffsetX: 0, OffsetY: 0, Scale: 1 }; // identity, as FromSettings does

@@ -50,4 +50,31 @@ public class DocumentMigrationTests
         Assert.Equal(TextAlign.Left, d.Layers[0].Align);
         Assert.InRange(d.Layers[0].X, 0.04f, 0.06f); // near the left padding
     }
+
+    // Pins the null-passthrough contract the client-side migrateTemplateToDocument
+    // (configPage.html) mirrors: a legacy CoverArtSettings with no gradient must
+    // migrate to Background.Gradient == null, NOT the default purple/blue
+    // gradient. Falling back to a default here would put a phantom gradient
+    // (IsEnabled:true) on every plain-image/flat-colour legacy design.
+    [Fact]
+    public void FromSettings_NullGradientStaysNull()
+    {
+        var s = new CoverArtSettings { Title = "X", BackgroundGradient = null };
+        var d = DocumentMigration.FromSettings(s);
+        Assert.Null(d.Background.Gradient);
+    }
+
+    [Fact]
+    public void FromSettings_NonNullGradientPassesThroughUnchanged()
+    {
+        var gradient = new GradientSettings { IsEnabled = true, Type = GradientType.Radial, Angle = 45f };
+        var s = new CoverArtSettings { Title = "X", BackgroundGradient = gradient };
+
+        var d = DocumentMigration.FromSettings(s);
+
+        Assert.Same(gradient, d.Background.Gradient);
+        Assert.True(d.Background.Gradient!.IsEnabled);
+        Assert.Equal(GradientType.Radial, d.Background.Gradient.Type);
+        Assert.Equal(45f, d.Background.Gradient.Angle);
+    }
 }
