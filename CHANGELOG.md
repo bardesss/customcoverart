@@ -4,6 +4,9 @@ The text under each version heading is published to the plugin's manifest by the
 release workflow (and shown as the version's changelog inside Jellyfin). Add a
 new `## <version>` section when you bump `<Version>` in the csproj.
 
+## 2.0.0.0
+A big release. **Poster-collage backgrounds** build a grid mosaic from a target's own item posters (with density and shuffle controls). **Design templates** let you save a look and reuse it, and **batch apply** pushes one design onto many libraries, collections or playlists at once — each cover titled with its own target's name. **Animated GIF export** is now real: it passes through an animated-GIF background or applies a Ken Burns pan/zoom (capped at 30 frames). And **Restore original cover** reverts any target to its pre-plugin image — applying a cover now backs up the previous image automatically.
+
 ## 1.3.1.0
 The plugin now has its own entry in the dashboard's left navigation menu, so you no longer have to open it through the Plugins list. Added **Live TV** as a cover target (best-effort — it sets the image on Jellyfin's generated Live TV view, which may not persist on every server). Moved the custom-font picker into the **Text** card where it belongs, and added a screenshot to the README.
 
