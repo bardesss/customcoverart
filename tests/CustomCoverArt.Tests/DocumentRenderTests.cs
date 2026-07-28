@@ -47,4 +47,21 @@ public class DocumentRenderTests
             for (int x = 0; x < 100; x++)
                 Assert.True(canvas[x, y].R < 40, "Hidden layer must not render.");
     }
+
+    [Fact]
+    public async System.Threading.Tasks.Task GenerateFromDocumentAsync_ProducesPng()
+    {
+        var svc = AnimationTestHost.NewCoverArtService();
+        var doc = new CoverDocument { Canvas = new CanvasSettings { Width = 200, Height = 200, Format = "png" } };
+        doc.Background.DimColor = "#222222";
+        doc.Layers.Add(new CoverLayer { Type = "text", Content = "Hi", Color = "#ffffff", Size = 0.2f });
+
+        var path = await svc.GenerateFromDocumentAsync(doc);
+
+        Assert.True(System.IO.File.Exists(path));
+        Assert.EndsWith(".png", path);
+        using var img = SixLabors.ImageSharp.Image.Load(path);
+        Assert.Equal(200, img.Width);
+        try { System.IO.File.Delete(path); } catch { }
+    }
 }

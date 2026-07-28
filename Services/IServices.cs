@@ -25,6 +25,9 @@ public interface ICoverArtService
 {
     Task<string> GenerateCoverArtAsync(CoverArtSettings settings);
 
+    /// <summary>Renders a CoverDocument to a file and returns its path.</summary>
+    Task<string> GenerateFromDocumentAsync(CoverDocument document);
+
     /// <summary>Persists the cover into the per-library folder and returns that
     /// stable path (or null on failure) so it can be applied to the library.</summary>
     Task<string?> SaveCoverArtAsync(string libraryId, string coverArtPath);

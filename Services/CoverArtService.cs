@@ -40,14 +40,17 @@ public class CoverArtService : ICoverArtService
         Directory.CreateDirectory(_outputDirectory);
     }
 
-    public async Task<string> GenerateCoverArtAsync(CoverArtSettings settings)
+    public Task<string> GenerateCoverArtAsync(CoverArtSettings settings)
+        => GenerateFromDocumentAsync(DocumentMigration.FromSettings(settings));
+
+    public async Task<string> GenerateFromDocumentAsync(CoverDocument document)
     {
         try
         {
-            if (settings == null)
-                throw new ArgumentNullException(nameof(settings));
+            if (document == null)
+                throw new ArgumentNullException(nameof(document));
 
-            if (settings.ExportWidth <= 0 || settings.ExportHeight <= 0)
+            if (document.Canvas.Width <= 0 || document.Canvas.Height <= 0)
                 throw new ArgumentException("Invalid dimensions");
 
             // Housekeeping: drop stale preview/generated files.
@@ -56,34 +59,35 @@ public class CoverArtService : ICoverArtService
             // Security: background image and font paths come from the client.
             // Only honour them if they resolve inside our own data directory,
             // otherwise ignore them (prevents reading arbitrary server files).
-            if (!PluginPaths.IsInsideBase(_applicationPaths, settings.BackgroundImagePath))
+            if (!PluginPaths.IsInsideBase(_applicationPaths, document.Background.ImagePath))
             {
-                if (!string.IsNullOrEmpty(settings.BackgroundImagePath))
+                if (!string.IsNullOrEmpty(document.Background.ImagePath))
                 {
-                    _loggingService.LogWarning("Background path rejected (outside plugin data dir): {Path}", settings.BackgroundImagePath);
+                    _loggingService.LogWarning("Background path rejected (outside plugin data dir): {Path}", document.Background.ImagePath);
                 }
-                settings.BackgroundImagePath = string.Empty;
+                document.Background.ImagePath = string.Empty;
             }
 
-            if (!PluginPaths.IsInsideBase(_applicationPaths, settings.CustomFontPath))
+            foreach (var layer in document.Layers)
             {
-                settings.CustomFontPath = string.Empty;
+                if (!PluginPaths.IsInsideBase(_applicationPaths, layer.FontPath))
+                {
+                    layer.FontPath = string.Empty;
+                }
             }
 
-            // Clamp client-controlled effect sizes. The outline is drawn as an
-            // O(n^2) grid of text passes, so an unbounded width could hang the
-            // request; the others just guard against absurd input.
-            settings.TextSize = Math.Clamp(settings.TextSize, 8, 1024);
-            settings.TextOutlineWidth = Math.Clamp(settings.TextOutlineWidth, 0, 10);
-            settings.BackgroundBlur = Math.Clamp(settings.BackgroundBlur, 0f, 100f);
-            settings.BackgroundDim = Math.Clamp(settings.BackgroundDim, 0f, 1f);
-            settings.TextShadowOffsetX = Math.Clamp(settings.TextShadowOffsetX, -50, 50);
-            settings.TextShadowOffsetY = Math.Clamp(settings.TextShadowOffsetY, -50, 50);
+            // Clamp client-controlled background effect sizes (guards against
+            // absurd input). Per-layer text/outline clamps (the outline is drawn
+            // as an O(n^2) grid of text passes, so an unbounded width could hang
+            // the request) already happen inside DocumentRenderer — do not
+            // double-clamp them here.
+            document.Background.Blur = Math.Clamp(document.Background.Blur, 0f, 100f);
+            document.Background.Dim = Math.Clamp(document.Background.Dim, 0f, 1f);
 
             // Validate dimensions and estimated file size
             var dimensionValidation = ImageProcessingService.ValidateCoverArtDimensions(
-                settings.ExportWidth, settings.ExportHeight, settings.OutputFormat);
-            
+                document.Canvas.Width, document.Canvas.Height, document.Canvas.Format);
+
             if (!dimensionValidation.IsValid)
             {
                 throw new ArgumentException(dimensionValidation.ErrorMessage);
@@ -92,42 +96,38 @@ public class CoverArtService : ICoverArtService
             // A large-file-size estimate (dimensionValidation.WarningMessage) is
             // non-fatal and intentionally ignored here.
 
-            // Auto-determine optimal format if not explicitly set
-            if (string.IsNullOrEmpty(settings.OutputFormat) || settings.OutputFormat == "auto")
-            {
-                settings.OutputFormat = await _imageProcessingService.DetermineOptimalFormatAsync(settings);
-            }
-
             // Whitelist the output format. The extension is NEVER derived from the
             // raw client string (which could contain path-traversal segments) —
-            // anything that is not "gif" becomes "png".
-            settings.OutputFormat = settings.OutputFormat?.ToLowerInvariant() == "gif" ? "gif" : "png";
-            var extension = settings.OutputFormat;
+            // anything that is not "gif" becomes "png". (This subsumes the old
+            // "auto"-format optimizer: DetermineOptimalFormatAsync always resolved
+            // to "png" unconditionally, so this mapping is exactly equivalent.)
+            var outputFormat = document.Canvas.Format?.ToLowerInvariant() == "gif" ? "gif" : "png";
+            document.Canvas.Format = outputFormat;
 
-            var fileName = $"cover_{Guid.NewGuid():N}.{extension}";
+            var fileName = $"cover_{Guid.NewGuid():N}.{outputFormat}";
             var outputPath = Path.Combine(_outputDirectory, fileName);
 
             // Load background image if provided (path already sandboxed above).
             Image? backgroundImage = null;
             try
             {
-                if (settings.BackgroundSource == BackgroundSources.Collage && settings.Collage is not null
-                    && !string.IsNullOrEmpty(settings.Collage.SourceId))
+                if (document.Background.Source == BackgroundSources.Collage && document.Background.Collage is not null
+                    && !string.IsNullOrEmpty(document.Background.Collage.SourceId))
                 {
                     // Build a full-bleed grid mosaic from the target's child posters.
                     var posters = await _mediaItemService
-                        .GetPosterPathsAsync(settings.Collage.SourceId, 60)
+                        .GetPosterPathsAsync(document.Background.Collage.SourceId, 60)
                         .ConfigureAwait(false);
 
                     backgroundImage = CollageComposer.BuildCollage(
-                        posters, settings.ExportWidth, settings.ExportHeight,
-                        settings.Collage.Density, settings.Collage.Seed);
+                        posters, document.Canvas.Width, document.Canvas.Height,
+                        document.Background.Collage.Density, document.Background.Collage.Seed);
                 }
-                else if (!string.IsNullOrEmpty(settings.BackgroundImagePath))
+                else if (!string.IsNullOrEmpty(document.Background.ImagePath))
                 {
-                    if (!File.Exists(settings.BackgroundImagePath))
+                    if (!File.Exists(document.Background.ImagePath))
                     {
-                        _loggingService.LogWarning("Background file not found: {Path}", settings.BackgroundImagePath);
+                        _loggingService.LogWarning("Background file not found: {Path}", document.Background.ImagePath);
                     }
                     else
                     {
@@ -135,11 +135,11 @@ public class CoverArtService : ICoverArtService
                         {
                             // Reject oversize source images before a full decode
                             // (decompression-bomb guard).
-                            var info = Image.Identify(settings.BackgroundImagePath);
+                            var info = Image.Identify(document.Background.ImagePath);
                             const long maxSourcePixels = 8192L * 8192L;
                             if ((long)info.Width * info.Height <= maxSourcePixels)
                             {
-                                backgroundImage = await Image.LoadAsync(settings.BackgroundImagePath);
+                                backgroundImage = await Image.LoadAsync(document.Background.ImagePath);
                             }
                             else
                             {
@@ -148,23 +148,23 @@ public class CoverArtService : ICoverArtService
                         }
                         catch (Exception ex)
                         {
-                            _loggingService.LogWarning("Failed to decode background {Path}: {Error}", settings.BackgroundImagePath, ex.Message);
+                            _loggingService.LogWarning("Failed to decode background {Path}: {Error}", document.Background.ImagePath, ex.Message);
                         }
                     }
                 }
 
                 // Animated GIF export: build multiple frames instead of one image.
-                if (settings.Animation?.Enabled == true)
+                if (document.Background.Animation?.Enabled == true)
                 {
-                    return await GenerateAnimatedAsync(settings, backgroundImage).ConfigureAwait(false);
+                    return await GenerateAnimatedAsync(document, backgroundImage).ConfigureAwait(false);
                 }
 
                 // Create new image with specified dimensions and composite one frame.
-                using var image = new Image<Rgba32>(settings.ExportWidth, settings.ExportHeight);
-                ComposeFrame(image, backgroundImage, settings);
+                using var image = new Image<Rgba32>(document.Canvas.Width, document.Canvas.Height);
+                ComposeFrame(image, backgroundImage, document);
 
                 // Save image with retry mechanism
-                await SaveImageWithRetryAsync(image, outputPath, settings);
+                await SaveImageWithRetryAsync(image, outputPath, outputFormat);
 
                 return outputPath;
             }
@@ -193,17 +193,27 @@ public class CoverArtService : ICoverArtService
         return Path.Combine(_outputDirectory, "Libraries", id.ToString("N"));
     }
 
-    // Clones settings with text-related pixel sizes scaled to a resized canvas, so
-    // a downscaled animated frame keeps the same visual proportions as the preview.
-    private static CoverArtSettings ScaleTextForCanvas(CoverArtSettings s, float scale)
+    // Clones a document for a downscaled animated working canvas. Layer.Size is
+    // already a fraction of Canvas.Height, so pointing Canvas.Width/Height at the
+    // actual (capped) working dimensions keeps text proportional automatically —
+    // no separate text-size scaling needed (unlike the legacy flat TextSize,
+    // which was an absolute pixel value tied to the ORIGINAL ExportHeight and
+    // required pre-shrinking to compensate). Shadow/outline pixel offsets are
+    // still absolute values on CoverLayer, so those are scaled explicitly to
+    // preserve their visual proportions on the smaller canvas.
+    private static CoverDocument ScaleDocumentForCanvas(CoverDocument doc, int width, int height, float scale)
     {
-        var json = System.Text.Json.JsonSerializer.Serialize(s);
-        var c = System.Text.Json.JsonSerializer.Deserialize<CoverArtSettings>(json) ?? s;
-        c.TextSize = System.Math.Max(8, (int)System.Math.Round(s.TextSize * scale));
-        c.TextShadowBlur = (int)System.Math.Round(s.TextShadowBlur * scale);
-        c.TextShadowOffsetX = (int)System.Math.Round(s.TextShadowOffsetX * scale);
-        c.TextShadowOffsetY = (int)System.Math.Round(s.TextShadowOffsetY * scale);
-        c.TextOutlineWidth = (int)System.Math.Round(s.TextOutlineWidth * scale);
+        var json = System.Text.Json.JsonSerializer.Serialize(doc);
+        var c = System.Text.Json.JsonSerializer.Deserialize<CoverDocument>(json) ?? doc;
+        c.Canvas.Width = width;
+        c.Canvas.Height = height;
+        foreach (var layer in c.Layers)
+        {
+            layer.Shadow.Blur = (int)System.Math.Round(layer.Shadow.Blur * scale);
+            layer.Shadow.OffsetX = (int)System.Math.Round(layer.Shadow.OffsetX * scale);
+            layer.Shadow.OffsetY = (int)System.Math.Round(layer.Shadow.OffsetY * scale);
+            layer.Outline.Width = (int)System.Math.Round(layer.Outline.Width * scale);
+        }
         return c;
     }
 
@@ -279,14 +289,13 @@ public class CoverArtService : ICoverArtService
     }
 
     /// <summary>
-    /// Composites one frame (background + text) onto the supplied canvas. Shared
+    /// Composites one frame (background + layers) onto the supplied canvas. Shared
     /// by the single-image path and the animated-GIF path (which calls it per frame).
-    /// Delegates to the shared <see cref="DocumentRenderer"/> compositor via a
-    /// one-text-layer <see cref="CoverDocument"/> built from the legacy flat settings.
+    /// Delegates directly to the shared <see cref="DocumentRenderer"/> compositor.
     /// </summary>
-    private static void ComposeFrame(Image<Rgba32> canvas, Image? background, CoverArtSettings settings)
+    private static void ComposeFrame(Image<Rgba32> canvas, Image? background, CoverDocument document)
     {
-        DocumentRenderer.ComposeDocumentFrame(canvas, background, DocumentMigration.FromSettings(settings));
+        DocumentRenderer.ComposeDocumentFrame(canvas, background, document);
     }
 
     /// <summary>
@@ -294,24 +303,24 @@ public class CoverArtService : ICoverArtService
     /// frame-by-frame, or applying a Ken Burns pan/zoom to a static background.
     /// Frame count is clamped to [2, 30]; loop uses the GIF repeat count.
     /// </summary>
-    private async Task<string> GenerateAnimatedAsync(CoverArtSettings settings, Image? background)
+    private async Task<string> GenerateAnimatedAsync(CoverDocument document, Image? background)
     {
-        var w = settings.ExportWidth;
-        var h = settings.ExportHeight;
+        var w = document.Canvas.Width;
+        var h = document.Canvas.Height;
 
         // An animated GIF costs N× a static render and Jellyfin re-processes very
         // large library images poorly (a full-size multi-frame GIF often fails to
         // appear at all). Cap the working size so the render stays fast and the
         // file stays applyable; text scales with the canvas so it looks the same.
         const int maxGifSide = 1280;
-        var composeSettings = settings;
+        var composeDocument = document;
         var longestSide = System.Math.Max(w, h);
         if (longestSide > maxGifSide)
         {
             var canvasScale = maxGifSide / (float)longestSide;
             w = System.Math.Max(1, (int)System.Math.Round(w * canvasScale));
             h = System.Math.Max(1, (int)System.Math.Round(h * canvasScale));
-            composeSettings = ScaleTextForCanvas(settings, canvasScale);
+            composeDocument = ScaleDocumentForCanvas(document, w, h, canvasScale);
         }
 
         // Passthrough when the source background is itself animated.
@@ -321,8 +330,8 @@ public class CoverArtService : ICoverArtService
         // truncated or padded); Ken Burns / static sources use the requested count.
         var frameCount = animatedSource
             ? System.Math.Clamp(background!.Frames.Count, 2, 60)
-            : System.Math.Clamp(settings.Animation!.FrameCount, 2, 30);
-        var delayCentis = System.Math.Max(2, settings.Animation!.DelayMs / 10); // GIF delay is 1/100s
+            : System.Math.Clamp(document.Background.Animation!.FrameCount, 2, 30);
+        var delayCentis = System.Math.Max(2, document.Background.Animation!.DelayMs / 10); // GIF delay is 1/100s
 
         Image<Rgba32>? output = null;
         try
@@ -346,10 +355,10 @@ public class CoverArtService : ICoverArtService
                         var srcDelay = background.Frames[srcIndex].Metadata.GetGifMetadata().FrameDelay;
                         if (srcDelay > 0) { frameDelay = srcDelay; }
                     }
-                    else if (settings.Animation.KenBurns && background is not null)
+                    else if (document.Background.Animation!.KenBurns && background is not null)
                     {
                         var crop = KenBurnsCrop(background.Width, background.Height, t,
-                            settings.Animation.ZoomAmount, settings.Animation.Direction);
+                            document.Background.Animation.ZoomAmount, document.Background.Animation.Direction);
                         tempBg = background.CloneAs<Rgba32>();
                         tempBg.Mutate(x => x.Crop(crop).Resize(w, h));
                         frameBg = tempBg;
@@ -360,13 +369,13 @@ public class CoverArtService : ICoverArtService
                         frameBg = tempBg;
                     }
 
-                    ComposeFrame(frameCanvas, frameBg, composeSettings);
+                    ComposeFrame(frameCanvas, frameBg, composeDocument);
 
                     if (output is null)
                     {
                         output = frameCanvas.Clone();
                         var gm = output.Metadata.GetGifMetadata();
-                        gm.RepeatCount = (ushort)(settings.Animation.Loop ? 0 : 1);
+                        gm.RepeatCount = (ushort)(document.Background.Animation!.Loop ? 0 : 1);
                         output.Frames.RootFrame.Metadata.GetGifMetadata().FrameDelay = frameDelay;
                     }
                     else
@@ -395,7 +404,7 @@ public class CoverArtService : ICoverArtService
     /// <summary>
     /// Saves image with retry mechanism for transient failures
     /// </summary>
-    private static async Task SaveImageWithRetryAsync(Image<Rgba32> image, string outputPath, CoverArtSettings settings)
+    private static async Task SaveImageWithRetryAsync(Image<Rgba32> image, string outputPath, string outputFormat)
     {
         const int maxRetries = 3;
         const int delayMs = 100;
@@ -404,7 +413,7 @@ public class CoverArtService : ICoverArtService
         {
             try
             {
-                if (settings.OutputFormat?.ToLowerInvariant() == "gif")
+                if (outputFormat?.ToLowerInvariant() == "gif")
                 {
                     await image.SaveAsync(outputPath, new SixLabors.ImageSharp.Formats.Gif.GifEncoder());
                 }
