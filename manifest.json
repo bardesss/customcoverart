@@ -9,6 +9,14 @@
     "imageUrl": "",
     "versions": [
       {
+        "version": "2.0.1.0",
+        "changelog": "Polish on the v2 release. The config page now matches Jellyfin more closely — compact colour pickers (they used to stretch the full width), and action buttons that align with the selects beside them. The preview no longer starts on a black canvas: it opens with Jellyfin's **brand gradient** (purple → blue) by default. And uploading an **animated GIF** as a background now animates the preview automatically — it switches to Animated GIF output and passes the source's frames through at their own timing, instead of showing a single still frame.",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://github.com/Bardesss/customcoverart/releases/download/v2.0.1.0/customcoverart_2.0.1.0.zip",
+        "checksum": "224345626e1036722381d7b557c8e46e",
+        "timestamp": "2026-07-28T11:16:36Z"
+      },
+      {
         "version": "2.0.0.0",
         "changelog": "A big release. **Poster-collage backgrounds** build a grid mosaic from a target's own item posters (with density and shuffle controls). **Design templates** let you save a look and reuse it, and **batch apply** pushes one design onto many libraries, collections or playlists at once — each cover titled with its own target's name. **Animated GIF export** is now real: it passes through an animated-GIF background or applies a Ken Burns pan/zoom (capped at 30 frames). And **Restore original cover** reverts any target to its pre-plugin image — applying a cover now backs up the previous image automatically.",
         "targetAbi": "10.11.0.0",
