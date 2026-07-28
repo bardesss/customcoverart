@@ -140,6 +140,7 @@
                             <input type="color" id="ccaDimColor" value="#000000" />
                         </div>
 
+                        <div id="ccaUploadControls">
                         <label class="ccaCheck ccaCheckBlock"><input is="emby-checkbox" type="checkbox" id="ccaGradient" /><span data-i18n="bg.gradient">Enable gradient background</span></label>
                         <div id="ccaGradientOpts" class="ccaSub" style="display:none;">
                             <div class="inputContainer">
@@ -183,40 +184,6 @@
                             <button is="emby-button" type="button" id="ccaBrowseBtn" class="raised ccaBtnWide"><span data-i18n="bg.browse">Browse library posters</span></button>
                             <div id="ccaSelectedBg" class="ccaSelected" style="display:none;"><span data-i18n="bg.selected">Selected background:</span> <strong id="ccaSelectedBgName"></strong></div>
                         </div>
-                    </section>
-
-                    <section class="ccaCard">
-                        <div class="ccaCardHead" data-i18n="card.templates">Templates</div>
-                        <div class="ccaGrid">
-                            <div class="inputContainer">
-                                <label for="ccaTemplateSelect" data-i18n="tpl.load">Load template</label>
-                                <select is="emby-select" id="ccaTemplateSelect" class="emby-select"></select>
-                            </div>
-                            <div class="inputContainer">
-                                <label>&nbsp;</label>
-                                <button is="emby-button" type="button" id="ccaTemplateDelete" class="raised">
-                                    <span data-i18n="tpl.delete">Delete</span>
-                                </button>
-                            </div>
-                        </div>
-                        <div class="ccaFileRow">
-                            <input type="text" id="ccaTemplateName" class="emby-input" placeholder="Template name" data-i18n-ph="tpl.nameph" />
-                            <button is="emby-button" type="button" id="ccaTemplateSave" class="raised">
-                                <span data-i18n="tpl.save">Save current design</span>
-                            </button>
-                        </div>
-                        <div class="fieldDescription" data-i18n="tpl.hint">Templates store the design but not the title — each target keeps its own name.</div>
-                    </section>
-
-                    <section class="ccaCard">
-                        <div class="ccaCardHead" data-i18n="card.batch">Batch apply</div>
-                        <div class="fieldDescription" data-i18n="batch.hint">Apply the current design (or loaded template) to several targets at once. Each cover is titled with its target's name.</div>
-                        <div id="ccaBatchList" class="ccaBatchList"></div>
-                        <div class="ccaFileRow">
-                            <button is="emby-button" type="button" id="ccaBatchApply" class="raised">
-                                <span data-i18n="batch.apply">Apply to selected</span>
-                            </button>
-                            <span class="ccaFileName" id="ccaBatchStatus"></span>
                         </div>
                     </section>
 
@@ -271,6 +238,41 @@
                                 <label for="ccaHeight" data-i18n="out.height">Height</label>
                                 <input is="emby-input" type="number" id="ccaHeight" min="100" max="2048" value="1400" />
                             </div>
+                        </div>
+                    </section>
+
+                    <section class="ccaCard">
+                        <div class="ccaCardHead" data-i18n="card.templates">Templates</div>
+                        <div class="ccaGrid">
+                            <div class="inputContainer">
+                                <label for="ccaTemplateSelect" data-i18n="tpl.load">Load template</label>
+                                <select is="emby-select" id="ccaTemplateSelect" class="emby-select"></select>
+                            </div>
+                            <div class="inputContainer">
+                                <label>&nbsp;</label>
+                                <button is="emby-button" type="button" id="ccaTemplateDelete" class="raised">
+                                    <span data-i18n="tpl.delete">Delete</span>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="ccaFileRow">
+                            <input type="text" id="ccaTemplateName" class="emby-input" placeholder="Template name" data-i18n-ph="tpl.nameph" />
+                            <button is="emby-button" type="button" id="ccaTemplateSave" class="raised">
+                                <span data-i18n="tpl.save">Save current design</span>
+                            </button>
+                        </div>
+                        <div class="fieldDescription" data-i18n="tpl.hint">Templates store the design but not the title — each target keeps its own name.</div>
+                    </section>
+
+                    <section class="ccaCard">
+                        <div class="ccaCardHead" data-i18n="card.batch">Batch apply</div>
+                        <div class="fieldDescription" data-i18n="batch.hint">Apply the current design (or loaded template) to several targets at once. Each cover is titled with its target's name.</div>
+                        <div id="ccaBatchList" class="ccaBatchList"></div>
+                        <div class="ccaFileRow">
+                            <button is="emby-button" type="button" id="ccaBatchApply" class="raised">
+                                <span data-i18n="batch.apply">Apply to selected</span>
+                            </button>
+                            <span class="ccaFileName" id="ccaBatchStatus"></span>
                         </div>
                     </section>
 
@@ -720,6 +722,10 @@
             if (opt) { opt.disabled = (type === 'livetv'); }
             if (type === 'livetv' && isCollage) { el('ccaBgSource').value = 'upload'; isCollage = false; }
             el('ccaCollageRow').style.display = isCollage ? '' : 'none';
+            // A collage supplies the whole background, so the upload/gradient/fit
+            // controls don't apply — hide them to keep the card focused.
+            var up = el('ccaUploadControls');
+            if (up) { up.style.display = isCollage ? 'none' : ''; }
             updateUI();
         }
 
