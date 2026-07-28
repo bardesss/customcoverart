@@ -9,6 +9,14 @@
     "imageUrl": "",
     "versions": [
       {
+        "version": "2.1.0.0",
+        "changelog": "A code-quality and size pass. The plugin is now **much smaller** — the bundled Noto Sans fonts were subset to the glyphs cover titles use (Latin, Greek, Cyrillic, punctuation), cutting the plugin DLL from ~3.9 MB to ~1.6 MB with no visible change. **Dead code was removed** (an unused retry service, an unused exceptions module, and nine internal API endpoints the UI never called), and the render pipeline was tidied up (the image compositing is no longer needlessly async). A few **security hardening** touches: the Apply and batch-apply endpoints are now rate-limited and batch size is capped, text size is clamped, poster-collage sources get the same decompression-bomb guard as other images, and error messages no longer echo server paths back to the browser. Purely internal — no user-facing behaviour changes.",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://github.com/bardesss/customcoverart/releases/download/v2.1.0.0/customcoverart_2.1.0.0.zip",
+        "checksum": "2e3770bef26df0a595242209e4e4ddc8",
+        "timestamp": "2026-07-28T12:41:34Z"
+      },
+      {
         "version": "2.0.3.0",
         "changelog": "Small UI fixes on the Target card: a **disabled button now clearly looks disabled** (dimmed, not-allowed cursor) — the Restore button no longer looks clickable when there's no backup yet — and the Restore row has proper spacing above it. Also added an animated preview to the README.",
         "targetAbi": "10.11.0.0",
