@@ -754,8 +754,10 @@
             // transform, else the gradient, else a flat base-colour fill — the same
             // precedence as DocumentRenderer.ComposeDocumentFrame /
             // CreateGradientBackground.
+            var drewImage = false;
             if (bgImageEl && bgImageEl.complete && bgImageEl.naturalWidth) {
                 drawBackgroundImage(ctx, bgImageEl, W, H);
+                drewImage = true;
             } else if (doc.Background.Gradient && doc.Background.Gradient.IsEnabled) {
                 drawGradient(ctx, doc.Background.Gradient, W, H);
             } else {
@@ -764,9 +766,12 @@
             }
 
             // Dim overlay: a solid base-colour layer at fractional opacity over the
-            // background only (text is drawn after) — mirrors the DrawImage-with-
-            // opacity dim in ApplyBackgroundLayer.
-            if (doc.Background.Dim > 0) {
+            // background only (text is drawn after). Parity with the server: dim is
+            // applied ONLY on the image-background path (ApplyBackgroundLayer). The
+            // gradient/flat path (CreateGradientBackground) applies NO dim, so we
+            // must not either — otherwise the default gradient view (Dim 0.25, no
+            // image) would render darker than the authoritative server render.
+            if (drewImage && doc.Background.Dim > 0) {
                 ctx.save();
                 ctx.globalAlpha = Math.min(1, doc.Background.Dim);
                 ctx.fillStyle = doc.Background.DimColor || '#000';
@@ -785,6 +790,9 @@
 
             var ph = el('ccaPreviewPlaceholder');
             if (ph) { ph.style.display = 'none'; }
+            // The canvas always renders, so the export target is always available.
+            var dl = el('ccaDownloadBtn');
+            if (dl) { dl.disabled = false; }
         }
 
         // Builds the canvas colour-stop list from gradient settings — the explicit
