@@ -201,6 +201,9 @@ public class CustomCoverArtController : ControllerBase
                 return Fail<bool>("Failed to save cover art");
             }
 
+            // Preserve the target's current image once, so Restore can undo later.
+            await _libraryService.BackupCurrentCoverArtAsync(libraryId).ConfigureAwait(false);
+
             var updated = await _libraryService.UpdateLibraryCoverArtAsync(libraryId, savedPath).ConfigureAwait(false);
             if (!updated)
             {
@@ -213,6 +216,39 @@ public class CustomCoverArtController : ControllerBase
         {
             _loggingService.LogError("Failed to apply cover art to library {LibraryId}", ex, libraryId);
             return Fail<bool>("Failed to apply cover art.");
+        }
+    }
+
+    /// <summary>Whether a restore point (original cover backup) exists for a target.</summary>
+    [HttpGet("targets/{id}/backup")]
+    public ApiResponse<bool> HasBackup(string id)
+    {
+        if (!Guid.TryParse(id, out _))
+        {
+            return Fail<bool>("Invalid target id");
+        }
+
+        return Success(_libraryService.HasBackup(id));
+    }
+
+    /// <summary>Restore a target's original (pre-plugin) primary image.</summary>
+    [HttpPost("targets/{type}/{id}/restore")]
+    public async Task<ApiResponse<bool>> RestoreOriginal(string type, string id)
+    {
+        if (!Guid.TryParse(id, out _))
+        {
+            return Fail<bool>("Invalid target id");
+        }
+
+        try
+        {
+            var ok = await _libraryService.RestoreOriginalCoverArtAsync(id).ConfigureAwait(false);
+            return ok ? Success(true) : Fail<bool>("No original cover backup found for this target.");
+        }
+        catch (Exception ex)
+        {
+            _loggingService.LogError("Failed to restore original cover for {Id}", ex, id);
+            return Fail<bool>("Failed to restore original cover.");
         }
     }
 
