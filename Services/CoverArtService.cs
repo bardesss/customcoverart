@@ -154,22 +154,9 @@ public class CoverArtService : ICoverArtService
                     }
                 }
 
-                // Create new image with specified dimensions
+                // Create new image with specified dimensions and composite one frame.
                 using var image = new Image<Rgba32>(settings.ExportWidth, settings.ExportHeight);
-
-                // Apply background
-                if (backgroundImage != null)
-                {
-                    await ApplyBackgroundAsync(image, backgroundImage, settings);
-                }
-                else
-                {
-                    // Create gradient background if no image provided
-                    await CreateGradientBackgroundAsync(image, settings);
-                }
-
-                // Apply text overlay with fallback
-                await ApplyTextOverlayWithFallbackAsync(image, settings);
+                await ComposeFrameAsync(image, backgroundImage, settings).ConfigureAwait(false);
 
                 // Save image with retry mechanism
                 await SaveImageWithRetryAsync(image, outputPath, settings);
@@ -315,6 +302,24 @@ public class CoverArtService : ICoverArtService
         {
             return false;
         }
+    }
+
+    /// <summary>
+    /// Composites one frame (background + text) onto the supplied canvas. Shared
+    /// by the single-image path and the animated-GIF path (which calls it per frame).
+    /// </summary>
+    private async Task ComposeFrameAsync(Image<Rgba32> canvas, Image? background, CoverArtSettings settings)
+    {
+        if (background is not null)
+        {
+            await ApplyBackgroundAsync(canvas, background, settings).ConfigureAwait(false);
+        }
+        else
+        {
+            await CreateGradientBackgroundAsync(canvas, settings).ConfigureAwait(false);
+        }
+
+        await ApplyTextOverlayWithFallbackAsync(canvas, settings).ConfigureAwait(false);
     }
 
     private static async Task ApplyBackgroundAsync(Image<Rgba32> image, Image backgroundImage, CoverArtSettings settings)
