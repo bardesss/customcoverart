@@ -4,6 +4,9 @@ The text under each version heading is published to the plugin's manifest by the
 release workflow (and shown as the version's changelog inside Jellyfin). Add a
 new `## <version>` section when you bump `<Version>` in the csproj.
 
+## 2.0.1.0
+Polish on the v2 release. The config page now matches Jellyfin more closely — compact colour pickers (they used to stretch the full width), and action buttons that align with the selects beside them. The preview no longer starts on a black canvas: it opens with Jellyfin's **brand gradient** (purple → blue) by default. And uploading an **animated GIF** as a background now animates the preview automatically — it switches to Animated GIF output and passes the source's frames through at their own timing, instead of showing a single still frame.
+
 ## 2.0.0.0
 A big release. **Poster-collage backgrounds** build a grid mosaic from a target's own item posters (with density and shuffle controls). **Design templates** let you save a look and reuse it, and **batch apply** pushes one design onto many libraries, collections or playlists at once — each cover titled with its own target's name. **Animated GIF export** is now real: it passes through an animated-GIF background or applies a Ken Burns pan/zoom (capped at 30 frames). And **Restore original cover** reverts any target to its pre-plugin image — applying a cover now backs up the previous image automatically.
 

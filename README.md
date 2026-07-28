@@ -172,6 +172,12 @@ already been released, the workflow is a no-op.
 | `Services/` | Cover‑art generation, image processing, library/media access, etc. |
 | `Common/PluginPaths.cs` | Data‑directory resolution and the path sandbox |
 
+## 🤝 Contributing
+
+Contributions are welcome! If you hit a bug, have an idea, or want to add a feature or translation,
+please [open an issue](https://github.com/Bardesss/customcoverart/issues) or send a pull request.
+For larger changes, opening an issue first to discuss the approach is appreciated.
+
 ## 📄 License
 
 MIT — see [`LICENSE`](LICENSE).
