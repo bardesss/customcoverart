@@ -160,13 +160,13 @@ public class AnimationTests
     /// document's declared canvas size), not from the actual pixel buffer height.
     ///
     /// GenerateAnimatedAsync's working-size cap (maxGifSide = 1280) downscales the
-    /// canvas AND pre-shrinks TextSize by the same factor via ScaleTextForCanvas,
-    /// but leaves ExportHeight (-> doc.Canvas.Height) at the original, pre-downscale
-    /// value. That only renders correctly if font sizing keys off doc.Canvas.Height:
-    /// layer.Size (= scaledTextSize / originalExportHeight) * originalExportHeight
-    /// reproduces the already-scaled TextSize. If font sizing were changed to use
-    /// the raw (downscaled) canvas height instead, that cancellation breaks and text
-    /// on any capped animated frame would render ~(downscale factor) smaller again.
+    /// working canvas and, via ScaleDocumentForCanvas, points the composed document's
+    /// Canvas.Width/Height at that same capped size. Because layer.Size is a fraction
+    /// of canvas height (not an absolute pixel value), this keeps the rendered font
+    /// proportionally correct automatically. If font sizing were changed to use the
+    /// raw pixel-buffer height passed to ComposeDocumentFrame instead of the document's
+    /// own declared Canvas.Height, any future caller that composes onto a buffer sized
+    /// differently than doc.Canvas would silently mis-size text.
     ///
     /// This test renders the same title/TextSize as a static (non-animated) PNG at
     /// 2000x1000 — the "ground truth" proportion, unaffected by any downscale path —
