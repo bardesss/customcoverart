@@ -52,6 +52,14 @@ public static class CollageComposer
                 tileIndex++;
                 try
                 {
+                    // Header-only check first, so a decompression-bomb poster can't
+                    // exhaust memory during the full decode below.
+                    var info = Image.Identify(path);
+                    if ((long)info.Width * info.Height > 8192L * 8192L)
+                    {
+                        continue;
+                    }
+
                     using var poster = Image.Load<Rgba32>(path);
                     poster.Mutate(x => x.Resize(new ResizeOptions
                     {

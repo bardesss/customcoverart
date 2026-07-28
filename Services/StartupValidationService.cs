@@ -6,9 +6,6 @@ using SixLabors.ImageSharp.Drawing.Processing;
 
 namespace CustomCoverArt.Services;
 
-/// <summary>
-/// Service for validating plugin configuration and dependencies at startup
-/// </summary>
 public interface IStartupValidationService
 {
     Task<ValidationResult> ValidateConfigurationAsync();
@@ -17,9 +14,6 @@ public interface IStartupValidationService
     bool IsPluginReady { get; }
 }
 
-/// <summary>
-/// Implementation of startup validation service
-/// </summary>
 public class StartupValidationService : IStartupValidationService
 {
     private readonly ILoggingService _loggingService;
