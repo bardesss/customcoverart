@@ -10,7 +10,7 @@
     <IsPackable>false</IsPackable>
     <!-- Single source of truth for the plugin version. Bump this in a PR;
          merging to main triggers a release of the new version. -->
-    <Version>3.0.0.0</Version>
+    <Version>3.0.1.0</Version>
     <!--
       Copy runtime dependencies (SixLabors.*) into the build output so they can be
       packaged with the plugin. The Jellyfin.* references use ExcludeAssets=runtime,
