@@ -71,7 +71,7 @@ public static class DocumentRenderer
         {
             // Distort to fill the whole canvas exactly.
             backgroundImage.Mutate(x => x.Resize(image.Width, image.Height));
-            ApplyBackgroundTransform(backgroundImage, image, bg.Transform);
+            ApplyBackgroundTransform(backgroundImage, image.Width, image.Height, bg.Transform);
             if (bg.Blur > 0)
             {
                 backgroundImage.Mutate(x => x.GaussianBlur(bg.Blur));
@@ -89,7 +89,8 @@ public static class DocumentRenderer
             var w = Math.Max(1, (int)Math.Round(backgroundImage.Width * scale));
             var h = Math.Max(1, (int)Math.Round(backgroundImage.Height * scale));
             backgroundImage.Mutate(x => x.Resize(w, h));
-            ApplyBackgroundTransform(backgroundImage, image, bg.Transform);
+            // Footprint is the letterboxed size, not the canvas — see ApplyBackgroundTransform.
+            ApplyBackgroundTransform(backgroundImage, w, h, bg.Transform);
             if (bg.Blur > 0)
             {
                 backgroundImage.Mutate(x => x.GaussianBlur(bg.Blur));
@@ -110,10 +111,10 @@ public static class DocumentRenderer
 
             backgroundImage.Mutate(x => x.Resize(newWidth, newHeight));
 
-            var offsetX = (newWidth - image.Width) / 2;
-            var offsetY = (newHeight - image.Height) / 2;
-            backgroundImage.Mutate(x => x.Crop(new Rectangle(offsetX, offsetY, image.Width, image.Height)));
-            ApplyBackgroundTransform(backgroundImage, image, bg.Transform);
+            // The centre-crop is NOT done here: ApplyBackgroundTransform performs it,
+            // so the part "cover" would discard stays pannable. With an identity
+            // transform it crops dead-centre, exactly as the plain centre-crop did.
+            ApplyBackgroundTransform(backgroundImage, image.Width, image.Height, bg.Transform);
 
             if (bg.Blur > 0)
             {
@@ -137,43 +138,57 @@ public static class DocumentRenderer
     }
 
     /// <summary>
-    /// Applies the user's pan/zoom to a background already fitted for the current
-    /// <c>Fit</c> mode (cover/contain/stretch), so client canvas and server render
-    /// frame it identically. Skips the crop/resize entirely for the identity
-    /// transform (Scale=1, Offset=0) so today's centered render is reproduced
-    /// EXACTLY, byte-for-byte, with no needless resample.
+    /// Applies the user's pan/zoom to a background that has been SCALED for the
+    /// current <c>Fit</c> mode but not yet cropped, so client canvas and server
+    /// render frame it identically. This also performs the fit's own crop: under
+    /// "cover" the scaled image is larger than the footprint, and that leftover is
+    /// exactly what the user expects to pan across. Deriving the pannable slack from
+    /// zoom alone made repositioning a silent no-op at the default Scale=1.
     ///
-    /// Resizes the crop back to the background's OWN pre-crop size (not
-    /// necessarily the canvas size): for cover/stretch that size already equals
-    /// the canvas, but for contain it's the smaller letterboxed footprint —
-    /// stretching a contain-fitted image out to full canvas on every pan/zoom
-    /// would silently turn "contain" into "stretch" the moment a transform is
-    /// non-identity, which the transform feature must not do.
+    /// <paramref name="footprintW"/>/<paramref name="footprintH"/> are the destination
+    /// the background occupies, NOT necessarily the canvas: for cover/stretch it is
+    /// the whole canvas, but for contain it's the smaller letterboxed footprint.
+    /// Resizing a contain-fitted image out to full canvas would silently turn
+    /// "contain" into "stretch", which the transform feature must not do.
+    ///
+    /// Skips the crop and the resample whenever either would be a no-op, so an
+    /// identity transform still reproduces the plain centered render EXACTLY.
     /// </summary>
-    private static void ApplyBackgroundTransform(Image backgroundImage, Image<Rgba32> canvas, BackgroundTransform transform)
+    private static void ApplyBackgroundTransform(Image backgroundImage, int footprintW, int footprintH, BackgroundTransform transform)
     {
-        if (transform.Scale == 1f && transform.OffsetX == 0f && transform.OffsetY == 0f)
+        var rect = TransformedSourceRect(backgroundImage.Width, backgroundImage.Height, footprintW, footprintH, transform);
+
+        if (rect.X != 0 || rect.Y != 0 || rect.Width != backgroundImage.Width || rect.Height != backgroundImage.Height)
         {
-            return;
+            backgroundImage.Mutate(x => x.Crop(rect));
         }
 
-        var fittedWidth = backgroundImage.Width;
-        var fittedHeight = backgroundImage.Height;
-        var rect = TransformedSourceRect(fittedWidth, fittedHeight, canvas.Width, canvas.Height, transform);
-        backgroundImage.Mutate(x => x.Crop(rect).Resize(fittedWidth, fittedHeight));
+        // Only a zoomed window needs resampling back up: an unzoomed crop already IS
+        // footprint-sized, so cropping alone reproduces the old centre-crop bit for bit.
+        if (backgroundImage.Width != footprintW || backgroundImage.Height != footprintH)
+        {
+            backgroundImage.Mutate(x => x.Resize(footprintW, footprintH));
+        }
     }
 
-    /// <summary>Sub-rectangle of the fitted background to draw, given pan/zoom. Clamped in-bounds.</summary>
-    public static Rectangle TransformedSourceRect(int fittedW, int fittedH, int canvasW, int canvasH, BackgroundTransform t)
+    /// <summary>
+    /// Sub-rectangle of the fit-scaled background to draw, given pan/zoom: the
+    /// destination footprint shrunk by the zoom, panned across everything the
+    /// fit-scaled image has to spare. Clamped in-bounds.
+    /// </summary>
+    public static Rectangle TransformedSourceRect(int fittedW, int fittedH, int footprintW, int footprintH, BackgroundTransform t)
     {
         var scale = Math.Max(1f, t.Scale);
-        var w = (int)Math.Round(fittedW / scale);
-        var h = (int)Math.Round(fittedH / scale);
+        // Clamp to the image: a "contain" footprint can exceed it on an axis, and a
+        // window larger than the source would upscale rather than pan.
+        var w = Math.Clamp((int)Math.Round(footprintW / scale), 1, fittedW);
+        var h = Math.Clamp((int)Math.Round(footprintH / scale), 1, fittedH);
         var slackX = fittedW - w;
         var slackY = fittedH - h;
-        // Offset -1..1 maps across the available slack; 0 = centered.
-        var x = (int)Math.Round(slackX / 2f + Math.Clamp(t.OffsetX, -1f, 1f) * slackX / 2f);
-        var y = (int)Math.Round(slackY / 2f + Math.Clamp(t.OffsetY, -1f, 1f) * slackY / 2f);
+        // Offset -1..1 maps across the available slack; 0 = centered. The centre uses
+        // integer halving so identity matches a plain centre-crop to the pixel.
+        var x = (slackX / 2) + (int)Math.Round(Math.Clamp(t.OffsetX, -1f, 1f) * slackX / 2f);
+        var y = (slackY / 2) + (int)Math.Round(Math.Clamp(t.OffsetY, -1f, 1f) * slackY / 2f);
         x = Math.Clamp(x, 0, slackX);
         y = Math.Clamp(y, 0, slackY);
         return new Rectangle(x, y, w, h);
