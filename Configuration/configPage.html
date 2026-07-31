@@ -848,53 +848,71 @@
             ctx.fillRect(0, 0, W, H);
         }
 
-        // Draws the background image with cover/contain/stretch fit plus the pan/zoom
-        // transform, mirroring ApplyBackgroundLayer + TransformedSourceRect: the fit
-        // maps a base source rect onto a destination footprint, then the transform
-        // crops that source rect by 1/Scale and pans it across the slack.
-        // NOTE: only ever called with a blob-loaded (untainted) image (see bgImageEl).
-        function drawBackgroundImage(ctx, img, W, H) {
+        // Source/destination geometry for the background image, mirroring
+        // ApplyBackgroundLayer + ApplyBackgroundTransform + TransformedSourceRect:
+        // the fit maps a base window onto a destination footprint, then the transform
+        // shrinks that window by 1/Scale and pans it across the slack.
+        //
+        // The slack is measured against the WHOLE source image, not just the base
+        // window — so under "cover" the strip the fit crops away is pannable at the
+        // default Scale=1, where zoom-derived slack alone would be zero (i.e. drag
+        // would move nothing at all). Shared with the drag handler so the pointer
+        // maths and the render can never disagree.
+        function backgroundGeometry(img, W, H) {
             var iw = img.naturalWidth, ih = img.naturalHeight;
             var fit = (doc.Background.Fit || 'cover').toLowerCase();
 
-            var srcX, srcY, srcW, srcH;      // base source rect (image pixels)
+            var baseW, baseH;                // unzoomed window (image pixels)
             var dstX, dstY, dstW, dstH;      // destination footprint (canvas pixels)
 
             if (fit === 'stretch') {
-                srcX = 0; srcY = 0; srcW = iw; srcH = ih;
+                baseW = iw; baseH = ih;
                 dstX = 0; dstY = 0; dstW = W; dstH = H;
             } else if (fit === 'contain') {
-                // Letterbox the remainder with the base colour, like the server.
-                ctx.fillStyle = doc.Background.DimColor || '#000';
-                ctx.fillRect(0, 0, W, H);
                 var cs = Math.min(W / iw, H / ih);
-                srcX = 0; srcY = 0; srcW = iw; srcH = ih;
+                baseW = iw; baseH = ih;
                 dstW = iw * cs; dstH = ih * cs;
                 dstX = (W - dstW) / 2; dstY = (H - dstH) / 2;
             } else { // cover
                 var vs = Math.max(W / iw, H / ih);
-                srcW = W / vs; srcH = H / vs;
-                srcX = (iw - srcW) / 2; srcY = (ih - srcH) / 2;
+                baseW = W / vs; baseH = H / vs;
                 dstX = 0; dstY = 0; dstW = W; dstH = H;
             }
 
-            // Pan/zoom: shrink the source rect by 1/Scale, pan across the slack
-            // (Offset -1..1, 0 = centred). Identity transform leaves the rect intact.
             var t = doc.Background.Transform || { OffsetX: 0, OffsetY: 0, Scale: 1 };
             var sc = Math.max(1, t.Scale || 1);
-            if (sc !== 1 || t.OffsetX || t.OffsetY) {
-                var w2 = srcW / sc, h2 = srcH / sc;
-                var slackX = srcW - w2, slackY = srcH - h2;
-                var ox = Math.max(-1, Math.min(1, t.OffsetX || 0));
-                var oy = Math.max(-1, Math.min(1, t.OffsetY || 0));
-                srcX = srcX + slackX / 2 + ox * slackX / 2;
-                srcY = srcY + slackY / 2 + oy * slackY / 2;
-                srcW = w2; srcH = h2;
-            }
+            // Clamp like the server: never sample outside the source ("contain" can
+            // otherwise ask for a window bigger than the image).
+            var srcW = Math.min(iw, baseW / sc), srcH = Math.min(ih, baseH / sc);
+            var slackX = Math.max(0, iw - srcW), slackY = Math.max(0, ih - srcH);
+            var ox = Math.max(-1, Math.min(1, t.OffsetX || 0));
+            var oy = Math.max(-1, Math.min(1, t.OffsetY || 0));
 
+            return {
+                fit: fit,
+                srcX: slackX / 2 + ox * slackX / 2,
+                srcY: slackY / 2 + oy * slackY / 2,
+                srcW: srcW, srcH: srcH,
+                dstX: dstX, dstY: dstY, dstW: dstW, dstH: dstH,
+                // Canvas pixels the poster travels per 1.0 of Offset change. Zero means
+                // the axis has nothing hidden to reveal, so it cannot be panned.
+                gainX: srcW ? slackX / 2 * (dstW / srcW) : 0,
+                gainY: srcH ? slackY / 2 * (dstH / srcH) : 0
+            };
+        }
+
+        // Draws the background image using that geometry.
+        // NOTE: only ever called with a blob-loaded (untainted) image (see bgImageEl).
+        function drawBackgroundImage(ctx, img, W, H) {
+            var g = backgroundGeometry(img, W, H);
+            if (g.fit === 'contain') {
+                // Letterbox the remainder with the base colour, like the server.
+                ctx.fillStyle = doc.Background.DimColor || '#000';
+                ctx.fillRect(0, 0, W, H);
+            }
             ctx.save();
             if (doc.Background.Blur > 0) { ctx.filter = 'blur(' + doc.Background.Blur + 'px)'; }
-            ctx.drawImage(img, srcX, srcY, srcW, srcH, dstX, dstY, dstW, dstH);
+            ctx.drawImage(img, g.srcX, g.srcY, g.srcW, g.srcH, g.dstX, g.dstY, g.dstW, g.dstH);
             ctx.restore();
         }
 
@@ -1055,14 +1073,24 @@
                 if (!_bgDrag) { return; }
                 var cv = el('ccaCanvas');
                 var bgPt = canvasPoint(ev);
-                // Natural "grab and slide" direction: dragging right/down should
-                // make the image appear to follow the cursor, which means the
-                // sampled source rect (see drawBackgroundImage) must shift the
-                // OTHER way — so the offset moves opposite the drag delta.
-                doc.Background.Transform.OffsetX = Math.max(-1, Math.min(1,
-                    _bgDrag.origOffsetX - (bgPt.x - _bgDrag.startX) / (cv.width / 2)));
-                doc.Background.Transform.OffsetY = Math.max(-1, Math.min(1,
-                    _bgDrag.origOffsetY - (bgPt.y - _bgDrag.startY) / (cv.height / 2)));
+                // Convert the drag in CANVAS pixels into an Offset delta using the
+                // geometry's own gain (canvas px travelled per 1.0 of Offset). A fixed
+                // divisor cannot work: the gain depends on how much slack the fit and
+                // the zoom leave, so the poster would lag or outrun the cursor at every
+                // zoom but one. gain 0 = nothing hidden on that axis, so leave it be.
+                //
+                // Natural "grab and slide" direction: dragging right/down should make
+                // the image follow the cursor, which means the sampled source rect
+                // shifts the OTHER way — the offset moves opposite the drag delta.
+                var g = backgroundGeometry(bgImageEl, cv.width, cv.height);
+                if (g.gainX > 0) {
+                    doc.Background.Transform.OffsetX = Math.max(-1, Math.min(1,
+                        _bgDrag.origOffsetX - (bgPt.x - _bgDrag.startX) / g.gainX));
+                }
+                if (g.gainY > 0) {
+                    doc.Background.Transform.OffsetY = Math.max(-1, Math.min(1,
+                        _bgDrag.origOffsetY - (bgPt.y - _bgDrag.startY) / g.gainY));
+                }
                 scheduleRender();
                 ev.preventDefault();
                 return;

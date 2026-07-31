@@ -48,6 +48,42 @@ public class DocumentRenderTests
                 Assert.True(canvas[x, y].R < 40, "Hidden layer must not render.");
     }
 
+    /// <summary>
+    /// A 100x300 background banded red/green/blue drawn into a 100x100 canvas with
+    /// "cover": the fit crops away two thirds of it, and OffsetY chooses WHICH third
+    /// is shown — at the default Scale=1, with no zoom required. Panning used to be a
+    /// no-op here because the slack came from zoom alone, so the render was always green.
+    /// </summary>
+    [Theory]
+    [InlineData(0f, 0, 255, 0)]    // identity -> the centre band (plain centre-crop)
+    [InlineData(-1f, 255, 0, 0)]   // panned to the top    -> red
+    [InlineData(1f, 0, 0, 255)]    // panned to the bottom -> blue
+    public void ComposeDocumentFrame_CoverFit_OffsetYChoosesBandAtScale1(float offsetY, byte r, byte g, byte b)
+    {
+        using var background = new Image<Rgba32>(100, 300);
+        for (var y = 0; y < 300; y++)
+        {
+            var band = y < 100 ? new Rgba32(255, 0, 0) : y < 200 ? new Rgba32(0, 255, 0) : new Rgba32(0, 0, 255);
+            for (var x = 0; x < 100; x++)
+            {
+                background[x, y] = band;
+            }
+        }
+
+        var doc = new CoverDocument { Canvas = new CanvasSettings { Width = 100, Height = 100 } };
+        doc.Background.Fit = "cover";
+        doc.Background.Dim = 0f;
+        doc.Background.Transform = new BackgroundTransform { Scale = 1f, OffsetY = offsetY };
+
+        using var canvas = new Image<Rgba32>(100, 100);
+        DocumentRenderer.ComposeDocumentFrame(canvas, background, doc);
+
+        var centre = canvas[50, 50];
+        Assert.Equal(r, centre.R);
+        Assert.Equal(g, centre.G);
+        Assert.Equal(b, centre.B);
+    }
+
     [Fact]
     public async System.Threading.Tasks.Task GenerateFromDocumentAsync_ProducesPng()
     {
