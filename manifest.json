@@ -9,6 +9,14 @@
     "imageUrl": "",
     "versions": [
       {
+        "version": "3.0.1.0",
+        "changelog": "Fixes **Reposition background**, which barely worked in 3.0.0.0. Dragging the background now **follows your cursor exactly** — it used to lag badly at low zoom and overshoot at high zoom, matching the cursor only at one specific zoom level. More importantly, repositioning now **works straight away, without zooming in first**: on a **Fill** background you can slide a portrait poster up and down (or a wide still left and right) to choose which part of it the cover shows. Previously that did nothing at all until you zoomed in, because only the zoomed-in part of the image was treated as movable. The server render and the on-screen canvas were fixed together, so what you position is what gets applied. Designs you have already saved or applied are unaffected and render exactly as before.",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://github.com/bardesss/customcoverart/releases/download/v3.0.1.0/customcoverart_3.0.1.0.zip",
+        "checksum": "e7ebea723de0811bdb1c723272c9c67f",
+        "timestamp": "2026-07-31T12:39:07Z"
+      },
+      {
         "version": "3.0.0.0",
         "changelog": "The config page preview is now a **live interactive canvas**, not a static image: click the title to select it and **drag it** to position, and toggle **Reposition background** to **drag-pan** and **scroll/pinch-zoom** the background image directly on the canvas. A new **Show server render** button renders the exact same design on the server — the authoritative output, since the canvas is a fast approximation — so you can compare before applying. Designs are now stored internally in a new **layered document format** (title text is one layer, more layer types land in a later release); **existing saved templates migrate automatically** the first time you load them, so nothing is lost.",
         "targetAbi": "10.11.0.0",
