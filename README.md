@@ -100,7 +100,7 @@ The output is in `bin/Release/net9.0/`. Copy `CustomCoverArt.dll` plus the
 1. Go to **Dashboard → Plugins → Custom Cover Art**.
 2. Pick a **library** from the dropdown.
 3. Design directly on the **canvas**: adjust the settings on the left, or click the title text and **drag** it to reposition. The canvas updates live as you go.
-4. Toggle **Reposition background** to drag-pan the background image, and scroll (or pinch, on touch) to zoom it — up to 4×.
+4. Toggle **Reposition background** to drag-pan the background image, and scroll (or pinch, on touch) to zoom it — up to 4×. With the **Fill** image fit you can pan straight away to choose which part of the picture the cover shows; **Fit** and **Stretch** show the whole image already, so there is nothing to pan into until you zoom in.
 5. Click **Show server render** to confirm the exact server-rendered output (the canvas is a fast approximation; the server render is authoritative).
 6. Click **Apply to library** to set it as the library's cover.
 
