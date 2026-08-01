@@ -43,10 +43,54 @@ public class BackgroundTransform
     public float Scale { get; set; } = 1f;                  // >= 1
 }
 
-/// <summary>Composition effects. Empty in Phase 1; populated in Phase 3.</summary>
+/// <summary>
+/// Non-destructive composition effects, applied in a fixed order around the layers:
+/// soft-light before them, then vignette → grain → border after. Everything defaults
+/// to disabled so a document written before Phase 3 renders exactly as it always did.
+/// </summary>
 public class EffectSettings
 {
+    public BorderSettings Border { get; set; } = new();
+    public VignetteSettings Vignette { get; set; } = new();
+    public GrainSettings Grain { get; set; } = new();
+    public SoftLightSettings SoftLight { get; set; } = new();
     public string? Preset { get; set; }
+}
+
+/// <summary>Inset frame drawn last, on top of everything else.</summary>
+public class BorderSettings
+{
+    public bool Enabled { get; set; }
+    public string Color { get; set; } = "#ffffff";
+    public int Thickness { get; set; } = 8;
+    public int Radius { get; set; }
+    public bool Double { get; set; }
+    public int Gap { get; set; } = 6;
+}
+
+/// <summary>Radial darkening toward the edges.</summary>
+public class VignetteSettings
+{
+    public bool Enabled { get; set; }
+    public float Amount { get; set; } = 0.4f;
+    public float Softness { get; set; } = 0.5f;
+    public string Color { get; set; } = "#000000";
+}
+
+/// <summary>Film grain. <see cref="Seed"/> is stored so re-renders reproduce the same noise.</summary>
+public class GrainSettings
+{
+    public bool Enabled { get; set; }
+    public float Amount { get; set; } = 0.08f;
+    public int Seed { get; set; } = 12345;
+}
+
+/// <summary>Flat colour wash under the layers, for a tinted/washed look.</summary>
+public class SoftLightSettings
+{
+    public bool Enabled { get; set; }
+    public string Color { get; set; } = "#ffffff";
+    public float Opacity { get; set; } = 0.15f;
 }
 
 /// <summary>One text or image layer. A single flat type (Type discriminator) keeps System.Text.Json simple.</summary>

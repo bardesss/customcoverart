@@ -4,6 +4,9 @@ The text under each version heading is published to the plugin's manifest by the
 release workflow (and shown as the version's changelog inside Jellyfin). Add a
 new `## <version>` section when you bump `<Version>` in the csproj.
 
+## 3.2.0.0
+Adds a new **Effects** card. A **colour wash** tints the background under your text, a **vignette** darkens the edges to draw the eye inward, **film grain** adds texture, and a **border** frames the cover — square or rounded, single or double-lined. Every effect is off until you switch it on, and turning one back down to zero leaves your cover exactly as it was. One click of **Jellyfin style** lays down the familiar dark-gradient look with clean white text, which you can then edit freely. And **Auto palette** reads the dominant colours straight out of your background and offers them as swatches — click one to recolour the selected text layer or the colour wash. Existing designs and saved templates are untouched and render exactly as before.
+
 ## 3.1.0.0
 Covers are no longer one line of text. A new **Layers** card lets you stack **as many text layers as you like** plus your own **PNG logos and icons**, each independently styled and freely placed. Every layer can be **shown or hidden, reordered, duplicated, deleted** and selected from the list, and the card below it edits whichever layer you have selected. On the preview canvas, the selected layer gets **corner handles to resize it** and a **knob to rotate it** — hold **Shift** to keep a logo's proportions or snap rotation to 15°. Two new sliders, **Opacity** and **Rotation**, work on text and logos alike. Logos are uploaded the same way as backgrounds (PNG, transparency preserved) and are restored onto the canvas when you load a saved template. As always the server render stays authoritative, and rotated or faded text now renders there exactly as the preview shows it.
 
