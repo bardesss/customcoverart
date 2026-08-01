@@ -33,6 +33,80 @@ public class DocumentRenderTests
         Assert.True(found, "Expected white text pixels over the black background.");
     }
 
+    // Widest column of text ink, i.e. how far the glyphs spread horizontally.
+    private static int InkWidth(Image<Rgba32> canvas)
+    {
+        int min = int.MaxValue, max = int.MinValue;
+        for (var y = 0; y < canvas.Height; y++)
+            for (var x = 0; x < canvas.Width; x++)
+                if (canvas[x, y].R > 128) { if (x < min) { min = x; } if (x > max) { max = x; } }
+        return max < min ? 0 : max - min + 1;
+    }
+
+    /// <summary>
+    /// The client draws a rotated layer by rotating the canvas about the layer anchor,
+    /// so the server has to pivot on the same point. A long line of text rotated 90°
+    /// stops being wide and becomes tall — if Rotation were ignored the two renders
+    /// would be identical.
+    /// </summary>
+    [Fact]
+    public void ComposeDocumentFrame_RotatedTextLayer_TurnsWithTheAnchor()
+    {
+        CoverDocument Doc(float rotation)
+        {
+            var d = new CoverDocument { Canvas = new CanvasSettings { Width = 300, Height = 300 } };
+            d.Background.DimColor = "#000000";
+            d.Layers.Add(new CoverLayer
+            {
+                Type = "text", Content = "IIIIIIII", Color = "#ffffff",
+                Size = 0.12f, X = 0.5f, Y = 0.5f, Rotation = rotation
+            });
+            return d;
+        }
+
+        using var flat = new Image<Rgba32>(300, 300);
+        DocumentRenderer.ComposeDocumentFrame(flat, null, Doc(0f));
+        using var turned = new Image<Rgba32>(300, 300);
+        DocumentRenderer.ComposeDocumentFrame(turned, null, Doc(90f));
+
+        var flatWidth = InkWidth(flat);
+        var turnedWidth = InkWidth(turned);
+        Assert.True(flatWidth > 0, "Unrotated text should render.");
+        Assert.True(turnedWidth > 0, "Rotated text should still render.");
+        Assert.True(turnedWidth < flatWidth / 2,
+            $"90°-rotated text should be far narrower ({turnedWidth} vs {flatWidth}).");
+    }
+
+    /// <summary>
+    /// Layer Opacity is exposed as a slider for text as well as logos, so the server
+    /// must fade text too — otherwise the canvas preview and the applied cover disagree.
+    /// </summary>
+    [Fact]
+    public void ComposeDocumentFrame_TextLayerOpacity_FadesTowardsBackground()
+    {
+        byte Brightest(float opacity)
+        {
+            var d = new CoverDocument { Canvas = new CanvasSettings { Width = 200, Height = 200 } };
+            d.Background.DimColor = "#000000";
+            d.Layers.Add(new CoverLayer
+            {
+                Type = "text", Content = "HELLO", Color = "#ffffff",
+                Size = 0.25f, X = 0.5f, Y = 0.5f, Opacity = opacity
+            });
+            using var canvas = new Image<Rgba32>(200, 200);
+            DocumentRenderer.ComposeDocumentFrame(canvas, null, d);
+            byte max = 0;
+            for (var y = 0; y < 200; y++)
+                for (var x = 0; x < 200; x++)
+                    if (canvas[x, y].R > max) { max = canvas[x, y].R; }
+            return max;
+        }
+
+        Assert.True(Brightest(1f) > 240, "Fully opaque white text should stay white.");
+        Assert.InRange(Brightest(0.5f), 100, 160);
+        Assert.True(Brightest(0f) < 20, "Zero opacity should draw nothing visible.");
+    }
+
     [Fact]
     public void ComposeDocumentFrame_HiddenLayer_IsNotDrawn()
     {

@@ -25,6 +25,55 @@ public class ControllerDocumentTests
         Assert.Equal(2, t.Document!.Version);
     }
 
+    /// <summary>
+    /// Batching must carry the WHOLE design. The flat settings model holds one title, so
+    /// if batch apply fell back to it every extra text layer and logo would vanish from
+    /// the applied covers with no error shown.
+    /// </summary>
+    [Fact]
+    public void BuildBatchDocument_KeepsEveryLayer_AndRetitlesOnlyTheTitleLayer()
+    {
+        var doc = new CoverDocument();
+        doc.Layers.Add(new CoverLayer { Id = "title", Type = "text", Content = "Old name" });
+        doc.Layers.Add(new CoverLayer { Id = "tagline", Type = "text", Content = "Keep me" });
+        doc.Layers.Add(new CoverLayer { Id = "logo", Type = "image", ImagePath = "/data/customcoverart/uploads/l.png" });
+
+        var built = CustomCoverArtController.BuildBatchDocument(doc, "Documentaries", "11111111-1111-1111-1111-111111111111");
+
+        Assert.Equal(3, built.Layers.Count);
+        Assert.Equal("Documentaries", built.Layers.First(l => l.Id == "title").Content);
+        Assert.Equal("Keep me", built.Layers.First(l => l.Id == "tagline").Content);
+        Assert.Equal("/data/customcoverart/uploads/l.png", built.Layers.First(l => l.Id == "logo").ImagePath);
+        // Deep clone: retitling one target must not bleed into the next.
+        Assert.Equal("Old name", doc.Layers.First(l => l.Id == "title").Content);
+    }
+
+    /// <summary>A design built entirely from new layers has no "title" id to look for.</summary>
+    [Fact]
+    public void BuildBatchDocument_NoTitleId_UsesTheBottomMostTextLayer()
+    {
+        var doc = new CoverDocument();
+        doc.Layers.Add(new CoverLayer { Id = "labc", Type = "text", Content = "first" });
+        doc.Layers.Add(new CoverLayer { Id = "ldef", Type = "text", Content = "second" });
+
+        var built = CustomCoverArtController.BuildBatchDocument(doc, "Anime", "22222222-2222-2222-2222-222222222222");
+
+        Assert.Equal("Anime", built.Layers[0].Content);
+        Assert.Equal("second", built.Layers[1].Content);
+    }
+
+    [Fact]
+    public void BuildBatchDocument_Collage_RepointsAtTheTarget()
+    {
+        var doc = new CoverDocument();
+        doc.Background.Source = BackgroundSources.Collage;
+        doc.Background.Collage = new CollageSettings { SourceId = string.Empty };
+
+        var built = CustomCoverArtController.BuildBatchDocument(doc, "Shows", "33333333-3333-3333-3333-333333333333");
+
+        Assert.Equal("33333333-3333-3333-3333-333333333333", built.Background.Collage!.SourceId);
+    }
+
     [Fact]
     public void NormalizeTemplate_WithDocument_StripsTitleLayerAndCollageSource()
     {
