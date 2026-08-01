@@ -39,7 +39,77 @@ public static class DocumentRenderer
             {
                 RenderTextLayerWithFallback(canvas, layer, doc);
             }
-            // image layers: added in Phase 2
+            else if (layer.Type == "image")
+            {
+                RenderImageLayer(canvas, layer);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Draws an image (logo/icon) layer: the PNG at <see cref="CoverLayer.ImagePath"/>,
+    /// resized to the layer's normalized <c>Width</c>/<c>Height</c> fraction of the canvas,
+    /// optionally rotated, composited centred on <c>(X, Y)</c> at <c>Opacity</c>.
+    ///
+    /// The path is expected to have been sandbox-filtered upstream
+    /// (<see cref="CoverArtService.GenerateFromDocumentAsync"/>); this method never
+    /// resolves relative paths of its own. It is also deliberately total: a missing,
+    /// corrupt or oversized file skips the layer instead of failing the whole render,
+    /// mirroring <see cref="RenderTextLayerWithFallback"/>.
+    /// </summary>
+    public static void RenderImageLayer(Image<Rgba32> canvas, CoverLayer layer)
+    {
+        if (string.IsNullOrEmpty(layer.ImagePath) || !File.Exists(layer.ImagePath))
+        {
+            return;
+        }
+
+        // Clamp the normalized size before it becomes an allocation: Width/Height are
+        // client-supplied, and an absurd fraction would drive a giant Resize buffer.
+        var normW = Math.Clamp(layer.Width, 0f, 4f);
+        var normH = Math.Clamp(layer.Height, 0f, 4f);
+        var w = Math.Max(1, (int)Math.Round(normW * canvas.Width));
+        var h = Math.Max(1, (int)Math.Round(normH * canvas.Height));
+
+        try
+        {
+            // Decompression-bomb guard: inspect the header before a full decode.
+            var info = Image.Identify(layer.ImagePath);
+            const long maxSourcePixels = 8192L * 8192L;
+            if ((long)info.Width * info.Height > maxSourcePixels)
+            {
+                return;
+            }
+
+            using var logo = Image.Load<Rgba32>(layer.ImagePath);
+            logo.Mutate(x => x.Resize(w, h));
+
+            // Rotation grows the bounding box, so the top-left must be derived from the
+            // ROTATED size — otherwise the layer visibly drifts off its anchor.
+            if (layer.Rotation != 0f)
+            {
+                logo.Mutate(x => x.Rotate(layer.Rotation));
+            }
+
+            var cx = (int)Math.Round(layer.X * canvas.Width);
+            var cy = (int)Math.Round(layer.Y * canvas.Height);
+            var px = cx - logo.Width / 2;
+            var py = cy - logo.Height / 2;
+
+            // DrawImage needs the two rectangles to overlap; a layer dragged fully off
+            // the canvas is a legitimate state, so treat it as a no-op rather than
+            // letting the processor throw.
+            if (px + logo.Width <= 0 || py + logo.Height <= 0 || px >= canvas.Width || py >= canvas.Height)
+            {
+                return;
+            }
+
+            var opacity = Math.Clamp(layer.Opacity, 0f, 1f);
+            canvas.Mutate(x => x.DrawImage(logo, new Point(px, py), opacity));
+        }
+        catch
+        {
+            // Unreadable/undecodable logo: skip it, never break the whole render.
         }
     }
 
