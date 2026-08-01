@@ -4,6 +4,9 @@ The text under each version heading is published to the plugin's manifest by the
 release workflow (and shown as the version's changelog inside Jellyfin). Add a
 new `## <version>` section when you bump `<Version>` in the csproj.
 
+## 3.1.0.0
+Covers are no longer one line of text. A new **Layers** card lets you stack **as many text layers as you like** plus your own **PNG logos and icons**, each independently styled and freely placed. Every layer can be **shown or hidden, reordered, duplicated, deleted** and selected from the list, and the card below it edits whichever layer you have selected. On the preview canvas, the selected layer gets **corner handles to resize it** and a **knob to rotate it** — hold **Shift** to keep a logo's proportions or snap rotation to 15°. Two new sliders, **Opacity** and **Rotation**, work on text and logos alike. Logos are uploaded the same way as backgrounds (PNG, transparency preserved) and are restored onto the canvas when you load a saved template. As always the server render stays authoritative, and rotated or faded text now renders there exactly as the preview shows it.
+
 ## 3.0.1.0
 Fixes **Reposition background**, which barely worked in 3.0.0.0. Dragging the background now **follows your cursor exactly** — it used to lag badly at low zoom and overshoot at high zoom, matching the cursor only at one specific zoom level. More importantly, repositioning now **works straight away, without zooming in first**: on a **Fill** background you can slide a portrait poster up and down (or a wide still left and right) to choose which part of it the cover shows. Previously that did nothing at all until you zoomed in, because only the zoomed-in part of the image was treated as movable. The server render and the on-screen canvas were fixed together, so what you position is what gets applied. Designs you have already saved or applied are unaffected and render exactly as before.
 
