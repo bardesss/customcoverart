@@ -2452,7 +2452,10 @@
                 if (!checks.length) { Dashboard.alert(t('batch.none')); return; }
                 var targets = Array.prototype.map.call(checks, function (c) { return { Id: c.value, Type: c.dataset.type }; });
                 el('ccaBatchStatus').textContent = t('batch.running');
-                jsonFetch('CustomCoverArt/batchApply', 'POST', { Settings: collectSettings(), Targets: targets })
+                // Send the layered document as well: the server prefers it, so batching
+                // a multi-layer design no longer collapses to the flat single-title
+                // model. Settings stays for older servers / the template path.
+                jsonFetch('CustomCoverArt/batchApply', 'POST', { Document: collectDocument(), Settings: collectSettings(), Targets: targets })
                     .then(function (res) {
                         var data = pick(res, 'Data') || [];
                         var ok = data.filter(function (r) { return pick(r, 'Success'); }).length;
