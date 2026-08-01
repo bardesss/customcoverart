@@ -365,8 +365,12 @@ public static class DocumentRenderer
         var fontPixelSize = Math.Clamp(layer.Size * doc.Canvas.Height, 8f, 1024f);
         var font = CreateFont(layer, fontPixelSize);
 
-        // Parse text color
-        var textColor = SafeColor(layer.Color, Color.White);
+        // Per-layer opacity folded into every colour this layer draws with. The client
+        // canvas sets ctx.globalAlpha once per layer and then strokes/fills separately,
+        // so alpha-per-element is the matching behaviour (outline and fill each fade
+        // independently rather than being flattened first).
+        var opacity = Math.Clamp(layer.Opacity, 0f, 1f);
+        var textColor = SafeColor(layer.Color, Color.White).WithAlpha(opacity);
 
         // Convert normalized layer coordinates to canvas pixels.
         var textPosition = new PointF(layer.X * canvas.Width, layer.Y * canvas.Height);
@@ -379,56 +383,74 @@ public static class DocumentRenderer
             VerticalAlignment = VerticalAlignment.Center
         };
 
-        // Apply text effects
-        if (layer.Shadow.Enabled)
+        // Rotation pivots on the layer's own anchor, matching the client's
+        // translate/rotate around (X*W, Y*H). Set on the drawing context (not the
+        // image) so it applies to this layer's passes only — which is also why every
+        // pass below shares ONE Mutate block.
+        var rotate = layer.Rotation != 0f
+            ? System.Numerics.Matrix3x2.CreateRotation(
+                (float)(layer.Rotation * Math.PI / 180.0),
+                new System.Numerics.Vector2(textPosition.X, textPosition.Y))
+            : System.Numerics.Matrix3x2.Identity;
+
+        canvas.Mutate(ctx =>
         {
-            var shadowColor = SafeColor(layer.Shadow.Color, Color.Black);
-            // Clamp to [-50, 50]px: the render-time parity equivalent of the
-            // legacy CoverArtSettings.TextShadowOffsetX/Y clamp.
-            var shadowOffsetX = Math.Clamp(layer.Shadow.OffsetX, -50, 50);
-            var shadowOffsetY = Math.Clamp(layer.Shadow.OffsetY, -50, 50);
-            var shadowPosition = new PointF(
-                textPosition.X + shadowOffsetX,
-                textPosition.Y + shadowOffsetY
-            );
-
-            var shadowOptions = new RichTextOptions(font)
+            if (!rotate.IsIdentity)
             {
-                Origin = shadowPosition,
-                HorizontalAlignment = textOptions.HorizontalAlignment,
-                VerticalAlignment = textOptions.VerticalAlignment
-            };
+                ctx.SetDrawingTransform(rotate);
+            }
 
-            canvas.Mutate(x => x.DrawText(shadowOptions, layer.Content, shadowColor));
-        }
-
-        if (layer.Outline.Enabled)
-        {
-            var outlineColor = SafeColor(layer.Outline.Color, Color.Black);
-            var outlineWidth = Math.Clamp(layer.Outline.Width, 0, 10);
-
-            // Draw outline by drawing text multiple times with slight offsets
-            for (int x = -outlineWidth; x <= outlineWidth; x++)
+            // Apply text effects
+            if (layer.Shadow.Enabled)
             {
-                for (int y = -outlineWidth; y <= outlineWidth; y++)
+                var shadowColor = SafeColor(layer.Shadow.Color, Color.Black).WithAlpha(opacity);
+                // Clamp to [-50, 50]px: the render-time parity equivalent of the
+                // legacy CoverArtSettings.TextShadowOffsetX/Y clamp.
+                var shadowOffsetX = Math.Clamp(layer.Shadow.OffsetX, -50, 50);
+                var shadowOffsetY = Math.Clamp(layer.Shadow.OffsetY, -50, 50);
+                var shadowPosition = new PointF(
+                    textPosition.X + shadowOffsetX,
+                    textPosition.Y + shadowOffsetY
+                );
+
+                var shadowOptions = new RichTextOptions(font)
                 {
-                    if (x == 0 && y == 0) continue;
+                    Origin = shadowPosition,
+                    HorizontalAlignment = textOptions.HorizontalAlignment,
+                    VerticalAlignment = textOptions.VerticalAlignment
+                };
 
-                    var outlinePosition = new PointF(textPosition.X + x, textPosition.Y + y);
-                    var outlineOptions = new RichTextOptions(font)
+                ctx.DrawText(shadowOptions, layer.Content, shadowColor);
+            }
+
+            if (layer.Outline.Enabled)
+            {
+                var outlineColor = SafeColor(layer.Outline.Color, Color.Black).WithAlpha(opacity);
+                var outlineWidth = Math.Clamp(layer.Outline.Width, 0, 10);
+
+                // Draw outline by drawing text multiple times with slight offsets
+                for (int x = -outlineWidth; x <= outlineWidth; x++)
+                {
+                    for (int y = -outlineWidth; y <= outlineWidth; y++)
                     {
-                        Origin = outlinePosition,
-                        HorizontalAlignment = textOptions.HorizontalAlignment,
-                        VerticalAlignment = textOptions.VerticalAlignment
-                    };
+                        if (x == 0 && y == 0) continue;
 
-                    canvas.Mutate(ctx => ctx.DrawText(outlineOptions, layer.Content, outlineColor));
+                        var outlinePosition = new PointF(textPosition.X + x, textPosition.Y + y);
+                        var outlineOptions = new RichTextOptions(font)
+                        {
+                            Origin = outlinePosition,
+                            HorizontalAlignment = textOptions.HorizontalAlignment,
+                            VerticalAlignment = textOptions.VerticalAlignment
+                        };
+
+                        ctx.DrawText(outlineOptions, layer.Content, outlineColor);
+                    }
                 }
             }
-        }
 
-        // Draw main text
-        canvas.Mutate(x => x.DrawText(textOptions, layer.Content, textColor));
+            // Draw main text
+            ctx.DrawText(textOptions, layer.Content, textColor);
+        });
     }
 
     /// <summary>
