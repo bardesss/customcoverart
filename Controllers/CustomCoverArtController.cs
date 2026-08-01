@@ -196,7 +196,16 @@ public class CustomCoverArtController : ControllerBase
         return await ApplyInternal(request.LibraryId, request.Settings).ConfigureAwait(false);
     }
 
-    private async Task<ApiResponse<bool>> ApplyInternal(string libraryId, CoverArtSettings settings)
+    private Task<ApiResponse<bool>> ApplyInternal(string libraryId, CoverArtSettings settings)
+        => ApplyRenderedAsync(libraryId, () => _coverArtService.GenerateCoverArtAsync(settings));
+
+    /// <summary>Batch equivalent of the document/apply endpoint, for layered designs.</summary>
+    private Task<ApiResponse<bool>> ApplyDocumentInternal(string libraryId, CoverDocument document)
+        => ApplyRenderedAsync(libraryId, () => _coverArtService.GenerateFromDocumentAsync(document));
+
+    // Render (however the caller wants), persist to the per-library folder, back up
+    // whatever is there now, then point the target at the saved file.
+    private async Task<ApiResponse<bool>> ApplyRenderedAsync(string libraryId, Func<Task<string>> render)
     {
         // Validate the library id up front, before it is used anywhere.
         if (!Guid.TryParse(libraryId, out _))
@@ -209,7 +218,7 @@ public class CustomCoverArtController : ControllerBase
             var userName = _userContextService.GetCurrentUserName() ?? "unknown";
             _loggingService.LogInformation("User {UserName} applying cover art to library {LibraryId}", userName, libraryId);
 
-            var coverArtPath = await _coverArtService.GenerateCoverArtAsync(settings).ConfigureAwait(false);
+            var coverArtPath = await render().ConfigureAwait(false);
 
             // Persist into the per-library folder; apply THAT stable path.
             var savedPath = await _coverArtService.SaveCoverArtAsync(libraryId, coverArtPath).ConfigureAwait(false);
@@ -590,6 +599,34 @@ public class CustomCoverArtController : ControllerBase
         return clone;
     }
 
+    /// <summary>
+    /// Clone a document for one batch target: the title layer gets the target's name and
+    /// a collage is re-pointed at that target. Prefers the layer with the well-known
+    /// "title" id (what DocumentMigration and NormalizeTemplate both use); for a design
+    /// built entirely from new layers there is no such id, so the bottom-most text layer
+    /// stands in — the same layer the editor treats as the title.
+    /// </summary>
+    public static CoverDocument BuildBatchDocument(CoverDocument baseDocument, string targetName, string targetId)
+    {
+        var json = System.Text.Json.JsonSerializer.Serialize(baseDocument);
+        var clone = System.Text.Json.JsonSerializer.Deserialize<CoverDocument>(json) ?? new CoverDocument();
+        DocumentMigration.Normalize(clone);
+
+        var titleLayer = clone.Layers.FirstOrDefault(l => l.Id == "title")
+            ?? clone.Layers.FirstOrDefault(l => l.Type == "text");
+        if (titleLayer is not null)
+        {
+            titleLayer.Content = targetName;
+        }
+
+        if (clone.Background.Source == BackgroundSources.Collage && clone.Background.Collage is not null)
+        {
+            clone.Background.Collage.SourceId = targetId;
+        }
+
+        return clone;
+    }
+
     /// <summary>Apply one design to many targets, auto-titling each from the target's name.</summary>
     [HttpPost("batchApply")]
     public async Task<ApiResponse<List<BatchApplyResult>>> BatchApply([FromBody] BatchApplyRequest request)
@@ -610,7 +647,11 @@ public class CustomCoverArtController : ControllerBase
             return Fail<List<BatchApplyResult>>(_localizationService.GetString("errors.too_many_uploads"));
         }
 
-        // Resolve the base design: a named template, or inline settings.
+        // Resolve the base design: a named template, or what the client sent inline.
+        // The layered document wins wherever both exist — the flat settings model has
+        // room for exactly one title layer, so batching through it would quietly throw
+        // away every additional text layer and logo in the design.
+        CoverDocument? baseDocument = request.Document;
         CoverArtSettings? baseSettings = request.Settings;
         if (!string.IsNullOrWhiteSpace(request.TemplateName))
         {
@@ -620,12 +661,13 @@ public class CustomCoverArtController : ControllerBase
             {
                 return Fail<List<BatchApplyResult>>("Template not found: " + request.TemplateName);
             }
+            baseDocument = tpl.Document;
             baseSettings = tpl.Settings;
         }
 
-        if (baseSettings is null)
+        if (baseDocument is null && baseSettings is null)
         {
-            return Fail<List<BatchApplyResult>>("No template or settings provided.");
+            return Fail<List<BatchApplyResult>>("No template, document or settings provided.");
         }
 
         var results = new List<BatchApplyResult>();
@@ -644,8 +686,9 @@ public class CustomCoverArtController : ControllerBase
             var name = info?.Name ?? "Cover";
             result.Name = name;
 
-            var settings = BuildBatchSettings(baseSettings, name, target.Id);
-            var applied = await ApplyInternal(target.Id, settings).ConfigureAwait(false);
+            var applied = baseDocument is not null
+                ? await ApplyDocumentInternal(target.Id, BuildBatchDocument(baseDocument, name, target.Id)).ConfigureAwait(false)
+                : await ApplyInternal(target.Id, BuildBatchSettings(baseSettings!, name, target.Id)).ConfigureAwait(false);
             result.Success = applied.Success;
             result.Error = applied.ErrorMessage;
             results.Add(result);
