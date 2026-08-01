@@ -73,11 +73,33 @@ public class CoverArtService : ICoverArtService
                 document.Background.ImagePath = string.Empty;
             }
 
+            // Bound the layer list before compositing: each layer is a full draw pass
+            // (an outline is itself an O(n^2) grid of text passes), so an unbounded
+            // Layers array is a cheap way to burn render threads.
+            const int maxLayers = 40;
+            if (document.Layers.Count > maxLayers)
+            {
+                _loggingService.LogWarning("Dropping {Count} excess layers (max {Max})", document.Layers.Count - maxLayers, maxLayers);
+                document.Layers = document.Layers.Take(maxLayers).ToList();
+            }
+
             foreach (var layer in document.Layers)
             {
                 if (!PluginPaths.IsInsideBase(_applicationPaths, layer.FontPath))
                 {
                     layer.FontPath = string.Empty;
+                }
+
+                // Same rule as the background: an image layer path comes from the client,
+                // so honour it only inside our own data dir. Otherwise any readable file
+                // on the server could be composited into a cover and downloaded.
+                if (layer.Type == "image" && !PluginPaths.IsInsideBase(_applicationPaths, layer.ImagePath))
+                {
+                    if (!string.IsNullOrEmpty(layer.ImagePath))
+                    {
+                        _loggingService.LogWarning("Layer image rejected (outside plugin data dir): {Path}", layer.ImagePath);
+                    }
+                    layer.ImagePath = string.Empty;
                 }
             }
 
