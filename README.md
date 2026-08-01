@@ -32,6 +32,9 @@ Text, gradients, blur, custom backgrounds and fonts — with a live preview, rig
 | 🌈 | **Gradients** | Linear and radial gradient backgrounds |
 | 🖼️ | **Custom backgrounds** | Upload your own image, or pick an existing poster from any library |
 | 🌫️ | **Blur & dimming** | Soften and darken backgrounds so text stands out |
+| ✨ | **Composition effects** | Colour wash, vignette, film grain and a square/rounded border — single or double-lined |
+| 🎨 | **Auto palette** | Pulls the dominant colours out of your background as clickable swatches |
+| ⚡ | **Jellyfin-style preset** | One click for the familiar dark-gradient look, editable afterwards |
 | 🔠 | **Fonts** | Bundled Noto Sans (matches Jellyfin's UI, so text always renders) — or upload your own `.ttf` / `.otf` / `.woff` / `.woff2` |
 | 📐 | **Presets & sizes** | Square cover, portrait poster, wide banner, or custom dimensions |
 | 🖱️ | **Interactive canvas** | The preview is a live canvas — drag layers to position them, resize/rotate them with handles, drag/scroll/pinch to reposition and zoom the background |
@@ -125,6 +128,25 @@ to keep a logo's proportions, or while rotating to snap to 15° steps. The **Opa
 Open **Browse library posters**, search/filter your media, and click any item. Its poster is
 copied into the plugin's own data folder and used as the background — a safe, sandboxed copy,
 never a direct reference to your media files.
+
+### Effects and colours
+
+The **Effects** card holds four composition effects, each off until you tick it: a **colour
+wash** that tints everything under your layers, a **vignette** that darkens toward the edges, **film
+grain**, and a **border** with optional rounded corners and a second inner line. Sliding an effect
+back to zero restores the cover exactly — nothing is baked in.
+
+**Jellyfin style** applies the familiar default look (dark vertical gradient, clean white bold
+centred text) as an ordinary starting point you can keep editing. It clears any background image,
+since the gradient is the point.
+
+**Auto palette** samples the dominant colours from your background and shows them as swatches.
+Click one to recolour the selected text layer, or the colour wash if no text layer is selected. It
+runs entirely in your browser — nothing is uploaded — and stays off until you enable it.
+
+> Film grain is the one effect where the preview is an approximation: the canvas scales a noise
+> tile for speed, while the server draws true per-pixel noise. Use **Show server render** to see
+> the exact result.
 
 ### Poster-collage backgrounds
 

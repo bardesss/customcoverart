@@ -208,6 +208,74 @@
                     </section>
 
                     <section class="ccaCard">
+                        <div class="ccaCardHead" data-i18n="card.effects">Effects</div>
+
+                        <div class="ccaFileRow">
+                            <button is="emby-button" type="button" id="ccaPresetJf" class="raised"><span data-i18n="fx.jellyfin">Jellyfin style</span></button>
+                            <span class="ccaFileName" data-i18n="fx.presetHint">Applies a dark gradient with clean white text — editable afterwards.</span>
+                        </div>
+
+                        <label class="ccaCheck ccaCheckBlock"><input is="emby-checkbox" type="checkbox" id="ccaFxSoftLight" /><span data-i18n="fx.softlight">Colour wash</span></label>
+                        <div class="ccaGrid ccaFxRow" id="ccaFxSoftLightRow" style="display:none">
+                            <div class="inputContainer">
+                                <label for="ccaFxSoftLightColor" data-i18n="fx.color">Colour</label>
+                                <input type="color" id="ccaFxSoftLightColor" value="#ffffff" />
+                            </div>
+                            <div class="inputContainer">
+                                <label for="ccaFxSoftLightOpacity"><span data-i18n="fx.opacity">Strength</span> <span class="ccaVal" id="ccaFxSoftLightOpacityVal">15</span></label>
+                                <input type="range" class="ccaRange" id="ccaFxSoftLightOpacity" min="0" max="100" step="1" value="15" />
+                            </div>
+                        </div>
+
+                        <label class="ccaCheck ccaCheckBlock"><input is="emby-checkbox" type="checkbox" id="ccaFxVignette" /><span data-i18n="fx.vignette">Vignette</span></label>
+                        <div class="ccaGrid ccaFxRow" id="ccaFxVignetteRow" style="display:none">
+                            <div class="inputContainer">
+                                <label for="ccaFxVignetteAmount"><span data-i18n="fx.amount">Strength</span> <span class="ccaVal" id="ccaFxVignetteAmountVal">40</span></label>
+                                <input type="range" class="ccaRange" id="ccaFxVignetteAmount" min="0" max="100" step="1" value="40" />
+                            </div>
+                            <div class="inputContainer">
+                                <label for="ccaFxVignetteSoftness"><span data-i18n="fx.softness">Softness</span> <span class="ccaVal" id="ccaFxVignetteSoftnessVal">50</span></label>
+                                <input type="range" class="ccaRange" id="ccaFxVignetteSoftness" min="1" max="100" step="1" value="50" />
+                            </div>
+                        </div>
+
+                        <label class="ccaCheck ccaCheckBlock"><input is="emby-checkbox" type="checkbox" id="ccaFxGrain" /><span data-i18n="fx.grain">Film grain</span></label>
+                        <div class="ccaFxRow" id="ccaFxGrainRow" style="display:none">
+                            <div class="inputContainer">
+                                <label for="ccaFxGrainAmount"><span data-i18n="fx.amount">Strength</span> <span class="ccaVal" id="ccaFxGrainAmountVal">8</span></label>
+                                <input type="range" class="ccaRange" id="ccaFxGrainAmount" min="0" max="100" step="1" value="8" />
+                            </div>
+                        </div>
+
+                        <label class="ccaCheck ccaCheckBlock"><input is="emby-checkbox" type="checkbox" id="ccaFxBorder" /><span data-i18n="fx.border">Border</span></label>
+                        <div class="ccaFxRow" id="ccaFxBorderRow" style="display:none">
+                            <div class="ccaGrid">
+                                <div class="inputContainer">
+                                    <label for="ccaFxBorderColor" data-i18n="fx.color">Colour</label>
+                                    <input type="color" id="ccaFxBorderColor" value="#ffffff" />
+                                </div>
+                                <div class="inputContainer">
+                                    <label for="ccaFxBorderThickness"><span data-i18n="fx.thickness">Thickness</span> <span class="ccaVal" id="ccaFxBorderThicknessVal">8</span></label>
+                                    <input type="range" class="ccaRange" id="ccaFxBorderThickness" min="0" max="64" step="1" value="8" />
+                                </div>
+                            </div>
+                            <div class="inputContainer">
+                                <label for="ccaFxBorderRadius"><span data-i18n="fx.radius">Corner radius</span> <span class="ccaVal" id="ccaFxBorderRadiusVal">0</span></label>
+                                <input type="range" class="ccaRange" id="ccaFxBorderRadius" min="0" max="200" step="1" value="0" />
+                            </div>
+                            <label class="ccaCheck ccaCheckBlock"><input is="emby-checkbox" type="checkbox" id="ccaFxBorderDouble" /><span data-i18n="fx.double">Double line</span></label>
+                            <div class="inputContainer" id="ccaFxBorderGapRow" style="display:none">
+                                <label for="ccaFxBorderGap"><span data-i18n="fx.gap">Gap</span> <span class="ccaVal" id="ccaFxBorderGapVal">6</span></label>
+                                <input type="range" class="ccaRange" id="ccaFxBorderGap" min="0" max="32" step="1" value="6" />
+                            </div>
+                        </div>
+
+                        <label class="ccaCheck ccaCheckBlock"><input is="emby-checkbox" type="checkbox" id="ccaAutoPalette" /><span data-i18n="fx.autopalette">Auto palette</span></label>
+                        <div id="ccaSwatches" class="ccaSwatches"></div>
+                        <div class="fieldDescription" data-i18n="fx.paletteHint">Click a colour to apply it to the selected text layer, or to the colour wash when no text layer is selected.</div>
+                    </section>
+
+                    <section class="ccaCard">
                         <div class="ccaCardHead" data-i18n="card.output">Output</div>
                         <div class="ccaGrid">
                             <div class="inputContainer">
@@ -445,6 +513,15 @@
         }
         #CustomCoverArtConfigPage .ccaStopRemove:hover { opacity: 1; }
 
+        /* Palette swatches extracted from the background. */
+        #CustomCoverArtConfigPage .ccaSwatches { display: flex; flex-wrap: wrap; gap: .4em; margin: .3em 0 0; }
+        #CustomCoverArtConfigPage .ccaSwatches:empty { display: none; }
+        #CustomCoverArtConfigPage .ccaSwatch {
+            width: 2em; height: 2em; padding: 0; cursor: pointer;
+            border: 1px solid rgba(127, 127, 127, .5); border-radius: 6px;
+        }
+        #CustomCoverArtConfigPage .ccaSwatch:hover { border-color: var(--theme-primary-color, #00a4dc); }
+
         /* Layers panel: newest/topmost layer first, one row per layer. */
         #CustomCoverArtConfigPage .ccaLayerList { display: flex; flex-direction: column; gap: .2em; max-height: 240px; overflow-y: auto; }
         #CustomCoverArtConfigPage .ccaLayerList:empty { display: none; }
@@ -573,6 +650,11 @@
                 'text.align': 'Alignment', 'a.left': 'Left', 'a.center': 'Center', 'a.right': 'Right',
                 'text.size': 'Text size', 'text.color': 'Text color', 'text.effects': 'Effects', 'e.shadow': 'Shadow', 'e.outline': 'Outline',
                 'text.font': 'Custom font (optional)',
+                'card.effects': 'Effects', 'fx.softlight': 'Colour wash', 'fx.vignette': 'Vignette', 'fx.grain': 'Film grain', 'fx.border': 'Border',
+                'fx.color': 'Colour', 'fx.opacity': 'Strength', 'fx.amount': 'Strength', 'fx.softness': 'Softness',
+                'fx.thickness': 'Thickness', 'fx.radius': 'Corner radius', 'fx.double': 'Double line', 'fx.gap': 'Gap',
+                'fx.jellyfin': 'Jellyfin style', 'fx.presetHint': 'Applies a dark gradient with clean white text — editable afterwards.',
+                'fx.autopalette': 'Auto palette', 'fx.paletteHint': 'Click a colour to apply it to the selected text layer, or to the colour wash when no text layer is selected.',
                 'card.background': 'Background', 'bg.dim': 'Dimming', 'bg.blur': 'Blur', 'bg.dimcolor': 'Dim / base color',
                 'bg.gradient': 'Enable gradient background', 'bg.gtype': 'Gradient type', 'g.linear': 'Linear', 'g.radial': 'Radial',
                 'bg.startcolor': 'Start color', 'bg.endcolor': 'End color',
@@ -617,6 +699,11 @@
                 'text.align': 'Uitlijning', 'a.left': 'Links', 'a.center': 'Gecentreerd', 'a.right': 'Rechts',
                 'text.size': 'Tekstgrootte', 'text.color': 'Tekstkleur', 'text.effects': 'Effecten', 'e.shadow': 'Schaduw', 'e.outline': 'Omlijning',
                 'text.font': 'Aangepast lettertype (optioneel)',
+                'card.effects': 'Effecten', 'fx.softlight': 'Kleurwaas', 'fx.vignette': 'Vignet', 'fx.grain': 'Filmkorrel', 'fx.border': 'Rand',
+                'fx.color': 'Kleur', 'fx.opacity': 'Sterkte', 'fx.amount': 'Sterkte', 'fx.softness': 'Zachtheid',
+                'fx.thickness': 'Dikte', 'fx.radius': 'Hoekafronding', 'fx.double': 'Dubbele lijn', 'fx.gap': 'Tussenruimte',
+                'fx.jellyfin': 'Jellyfin-stijl', 'fx.presetHint': 'Past een donker verloop met strakke witte tekst toe — daarna vrij aanpasbaar.',
+                'fx.autopalette': 'Automatisch kleurenpalet', 'fx.paletteHint': 'Klik op een kleur om die toe te passen op de geselecteerde tekstlaag, of op het kleurwaas als er geen tekstlaag geselecteerd is.',
                 'card.background': 'Achtergrond', 'bg.dim': 'Dimmen', 'bg.blur': 'Vervaging', 'bg.dimcolor': 'Dim- / basiskleur',
                 'bg.gradient': 'Verloop-achtergrond inschakelen', 'bg.gtype': 'Verlooptype', 'g.linear': 'Lineair', 'g.radial': 'Radiaal',
                 'bg.startcolor': 'Startkleur', 'bg.endcolor': 'Eindkleur',
@@ -759,6 +846,31 @@
 
         // The working document. PascalCase mirrors Models/CoverDocument.cs so the
         // same object shape can later be POSTed for the authoritative server render.
+        // Mirrors Models/CoverDocument.cs EffectSettings, all disabled by default so an
+        // untouched design renders exactly as it did before effects existed.
+        function defaultEffects() {
+            return {
+                Border: { Enabled: false, Color: '#ffffff', Thickness: 8, Radius: 0, Double: false, Gap: 6 },
+                Vignette: { Enabled: false, Amount: 0.4, Softness: 0.5, Color: '#000000' },
+                Grain: { Enabled: false, Amount: 0.08, Seed: 12345 },
+                SoftLight: { Enabled: false, Color: '#ffffff', Opacity: 0.15 },
+                Preset: null
+            };
+        }
+
+        // Client mirror of DocumentMigration.Normalize's effects guard: a document saved
+        // before Phase 3 carries `Effects: { Preset: null }` with no sub-objects, and the
+        // draw functions dereference them unconditionally.
+        function normalizeEffects(d) {
+            var def = defaultEffects();
+            d.Effects = d.Effects || {};
+            ['Border', 'Vignette', 'Grain', 'SoftLight'].forEach(function (k) {
+                d.Effects[k] = Object.assign({}, def[k], d.Effects[k] || {});
+            });
+            if (d.Effects.Preset === undefined) { d.Effects.Preset = null; }
+            return d;
+        }
+
         function defaultDocument() {
             return {
                 Version: 2,
@@ -774,7 +886,7 @@
                     },
                     Collage: null, Animation: null
                 },
-                Effects: { Preset: null },
+                Effects: defaultEffects(),
                 Layers: [{
                     Id: 'title', Type: 'text', Visible: true, X: 0.5, Y: 0.5, Width: 0, Height: 0,
                     Rotation: 0, Opacity: 1, Content: 'Movies', Size: 120 / 720, Weight: 400,
@@ -1008,10 +1120,44 @@
             var W = cv.width, H = cv.height;
             ctx.clearRect(0, 0, W, H);
 
-            // Background: image (if a blob-loaded one is ready) honouring fit +
-            // transform, else the gradient, else a flat base-colour fill — the same
-            // precedence as DocumentRenderer.ComposeDocumentFrame /
-            // CreateGradientBackground.
+            paintBackgroundOnly(ctx, W, H);
+
+            // Effects order is a contract shared with the server (EffectsComposer):
+            // soft-light UNDER the layers, then vignette -> grain -> border on top.
+            drawSoftLight(ctx, W, H);
+
+            // Visible layers, in array order (draw order matches the server loop).
+            doc.Layers.forEach(function (layer) {
+                if (!layer.Visible) { return; }
+                if (layer.Type === 'text') { drawTextLayer(ctx, layer, W, H); }
+                else if (layer.Type === 'image') { drawImageLayer(ctx, layer, W, H); }
+            });
+
+            drawVignette(ctx, W, H);
+            drawGrain(ctx, W, H);
+            drawBorder(ctx, W, H);
+
+            // Selection UI last of all: it is editor chrome, not part of the design, and
+            // downloadPreview() clears the selection before exporting so it never bakes in.
+            drawSelectionHandles(ctx, W, H);
+
+            // Keep the swatches in step with whatever the background has become.
+            refreshPalette();
+
+            var ph = el('ccaPreviewPlaceholder');
+            if (ph) { ph.style.display = 'none'; }
+            // The canvas always renders, so the export target is always available.
+            var dl = el('ccaDownloadBtn');
+            if (dl) { dl.disabled = false; }
+        }
+
+        // Background only — no layers, no effects, no selection chrome. Split out of
+        // renderDocument so the palette sampler can paint the same background into a
+        // tiny offscreen canvas without text pixels skewing the dominant colours.
+        //
+        // Precedence mirrors ComposeDocumentFrame / CreateGradientBackground: a
+        // blob-loaded image if one is ready, else the gradient, else a flat fill.
+        function paintBackgroundOnly(ctx, W, H) {
             var drewImage = false;
             if (bgImageEl && bgImageEl.complete && bgImageEl.naturalWidth) {
                 drawBackgroundImage(ctx, bgImageEl, W, H);
@@ -1036,22 +1182,213 @@
                 ctx.fillRect(0, 0, W, H);
                 ctx.restore();
             }
-
-            // Visible layers, in array order (draw order matches the server loop).
-            doc.Layers.forEach(function (layer) {
-                if (!layer.Visible) { return; }
-                if (layer.Type === 'text') { drawTextLayer(ctx, layer, W, H); }
-                else if (layer.Type === 'image') { drawImageLayer(ctx, layer, W, H); }
-            });
-
-            drawSelectionHandles(ctx, W, H);
-
-            var ph = el('ccaPreviewPlaceholder');
-            if (ph) { ph.style.display = 'none'; }
-            // The canvas always renders, so the export target is always available.
-            var dl = el('ccaDownloadBtn');
-            if (dl) { dl.disabled = false; }
         }
+
+        // --- Effects (Phase 3) --------------------------------------------
+        // Client mirrors of Services/EffectsComposer.cs. The server is authoritative —
+        // grain in particular is an approximation here (a scaled noise tile blended in
+        // 'overlay', versus true per-pixel noise on the server) because a full-canvas
+        // per-pixel pass every frame would stall the live preview.
+
+        function hexToRgba(hex, alpha) {
+            var h = String(hex || '#000000').replace('#', '');
+            if (h.length === 3) { h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2]; }
+            var n = parseInt(h, 16);
+            if (isNaN(n)) { n = 0; }
+            return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + alpha + ')';
+        }
+
+        function strokeRoundRect(ctx, x, y, w, h, r) {
+            if (w <= 0 || h <= 0) { return; }
+            r = Math.max(0, Math.min(r, Math.min(w, h) / 2));
+            ctx.beginPath();
+            if (r > 0 && ctx.roundRect) { ctx.roundRect(x, y, w, h, r); }
+            else if (r > 0) {
+                ctx.moveTo(x + r, y);
+                ctx.arcTo(x + w, y, x + w, y + h, r);
+                ctx.arcTo(x + w, y + h, x, y + h, r);
+                ctx.arcTo(x, y + h, x, y, r);
+                ctx.arcTo(x, y, x + w, y, r);
+                ctx.closePath();
+            } else { ctx.rect(x, y, w, h); }
+            ctx.stroke();
+        }
+
+        function drawSoftLight(ctx, W, H) {
+            var s = doc.Effects && doc.Effects.SoftLight;
+            if (!s || !s.Enabled || s.Opacity <= 0) { return; }
+            ctx.save();
+            ctx.globalAlpha = Math.min(1, Math.max(0, s.Opacity));
+            ctx.fillStyle = s.Color || '#ffffff';
+            ctx.fillRect(0, 0, W, H);
+            ctx.restore();
+        }
+
+        function drawVignette(ctx, W, H) {
+            var v = doc.Effects && doc.Effects.Vignette;
+            if (!v || !v.Enabled || v.Amount <= 0) { return; }
+            var softness = Math.min(1, Math.max(0.01, v.Softness));
+            // Same geometry as ApplyVignette: distance is normalized against the CORNER
+            // distance, and the ramp starts `softness` of the way in from there. Using
+            // min(W,H)/2 for the inner radius instead would put the ramp in a visibly
+            // different place from the server render on any non-square cover.
+            var maxD = Math.sqrt((W / 2) * (W / 2) + (H / 2) * (H / 2));
+            var g = ctx.createRadialGradient(W / 2, H / 2, maxD * (1 - softness), W / 2, H / 2, maxD);
+            g.addColorStop(0, hexToRgba(v.Color, 0));
+            g.addColorStop(1, hexToRgba(v.Color, Math.min(1, Math.max(0, v.Amount))));
+            ctx.save();
+            ctx.fillStyle = g;
+            ctx.fillRect(0, 0, W, H);
+            ctx.restore();
+        }
+
+        var _grainTile = null, _grainKey = '';
+        function grainTile(seed) {
+            // Build a small seeded monochrome-noise tile ONCE per seed, then scale it over
+            // the whole canvas. This is genuinely downscaled work (128x128), not a
+            // full-canvas per-pixel pass every frame, so it stays cheap on large canvases.
+            var key = String(seed);
+            if (_grainKey === key && _grainTile) { return _grainTile; }
+            var S = 128, tile = document.createElement('canvas');
+            tile.width = S; tile.height = S;
+            var tctx = tile.getContext('2d');
+            var id = tctx.createImageData(S, S), d = id.data, s = seed >>> 0;
+            function rnd() { s = (s * 1664525 + 1013904223) >>> 0; return (s >>> 24); }
+            for (var i = 0; i < d.length; i += 4) {
+                var v = rnd();
+                d[i] = d[i + 1] = d[i + 2] = v;
+                d[i + 3] = 255;
+            }
+            tctx.putImageData(id, 0, 0);
+            _grainTile = tile; _grainKey = key;
+            return tile;
+        }
+
+        function drawGrain(ctx, W, H) {
+            var g = doc.Effects && doc.Effects.Grain;
+            if (!g || !g.Enabled || g.Amount <= 0) { return; }
+            // 'overlay' blends the mid-grey noise as light/dark grain without a
+            // getImageData read, so it can't throw on a tainted or CSP-restricted canvas.
+            try {
+                ctx.save();
+                ctx.globalAlpha = Math.min(1, g.Amount);
+                ctx.globalCompositeOperation = 'overlay';
+                ctx.imageSmoothingEnabled = true;
+                ctx.drawImage(grainTile(g.Seed), 0, 0, W, H);
+                ctx.restore();
+            } catch (e) {
+                // Blend mode unsupported: skip client grain; the server render still applies it.
+                try { ctx.restore(); } catch (e2) { /* ignore */ }
+            }
+        }
+
+        function drawBorder(ctx, W, H) {
+            var b = doc.Effects && doc.Effects.Border;
+            if (!b || !b.Enabled || b.Thickness <= 0) { return; }
+            var t = Math.min(64, Math.max(0, b.Thickness));
+            ctx.save();
+            ctx.strokeStyle = b.Color || '#ffffff';
+            // A stroke straddles the path, so inset by half the width — matching
+            // DrawInsetFrame, which offsets its rectangle the same way.
+            ctx.lineWidth = t;
+            strokeRoundRect(ctx, t / 2, t / 2, W - t, H - t, b.Radius || 0);
+            if (b.Double) {
+                var gap = Math.min(32, Math.max(0, b.Gap || 0));
+                var inset = t + gap;
+                if (inset * 2 < Math.min(W, H)) {
+                    var inner = Math.max(1, Math.floor(t / 2));
+                    ctx.lineWidth = inner;
+                    strokeRoundRect(ctx, inset + inner / 2, inset + inner / 2,
+                        W - (inset + inner / 2) * 2, H - (inset + inner / 2) * 2,
+                        Math.max(0, (b.Radius || 0) - inset));
+                }
+            }
+            ctx.restore();
+        }
+
+        // --- Colour palette (Phase 3) -------------------------------------
+        // Dominant colours of the BACKGROUND, extracted entirely client-side — no new
+        // endpoint, no upload round-trip. Sampled from a tiny offscreen render (the
+        // cover's aspect ratio, 64px wide) so it costs a few thousand pixels, not
+        // millions, and never blocks the UI.
+        //
+        // This is the feature the blob-URL canvas-source invariant has been protecting
+        // since Phase 1: getImageData throws a SecurityError on a canvas tainted by a
+        // cross-origin image, which is why background bitmaps only ever come from
+        // URL.createObjectURL. The read is still guarded — a tainted or CSP-blocked
+        // canvas degrades to "no swatches" rather than an exception.
+        function extractPalette() {
+            var SW = 64;
+            var SH = Math.max(1, Math.round(SW * (doc.Canvas.Height || 1) / (doc.Canvas.Width || 1)));
+            var tmp = document.createElement('canvas');
+            tmp.width = SW; tmp.height = SH;
+            var tctx = tmp.getContext('2d');
+            paintBackgroundOnly(tctx, SW, SH);
+
+            var data;
+            try { data = tctx.getImageData(0, 0, SW, SH).data; }
+            catch (e) { return []; }
+
+            // Quantize each channel to 4 bits so near-identical shades collapse into one
+            // bucket; the most populated buckets are the colours a viewer actually sees.
+            var counts = {};
+            for (var i = 0; i < data.length; i += 4) {
+                if (data[i + 3] < 128) { continue; }
+                var key = (data[i] >> 4) + ',' + (data[i + 1] >> 4) + ',' + (data[i + 2] >> 4);
+                counts[key] = (counts[key] || 0) + 1;
+            }
+
+            return Object.keys(counts)
+                .sort(function (a, b) { return counts[b] - counts[a]; })
+                .slice(0, 8)
+                .map(function (k) {
+                    // Back to 8-bit, biased to the middle of the bucket.
+                    var p = k.split(',').map(function (n) { return (parseInt(n, 10) << 4) | 8; });
+                    return '#' + p.map(function (n) { return ('0' + n.toString(16)).slice(-2); }).join('');
+                });
+        }
+
+        function renderSwatches(colors) {
+            var box = el('ccaSwatches');
+            if (!box) { return; }
+            box.innerHTML = '';
+            colors.forEach(function (hex) {
+                var s = document.createElement('button');
+                s.type = 'button';
+                s.className = 'ccaSwatch';
+                s.style.background = hex;
+                s.title = hex;
+                s.addEventListener('click', function () { applySwatch(hex); });
+                box.appendChild(s);
+            });
+        }
+
+        // Where a clicked swatch lands: the selected text layer if there is one,
+        // otherwise the colour wash when it is switched on. Both update their control
+        // so the card and the canvas never disagree.
+        function applySwatch(hex) {
+            var l = selectedLayer();
+            if (l && l.Type === 'text') {
+                l.Color = hex;
+                el('ccaTextColor').value = hex;
+            } else if (doc.Effects.SoftLight.Enabled) {
+                doc.Effects.SoftLight.Color = hex;
+                el('ccaFxSoftLightColor').value = hex;
+            } else {
+                return; // nothing sensible to apply it to; leave the design alone
+            }
+            scheduleRender();
+        }
+
+        // Re-extract after the canvas settles rather than wiring every background
+        // trigger (upload, poster pick, gradient stop edit, collage shuffle, preset).
+        // Debounced, and only while the toggle is on, so it costs nothing when unused.
+        var refreshPalette = debounce(function () {
+            var toggle = el('ccaAutoPalette');
+            if (!toggle || !toggle.checked) { return; }
+            renderSwatches(extractPalette());
+        }, 300);
+        // ------------------------------------------------------------------
 
         // Builds the canvas colour-stop list from gradient settings — the explicit
         // Stops (sorted, clamped) when there are 2+, else a black→white fallback,
@@ -1789,10 +2126,101 @@
                 el('ccaFormat').value = doc.Canvas.Format || 'auto';
             }
 
+            // Effects card
+            var fx = doc.Effects;
+            el('ccaFxSoftLight').checked = !!fx.SoftLight.Enabled;
+            el('ccaFxSoftLightColor').value = fx.SoftLight.Color || '#ffffff';
+            setRange('ccaFxSoftLightOpacity', Math.round(fx.SoftLight.Opacity * 100));
+            el('ccaFxVignette').checked = !!fx.Vignette.Enabled;
+            setRange('ccaFxVignetteAmount', Math.round(fx.Vignette.Amount * 100));
+            setRange('ccaFxVignetteSoftness', Math.round(fx.Vignette.Softness * 100));
+            el('ccaFxGrain').checked = !!fx.Grain.Enabled;
+            setRange('ccaFxGrainAmount', Math.round(fx.Grain.Amount * 100));
+            el('ccaFxBorder').checked = !!fx.Border.Enabled;
+            el('ccaFxBorderColor').value = fx.Border.Color || '#ffffff';
+            setRange('ccaFxBorderThickness', fx.Border.Thickness);
+            setRange('ccaFxBorderRadius', fx.Border.Radius);
+            el('ccaFxBorderDouble').checked = !!fx.Border.Double;
+            setRange('ccaFxBorderGap', fx.Border.Gap);
+
             // Re-sync dependent visibility + labels.
             updateUI();
             updateCollageVisibility();
             updateAnimVisibility();
+            updateEffectsVisibility();
+        }
+
+        // The default Jellyfin library-cover look: a dark vertical gradient with clean
+        // white bold centred text and no effects. It writes plain document values, so
+        // every control still edits the result afterwards — it is a starting point, not
+        // a mode. Constants are pinned by PresetTests so the docs and code agree.
+        var JELLYFIN_PRESET = {
+            gradientStart: '#0b0b10',
+            gradientEnd: '#1a1a24',
+            gradientAngle: 90,
+            dim: 0.1,
+            textColor: '#ffffff',
+            textWeight: 700,
+            textSize: 0.11
+        };
+
+        function applyJellyfinPreset() {
+            var p = JELLYFIN_PRESET;
+            doc.Background.Source = 'upload';
+            doc.Background.Gradient = {
+                IsEnabled: true, Type: 0, Angle: p.gradientAngle,
+                Stops: [{ Color: p.gradientStart, Position: 0 }, { Color: p.gradientEnd, Position: 1 }],
+                CenterX: 0.5, CenterY: 0.5, Radius: 0.5
+            };
+            doc.Background.Dim = p.dim;
+
+            // Restyle the title layer, leaving any other layers the user added alone.
+            var l = selectedLayer();
+            if (!l || l.Type !== 'text') {
+                l = null;
+                for (var i = 0; i < doc.Layers.length; i++) {
+                    if (doc.Layers[i].Type === 'text') { l = doc.Layers[i]; break; }
+                }
+            }
+            if (l) {
+                l.Color = p.textColor; l.Weight = p.textWeight; l.Align = 1;
+                l.X = 0.5; l.Y = 0.5; l.Size = p.textSize; l.Rotation = 0; l.Opacity = 1;
+                l.Shadow = { Enabled: false, Color: '#000000', Blur: 4, OffsetX: 2, OffsetY: 2 };
+                l.Outline = { Enabled: false, Color: '#000000', Width: 2 };
+            }
+
+            doc.Effects = defaultEffects();
+            doc.Effects.Preset = 'jellyfin';
+
+            // The gradient is the point of the preset, so drop any background bitmap that
+            // would paint over it (both the canvas copy and the path the server renders).
+            bgImageEl = null;
+            doc.Background.ImagePath = '';
+            state.backgroundImagePath = '';
+            var sel = el('ccaSelectedBg');
+            if (sel) { sel.style.display = 'none'; }
+
+            renderLayersPanel();
+            syncControlsFromDocument();
+            scheduleRender();
+        }
+
+        // Sets a range input and the little value label that shadows it.
+        function setRange(id, value) {
+            var input = el(id);
+            if (!input) { return; }
+            input.value = value;
+            var label = el(id + 'Val');
+            if (label) { label.textContent = value; }
+        }
+
+        // Each effect's controls only appear once it is switched on.
+        function updateEffectsVisibility() {
+            el('ccaFxSoftLightRow').style.display = el('ccaFxSoftLight').checked ? '' : 'none';
+            el('ccaFxVignetteRow').style.display = el('ccaFxVignette').checked ? '' : 'none';
+            el('ccaFxGrainRow').style.display = el('ccaFxGrain').checked ? '' : 'none';
+            el('ccaFxBorderRow').style.display = el('ccaFxBorder').checked ? '' : 'none';
+            el('ccaFxBorderGapRow').style.display = el('ccaFxBorderDouble').checked ? '' : 'none';
         }
         // ------------------------------------------------------------------
 
@@ -2297,6 +2725,52 @@
                 scheduleRender();
             });
 
+            // --- Effects card ---------------------------------------------
+            // Checkboxes toggle the effect and reveal its controls; sliders write the
+            // 0..1 model value (the UI works in whole percent) and re-render.
+            [['ccaFxSoftLight', 'SoftLight'], ['ccaFxVignette', 'Vignette'],
+             ['ccaFxGrain', 'Grain'], ['ccaFxBorder', 'Border']].forEach(function (pair) {
+                el(pair[0]).addEventListener('change', function () {
+                    doc.Effects[pair[1]].Enabled = this.checked;
+                    updateEffectsVisibility();
+                    scheduleRender();
+                });
+            });
+
+            function bindFxRange(id, apply) {
+                el(id).addEventListener('input', function () {
+                    var label = el(id + 'Val');
+                    if (label) { label.textContent = this.value; }
+                    apply(parseInt(this.value, 10) || 0);
+                    scheduleRender();
+                });
+            }
+            function bindFxColor(id, apply) {
+                el(id).addEventListener('input', function () { apply(this.value); scheduleRender(); });
+            }
+
+            bindFxColor('ccaFxSoftLightColor', function (v) { doc.Effects.SoftLight.Color = v; });
+            bindFxRange('ccaFxSoftLightOpacity', function (v) { doc.Effects.SoftLight.Opacity = v / 100; });
+            bindFxRange('ccaFxVignetteAmount', function (v) { doc.Effects.Vignette.Amount = v / 100; });
+            bindFxRange('ccaFxVignetteSoftness', function (v) { doc.Effects.Vignette.Softness = v / 100; });
+            bindFxRange('ccaFxGrainAmount', function (v) { doc.Effects.Grain.Amount = v / 100; });
+            bindFxColor('ccaFxBorderColor', function (v) { doc.Effects.Border.Color = v; });
+            bindFxRange('ccaFxBorderThickness', function (v) { doc.Effects.Border.Thickness = v; });
+            bindFxRange('ccaFxBorderRadius', function (v) { doc.Effects.Border.Radius = v; });
+            bindFxRange('ccaFxBorderGap', function (v) { doc.Effects.Border.Gap = v; });
+            el('ccaFxBorderDouble').addEventListener('change', function () {
+                doc.Effects.Border.Double = this.checked;
+                updateEffectsVisibility();
+                scheduleRender();
+            });
+
+            el('ccaPresetJf').addEventListener('click', applyJellyfinPreset);
+
+            el('ccaAutoPalette').addEventListener('change', function () {
+                if (this.checked) { renderSwatches(extractPalette()); }
+                else { el('ccaSwatches').innerHTML = ''; }
+            });
+
             // --- Output card ----------------------------------------------
             el('ccaPreset').addEventListener('change', function () {
                 if (this.value !== 'custom' && PRESETS[this.value]) {
@@ -2428,6 +2902,9 @@
                 var currentTitle = curLayer ? curLayer.Content : '';
                 doc = JSON.parse(JSON.stringify(tplDoc));
                 if (!doc.Layers) { doc.Layers = []; }
+                // Templates saved before Phase 3 have no effect sub-objects; the draw
+                // functions dereference them, so fill them in like the server does.
+                normalizeEffects(doc);
                 var titleLayer = null;
                 for (var i = 0; i < doc.Layers.length; i++) {
                     if (doc.Layers[i].Id === 'title') { titleLayer = doc.Layers[i]; break; }

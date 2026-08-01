@@ -75,6 +75,14 @@ public static class DocumentMigration
         doc.Background ??= new BackgroundLayer();
         doc.Background.Transform ??= new BackgroundTransform();
         doc.Effects ??= new EffectSettings();
+        // The effect sub-objects are dereferenced unconditionally by EffectsComposer,
+        // and a client can POST any of them as explicit null (System.Text.Json does not
+        // enforce non-null on non-nullable reference types, so the initializers above
+        // are overwritten rather than kept).
+        doc.Effects.Border ??= new BorderSettings();
+        doc.Effects.Vignette ??= new VignetteSettings();
+        doc.Effects.Grain ??= new GrainSettings();
+        doc.Effects.SoftLight ??= new SoftLightSettings();
         doc.Layers = (doc.Layers ?? new List<CoverLayer>())
             .Where(l => l is not null)
             .ToList();

@@ -31,6 +31,10 @@ public static class DocumentRenderer
             CreateGradientBackground(canvas, doc.Background);
         }
 
+        // Soft-light washes the background BEFORE the layers, so text and logos sit on
+        // top of the tint rather than under it. The client mirrors this order exactly.
+        EffectsComposer.ApplySoftLight(canvas, doc.Effects.SoftLight);
+
         foreach (var layer in doc.Layers)
         {
             if (!layer.Visible) { continue; }
@@ -44,6 +48,9 @@ public static class DocumentRenderer
                 RenderImageLayer(canvas, layer);
             }
         }
+
+        // Vignette → grain → border, the border outermost and last.
+        EffectsComposer.Apply(canvas, doc.Effects);
     }
 
     /// <summary>
