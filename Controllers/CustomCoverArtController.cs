@@ -489,6 +489,61 @@ public class CustomCoverArtController : ControllerBase
         return File(stream, "font/ttf");
     }
 
+    /// <summary>
+    /// Streams a previously uploaded image back to the config page so a logo layer
+    /// restored from a saved template can be drawn on the client canvas.
+    ///
+    /// The canvas may only ever be fed blob: URLs (a tainted canvas breaks
+    /// getImageData), which is why the page fetches this endpoint as a Blob rather
+    /// than pointing an &lt;img src&gt; at a server path.
+    ///
+    /// Scope is deliberately narrower than the plugin data dir: only the uploads
+    /// folder, so this can never be turned into a reader for backups or generated
+    /// output. Inherits the class-level RequiresElevation policy.
+    /// </summary>
+    [HttpGet("layerImage")]
+    public IActionResult GetLayerImage([FromQuery] string path)
+    {
+        var uploads = Path.GetFullPath(PluginPaths.Uploads(_applicationPaths))
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+
+        string full;
+        try
+        {
+            full = Path.GetFullPath(path ?? string.Empty);
+        }
+        catch
+        {
+            return BadRequest();
+        }
+
+        var comparison = System.OperatingSystem.IsWindows()
+            ? System.StringComparison.OrdinalIgnoreCase
+            : System.StringComparison.Ordinal;
+
+        if (!full.StartsWith(uploads, comparison) || !System.IO.File.Exists(full))
+        {
+            return NotFound();
+        }
+
+        var contentType = Path.GetExtension(full).ToLowerInvariant() switch
+        {
+            ".png" => "image/png",
+            ".jpg" or ".jpeg" => "image/jpeg",
+            ".gif" => "image/gif",
+            ".webp" => "image/webp",
+            ".bmp" => "image/bmp",
+            _ => null
+        };
+
+        if (contentType is null)
+        {
+            return NotFound();
+        }
+
+        return PhysicalFile(full, contentType);
+    }
+
     /// <summary>Strip title and target-specific fields so a template is reusable across targets.</summary>
     public static SavedTemplate NormalizeTemplate(SavedTemplate template)
     {

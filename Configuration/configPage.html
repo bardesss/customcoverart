@@ -45,13 +45,24 @@
                         </div>
                     </section>
 
+                    <section class="ccaCard">
+                        <div class="ccaCardHead" data-i18n="card.layers">Layers</div>
+                        <div id="ccaLayerList" class="ccaLayerList"></div>
+                        <div class="ccaFileRow">
+                            <button is="emby-button" type="button" id="ccaAddText" class="raised"><span data-i18n="layer.addText">Add text</span></button>
+                            <button is="emby-button" type="button" id="ccaAddImage" class="raised"><span data-i18n="layer.addImage">Add logo/icon</span></button>
+                            <input type="file" id="ccaLayerImage" accept=".png" class="ccaHiddenFile" />
+                        </div>
+                        <div class="fieldDescription" data-i18n="hint.logo">PNG with transparency · up to 5 MB. The topmost row is drawn last, on top of the others.</div>
+                    </section>
+
                     <section class="ccaCard" id="ccaSettings">
-                        <div class="ccaCardHead" data-i18n="card.text">Text</div>
-                        <div class="inputContainer">
+                        <div class="ccaCardHead" data-i18n="card.selected">Selected layer</div>
+                        <div class="inputContainer ccaTextOnly">
                             <label for="ccaTitle" data-i18n="text.title">Title</label>
                             <input is="emby-input" type="text" id="ccaTitle" value="Movies" />
                         </div>
-                        <div class="ccaGrid">
+                        <div class="ccaGrid ccaTextOnly">
                             <div class="inputContainer">
                                 <label for="ccaTextWeight" data-i18n="text.weight">Font weight</label>
                                 <select is="emby-select" id="ccaTextWeight" class="emby-select">
@@ -72,11 +83,11 @@
                                 </select>
                             </div>
                         </div>
-                        <div class="inputContainer">
+                        <div class="inputContainer ccaTextOnly">
                             <label for="ccaTextSize"><span data-i18n="text.size">Text size</span> <span class="ccaVal" id="ccaTextSizeVal">120</span></label>
                             <input type="range" class="ccaRange" id="ccaTextSize" min="20" max="300" value="120" />
                         </div>
-                        <div class="ccaGrid">
+                        <div class="ccaGrid ccaTextOnly">
                             <div class="inputContainer">
                                 <label for="ccaTextColor" data-i18n="text.color">Text color</label>
                                 <input type="color" id="ccaTextColor" value="#ffffff" />
@@ -89,7 +100,7 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="inputContainer">
+                        <div class="inputContainer ccaTextOnly">
                             <label data-i18n="text.font">Custom font (optional)</label>
                             <div class="ccaFileRow">
                                 <button is="emby-button" type="button" id="ccaFontBtn" class="raised"><span data-i18n="f.chooseFont">Choose font…</span></button>
@@ -98,6 +109,18 @@
                             <div class="fieldDescription" data-i18n="hint.font">TTF, OTF, TTC, WOFF or WOFF2 · up to 5 MB. Leave empty to use the bundled Noto Sans.</div>
                             <input type="file" id="ccaFont" accept=".ttf,.otf,.ttc,.woff,.woff2" class="ccaHiddenFile" />
                         </div>
+                        <div class="ccaGrid">
+                            <div class="inputContainer">
+                                <label for="ccaLayerOpacity"><span data-i18n="layer.opacity">Opacity</span> <span class="ccaVal" id="ccaLayerOpacityVal">100</span></label>
+                                <input type="range" class="ccaRange" id="ccaLayerOpacity" min="0" max="100" step="1" value="100" />
+                            </div>
+                            <div class="inputContainer">
+                                <label for="ccaLayerRotation"><span data-i18n="layer.rotation">Rotation</span> <span class="ccaVal" id="ccaLayerRotationVal">0°</span></label>
+                                <input type="range" class="ccaRange" id="ccaLayerRotation" min="-180" max="180" step="1" value="0" />
+                            </div>
+                        </div>
+                        <div class="fieldDescription ccaImageOnly" data-i18n="hint.logoSize">Drag the corner handles on the preview to resize the logo, or the knob above it to rotate.</div>
+                        <div class="fieldDescription" id="ccaNoLayerHint" data-i18n="layer.none" style="display:none">No layer selected — add one in the Layers card above.</div>
                     </section>
 
                     <section class="ccaCard">
@@ -422,6 +445,34 @@
         }
         #CustomCoverArtConfigPage .ccaStopRemove:hover { opacity: 1; }
 
+        /* Layers panel: newest/topmost layer first, one row per layer. */
+        #CustomCoverArtConfigPage .ccaLayerList { display: flex; flex-direction: column; gap: .2em; max-height: 240px; overflow-y: auto; }
+        #CustomCoverArtConfigPage .ccaLayerList:empty { display: none; }
+        #CustomCoverArtConfigPage .ccaLayerRow {
+            display: flex; align-items: center; gap: .3em;
+            padding: .35em .5em;
+            border: 1px solid rgba(127, 127, 127, .2);
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        #CustomCoverArtConfigPage .ccaLayerRow:hover { background: rgba(127, 127, 127, .08); }
+        #CustomCoverArtConfigPage .ccaLayerSel {
+            border-color: var(--theme-primary-color, #00a4dc);
+            background: rgba(0, 164, 220, .12);
+        }
+        #CustomCoverArtConfigPage .ccaLayerName {
+            flex: 1 1 auto; min-width: 0;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        #CustomCoverArtConfigPage .ccaLayerHidden .ccaLayerName { opacity: .45; text-decoration: line-through; }
+        #CustomCoverArtConfigPage .ccaLayerBtn {
+            flex: 0 0 auto; width: 1.9em; height: 1.9em; line-height: 1;
+            border: 1px solid rgba(127, 127, 127, .35); border-radius: 6px;
+            background: transparent; color: inherit; cursor: pointer; opacity: .7;
+            font-size: .95em; padding: 0;
+        }
+        #CustomCoverArtConfigPage .ccaLayerBtn:hover { opacity: 1; }
+
         #CustomCoverArtConfigPage .ccaHiddenFile { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); border: 0; }
         #CustomCoverArtConfigPage .ccaFileRow { display: flex; align-items: center; gap: .75em; flex-wrap: wrap; }
         #CustomCoverArtConfigPage .ccaFileRow .emby-button { margin: 0; }
@@ -511,7 +562,13 @@
                 'lede': 'Design a cover for a library, preview it live, then apply it.',
                 'card.target': 'Target', 'target.type': 'Type', 'target.library': 'Library', 'target.collection': 'Collection', 'target.playlist': 'Playlist', 'target.livetv': 'Live TV',
                 'card.library': 'Library', 'lib.choose': 'Choose', 'lib.selectOption': 'Select…',
-                'card.text': 'Text', 'text.title': 'Title', 'text.weight': 'Font weight',
+                'card.layers': 'Layers', 'layer.addText': 'Add text', 'layer.addImage': 'Add logo/icon',
+                'layer.show': 'Show', 'layer.hide': 'Hide', 'layer.up': 'Move up', 'layer.down': 'Move down', 'layer.dup': 'Duplicate', 'layer.del': 'Delete',
+                'layer.text': 'Text', 'layer.logo': 'Logo', 'layer.none': 'No layer selected — add one in the Layers card above.',
+                'layer.opacity': 'Opacity', 'layer.rotation': 'Rotation',
+                'hint.logo': 'PNG with transparency · up to 5 MB. The topmost row is drawn last, on top of the others.',
+                'hint.logoSize': 'Drag the corner handles on the preview to resize the logo, or the knob above it to rotate.',
+                'card.selected': 'Selected layer', 'text.title': 'Title', 'text.weight': 'Font weight',
                 'w.light': 'Light', 'w.normal': 'Normal', 'w.medium': 'Medium', 'w.semibold': 'SemiBold', 'w.bold': 'Bold', 'w.extrabold': 'ExtraBold',
                 'text.align': 'Alignment', 'a.left': 'Left', 'a.center': 'Center', 'a.right': 'Right',
                 'text.size': 'Text size', 'text.color': 'Text color', 'text.effects': 'Effects', 'e.shadow': 'Shadow', 'e.outline': 'Outline',
@@ -549,7 +606,13 @@
                 'lede': 'Ontwerp een cover voor een bibliotheek, bekijk het live en pas het toe.',
                 'card.target': 'Doel', 'target.type': 'Type', 'target.library': 'Bibliotheek', 'target.collection': 'Verzameling', 'target.playlist': 'Afspeellijst', 'target.livetv': 'Live-tv',
                 'card.library': 'Bibliotheek', 'lib.choose': 'Kies', 'lib.selectOption': 'Selecteer…',
-                'card.text': 'Tekst', 'text.title': 'Titel', 'text.weight': 'Letterdikte',
+                'card.layers': 'Lagen', 'layer.addText': 'Tekst toevoegen', 'layer.addImage': 'Logo/pictogram toevoegen',
+                'layer.show': 'Tonen', 'layer.hide': 'Verbergen', 'layer.up': 'Omhoog', 'layer.down': 'Omlaag', 'layer.dup': 'Dupliceren', 'layer.del': 'Verwijderen',
+                'layer.text': 'Tekst', 'layer.logo': 'Logo', 'layer.none': 'Geen laag geselecteerd — voeg er een toe in de kaart Lagen hierboven.',
+                'layer.opacity': 'Dekking', 'layer.rotation': 'Rotatie',
+                'hint.logo': 'PNG met transparantie · max. 5 MB. De bovenste rij wordt als laatste getekend, boven op de andere.',
+                'hint.logoSize': 'Sleep de hoekgrepen in het voorbeeld om het logo te vergroten of verkleinen, of de knop erboven om te draaien.',
+                'card.selected': 'Geselecteerde laag', 'text.title': 'Titel', 'text.weight': 'Letterdikte',
                 'w.light': 'Licht', 'w.normal': 'Normaal', 'w.medium': 'Medium', 'w.semibold': 'Halfvet', 'w.bold': 'Vet', 'w.extrabold': 'Extra vet',
                 'text.align': 'Uitlijning', 'a.left': 'Links', 'a.center': 'Gecentreerd', 'a.right': 'Rechts',
                 'text.size': 'Tekstgrootte', 'text.color': 'Tekstkleur', 'text.effects': 'Effecten', 'e.shadow': 'Schaduw', 'e.outline': 'Omlijning',
@@ -750,6 +813,183 @@
             return null;
         }
 
+        // --- Layer management (Phase 2) ------------------------------------
+        // doc.Layers[0] is the BOTTOM layer (drawn first); the panel lists the array
+        // reversed so the top-most layer sits at the top of the list, like every other
+        // layers panel. Server-side the count is capped at 40 (CoverArtService), so the
+        // client refuses to add past that rather than letting layers vanish on apply.
+        var MAX_LAYERS = 40;
+
+        function newLayerId() { return 'l' + Date.now().toString(36) + Math.floor(Math.random() * 1e4).toString(36); }
+
+        function layerIndex(id) {
+            for (var i = 0; i < doc.Layers.length; i++) { if (doc.Layers[i].Id === id) { return i; } }
+            return -1;
+        }
+
+        function layerLabel(layer) {
+            if (layer.Type === 'text') { return (layer.Content || '').trim() || t('layer.text'); }
+            return layer._name || t('layer.logo');
+        }
+
+        function selectLayerById(id) {
+            doc._selectedId = id;
+            renderLayersPanel();
+            syncControlsFromDocument();
+            scheduleRender();
+        }
+
+        function renderLayersPanel() {
+            var box = el('ccaLayerList');
+            if (!box) { return; }
+            box.innerHTML = '';
+            for (var i = doc.Layers.length - 1; i >= 0; i--) {
+                (function (layer) {
+                    var row = document.createElement('div');
+                    row.className = 'ccaLayerRow'
+                        + (layer.Id === doc._selectedId ? ' ccaLayerSel' : '')
+                        + (layer.Visible ? '' : ' ccaLayerHidden');
+
+                    var vis = document.createElement('button');
+                    vis.type = 'button'; vis.className = 'ccaLayerBtn';
+                    vis.textContent = layer.Visible ? '👁' : '∅';
+                    vis.title = layer.Visible ? t('layer.hide') : t('layer.show');
+                    vis.addEventListener('click', function (e) {
+                        e.stopPropagation();
+                        layer.Visible = !layer.Visible;
+                        renderLayersPanel();
+                        scheduleRender();
+                    });
+
+                    var name = document.createElement('span');
+                    name.className = 'ccaLayerName';
+                    name.textContent = layerLabel(layer);
+
+                    row.appendChild(vis);
+                    row.appendChild(name);
+
+                    ['up', 'down', 'dup', 'del'].forEach(function (act) {
+                        var b = document.createElement('button');
+                        b.type = 'button'; b.className = 'ccaLayerBtn';
+                        b.textContent = act === 'up' ? '▲' : act === 'down' ? '▼' : act === 'dup' ? '⧉' : '✕';
+                        b.title = t('layer.' + act);
+                        b.addEventListener('click', function (e) {
+                            e.stopPropagation();
+                            // "Up" in the panel means later in the array = drawn on top.
+                            if (act === 'up') { moveLayer(layer.Id, 1); }
+                            else if (act === 'down') { moveLayer(layer.Id, -1); }
+                            else if (act === 'dup') { duplicateLayer(layer.Id); }
+                            else { deleteLayer(layer.Id); }
+                        });
+                        row.appendChild(b);
+                    });
+
+                    row.addEventListener('click', function () { selectLayerById(layer.Id); });
+                    box.appendChild(row);
+                })(doc.Layers[i]);
+            }
+            var atCap = doc.Layers.length >= MAX_LAYERS;
+            if (el('ccaAddText')) { el('ccaAddText').disabled = atCap; }
+            if (el('ccaAddImage')) { el('ccaAddImage').disabled = atCap; }
+        }
+
+        function addTextLayer() {
+            if (doc.Layers.length >= MAX_LAYERS) { return; }
+            var l = JSON.parse(JSON.stringify(defaultDocument().Layers[0]));
+            l.Id = newLayerId();
+            l.Content = t('layer.text');
+            // Offset from the existing title so a new layer doesn't land exactly on
+            // top of it and look like nothing happened.
+            l.Y = Math.min(0.95, l.Y + 0.15);
+            doc.Layers.push(l);
+            selectLayerById(l.Id);
+        }
+
+        // A logo layer carries the FULL CoverLayer field set (PascalCase) so it
+        // round-trips through the C# model; `_`-prefixed keys are UI-only and are
+        // stripped by stripUiKeys() before anything is POSTed.
+        function newImageLayer(path, name) {
+            return {
+                Id: newLayerId(), Type: 'image', Visible: true,
+                X: 0.5, Y: 0.5, Width: 0.25, Height: 0.25, Rotation: 0, Opacity: 1,
+                ImagePath: path, _name: name,
+                Content: '', Size: 0, Weight: 400, Color: '#ffffff', Align: 1, FontPath: '',
+                Shadow: { Enabled: false, Color: '#000000', Blur: 4, OffsetX: 2, OffsetY: 2 },
+                Outline: { Enabled: false, Color: '#000000', Width: 2 }
+            };
+        }
+
+        function duplicateLayer(id) {
+            if (doc.Layers.length >= MAX_LAYERS) { return; }
+            var i = layerIndex(id);
+            if (i < 0) { return; }
+            var src = doc.Layers[i];
+            var copy = stripUiKeys(src); // deep clone, minus the UI-only keys
+            copy.Id = newLayerId();
+            copy.X = Math.min(1, copy.X + 0.03);
+            copy.Y = Math.min(1, copy.Y + 0.03);
+            // JSON can't carry the decoded bitmap or the display name, so re-attach
+            // them instead of re-downloading what we already have.
+            if (src._img) { copy._img = src._img; }
+            if (src._name) { copy._name = src._name; }
+            doc.Layers.splice(i + 1, 0, copy);
+            selectLayerById(copy.Id);
+        }
+
+        function deleteLayer(id) {
+            doc.Layers = doc.Layers.filter(function (l) { return l.Id !== id; });
+            if (doc._selectedId === id) {
+                doc._selectedId = doc.Layers.length ? doc.Layers[doc.Layers.length - 1].Id : null;
+            }
+            renderLayersPanel();
+            syncControlsFromDocument();
+            scheduleRender();
+        }
+
+        function moveLayer(id, dir) {
+            var i = layerIndex(id);
+            var j = i + dir;
+            if (i < 0 || j < 0 || j >= doc.Layers.length) { return; }
+            var tmp = doc.Layers[i]; doc.Layers[i] = doc.Layers[j]; doc.Layers[j] = tmp;
+            renderLayersPanel();
+            scheduleRender();
+        }
+
+        // Loads the bitmap for any image layer that has a server path but no decoded
+        // image yet — i.e. layers restored from a saved template, where the upload
+        // File is long gone. Fetched as a BLOB and turned into an object URL, never
+        // assigned as a server URL directly: the canvas-source invariant (see
+        // bgImageEl) applies to every canvas source, not just the background.
+        function hydrateLayerImages() {
+            doc.Layers.forEach(function (layer) {
+                if (layer.Type !== 'image' || layer._img || layer._imgPending || !layer.ImagePath) { return; }
+                layer._imgPending = true;
+                authFetch('CustomCoverArt/layerImage?path=' + encodeURIComponent(layer.ImagePath))
+                    .then(function (r) {
+                        if (!r.ok) { throw new Error('layer image returned ' + r.status); }
+                        return r.blob();
+                    })
+                    .then(function (blob) {
+                        var url = URL.createObjectURL(blob);
+                        var img = new Image();
+                        img.onload = function () {
+                            URL.revokeObjectURL(url);
+                            layer._img = img;
+                            layer._imgPending = false;
+                            scheduleRender();
+                        };
+                        img.onerror = function () { URL.revokeObjectURL(url); layer._imgPending = false; };
+                        img.src = url;
+                    })
+                    .catch(function () {
+                        // Best-effort: the layer still renders in the authoritative
+                        // server output, it just can't be previewed on the canvas.
+                        layer._imgPending = false;
+                    });
+            });
+        }
+        // ------------------------------------------------------------------
+
         var _rafPending = false;
         function scheduleRender() {
             if (_rafPending) { return; }
@@ -801,10 +1041,10 @@
             doc.Layers.forEach(function (layer) {
                 if (!layer.Visible) { return; }
                 if (layer.Type === 'text') { drawTextLayer(ctx, layer, W, H); }
-                // image layers: Phase 2
+                else if (layer.Type === 'image') { drawImageLayer(ctx, layer, W, H); }
             });
 
-            drawSelectionHandles(ctx, W, H); // filled in by Task 8
+            drawSelectionHandles(ctx, W, H);
 
             var ph = el('ccaPreviewPlaceholder');
             if (ph) { ph.style.display = 'none'; }
@@ -924,6 +1164,10 @@
             var fontPx = Math.max(8, Math.min(1024, layer.Size * doc.Canvas.Height));
             ctx.save();
             ctx.globalAlpha = layer.Opacity;
+            // Rotate about the layer's own anchor and draw at the local origin —
+            // the same pivot the server uses (RenderTextLayer's SetDrawingTransform).
+            ctx.translate(px, py);
+            if (layer.Rotation) { ctx.rotate(layer.Rotation * Math.PI / 180); }
             ctx.font = layer.Weight + ' ' + fontPx + 'px "Noto Sans", sans-serif';
             ctx.textAlign = layer.Align === 0 ? 'left' : (layer.Align === 2 ? 'right' : 'center');
             ctx.textBaseline = 'middle';
@@ -932,7 +1176,7 @@
                 ctx.lineWidth = layer.Outline.Width * 2;
                 ctx.strokeStyle = layer.Outline.Color;
                 ctx.lineJoin = 'round';
-                ctx.strokeText(layer.Content, px, py);
+                ctx.strokeText(layer.Content, 0, 0);
             }
             if (layer.Shadow && layer.Shadow.Enabled) {
                 ctx.shadowColor = layer.Shadow.Color;
@@ -941,7 +1185,24 @@
                 ctx.shadowOffsetY = layer.Shadow.OffsetY;
             }
             ctx.fillStyle = layer.Color;
-            ctx.fillText(layer.Content, px, py);
+            ctx.fillText(layer.Content, 0, 0);
+            ctx.restore();
+        }
+
+        // One image (logo) layer, mirroring DocumentRenderer.RenderImageLayer: the
+        // bitmap scaled to Width×Height of the canvas, rotated about the layer anchor,
+        // composited at Opacity. Draws nothing until the bitmap is decoded — the
+        // authoritative server render is the one that counts either way.
+        function drawImageLayer(ctx, layer, W, H) {
+            var img = layer._img;
+            if (!img || !img.complete || !img.naturalWidth) { return; }
+            var w = Math.max(1, (layer.Width || 0) * W);
+            var h = Math.max(1, (layer.Height || 0) * H);
+            ctx.save();
+            ctx.globalAlpha = Math.max(0, Math.min(1, layer.Opacity == null ? 1 : layer.Opacity));
+            ctx.translate(normToPx(layer.X, W), normToPx(layer.Y, H));
+            if (layer.Rotation) { ctx.rotate(layer.Rotation * Math.PI / 180); }
+            ctx.drawImage(img, -w / 2, -h / 2, w, h);
             ctx.restore();
         }
 
@@ -964,18 +1225,111 @@
             return { x: left, y: cy - th / 2, w: tw, h: th };
         }
 
-        // Selection overlay: a dashed outline around the selected text layer's bounds.
+        // A layer's box expressed RELATIVE TO ITS ROTATION PIVOT, which for both types
+        // is the anchor (X*W, Y*H) — the same point the server rotates about. Image
+        // layers are centred on it; text layers hang off it according to alignment.
+        // Keeping one representation means selection, hit-testing and the handles all
+        // agree no matter how the layer is rotated.
+        function layerRect(ctx, layer, W, H) {
+            var px = normToPx(layer.X, W), py = normToPx(layer.Y, H);
+            var rot = layer.Rotation || 0;
+            if (layer.Type === 'image') {
+                var w = Math.max(1, (layer.Width || 0) * W);
+                var h = Math.max(1, (layer.Height || 0) * H);
+                return { px: px, py: py, rot: rot, lx: -w / 2, ly: -h / 2, w: w, h: h };
+            }
+            var b = textLayerBounds(ctx, layer, W, H);
+            return { px: px, py: py, rot: rot, lx: b.x - px, ly: b.y - py, w: b.w, h: b.h };
+        }
+
+        // Layer space -> canvas space.
+        function rectToCanvas(r, lx, ly) {
+            var a = r.rot * Math.PI / 180, c = Math.cos(a), s = Math.sin(a);
+            return { x: r.px + lx * c - ly * s, y: r.py + lx * s + ly * c };
+        }
+        // Canvas space -> layer space (inverse rotation about the pivot).
+        function canvasToRect(r, pt) {
+            var a = -r.rot * Math.PI / 180, c = Math.cos(a), s = Math.sin(a);
+            var dx = pt.x - r.px, dy = pt.y - r.py;
+            return { x: dx * c - dy * s, y: dx * s + dy * c };
+        }
+
+        // Handle sizes in CANVAS pixels — the canvas is displayed CSS-scaled, so these
+        // are derived from the backing-store height to stay visually constant.
+        function handleSize(H) { return Math.max(7, H / 55); }
+        function rotateKnobGap(H) { return Math.max(18, H / 16); }
+
+        // The four corner handles plus the rotate knob, in canvas coordinates, tagged
+        // with their layer-space corner so a drag knows which way it is resizing.
+        function layerHandles(r, H) {
+            var pts = [
+                { id: 'nw', lx: r.lx, ly: r.ly },
+                { id: 'ne', lx: r.lx + r.w, ly: r.ly },
+                { id: 'sw', lx: r.lx, ly: r.ly + r.h },
+                { id: 'se', lx: r.lx + r.w, ly: r.ly + r.h }
+            ].map(function (p) {
+                var c = rectToCanvas(r, p.lx, p.ly);
+                return { id: p.id, lx: p.lx, ly: p.ly, x: c.x, y: c.y };
+            });
+            var knobLocal = { lx: r.lx + r.w / 2, ly: r.ly - rotateKnobGap(H) };
+            var k = rectToCanvas(r, knobLocal.lx, knobLocal.ly);
+            pts.push({ id: 'rot', lx: knobLocal.lx, ly: knobLocal.ly, x: k.x, y: k.y });
+            return pts;
+        }
+
+        // Selection overlay: a dashed outline around the selected layer, following its
+        // rotation, plus corner-resize handles and a rotate knob.
         function drawSelectionHandles(ctx, W, H) {
             var layer = selectedLayer();
-            if (!layer || !layer.Visible || layer.Type !== 'text') { return; }
-            var b = textLayerBounds(ctx, layer, W, H);
-            var pad = Math.max(6, b.h * 0.18);
+            if (!layer || !layer.Visible) { return; }
+            var r = layerRect(ctx, layer, W, H);
+            var pad = Math.max(6, r.h * 0.12);
+            var hs = handleSize(H);
+
             ctx.save();
+            ctx.translate(r.px, r.py);
+            ctx.rotate(r.rot * Math.PI / 180);
             ctx.strokeStyle = 'rgba(0, 164, 220, 0.95)';
             ctx.lineWidth = Math.max(1.5, H / 500);
             ctx.setLineDash([Math.max(6, H / 120), Math.max(4, H / 200)]);
-            ctx.strokeRect(b.x - pad, b.y - pad, b.w + pad * 2, b.h + pad * 2);
+            ctx.strokeRect(r.lx - pad, r.ly - pad, r.w + pad * 2, r.h + pad * 2);
+
+            // Stem from the top edge to the rotate knob.
+            ctx.setLineDash([]);
+            ctx.beginPath();
+            ctx.moveTo(r.lx + r.w / 2, r.ly - pad);
+            ctx.lineTo(r.lx + r.w / 2, r.ly - rotateKnobGap(H));
+            ctx.stroke();
             ctx.restore();
+
+            ctx.save();
+            ctx.fillStyle = 'rgba(0, 164, 220, 0.95)';
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+            ctx.lineWidth = Math.max(1, H / 700);
+            layerHandles(r, H).forEach(function (p) {
+                ctx.beginPath();
+                if (p.id === 'rot') { ctx.arc(p.x, p.y, hs * 0.6, 0, Math.PI * 2); }
+                else { ctx.rect(p.x - hs / 2, p.y - hs / 2, hs, hs); }
+                ctx.fill();
+                ctx.stroke();
+            });
+            ctx.restore();
+        }
+
+        // The handle under the pointer, if any, for the currently selected layer.
+        function hitTestHandle(pt) {
+            var layer = selectedLayer();
+            var cv = el('ccaCanvas');
+            if (!layer || !layer.Visible || !cv) { return null; }
+            var ctx = cv.getContext('2d');
+            var r = layerRect(ctx, layer, cv.width, cv.height);
+            var tol = handleSize(cv.height);
+            var found = null;
+            layerHandles(r, cv.height).forEach(function (p) {
+                var dx = pt.x - p.x, dy = pt.y - p.y;
+                if (!found && Math.sqrt(dx * dx + dy * dy) <= tol) { found = p; }
+            });
+            return found ? { handle: found, rect: r, layer: layer } : null;
         }
 
         // Client → canvas-pixel mapping (accounts for the CSS-scaled canvas).
@@ -987,25 +1341,29 @@
             };
         }
 
-        // Topmost (last-drawn) visible text layer whose padded bounds contain the point.
+        // Topmost (last-drawn) visible layer whose padded box contains the point. The
+        // point is mapped into each layer's own rotated space, so a turned layer is
+        // grabbed where it actually appears rather than by its upright footprint.
         function hitTestLayer(pt) {
             var cv = el('ccaCanvas'); if (!cv) { return null; }
             var ctx = cv.getContext('2d');
             for (var i = doc.Layers.length - 1; i >= 0; i--) {
                 var layer = doc.Layers[i];
-                if (!layer.Visible || layer.Type !== 'text') { continue; }
-                var b = textLayerBounds(ctx, layer, cv.width, cv.height);
-                var pad = Math.max(8, b.h * 0.3);
-                if (pt.x >= b.x - pad && pt.x <= b.x + b.w + pad &&
-                    pt.y >= b.y - pad && pt.y <= b.y + b.h + pad) {
+                if (!layer.Visible) { continue; }
+                var r = layerRect(ctx, layer, cv.width, cv.height);
+                var local = canvasToRect(r, pt);
+                var pad = layer.Type === 'text' ? Math.max(8, r.h * 0.3) : 0;
+                if (local.x >= r.lx - pad && local.x <= r.lx + r.w + pad &&
+                    local.y >= r.ly - pad && local.y <= r.ly + r.h + pad) {
                     return layer;
                 }
             }
             return null;
         }
 
-        var _drag = null;     // text-layer drag (bgAdjustMode off)
-        var _bgDrag = null;   // background pan drag (bgAdjustMode on, single pointer)
+        var _drag = null;       // layer move drag (bgAdjustMode off)
+        var _handleDrag = null; // corner-resize / rotate-knob drag on the selected layer
+        var _bgDrag = null;     // background pan drag (bgAdjustMode on, single pointer)
 
         // Two-pointer pinch tracking for background zoom (bgAdjustMode on, touch).
         // Keyed by pointerId, client (not canvas) coordinates — only the RATIO
@@ -1046,10 +1404,32 @@
             }
 
             var pt = canvasPoint(ev);
+
+            // Handles belong to the already-selected layer and sit OUTSIDE its box, so
+            // they must win over a plain hit-test — otherwise a corner handle that
+            // overlaps a layer below would select that layer instead of resizing.
+            var grip = hitTestHandle(pt);
+            if (grip) {
+                _handleDrag = {
+                    kind: grip.handle.id === 'rot' ? 'rotate' : 'resize',
+                    layer: grip.layer,
+                    origWidth: grip.layer.Width, origHeight: grip.layer.Height,
+                    origSize: grip.layer.Size, origRotation: grip.layer.Rotation || 0,
+                    // Distance from the pivot at grab time: text resizes by ratio, so
+                    // it needs the starting reach, not an absolute corner.
+                    startDist: Math.sqrt(Math.pow(pt.x - grip.rect.px, 2) + Math.pow(pt.y - grip.rect.py, 2)),
+                    rect: grip.rect
+                };
+                try { el('ccaCanvas').setPointerCapture(ev.pointerId); } catch (e) { /* ignore */ }
+                ev.preventDefault();
+                return;
+            }
+
             var hit = hitTestLayer(pt);
             if (!hit) { return; }
             if (doc._selectedId !== hit.Id) {
                 doc._selectedId = hit.Id;
+                renderLayersPanel();
                 syncControlsFromDocument();
             }
             _drag = { startX: pt.x, startY: pt.y, origX: hit.X, origY: hit.Y };
@@ -1096,6 +1476,44 @@
                 return;
             }
 
+            if (_handleDrag) {
+                var hd = _handleDrag;
+                var r = hd.rect;
+                var hp = canvasPoint(ev);
+                if (hd.kind === 'rotate') {
+                    // The knob sits above the layer, so the pointer's bearing from the
+                    // pivot is 90° ahead of the layer's own rotation.
+                    var deg = Math.atan2(hp.y - r.py, hp.x - r.px) * 180 / Math.PI + 90;
+                    while (deg > 180) { deg -= 360; }
+                    while (deg < -180) { deg += 360; }
+                    if (ev.shiftKey) { deg = Math.round(deg / 15) * 15; }
+                    hd.layer.Rotation = Math.round(deg);
+                } else if (hd.layer.Type === 'image') {
+                    // An image layer is centred on its pivot, so the grabbed corner's
+                    // distance from the centre IS the half-width/half-height.
+                    var local = canvasToRect(r, hp);
+                    var w = Math.max(0.01, Math.abs(local.x) * 2 / el('ccaCanvas').width);
+                    var h = Math.max(0.01, Math.abs(local.y) * 2 / el('ccaCanvas').height);
+                    if (ev.shiftKey && hd.origWidth > 0) {
+                        h = w * (hd.origHeight / hd.origWidth); // keep the aspect ratio
+                    }
+                    hd.layer.Width = Math.min(4, w);
+                    hd.layer.Height = Math.min(4, h);
+                } else {
+                    // Text has no width/height of its own — scale its font size by how
+                    // much further the corner was dragged from the pivot.
+                    var dist = Math.sqrt(Math.pow(hp.x - r.px, 2) + Math.pow(hp.y - r.py, 2));
+                    if (hd.startDist > 0) {
+                        var size = hd.origSize * (dist / hd.startDist);
+                        hd.layer.Size = Math.max(8 / doc.Canvas.Height, Math.min(1024 / doc.Canvas.Height, size));
+                    }
+                }
+                syncControlsFromDocument();
+                scheduleRender();
+                ev.preventDefault();
+                return;
+            }
+
             if (!_drag) { return; }
             var layer = selectedLayer(); if (!layer) { return; }
             var cv = el('ccaCanvas');
@@ -1112,6 +1530,11 @@
             if (bgAdjustMode) {
                 try { el('ccaCanvas').releasePointerCapture(ev.pointerId); } catch (e) { /* ignore */ }
                 _bgDrag = null;
+                return;
+            }
+            if (_handleDrag) {
+                try { el('ccaCanvas').releasePointerCapture(ev.pointerId); } catch (e) { /* ignore */ }
+                _handleDrag = null;
                 return;
             }
             if (!_drag) { return; }
@@ -1288,7 +1711,27 @@
         // The selected text layer drives the Text card; doc.Background/doc.Canvas drive
         // the rest. Call after a selection change or a template load.
         function syncControlsFromDocument() {
-            var l = selectedLayer() || {};
+            var sel = selectedLayer();
+            var l = sel || {};
+            var isText = !!sel && sel.Type === 'text';
+            var isImage = !!sel && sel.Type === 'image';
+
+            // Selected-layer card: text-only controls hide for a logo, and the
+            // resize/rotate hint only makes sense for one.
+            page.querySelectorAll('#ccaSettings .ccaTextOnly').forEach(function (n) {
+                n.style.display = isText ? '' : 'none';
+            });
+            page.querySelectorAll('#ccaSettings .ccaImageOnly').forEach(function (n) {
+                n.style.display = isImage ? '' : 'none';
+            });
+            el('ccaNoLayerHint').style.display = sel ? 'none' : '';
+
+            // Opacity/Rotation apply to both layer types.
+            var opacityPct = Math.round((l.Opacity == null ? 1 : l.Opacity) * 100);
+            el('ccaLayerOpacity').value = opacityPct;
+            el('ccaLayerOpacityVal').textContent = opacityPct;
+            el('ccaLayerRotation').value = l.Rotation || 0;
+            el('ccaLayerRotationVal').textContent = (l.Rotation || 0) + '°';
 
             // Text card (selected layer)
             el('ccaTitle').value = (l.Content != null) ? l.Content : '';
@@ -1709,7 +2152,72 @@
             });
             // --- Text card: drives the SELECTED text layer ----------------
             el('ccaTitle').addEventListener('input', function () {
-                var l = selectedLayer(); if (l) { l.Content = this.value; scheduleRender(); }
+                var l = selectedLayer();
+                if (l) {
+                    l.Content = this.value;
+                    renderLayersPanel(); // the panel labels a text layer with its content
+                    scheduleRender();
+                }
+            });
+
+            // --- Layers card ----------------------------------------------
+            el('ccaAddText').addEventListener('click', addTextLayer);
+            el('ccaAddImage').addEventListener('click', function () { el('ccaLayerImage').click(); });
+
+            el('ccaLayerImage').addEventListener('change', function () {
+                if (!this.files || !this.files[0]) { return; }
+                var file = this.files[0];
+                var input = this;
+                Dashboard.showLoadingMsg();
+                uploadFile('upload', file).then(function (res) {
+                    Dashboard.hideLoadingMsg();
+                    // Let the same file be picked again later (change won't fire twice
+                    // for an unchanged value).
+                    input.value = '';
+                    if (!pick(res, 'Success')) {
+                        Dashboard.alert(t('dyn.uploadFail', pick(res, 'ErrorMessage') || t('dyn.unknown')));
+                        return;
+                    }
+                    var l = newImageLayer(pick(res, 'Data'), file.name);
+                    var img = new Image();
+                    var url = URL.createObjectURL(file);
+                    img.onload = function () {
+                        URL.revokeObjectURL(url);
+                        // Start at the logo's natural aspect ratio. Width/Height are
+                        // fractions of DIFFERENT canvas axes, so converting a pixel
+                        // ratio into them needs the canvas ratio folded in.
+                        var ar = img.naturalWidth ? (img.naturalHeight / img.naturalWidth) : 1;
+                        l.Height = Math.min(1, l.Width * ar * (doc.Canvas.Width / doc.Canvas.Height));
+                        l._img = img;
+                        doc.Layers.push(l);
+                        selectLayerById(l.Id);
+                    };
+                    img.onerror = function () {
+                        // Undecodable client-side, but the server still has the file —
+                        // add it anyway so the authoritative render includes it.
+                        URL.revokeObjectURL(url);
+                        doc.Layers.push(l);
+                        selectLayerById(l.Id);
+                    };
+                    // Canvas-source invariant: the bitmap comes from the client File as
+                    // a blob: URL, never from the server path we just received.
+                    img.src = url;
+                }).catch(function (e) {
+                    Dashboard.hideLoadingMsg();
+                    input.value = '';
+                    Dashboard.alert(e.message);
+                });
+            });
+
+            el('ccaLayerOpacity').addEventListener('input', function () {
+                el('ccaLayerOpacityVal').textContent = this.value;
+                var l = selectedLayer();
+                if (l) { l.Opacity = (parseInt(this.value, 10) || 0) / 100; scheduleRender(); }
+            });
+            el('ccaLayerRotation').addEventListener('input', function () {
+                el('ccaLayerRotationVal').textContent = this.value + '°';
+                var l = selectedLayer();
+                if (l) { l.Rotation = parseInt(this.value, 10) || 0; scheduleRender(); }
             });
             el('ccaTextSize').addEventListener('input', function () {
                 el('ccaTextSizeVal').textContent = this.value;
@@ -1888,7 +2396,7 @@
                 bgAdjustMode = this.checked;
                 // Toggling mid-gesture would otherwise leave a stale drag/pinch
                 // state around; clear it so the next pointer event starts clean.
-                _drag = null; _bgDrag = null; _pointers = {}; _pinchStartDist = 0;
+                _drag = null; _handleDrag = null; _bgDrag = null; _pointers = {}; _pinchStartDist = 0;
                 cv.style.cursor = bgAdjustMode ? 'grab' : '';
             });
 
@@ -1920,6 +2428,10 @@
                 // drop any stale canvas bitmap (the invariant forbids loading the
                 // server path); the gradient/flat background renders instead.
                 bgImageEl = null;
+                renderLayersPanel();
+                // Logo layers arrive as server paths only (a template can't carry the
+                // bitmap), so pull them back as blobs to preview them on the canvas.
+                hydrateLayerImages();
                 syncControlsFromDocument();
                 scheduleRender();
             });
@@ -2108,6 +2620,7 @@
             Dashboard.showLoadingMsg();
             // Seed every control (incl. the brand gradient stops) from the default
             // document, so the UI and the live canvas start in agreement.
+            renderLayersPanel();
             syncControlsFromDocument();
             // Render immediately with a sane fallback, then re-render once the
             // bundled Noto weights register so canvas text metrics match the server.
