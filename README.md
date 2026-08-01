@@ -25,14 +25,16 @@ Text, gradients, blur, custom backgrounds and fonts — with a live preview, rig
 
 | | Feature | Details |
 |---|---|---|
-| 🅰️ | **Text overlays** | Title text with size, weight, colour and alignment control |
+| 🅰️ | **Text overlays** | Any number of text layers, each with its own size, weight, colour and alignment |
+| 🖼️ | **Logo & icon layers** | Drop your own PNGs onto the cover — positioned, resized, rotated and faded independently |
+| 🗂️ | **Layers panel** | Show/hide, reorder, duplicate, delete and select every layer; the editor follows your selection |
 | 🌑 | **Text effects** | Drop shadow and outline for readability over busy backgrounds |
 | 🌈 | **Gradients** | Linear and radial gradient backgrounds |
 | 🖼️ | **Custom backgrounds** | Upload your own image, or pick an existing poster from any library |
 | 🌫️ | **Blur & dimming** | Soften and darken backgrounds so text stands out |
 | 🔠 | **Fonts** | Bundled Noto Sans (matches Jellyfin's UI, so text always renders) — or upload your own `.ttf` / `.otf` / `.woff` / `.woff2` |
 | 📐 | **Presets & sizes** | Square cover, portrait poster, wide banner, or custom dimensions |
-| 🖱️ | **Interactive canvas** | The preview is a live canvas — drag the title to position it, drag/scroll/pinch to reposition and zoom the background |
+| 🖱️ | **Interactive canvas** | The preview is a live canvas — drag layers to position them, resize/rotate them with handles, drag/scroll/pinch to reposition and zoom the background |
 | 🎯 | **Authoritative server render** | The canvas is a fast approximation; "Show server render" renders the exact same design on the server before you apply |
 | 🧩 | **Poster collage** | Auto-build a grid-mosaic background from a target's own item posters |
 | 💾 | **Design templates** | Save a look and reuse it; each target keeps its own name as the title |
@@ -99,10 +101,24 @@ The output is in `bin/Release/net9.0/`. Copy `CustomCoverArt.dll` plus the
 
 1. Go to **Dashboard → Plugins → Custom Cover Art**.
 2. Pick a **library** from the dropdown.
-3. Design directly on the **canvas**: adjust the settings on the left, or click the title text and **drag** it to reposition. The canvas updates live as you go.
-4. Toggle **Reposition background** to drag-pan the background image, and scroll (or pinch, on touch) to zoom it — up to 4×. With the **Fill** image fit you can pan straight away to choose which part of the picture the cover shows; **Fit** and **Stretch** show the whole image already, so there is nothing to pan into until you zoom in.
-5. Click **Show server render** to confirm the exact server-rendered output (the canvas is a fast approximation; the server render is authoritative).
-6. Click **Apply to library** to set it as the library's cover.
+3. Design directly on the **canvas**: adjust the settings on the left, or click a layer and **drag** it to reposition. The canvas updates live as you go.
+4. Build the cover up in the **Layers** card — see *Text and logo layers* below.
+5. Toggle **Reposition background** to drag-pan the background image, and scroll (or pinch, on touch) to zoom it — up to 4×. With the **Fill** image fit you can pan straight away to choose which part of the picture the cover shows; **Fit** and **Stretch** show the whole image already, so there is nothing to pan into until you zoom in.
+6. Click **Show server render** to confirm the exact server-rendered output (the canvas is a fast approximation; the server render is authoritative).
+7. Click **Apply to library** to set it as the library's cover.
+
+### Text and logo layers
+
+**Add text** stacks another independently styled text layer; **Add logo/icon** uploads a PNG
+(transparency preserved) as an image layer. The Layers list shows the top-most layer first — use
+▲/▼ to restack, 👁 to hide a layer without deleting it, ⧉ to duplicate and ✕ to remove. Click any
+row to select it; the **Selected layer** card below edits that layer, and text-only controls hide
+when a logo is selected.
+
+On the canvas the selected layer gets **corner handles** (drag to resize — a logo scales about its
+centre, text scales its font size) and a **knob above it to rotate**. Hold **Shift** while dragging
+to keep a logo's proportions, or while rotating to snap to 15° steps. The **Opacity** and
+**Rotation** sliders apply to text and logos alike. Covers are capped at 40 layers.
 
 ### Using an existing poster as a background
 
@@ -139,9 +155,11 @@ cover** on the Target card to revert.
 - All endpoints require an authenticated **administrator** (`RequiresElevation` policy).
 - Uploads are **rate‑limited**, size‑capped, and validated by **content** (not just extension) —
   executables and non‑image payloads are rejected even if renamed to `.png`.
-- Background/font paths supplied by the browser are **sandboxed** to the plugin's data
-  directory, so the generator cannot be pointed at arbitrary files on the server.
+- Background, font and layer-image paths supplied by the browser are **sandboxed** to the
+  plugin's data directory, so the generator cannot be pointed at arbitrary files on the server.
 - Uploaded files are stored under Jellyfin's data path using randomised names.
+- The number of layers per cover is **capped at 40** server-side, so a crafted request cannot
+  turn one render into unbounded work.
 
 ## 🌐 Adding a translation
 
