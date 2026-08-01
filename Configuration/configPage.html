@@ -269,6 +269,10 @@
                                 <input type="range" class="ccaRange" id="ccaFxBorderGap" min="0" max="32" step="1" value="6" />
                             </div>
                         </div>
+
+                        <label class="ccaCheck ccaCheckBlock"><input is="emby-checkbox" type="checkbox" id="ccaAutoPalette" /><span data-i18n="fx.autopalette">Auto palette</span></label>
+                        <div id="ccaSwatches" class="ccaSwatches"></div>
+                        <div class="fieldDescription" data-i18n="fx.paletteHint">Click a colour to apply it to the selected text layer, or to the colour wash when no text layer is selected.</div>
                     </section>
 
                     <section class="ccaCard">
@@ -509,6 +513,15 @@
         }
         #CustomCoverArtConfigPage .ccaStopRemove:hover { opacity: 1; }
 
+        /* Palette swatches extracted from the background. */
+        #CustomCoverArtConfigPage .ccaSwatches { display: flex; flex-wrap: wrap; gap: .4em; margin: .3em 0 0; }
+        #CustomCoverArtConfigPage .ccaSwatches:empty { display: none; }
+        #CustomCoverArtConfigPage .ccaSwatch {
+            width: 2em; height: 2em; padding: 0; cursor: pointer;
+            border: 1px solid rgba(127, 127, 127, .5); border-radius: 6px;
+        }
+        #CustomCoverArtConfigPage .ccaSwatch:hover { border-color: var(--theme-primary-color, #00a4dc); }
+
         /* Layers panel: newest/topmost layer first, one row per layer. */
         #CustomCoverArtConfigPage .ccaLayerList { display: flex; flex-direction: column; gap: .2em; max-height: 240px; overflow-y: auto; }
         #CustomCoverArtConfigPage .ccaLayerList:empty { display: none; }
@@ -641,6 +654,7 @@
                 'fx.color': 'Colour', 'fx.opacity': 'Strength', 'fx.amount': 'Strength', 'fx.softness': 'Softness',
                 'fx.thickness': 'Thickness', 'fx.radius': 'Corner radius', 'fx.double': 'Double line', 'fx.gap': 'Gap',
                 'fx.jellyfin': 'Jellyfin style', 'fx.presetHint': 'Applies a dark gradient with clean white text — editable afterwards.',
+                'fx.autopalette': 'Auto palette', 'fx.paletteHint': 'Click a colour to apply it to the selected text layer, or to the colour wash when no text layer is selected.',
                 'card.background': 'Background', 'bg.dim': 'Dimming', 'bg.blur': 'Blur', 'bg.dimcolor': 'Dim / base color',
                 'bg.gradient': 'Enable gradient background', 'bg.gtype': 'Gradient type', 'g.linear': 'Linear', 'g.radial': 'Radial',
                 'bg.startcolor': 'Start color', 'bg.endcolor': 'End color',
@@ -689,6 +703,7 @@
                 'fx.color': 'Kleur', 'fx.opacity': 'Sterkte', 'fx.amount': 'Sterkte', 'fx.softness': 'Zachtheid',
                 'fx.thickness': 'Dikte', 'fx.radius': 'Hoekafronding', 'fx.double': 'Dubbele lijn', 'fx.gap': 'Tussenruimte',
                 'fx.jellyfin': 'Jellyfin-stijl', 'fx.presetHint': 'Past een donker verloop met strakke witte tekst toe — daarna vrij aanpasbaar.',
+                'fx.autopalette': 'Automatisch kleurenpalet', 'fx.paletteHint': 'Klik op een kleur om die toe te passen op de geselecteerde tekstlaag, of op het kleurwaas als er geen tekstlaag geselecteerd is.',
                 'card.background': 'Achtergrond', 'bg.dim': 'Dimmen', 'bg.blur': 'Vervaging', 'bg.dimcolor': 'Dim- / basiskleur',
                 'bg.gradient': 'Verloop-achtergrond inschakelen', 'bg.gtype': 'Verlooptype', 'g.linear': 'Lineair', 'g.radial': 'Radiaal',
                 'bg.startcolor': 'Startkleur', 'bg.endcolor': 'Eindkleur',
@@ -1105,10 +1120,44 @@
             var W = cv.width, H = cv.height;
             ctx.clearRect(0, 0, W, H);
 
-            // Background: image (if a blob-loaded one is ready) honouring fit +
-            // transform, else the gradient, else a flat base-colour fill — the same
-            // precedence as DocumentRenderer.ComposeDocumentFrame /
-            // CreateGradientBackground.
+            paintBackgroundOnly(ctx, W, H);
+
+            // Effects order is a contract shared with the server (EffectsComposer):
+            // soft-light UNDER the layers, then vignette -> grain -> border on top.
+            drawSoftLight(ctx, W, H);
+
+            // Visible layers, in array order (draw order matches the server loop).
+            doc.Layers.forEach(function (layer) {
+                if (!layer.Visible) { return; }
+                if (layer.Type === 'text') { drawTextLayer(ctx, layer, W, H); }
+                else if (layer.Type === 'image') { drawImageLayer(ctx, layer, W, H); }
+            });
+
+            drawVignette(ctx, W, H);
+            drawGrain(ctx, W, H);
+            drawBorder(ctx, W, H);
+
+            // Selection UI last of all: it is editor chrome, not part of the design, and
+            // downloadPreview() clears the selection before exporting so it never bakes in.
+            drawSelectionHandles(ctx, W, H);
+
+            // Keep the swatches in step with whatever the background has become.
+            refreshPalette();
+
+            var ph = el('ccaPreviewPlaceholder');
+            if (ph) { ph.style.display = 'none'; }
+            // The canvas always renders, so the export target is always available.
+            var dl = el('ccaDownloadBtn');
+            if (dl) { dl.disabled = false; }
+        }
+
+        // Background only — no layers, no effects, no selection chrome. Split out of
+        // renderDocument so the palette sampler can paint the same background into a
+        // tiny offscreen canvas without text pixels skewing the dominant colours.
+        //
+        // Precedence mirrors ComposeDocumentFrame / CreateGradientBackground: a
+        // blob-loaded image if one is ready, else the gradient, else a flat fill.
+        function paintBackgroundOnly(ctx, W, H) {
             var drewImage = false;
             if (bgImageEl && bgImageEl.complete && bgImageEl.naturalWidth) {
                 drawBackgroundImage(ctx, bgImageEl, W, H);
@@ -1133,31 +1182,6 @@
                 ctx.fillRect(0, 0, W, H);
                 ctx.restore();
             }
-
-            // Effects order is a contract shared with the server (EffectsComposer):
-            // soft-light UNDER the layers, then vignette -> grain -> border on top.
-            drawSoftLight(ctx, W, H);
-
-            // Visible layers, in array order (draw order matches the server loop).
-            doc.Layers.forEach(function (layer) {
-                if (!layer.Visible) { return; }
-                if (layer.Type === 'text') { drawTextLayer(ctx, layer, W, H); }
-                else if (layer.Type === 'image') { drawImageLayer(ctx, layer, W, H); }
-            });
-
-            drawVignette(ctx, W, H);
-            drawGrain(ctx, W, H);
-            drawBorder(ctx, W, H);
-
-            // Selection UI last of all: it is editor chrome, not part of the design, and
-            // downloadPreview() clears the selection before exporting so it never bakes in.
-            drawSelectionHandles(ctx, W, H);
-
-            var ph = el('ccaPreviewPlaceholder');
-            if (ph) { ph.style.display = 'none'; }
-            // The canvas always renders, so the export target is always available.
-            var dl = el('ccaDownloadBtn');
-            if (dl) { dl.disabled = false; }
         }
 
         // --- Effects (Phase 3) --------------------------------------------
@@ -1281,6 +1305,89 @@
             }
             ctx.restore();
         }
+
+        // --- Colour palette (Phase 3) -------------------------------------
+        // Dominant colours of the BACKGROUND, extracted entirely client-side — no new
+        // endpoint, no upload round-trip. Sampled from a tiny offscreen render (the
+        // cover's aspect ratio, 64px wide) so it costs a few thousand pixels, not
+        // millions, and never blocks the UI.
+        //
+        // This is the feature the blob-URL canvas-source invariant has been protecting
+        // since Phase 1: getImageData throws a SecurityError on a canvas tainted by a
+        // cross-origin image, which is why background bitmaps only ever come from
+        // URL.createObjectURL. The read is still guarded — a tainted or CSP-blocked
+        // canvas degrades to "no swatches" rather than an exception.
+        function extractPalette() {
+            var SW = 64;
+            var SH = Math.max(1, Math.round(SW * (doc.Canvas.Height || 1) / (doc.Canvas.Width || 1)));
+            var tmp = document.createElement('canvas');
+            tmp.width = SW; tmp.height = SH;
+            var tctx = tmp.getContext('2d');
+            paintBackgroundOnly(tctx, SW, SH);
+
+            var data;
+            try { data = tctx.getImageData(0, 0, SW, SH).data; }
+            catch (e) { return []; }
+
+            // Quantize each channel to 4 bits so near-identical shades collapse into one
+            // bucket; the most populated buckets are the colours a viewer actually sees.
+            var counts = {};
+            for (var i = 0; i < data.length; i += 4) {
+                if (data[i + 3] < 128) { continue; }
+                var key = (data[i] >> 4) + ',' + (data[i + 1] >> 4) + ',' + (data[i + 2] >> 4);
+                counts[key] = (counts[key] || 0) + 1;
+            }
+
+            return Object.keys(counts)
+                .sort(function (a, b) { return counts[b] - counts[a]; })
+                .slice(0, 8)
+                .map(function (k) {
+                    // Back to 8-bit, biased to the middle of the bucket.
+                    var p = k.split(',').map(function (n) { return (parseInt(n, 10) << 4) | 8; });
+                    return '#' + p.map(function (n) { return ('0' + n.toString(16)).slice(-2); }).join('');
+                });
+        }
+
+        function renderSwatches(colors) {
+            var box = el('ccaSwatches');
+            if (!box) { return; }
+            box.innerHTML = '';
+            colors.forEach(function (hex) {
+                var s = document.createElement('button');
+                s.type = 'button';
+                s.className = 'ccaSwatch';
+                s.style.background = hex;
+                s.title = hex;
+                s.addEventListener('click', function () { applySwatch(hex); });
+                box.appendChild(s);
+            });
+        }
+
+        // Where a clicked swatch lands: the selected text layer if there is one,
+        // otherwise the colour wash when it is switched on. Both update their control
+        // so the card and the canvas never disagree.
+        function applySwatch(hex) {
+            var l = selectedLayer();
+            if (l && l.Type === 'text') {
+                l.Color = hex;
+                el('ccaTextColor').value = hex;
+            } else if (doc.Effects.SoftLight.Enabled) {
+                doc.Effects.SoftLight.Color = hex;
+                el('ccaFxSoftLightColor').value = hex;
+            } else {
+                return; // nothing sensible to apply it to; leave the design alone
+            }
+            scheduleRender();
+        }
+
+        // Re-extract after the canvas settles rather than wiring every background
+        // trigger (upload, poster pick, gradient stop edit, collage shuffle, preset).
+        // Debounced, and only while the toggle is on, so it costs nothing when unused.
+        var refreshPalette = debounce(function () {
+            var toggle = el('ccaAutoPalette');
+            if (!toggle || !toggle.checked) { return; }
+            renderSwatches(extractPalette());
+        }, 300);
         // ------------------------------------------------------------------
 
         // Builds the canvas colour-stop list from gradient settings — the explicit
@@ -2658,6 +2765,11 @@
             });
 
             el('ccaPresetJf').addEventListener('click', applyJellyfinPreset);
+
+            el('ccaAutoPalette').addEventListener('change', function () {
+                if (this.checked) { renderSwatches(extractPalette()); }
+                else { el('ccaSwatches').innerHTML = ''; }
+            });
 
             // --- Output card ----------------------------------------------
             el('ccaPreset').addEventListener('change', function () {
