@@ -1508,7 +1508,10 @@
                         hd.layer.Size = Math.max(8 / doc.Canvas.Height, Math.min(1024 / doc.Canvas.Height, size));
                     }
                 }
-                syncControlsFromDocument();
+                // Only the controls this gesture actually changes — a full
+                // syncControlsFromDocument() here would rebuild the gradient-stop rows
+                // on every pointer move.
+                syncTransformControls();
                 scheduleRender();
                 ev.preventDefault();
                 return;
@@ -1710,6 +1713,21 @@
         // Sets EVERY control from `doc` — the inverse of the old applySettingsToForm.
         // The selected text layer drives the Text card; doc.Background/doc.Canvas drive
         // the rest. Call after a selection change or a template load.
+        // The controls a canvas transform gesture can change (opacity, rotation, text
+        // size). Split out of syncControlsFromDocument so a drag can refresh just these
+        // at pointer rate instead of re-running the whole card, which rebuilds DOM.
+        function syncTransformControls() {
+            var l = selectedLayer() || {};
+            var opacityPct = Math.round((l.Opacity == null ? 1 : l.Opacity) * 100);
+            el('ccaLayerOpacity').value = opacityPct;
+            el('ccaLayerOpacityVal').textContent = opacityPct;
+            el('ccaLayerRotation').value = l.Rotation || 0;
+            el('ccaLayerRotationVal').textContent = (l.Rotation || 0) + '°';
+            var sizePx = Math.round((l.Size || 0) * doc.Canvas.Height);
+            el('ccaTextSize').value = sizePx;
+            el('ccaTextSizeVal').textContent = sizePx;
+        }
+
         function syncControlsFromDocument() {
             var sel = selectedLayer();
             var l = sel || {};
@@ -1726,17 +1744,11 @@
             });
             el('ccaNoLayerHint').style.display = sel ? 'none' : '';
 
-            // Opacity/Rotation apply to both layer types.
-            var opacityPct = Math.round((l.Opacity == null ? 1 : l.Opacity) * 100);
-            el('ccaLayerOpacity').value = opacityPct;
-            el('ccaLayerOpacityVal').textContent = opacityPct;
-            el('ccaLayerRotation').value = l.Rotation || 0;
-            el('ccaLayerRotationVal').textContent = (l.Rotation || 0) + '°';
+            // Opacity/Rotation/size — shared with the drag path below.
+            syncTransformControls();
 
             // Text card (selected layer)
             el('ccaTitle').value = (l.Content != null) ? l.Content : '';
-            var sizePx = Math.round((l.Size || 0) * doc.Canvas.Height);
-            el('ccaTextSize').value = sizePx; el('ccaTextSizeVal').textContent = sizePx;
             el('ccaTextWeight').value = String(l.Weight != null ? l.Weight : 400);
             el('ccaTextColor').value = l.Color || '#ffffff';
             el('ccaTextAlign').value = String(l.Align != null ? l.Align : 1);
