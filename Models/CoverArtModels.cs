@@ -55,10 +55,18 @@ public class CoverArtSettings
 }
 
 /// <summary>String constants for CoverArtSettings.BackgroundSource.</summary>
+/// <summary>
+/// What supplies the background. One value answers the question — before v3.3.0.0 this was
+/// split across Source and a separate Gradient.IsEnabled checkbox, so "what is my
+/// background?" had two overlapping answers.
+/// </summary>
 public static class BackgroundSources
 {
+    /// <summary>An image: uploaded from disk, or a library poster copied into the uploads dir.</summary>
     public const string Upload = "upload";
     public const string Collage = "collage";
+    public const string Gradient = "gradient";
+    public const string Solid = "solid";
 }
 
 /// <summary>Auto poster-collage background settings.</summary>

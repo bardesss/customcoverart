@@ -10,13 +10,12 @@ internal static class AnimationTestHost
 {
     public static (CoverArtService Service, string DataDir) New()
     {
-        var img = Substitute.For<IImageProcessingService>();
         var paths = Substitute.For<IApplicationPaths>();
         var dataDir = System.IO.Path.Combine(
             System.IO.Path.GetTempPath(), "cca_anim_" + System.Guid.NewGuid().ToString("N"));
         paths.DataPath.Returns(dataDir);
         var svc = new CoverArtService(
-            img, paths, Substitute.For<ILoggingService>(), Substitute.For<IMediaItemService>());
+            paths, Substitute.For<ILoggingService>(), Substitute.For<IMediaItemService>());
         return (svc, dataDir);
     }
 

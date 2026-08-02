@@ -18,8 +18,13 @@
 
                 <div class="ccaControls">
 
-                    <section class="ccaCard">
-                        <div class="ccaCardHead" data-i18n="card.target">Target</div>
+                    <section class="ccaStep" data-step="1">
+                        <button type="button" class="ccaStepHead" aria-expanded="false" aria-controls="ccaStepBody1">
+                            <span class="ccaStepNum">1</span>
+                            <span class="ccaStepTitle" data-i18n="step.target">Target &amp; start</span>
+                            <span class="ccaStepChevron" aria-hidden="true">&#9662;</span>
+                        </button>
+                        <div class="ccaStepBody" id="ccaStepBody1" hidden>
                         <div class="ccaGrid">
                             <div class="inputContainer">
                                 <label for="ccaTargetType" data-i18n="target.type">Type</label>
@@ -43,10 +48,123 @@
                             </button>
                             <span class="ccaFileName" id="ccaRestoreHint" data-i18n="restore.none">No backup yet</span>
                         </div>
+                        <div class="ccaStepGroup">
+                            <div class="ccaStepGroupHead" data-i18n="group.startFrom">Start from a saved design</div>
+                        <div class="inputContainer">
+                            <label for="ccaTemplateSelect" data-i18n="tpl.load">Load template</label>
+                            <div class="ccaFileRow">
+                                <select is="emby-select" id="ccaTemplateSelect" class="emby-select ccaGrow"></select>
+                                <button is="emby-button" type="button" id="ccaTemplateDelete" class="raised">
+                                    <span data-i18n="tpl.delete">Delete</span>
+                                </button>
+                            </div>
+                        </div>
+                        </div>
+                        </div>
                     </section>
+                    <section class="ccaStep" data-step="2">
+                        <button type="button" class="ccaStepHead" aria-expanded="false" aria-controls="ccaStepBody2">
+                            <span class="ccaStepNum">2</span>
+                            <span class="ccaStepTitle" data-i18n="step.background">Background</span>
+                            <span class="ccaStepChevron" aria-hidden="true">&#9662;</span>
+                        </button>
+                        <div class="ccaStepBody" id="ccaStepBody2" hidden>
+                        <div class="inputContainer">
+                            <label for="ccaBgSource" data-i18n="bg.source">Background source</label>
+                            <select is="emby-select" id="ccaBgSource" class="emby-select">
+                                <option value="upload" selected data-i18n="bg.source.image">Image</option>
+                                <option value="collage" data-i18n="bg.source.collage">Poster collage from this target</option>
+                                <option value="gradient" data-i18n="bg.source.gradient">Gradient</option>
+                                <option value="solid" data-i18n="bg.source.solid">Solid colour</option>
+                            </select>
+                        </div>
+                        <div class="inputContainer" id="ccaCollageRow" style="display:none">
+                            <label for="ccaCollageDensity" data-i18n="bg.collage.density">Collage density</label>
+                            <div class="ccaFileRow">
+                                <select is="emby-select" id="ccaCollageDensity" class="emby-select ccaGrow">
+                                    <option value="sparse" data-i18n="bg.collage.sparse">Sparse</option>
+                                    <option value="medium" selected data-i18n="bg.collage.medium">Medium</option>
+                                    <option value="dense" data-i18n="bg.collage.dense">Dense</option>
+                                </select>
+                                <button is="emby-button" type="button" id="ccaCollageShuffle" class="raised">
+                                    <span data-i18n="bg.collage.shuffle">Shuffle</span>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="inputContainer">
+                            <label for="ccaDim"><span data-i18n="bg.dim">Dimming</span> <span class="ccaVal" id="ccaDimVal">0.25</span></label>
+                            <input type="range" class="ccaRange" id="ccaDim" min="0" max="1" step="0.05" value="0.25" />
+                        </div>
 
-                    <section class="ccaCard">
-                        <div class="ccaCardHead" data-i18n="card.layers">Layers</div>
+                        <div id="ccaGradientOpts" class="ccaSub" style="display:none;">
+                            <div class="inputContainer">
+                                <label for="ccaGradientType" data-i18n="bg.gtype">Gradient type</label>
+                                <select is="emby-select" id="ccaGradientType" class="emby-select">
+                                    <option value="0" selected data-i18n="g.linear">Linear</option>
+                                    <option value="1" data-i18n="g.radial">Radial</option>
+                                </select>
+                            </div>
+                            <div class="inputContainer" id="ccaGradientAngleRow">
+                                <label for="ccaGradientAngle"><span data-i18n="bg.angle">Angle</span> <span class="ccaVal" id="ccaGradientAngleVal">0°</span></label>
+                                <input type="range" class="ccaRange" id="ccaGradientAngle" min="0" max="360" step="5" value="0" />
+                            </div>
+                            <div class="inputContainer">
+                                <label data-i18n="bg.colors">Colours</label>
+                                <div id="ccaGradientStops"></div>
+                                <button is="emby-button" type="button" id="ccaAddStop" class="raised"><span data-i18n="bg.addcolor">Add colour</span></button>
+                            </div>
+                        </div>
+
+                        <div id="ccaUploadControls">
+                        <div class="inputContainer">
+                            <label data-i18n="bg.image">Background image (optional)</label>
+                            <div class="ccaFileRow">
+                                <button is="emby-button" type="button" id="ccaBgImageBtn" class="raised"><span data-i18n="f.chooseImage">Choose image…</span></button>
+                                <span class="ccaFileName" id="ccaBgImageName" data-i18n="f.none">No file chosen</span>
+                            </div>
+                            <div class="fieldDescription" data-i18n="hint.image">JPG, PNG, GIF, BMP, WebP or TIFF · up to 5 MB.</div>
+                            <input type="file" id="ccaBgImage" accept=".jpg,.jpeg,.png,.gif,.bmp,.webp,.tiff,.tif" class="ccaHiddenFile" />
+                        </div>
+                        <div class="inputContainer">
+                            <label for="ccaBgFit" data-i18n="bg.fit">Image fit</label>
+                            <select is="emby-select" id="ccaBgFit" class="emby-select">
+                                <option value="cover" selected data-i18n="fit.cover">Fill (crop to fit)</option>
+                                <option value="contain" data-i18n="fit.contain">Fit (show whole image)</option>
+                                <option value="stretch" data-i18n="fit.stretch">Stretch to fill</option>
+                            </select>
+                            <div class="fieldDescription" data-i18n="hint.fit">Fill crops to cover the cover; Fit keeps the whole image and pads the rest with the base colour.</div>
+                        </div>
+                        <div class="inputContainer">
+                            <label data-i18n="bg.orposter">Or use an existing library poster</label>
+                            <button is="emby-button" type="button" id="ccaBrowseBtn" class="raised ccaBtnWide"><span data-i18n="bg.browse">Browse library posters</span></button>
+                            <div id="ccaSelectedBg" class="ccaSelected" style="display:none;"><span data-i18n="bg.selected">Selected background:</span> <strong id="ccaSelectedBgName"></strong></div>
+                        </div>
+                        </div>
+                        <div class="ccaAdv">
+                            <button type="button" class="ccaAdvHead" aria-expanded="false">
+                                <span class="ccaStepChevron" aria-hidden="true">&#9662;</span>
+                                <span data-i18n="ui.advanced">Advanced</span>
+                            </button>
+                            <div class="ccaAdvBody" hidden>
+                                <div class="inputContainer">
+                                    <label for="ccaBlur"><span data-i18n="bg.blur">Blur</span> <span class="ccaVal" id="ccaBlurVal">0</span></label>
+                                    <input type="range" class="ccaRange" id="ccaBlur" min="0" max="20" step="0.5" value="0" />
+                                </div>
+                                <div class="inputContainer">
+                                    <label for="ccaDimColor" data-i18n="bg.dimcolor">Dim / base color</label>
+                                    <input type="color" id="ccaDimColor" value="#000000" />
+                                </div>
+                            </div>
+                        </div>
+                        </div>
+                    </section>
+                    <section class="ccaStep" data-step="3">
+                        <button type="button" class="ccaStepHead" aria-expanded="false" aria-controls="ccaStepBody3">
+                            <span class="ccaStepNum">3</span>
+                            <span class="ccaStepTitle" data-i18n="step.text">Text &amp; logos</span>
+                            <span class="ccaStepChevron" aria-hidden="true">&#9662;</span>
+                        </button>
+                        <div class="ccaStepBody" id="ccaStepBody3" hidden>
                         <div id="ccaLayerList" class="ccaLayerList"></div>
                         <div class="ccaFileRow">
                             <button is="emby-button" type="button" id="ccaAddText" class="raised"><span data-i18n="layer.addText">Add text</span></button>
@@ -54,15 +172,37 @@
                             <input type="file" id="ccaLayerImage" accept=".png" class="ccaHiddenFile" />
                         </div>
                         <div class="fieldDescription" data-i18n="hint.logo">PNG with transparency · up to 5 MB. The topmost row is drawn last, on top of the others.</div>
-                    </section>
-
-                    <section class="ccaCard" id="ccaSettings">
-                        <div class="ccaCardHead" data-i18n="card.selected">Selected layer</div>
+                        <div class="ccaStepGroup">
+                            <div class="ccaStepGroupHead" data-i18n="group.selectedLayer">Selected layer</div>
+                        <div id="ccaSettings">
                         <div class="inputContainer ccaTextOnly">
                             <label for="ccaTitle" data-i18n="text.title">Title</label>
                             <input is="emby-input" type="text" id="ccaTitle" value="Movies" />
                         </div>
-                        <div class="ccaGrid ccaTextOnly">
+                        <div class="inputContainer ccaTextOnly">
+                                <label for="ccaTextAlign" data-i18n="text.align">Alignment</label>
+                                <select is="emby-select" id="ccaTextAlign" class="emby-select">
+                                    <option value="0" data-i18n="a.left">Left</option>
+                                    <option value="1" selected data-i18n="a.center">Center</option>
+                                    <option value="2" data-i18n="a.right">Right</option>
+                                </select>
+                        </div>
+                        <div class="inputContainer ccaTextOnly">
+                            <label for="ccaTextSize"><span data-i18n="text.size">Text size</span> <span class="ccaVal" id="ccaTextSizeVal">120</span></label>
+                            <input type="range" class="ccaRange" id="ccaTextSize" min="20" max="300" value="120" />
+                        </div>
+                        <div class="inputContainer ccaTextOnly">
+                            <label for="ccaTextColor" data-i18n="text.color">Text color</label>
+                            <input type="color" id="ccaTextColor" value="#ffffff" />
+                        </div>
+                        <div class="fieldDescription ccaImageOnly" data-i18n="hint.logoSize">Drag the corner handles on the preview to resize the logo, or the knob above it to rotate.</div>
+                        <div class="ccaAdv">
+                            <button type="button" class="ccaAdvHead" aria-expanded="false">
+                                <span class="ccaStepChevron" aria-hidden="true">&#9662;</span>
+                                <span data-i18n="ui.advanced">Advanced</span>
+                            </button>
+                            <div class="ccaAdvBody" hidden>
+                        <div class="inputContainer ccaTextOnly">
                             <div class="inputContainer">
                                 <label for="ccaTextWeight" data-i18n="text.weight">Font weight</label>
                                 <select is="emby-select" id="ccaTextWeight" class="emby-select">
@@ -74,24 +214,8 @@
                                     <option value="800" data-i18n="w.extrabold">ExtraBold</option>
                                 </select>
                             </div>
-                            <div class="inputContainer">
-                                <label for="ccaTextAlign" data-i18n="text.align">Alignment</label>
-                                <select is="emby-select" id="ccaTextAlign" class="emby-select">
-                                    <option value="0" data-i18n="a.left">Left</option>
-                                    <option value="1" selected data-i18n="a.center">Center</option>
-                                    <option value="2" data-i18n="a.right">Right</option>
-                                </select>
-                            </div>
                         </div>
                         <div class="inputContainer ccaTextOnly">
-                            <label for="ccaTextSize"><span data-i18n="text.size">Text size</span> <span class="ccaVal" id="ccaTextSizeVal">120</span></label>
-                            <input type="range" class="ccaRange" id="ccaTextSize" min="20" max="300" value="120" />
-                        </div>
-                        <div class="ccaGrid ccaTextOnly">
-                            <div class="inputContainer">
-                                <label for="ccaTextColor" data-i18n="text.color">Text color</label>
-                                <input type="color" id="ccaTextColor" value="#ffffff" />
-                            </div>
                             <div class="inputContainer">
                                 <label data-i18n="text.effects">Effects</label>
                                 <div class="ccaChecks">
@@ -119,96 +243,20 @@
                                 <input type="range" class="ccaRange" id="ccaLayerRotation" min="-180" max="180" step="1" value="0" />
                             </div>
                         </div>
-                        <div class="fieldDescription ccaImageOnly" data-i18n="hint.logoSize">Drag the corner handles on the preview to resize the logo, or the knob above it to rotate.</div>
+                            </div>
+                        </div>
                         <div class="fieldDescription" id="ccaNoLayerHint" data-i18n="layer.none" style="display:none">No layer selected — add one in the Layers card above.</div>
-                    </section>
-
-                    <section class="ccaCard">
-                        <div class="ccaCardHead" data-i18n="card.background">Background</div>
-                        <div class="inputContainer">
-                            <label for="ccaBgSource" data-i18n="bg.source">Background source</label>
-                            <select is="emby-select" id="ccaBgSource" class="emby-select">
-                                <option value="upload" selected data-i18n="bg.source.upload">Upload / poster</option>
-                                <option value="collage" data-i18n="bg.source.collage">Poster collage from this target</option>
-                            </select>
                         </div>
-                        <div class="inputContainer" id="ccaCollageRow" style="display:none">
-                            <label for="ccaCollageDensity" data-i18n="bg.collage.density">Collage density</label>
-                            <div class="ccaFileRow">
-                                <select is="emby-select" id="ccaCollageDensity" class="emby-select ccaGrow">
-                                    <option value="sparse" data-i18n="bg.collage.sparse">Sparse</option>
-                                    <option value="medium" selected data-i18n="bg.collage.medium">Medium</option>
-                                    <option value="dense" data-i18n="bg.collage.dense">Dense</option>
-                                </select>
-                                <button is="emby-button" type="button" id="ccaCollageShuffle" class="raised">
-                                    <span data-i18n="bg.collage.shuffle">Shuffle</span>
-                                </button>
-                            </div>
-                        </div>
-                        <div class="ccaGrid">
-                            <div class="inputContainer">
-                                <label for="ccaDim"><span data-i18n="bg.dim">Dimming</span> <span class="ccaVal" id="ccaDimVal">0.25</span></label>
-                                <input type="range" class="ccaRange" id="ccaDim" min="0" max="1" step="0.05" value="0.25" />
-                            </div>
-                            <div class="inputContainer">
-                                <label for="ccaBlur"><span data-i18n="bg.blur">Blur</span> <span class="ccaVal" id="ccaBlurVal">0</span></label>
-                                <input type="range" class="ccaRange" id="ccaBlur" min="0" max="20" step="0.5" value="0" />
-                            </div>
-                        </div>
-                        <div class="inputContainer">
-                            <label for="ccaDimColor" data-i18n="bg.dimcolor">Dim / base color</label>
-                            <input type="color" id="ccaDimColor" value="#000000" />
-                        </div>
-
-                        <div id="ccaUploadControls">
-                        <label class="ccaCheck ccaCheckBlock"><input is="emby-checkbox" type="checkbox" id="ccaGradient" checked /><span data-i18n="bg.gradient">Enable gradient background</span></label>
-                        <div id="ccaGradientOpts" class="ccaSub" style="display:none;">
-                            <div class="inputContainer">
-                                <label for="ccaGradientType" data-i18n="bg.gtype">Gradient type</label>
-                                <select is="emby-select" id="ccaGradientType" class="emby-select">
-                                    <option value="0" selected data-i18n="g.linear">Linear</option>
-                                    <option value="1" data-i18n="g.radial">Radial</option>
-                                </select>
-                            </div>
-                            <div class="inputContainer" id="ccaGradientAngleRow">
-                                <label for="ccaGradientAngle"><span data-i18n="bg.angle">Angle</span> <span class="ccaVal" id="ccaGradientAngleVal">0°</span></label>
-                                <input type="range" class="ccaRange" id="ccaGradientAngle" min="0" max="360" step="5" value="0" />
-                            </div>
-                            <div class="inputContainer">
-                                <label data-i18n="bg.colors">Colours</label>
-                                <div id="ccaGradientStops"></div>
-                                <button is="emby-button" type="button" id="ccaAddStop" class="raised"><span data-i18n="bg.addcolor">Add colour</span></button>
-                            </div>
-                        </div>
-
-                        <div class="inputContainer">
-                            <label data-i18n="bg.image">Background image (optional)</label>
-                            <div class="ccaFileRow">
-                                <button is="emby-button" type="button" id="ccaBgImageBtn" class="raised"><span data-i18n="f.chooseImage">Choose image…</span></button>
-                                <span class="ccaFileName" id="ccaBgImageName" data-i18n="f.none">No file chosen</span>
-                            </div>
-                            <div class="fieldDescription" data-i18n="hint.image">JPG, PNG, GIF, BMP, WebP or TIFF · up to 5 MB.</div>
-                            <input type="file" id="ccaBgImage" accept=".jpg,.jpeg,.png,.gif,.bmp,.webp,.tiff,.tif" class="ccaHiddenFile" />
-                        </div>
-                        <div class="inputContainer">
-                            <label for="ccaBgFit" data-i18n="bg.fit">Image fit</label>
-                            <select is="emby-select" id="ccaBgFit" class="emby-select">
-                                <option value="cover" selected data-i18n="fit.cover">Fill (crop to fit)</option>
-                                <option value="contain" data-i18n="fit.contain">Fit (show whole image)</option>
-                                <option value="stretch" data-i18n="fit.stretch">Stretch to fill</option>
-                            </select>
-                            <div class="fieldDescription" data-i18n="hint.fit">Fill crops to cover the cover; Fit keeps the whole image and pads the rest with the base colour.</div>
-                        </div>
-                        <div class="inputContainer">
-                            <label data-i18n="bg.orposter">Or use an existing library poster</label>
-                            <button is="emby-button" type="button" id="ccaBrowseBtn" class="raised ccaBtnWide"><span data-i18n="bg.browse">Browse library posters</span></button>
-                            <div id="ccaSelectedBg" class="ccaSelected" style="display:none;"><span data-i18n="bg.selected">Selected background:</span> <strong id="ccaSelectedBgName"></strong></div>
                         </div>
                         </div>
                     </section>
-
-                    <section class="ccaCard">
-                        <div class="ccaCardHead" data-i18n="card.effects">Effects</div>
+                    <section class="ccaStep" data-step="4">
+                        <button type="button" class="ccaStepHead" aria-expanded="false" aria-controls="ccaStepBody4">
+                            <span class="ccaStepNum">4</span>
+                            <span class="ccaStepTitle" data-i18n="step.effects">Effects</span>
+                            <span class="ccaStepChevron" aria-hidden="true">&#9662;</span>
+                        </button>
+                        <div class="ccaStepBody" id="ccaStepBody4" hidden>
 
                         <div class="ccaFileRow">
                             <button is="emby-button" type="button" id="ccaPresetJf" class="raised"><span data-i18n="fx.jellyfin">Jellyfin style</span></button>
@@ -216,26 +264,42 @@
                         </div>
 
                         <label class="ccaCheck ccaCheckBlock"><input is="emby-checkbox" type="checkbox" id="ccaFxSoftLight" /><span data-i18n="fx.softlight">Colour wash</span></label>
-                        <div class="ccaGrid ccaFxRow" id="ccaFxSoftLightRow" style="display:none">
-                            <div class="inputContainer">
-                                <label for="ccaFxSoftLightColor" data-i18n="fx.color">Colour</label>
-                                <input type="color" id="ccaFxSoftLightColor" value="#ffffff" />
-                            </div>
+                        <div class="ccaFxRow" id="ccaFxSoftLightRow" style="display:none">
                             <div class="inputContainer">
                                 <label for="ccaFxSoftLightOpacity"><span data-i18n="fx.opacity">Strength</span> <span class="ccaVal" id="ccaFxSoftLightOpacityVal">15</span></label>
                                 <input type="range" class="ccaRange" id="ccaFxSoftLightOpacity" min="0" max="100" step="1" value="15" />
                             </div>
+                            <div class="ccaAdv">
+                                <button type="button" class="ccaAdvHead" aria-expanded="false">
+                                    <span class="ccaStepChevron" aria-hidden="true">&#9662;</span>
+                                    <span data-i18n="ui.advanced">Advanced</span>
+                                </button>
+                                <div class="ccaAdvBody" hidden>
+                                <div class="inputContainer">
+                                    <label for="ccaFxSoftLightColor" data-i18n="fx.color">Colour</label>
+                                    <input type="color" id="ccaFxSoftLightColor" value="#ffffff" />
+                                </div>
+                                </div>
+                            </div>
                         </div>
 
                         <label class="ccaCheck ccaCheckBlock"><input is="emby-checkbox" type="checkbox" id="ccaFxVignette" /><span data-i18n="fx.vignette">Vignette</span></label>
-                        <div class="ccaGrid ccaFxRow" id="ccaFxVignetteRow" style="display:none">
+                        <div class="ccaFxRow" id="ccaFxVignetteRow" style="display:none">
                             <div class="inputContainer">
                                 <label for="ccaFxVignetteAmount"><span data-i18n="fx.amount">Strength</span> <span class="ccaVal" id="ccaFxVignetteAmountVal">40</span></label>
                                 <input type="range" class="ccaRange" id="ccaFxVignetteAmount" min="0" max="100" step="1" value="40" />
                             </div>
-                            <div class="inputContainer">
-                                <label for="ccaFxVignetteSoftness"><span data-i18n="fx.softness">Softness</span> <span class="ccaVal" id="ccaFxVignetteSoftnessVal">50</span></label>
-                                <input type="range" class="ccaRange" id="ccaFxVignetteSoftness" min="1" max="100" step="1" value="50" />
+                            <div class="ccaAdv">
+                                <button type="button" class="ccaAdvHead" aria-expanded="false">
+                                    <span class="ccaStepChevron" aria-hidden="true">&#9662;</span>
+                                    <span data-i18n="ui.advanced">Advanced</span>
+                                </button>
+                                <div class="ccaAdvBody" hidden>
+                                <div class="inputContainer">
+                                    <label for="ccaFxVignetteSoftness"><span data-i18n="fx.softness">Softness</span> <span class="ccaVal" id="ccaFxVignetteSoftnessVal">50</span></label>
+                                    <input type="range" class="ccaRange" id="ccaFxVignetteSoftness" min="1" max="100" step="1" value="50" />
+                                </div>
+                                </div>
                             </div>
                         </div>
 
@@ -249,34 +313,45 @@
 
                         <label class="ccaCheck ccaCheckBlock"><input is="emby-checkbox" type="checkbox" id="ccaFxBorder" /><span data-i18n="fx.border">Border</span></label>
                         <div class="ccaFxRow" id="ccaFxBorderRow" style="display:none">
-                            <div class="ccaGrid">
+                            <div class="inputContainer">
+                                <label for="ccaFxBorderThickness"><span data-i18n="fx.thickness">Thickness</span> <span class="ccaVal" id="ccaFxBorderThicknessVal">8</span></label>
+                                <input type="range" class="ccaRange" id="ccaFxBorderThickness" min="0" max="64" step="1" value="8" />
+                            </div>
+                            <div class="ccaAdv">
+                                <button type="button" class="ccaAdvHead" aria-expanded="false">
+                                    <span class="ccaStepChevron" aria-hidden="true">&#9662;</span>
+                                    <span data-i18n="ui.advanced">Advanced</span>
+                                </button>
+                                <div class="ccaAdvBody" hidden>
                                 <div class="inputContainer">
                                     <label for="ccaFxBorderColor" data-i18n="fx.color">Colour</label>
                                     <input type="color" id="ccaFxBorderColor" value="#ffffff" />
                                 </div>
                                 <div class="inputContainer">
-                                    <label for="ccaFxBorderThickness"><span data-i18n="fx.thickness">Thickness</span> <span class="ccaVal" id="ccaFxBorderThicknessVal">8</span></label>
-                                    <input type="range" class="ccaRange" id="ccaFxBorderThickness" min="0" max="64" step="1" value="8" />
+                                    <label for="ccaFxBorderRadius"><span data-i18n="fx.radius">Corner radius</span> <span class="ccaVal" id="ccaFxBorderRadiusVal">0</span></label>
+                                    <input type="range" class="ccaRange" id="ccaFxBorderRadius" min="0" max="200" step="1" value="0" />
                                 </div>
-                            </div>
-                            <div class="inputContainer">
-                                <label for="ccaFxBorderRadius"><span data-i18n="fx.radius">Corner radius</span> <span class="ccaVal" id="ccaFxBorderRadiusVal">0</span></label>
-                                <input type="range" class="ccaRange" id="ccaFxBorderRadius" min="0" max="200" step="1" value="0" />
-                            </div>
-                            <label class="ccaCheck ccaCheckBlock"><input is="emby-checkbox" type="checkbox" id="ccaFxBorderDouble" /><span data-i18n="fx.double">Double line</span></label>
-                            <div class="inputContainer" id="ccaFxBorderGapRow" style="display:none">
-                                <label for="ccaFxBorderGap"><span data-i18n="fx.gap">Gap</span> <span class="ccaVal" id="ccaFxBorderGapVal">6</span></label>
-                                <input type="range" class="ccaRange" id="ccaFxBorderGap" min="0" max="32" step="1" value="6" />
+                                <label class="ccaCheck ccaCheckBlock"><input is="emby-checkbox" type="checkbox" id="ccaFxBorderDouble" /><span data-i18n="fx.double">Double line</span></label>
+                                <div class="inputContainer" id="ccaFxBorderGapRow" style="display:none">
+                                    <label for="ccaFxBorderGap"><span data-i18n="fx.gap">Gap</span> <span class="ccaVal" id="ccaFxBorderGapVal">6</span></label>
+                                    <input type="range" class="ccaRange" id="ccaFxBorderGap" min="0" max="32" step="1" value="6" />
+                                </div>
+                                </div>
                             </div>
                         </div>
 
                         <label class="ccaCheck ccaCheckBlock"><input is="emby-checkbox" type="checkbox" id="ccaAutoPalette" /><span data-i18n="fx.autopalette">Auto palette</span></label>
                         <div id="ccaSwatches" class="ccaSwatches"></div>
                         <div class="fieldDescription" data-i18n="fx.paletteHint">Click a colour to apply it to the selected text layer, or to the colour wash when no text layer is selected.</div>
+                        </div>
                     </section>
-
-                    <section class="ccaCard">
-                        <div class="ccaCardHead" data-i18n="card.output">Output</div>
+                    <section class="ccaStep" data-step="5">
+                        <button type="button" class="ccaStepHead" aria-expanded="false" aria-controls="ccaStepBody5">
+                            <span class="ccaStepNum">5</span>
+                            <span class="ccaStepTitle" data-i18n="step.output">Output &amp; apply</span>
+                            <span class="ccaStepChevron" aria-hidden="true">&#9662;</span>
+                        </button>
+                        <div class="ccaStepBody" id="ccaStepBody5" hidden>
                         <div class="ccaGrid">
                             <div class="inputContainer">
                                 <label for="ccaPreset" data-i18n="out.dims">Dimensions</label>
@@ -298,6 +373,27 @@
                                 </select>
                             </div>
                         </div>
+                        <div class="inputContainer">
+                            <label data-i18n="ui.inContext">In context</label>
+                            <div class="ccaContexts" id="ccaContexts"></div>
+                            <div class="fieldDescription" data-i18n="ui.inContextHint">How the cover looks at other shapes. The canvas above is the real design.</div>
+                        </div>
+                        <div class="ccaAdv">
+                            <button type="button" class="ccaAdvHead" aria-expanded="false">
+                                <span class="ccaStepChevron" aria-hidden="true">&#9662;</span>
+                                <span data-i18n="ui.advanced">Advanced</span>
+                            </button>
+                            <div class="ccaAdvBody" hidden>
+                        <div id="ccaCustomDims" class="ccaGrid ccaSub" style="display:none;">
+                            <div class="inputContainer">
+                                <label for="ccaWidth" data-i18n="out.width">Width</label>
+                                <input is="emby-input" type="number" id="ccaWidth" min="100" max="2048" value="1400" />
+                            </div>
+                            <div class="inputContainer">
+                                <label for="ccaHeight" data-i18n="out.height">Height</label>
+                                <input is="emby-input" type="number" id="ccaHeight" min="100" max="2048" value="1400" />
+                            </div>
+                        </div>
                         <div class="ccaGrid ccaSub" id="ccaAnimRow" style="display:none">
                             <label class="ccaCheck ccaCheckBlock"><input is="emby-checkbox" type="checkbox" id="ccaKenBurns" checked /><span data-i18n="anim.kenburns">Ken Burns pan/zoom</span></label>
                             <div class="inputContainer">
@@ -317,29 +413,8 @@
                             </div>
                         </div>
                         <div class="fieldDescription" id="ccaAnimHint" data-i18n="anim.hint" style="display:none">Animated GIFs are larger and only animate in views that render GIFs. Capped at 30 frames.</div>
-                        <div id="ccaCustomDims" class="ccaGrid ccaSub" style="display:none;">
-                            <div class="inputContainer">
-                                <label for="ccaWidth" data-i18n="out.width">Width</label>
-                                <input is="emby-input" type="number" id="ccaWidth" min="100" max="2048" value="1400" />
-                            </div>
-                            <div class="inputContainer">
-                                <label for="ccaHeight" data-i18n="out.height">Height</label>
-                                <input is="emby-input" type="number" id="ccaHeight" min="100" max="2048" value="1400" />
-                            </div>
-                        </div>
-                    </section>
-
-                    <section class="ccaCard">
-                        <div class="ccaCardHead" data-i18n="card.templates">Templates</div>
-                        <div class="inputContainer">
-                            <label for="ccaTemplateSelect" data-i18n="tpl.load">Load template</label>
-                            <div class="ccaFileRow">
-                                <select is="emby-select" id="ccaTemplateSelect" class="emby-select ccaGrow"></select>
-                                <button is="emby-button" type="button" id="ccaTemplateDelete" class="raised">
-                                    <span data-i18n="tpl.delete">Delete</span>
-                                </button>
-                            </div>
-                        </div>
+                        <div class="ccaStepGroup">
+                            <div class="ccaStepGroupHead" data-i18n="group.saveTemplate">Save this design</div>
                         <div class="inputContainer">
                             <label for="ccaTemplateName" data-i18n="tpl.save">Save current design</label>
                             <div class="ccaFileRow">
@@ -350,10 +425,9 @@
                             </div>
                         </div>
                         <div class="fieldDescription" data-i18n="tpl.hint">Templates store the design but not the title — each target keeps its own name.</div>
-                    </section>
-
-                    <section class="ccaCard">
-                        <div class="ccaCardHead" data-i18n="card.batch">Batch apply</div>
+                        </div>
+                        <div class="ccaStepGroup">
+                            <div class="ccaStepGroupHead" data-i18n="group.batch">Apply to several targets</div>
                         <div class="fieldDescription" data-i18n="batch.hint">Apply the current design (or loaded template) to several targets at once. Each cover is titled with its target's name.</div>
                         <div id="ccaBatchList" class="ccaBatchList"></div>
                         <div class="ccaFileRow">
@@ -361,6 +435,10 @@
                                 <span data-i18n="batch.apply">Apply to selected</span>
                             </button>
                             <span class="ccaFileName" id="ccaBatchStatus"></span>
+                        </div>
+                        </div>
+                        </div>
+                            </div>
                         </div>
                     </section>
 
@@ -370,12 +448,19 @@
                     <section class="ccaCard">
                         <div class="ccaCardHead" data-i18n="card.preview">Preview</div>
                         <label class="ccaCheck ccaCheckBlock"><input is="emby-checkbox" type="checkbox" id="ccaBgAdjust" /><span data-i18n="bg.adjust">Reposition background (drag to pan, scroll or pinch to zoom)</span></label>
+                        <div class="ccaHistoryBar">
+                            <button is="emby-button" type="button" id="ccaUndo" class="raised" disabled title="Ctrl+Z">
+                                <span data-i18n="ui.undo">Undo</span>
+                            </button>
+                            <button is="emby-button" type="button" id="ccaRedo" class="raised" disabled title="Ctrl+Y">
+                                <span data-i18n="ui.redo">Redo</span>
+                            </button>
+                        </div>
                         <div class="ccaPreviewWrap">
                             <canvas id="ccaCanvas" class="ccaCanvas" width="1400" height="1400" aria-label="Cover art canvas"></canvas>
                             <div id="ccaPreviewPlaceholder" class="ccaPreviewPlaceholder" data-i18n="preview.placeholder">Generate a preview to see your cover art.</div>
-                            <div id="ccaPreviewSpinner" class="ccaSpinner" style="display:none" aria-hidden="true"></div>
                         </div>
-                        <div class="ccaActions">
+                        <div class="ccaActions ccaStickyApply">
                             <button is="emby-button" type="button" id="ccaApplyBtn" class="raised block button-submit" disabled><span data-i18n="action.apply">Apply to library</span></button>
                             <button is="emby-button" type="button" id="ccaServerRender" class="raised block"><span data-i18n="action.serverRender">Show server render</span></button>
                             <button is="emby-button" type="button" id="ccaDownloadBtn" class="raised block" disabled><span data-i18n="action.download">Download image</span></button>
@@ -513,6 +598,123 @@
         }
         #CustomCoverArtConfigPage .ccaStopRemove:hover { opacity: 1; }
 
+        /* Numbered accordion steps. One open at a time; the header is the map. */
+        #CustomCoverArtConfigPage .ccaStep { margin: 0 0 .6em; border: 1px solid rgba(127,127,127,.2); border-radius: 10px; overflow: hidden; }
+        #CustomCoverArtConfigPage .ccaStepHead {
+            display: flex; align-items: center; gap: .75em; width: 100%;
+            min-height: 3em; padding: .8em 1em; box-sizing: border-box;
+            background: transparent; border: 0; color: inherit; cursor: pointer;
+            font-size: 1.05em; text-align: left;
+        }
+        #CustomCoverArtConfigPage .ccaStepHead:hover { background: rgba(127,127,127,.08); }
+        #CustomCoverArtConfigPage .ccaStepNum {
+            flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
+            width: 1.8em; height: 1.8em; border-radius: 50%;
+            background: var(--theme-primary-color, #00a4dc); color: #fff; font-size: .85em;
+        }
+        #CustomCoverArtConfigPage .ccaStepTitle { flex: 1 1 auto; }
+        #CustomCoverArtConfigPage .ccaStepChevron { flex: 0 0 auto; opacity: .6; transition: transform .18s ease; }
+        #CustomCoverArtConfigPage .ccaStepHead[aria-expanded="true"] .ccaStepChevron { transform: rotate(180deg); }
+        #CustomCoverArtConfigPage .ccaStepBody { padding: 0 1em 1.1em; }
+        #CustomCoverArtConfigPage .ccaStepBody[hidden] { display: none; }
+        #CustomCoverArtConfigPage .ccaStepGroup { margin-top: 1.3em; padding-top: 1.1em; border-top: 1px solid rgba(127,127,127,.15); }
+        #CustomCoverArtConfigPage .ccaStepGroupHead { font-size: .9em; opacity: .6; margin-bottom: .6em; }
+        @media (prefers-reduced-motion: reduce) {
+            #CustomCoverArtConfigPage .ccaStepChevron { transition: none; }
+        }
+
+        /* "Advanced" disclosure inside a step. Independent of the step accordion and of
+           each other, and never persisted — advanced should feel closed by default. */
+        #CustomCoverArtConfigPage .ccaAdv { margin-top: 1.2em; border-top: 1px solid rgba(127,127,127,.18); }
+        #CustomCoverArtConfigPage .ccaAdvHead {
+            display: flex; align-items: center; gap: .5em; width: 100%;
+            min-height: 2.75em; padding: .6em 0; box-sizing: border-box;
+            background: transparent; border: 0; color: inherit; cursor: pointer;
+            font-size: .95em; opacity: .75; text-align: left;
+        }
+        #CustomCoverArtConfigPage .ccaAdvHead:hover { opacity: 1; }
+        #CustomCoverArtConfigPage .ccaAdvHead[aria-expanded="true"] .ccaStepChevron { transform: rotate(180deg); }
+        #CustomCoverArtConfigPage .ccaAdvBody[hidden] { display: none; }
+        /* Nested inside an effect row, the divider would double up with the row's own. */
+        #CustomCoverArtConfigPage .ccaFxRow .ccaAdv { margin-top: .5em; border-top: 0; }
+
+        /* ---- Mobile -------------------------------------------------------
+           Verified at 360x640. The rules here are about reach and hit size, not
+           just narrowness: everything interactive gets to 44x44 CSS px, the canvas
+           stays on screen while you work down the steps, and Apply stays reachable
+           without scrolling to the end of a long page. */
+        @media (max-width: 700px) {
+            /* Canvas first: it is the thing being edited. */
+            #CustomCoverArtConfigPage .ccaLayout { display: flex; flex-direction: column; }
+            #CustomCoverArtConfigPage .ccaPreviewCol {
+                order: -1; position: sticky; top: 0; z-index: 5;
+                background: var(--theme-body-background-color, #101010);
+                padding-bottom: .5em;
+            }
+            #CustomCoverArtConfigPage .ccaCanvas { max-height: 34vh; }
+            #CustomCoverArtConfigPage .ccaPreviewWrap { min-height: 0; padding: .5em; }
+
+            /* Touch targets. */
+            #CustomCoverArtConfigPage .ccaStepHead { min-height: 3.4em; }
+            #CustomCoverArtConfigPage .ccaAdvHead { min-height: 44px; }
+            #CustomCoverArtConfigPage .emby-select,
+            #CustomCoverArtConfigPage input[is="emby-input"],
+            #CustomCoverArtConfigPage .emby-input { min-height: 44px; }
+            #CustomCoverArtConfigPage input[type="color"] { min-height: 44px; min-width: 44px; }
+            #CustomCoverArtConfigPage input[type="range"] { height: 44px; }
+            #CustomCoverArtConfigPage .ccaSwatch { width: 44px; height: 44px; }
+            #CustomCoverArtConfigPage .emby-button { min-height: 44px; }
+            #CustomCoverArtConfigPage .ccaStopRemove { width: 44px; height: 44px; }
+
+            #CustomCoverArtConfigPage .ccaStickyApply {
+                position: sticky; bottom: 0; z-index: 6;
+                padding: .6em 0;
+                background: var(--theme-body-background-color, #101010);
+                border-top: 1px solid rgba(127,127,127,.2);
+            }
+
+            /* A layer row cannot fit a name plus five ~30px buttons. The row itself
+               becomes the tap target for selecting, and the actions move behind one
+               toggle so they are not competing for the same 40px of width. */
+            #CustomCoverArtConfigPage .ccaLayerRow { flex-wrap: wrap; min-height: 44px; }
+            #CustomCoverArtConfigPage .ccaLayerBtn { width: 44px; height: 44px; }
+            #CustomCoverArtConfigPage .ccaLayerActions { display: none; width: 100%; margin-top: .3em; }
+            #CustomCoverArtConfigPage .ccaLayerRow.ccaLayerActionsOpen .ccaLayerActions { display: flex; }
+            #CustomCoverArtConfigPage .ccaLayerMore { display: inline-flex; }
+
+            /* Full-screen poster browser: a centred dialog on a 360px viewport leaves
+               the grid a couple of tiles wide with the page scrolling behind it. */
+            #CustomCoverArtConfigPage .ccaModalBox {
+                width: 100%; max-width: none; height: 100%; max-height: none;
+                border-radius: 0; display: flex; flex-direction: column;
+            }
+            #CustomCoverArtConfigPage .ccaModalHead {
+                position: sticky; top: 0; z-index: 2;
+                background: var(--theme-body-background-color, #101010);
+            }
+            #CustomCoverArtConfigPage .ccaModalFilters { flex-wrap: wrap; gap: .5em; }
+            #CustomCoverArtConfigPage .ccaModalClose { min-width: 44px; min-height: 44px; }
+            #CustomCoverArtConfigPage .ccaPosterGrid { grid-template-columns: repeat(2, 1fr); }
+        }
+        /* The overflow toggle only exists on narrow screens. */
+        #CustomCoverArtConfigPage .ccaLayerMore { display: none; }
+        #CustomCoverArtConfigPage .ccaLayerActions { display: flex; gap: .2em; }
+
+        /* Undo/redo sits beside the canvas, not inside a step, so it is reachable
+           whichever step is open. */
+        #CustomCoverArtConfigPage .ccaHistoryBar { display: flex; gap: .5em; margin-bottom: .6em; }
+        #CustomCoverArtConfigPage .ccaHistoryBar .emby-button { margin: 0; }
+
+        /* The same design drawn at other aspect ratios, so it can be judged in context
+           before applying. Scrolls sideways rather than wrapping on a phone. */
+        #CustomCoverArtConfigPage .ccaContexts { display: flex; gap: .8em; overflow-x: auto; padding: .4em 0; }
+        #CustomCoverArtConfigPage .ccaContext { flex: 0 0 auto; text-align: center; }
+        #CustomCoverArtConfigPage .ccaContext canvas {
+            display: block; max-width: 100%; border-radius: 6px;
+            border: 1px solid rgba(127,127,127,.25);
+        }
+        #CustomCoverArtConfigPage .ccaContextCap { font-size: .8em; opacity: .6; margin-top: .3em; }
+
         /* Palette swatches extracted from the background. */
         #CustomCoverArtConfigPage .ccaSwatches { display: flex; flex-wrap: wrap; gap: .4em; margin: .3em 0 0; }
         #CustomCoverArtConfigPage .ccaSwatches:empty { display: none; }
@@ -639,9 +841,16 @@
                 'lede': 'Design a cover for a library, preview it live, then apply it.',
                 'card.target': 'Target', 'target.type': 'Type', 'target.library': 'Library', 'target.collection': 'Collection', 'target.playlist': 'Playlist', 'target.livetv': 'Live TV',
                 'card.library': 'Library', 'lib.choose': 'Choose', 'lib.selectOption': 'Select…',
+                'step.target': 'Target & start', 'step.background': 'Background', 'step.text': 'Text & logos',
+                'step.effects': 'Effects', 'step.output': 'Output & apply',
+                'group.startFrom': 'Start from a saved design', 'group.selectedLayer': 'Selected layer',
+                'group.saveTemplate': 'Save this design', 'group.batch': 'Apply to several targets',
+                'ui.advanced': 'Advanced', 'ui.undo': 'Undo', 'ui.redo': 'Redo',
+                'ui.inContext': 'In context', 'ui.inContextHint': 'How the cover looks at other shapes. The canvas above is the real design.',
+                'ctx.wide': 'Wide', 'ctx.square': 'Square', 'ctx.poster': 'Poster',
                 'card.layers': 'Layers', 'layer.addText': 'Add text', 'layer.addImage': 'Add logo/icon',
                 'layer.show': 'Show', 'layer.hide': 'Hide', 'layer.up': 'Move up', 'layer.down': 'Move down', 'layer.dup': 'Duplicate', 'layer.del': 'Delete',
-                'layer.text': 'Text', 'layer.logo': 'Logo', 'layer.none': 'No layer selected — add one in the Layers card above.',
+                'layer.text': 'Text', 'layer.logo': 'Logo', 'layer.more': 'More actions', 'layer.none': 'No layer selected — add one in the Layers card above.',
                 'layer.opacity': 'Opacity', 'layer.rotation': 'Rotation',
                 'hint.logo': 'PNG with transparency · up to 5 MB. The topmost row is drawn last, on top of the others.',
                 'hint.logoSize': 'Drag the corner handles on the preview to resize the logo, or the knob above it to rotate.',
@@ -656,7 +865,7 @@
                 'fx.jellyfin': 'Jellyfin style', 'fx.presetHint': 'Applies a dark gradient with clean white text — editable afterwards.',
                 'fx.autopalette': 'Auto palette', 'fx.paletteHint': 'Click a colour to apply it to the selected text layer, or to the colour wash when no text layer is selected.',
                 'card.background': 'Background', 'bg.dim': 'Dimming', 'bg.blur': 'Blur', 'bg.dimcolor': 'Dim / base color',
-                'bg.gradient': 'Enable gradient background', 'bg.gtype': 'Gradient type', 'g.linear': 'Linear', 'g.radial': 'Radial',
+                'bg.gtype': 'Gradient type', 'g.linear': 'Linear', 'g.radial': 'Radial',
                 'bg.startcolor': 'Start color', 'bg.endcolor': 'End color',
                 'bg.angle': 'Angle', 'bg.colors': 'Colours', 'bg.addcolor': 'Add colour',
                 'bg.image': 'Background image (optional)', 'f.chooseImage': 'Choose image…', 'f.none': 'No file chosen',
@@ -679,7 +888,7 @@
                 'dyn.uploadFail': 'Upload failed: {0}', 'dyn.fontFail': 'Font upload failed: {0}', 'dyn.useImgFail': 'Could not use that image: {0}',
                 'dyn.unknown': 'unknown error',
                 'restore.button': 'Restore original cover', 'restore.none': 'No backup yet', 'restore.available': 'A backup exists', 'restore.done': 'Original cover restored.', 'restore.fail': 'No backup found to restore.',
-                'bg.source': 'Background source', 'bg.source.upload': 'Upload / poster', 'bg.source.collage': 'Poster collage from this target', 'bg.collage.density': 'Collage density', 'bg.collage.sparse': 'Sparse', 'bg.collage.medium': 'Medium', 'bg.collage.dense': 'Dense', 'bg.collage.shuffle': 'Shuffle', 'bg.collage.livetv': 'Live TV has no posters to collage.',
+                'bg.source': 'Background source', 'bg.source.image': 'Image', 'bg.source.gradient': 'Gradient', 'bg.source.solid': 'Solid colour', 'bg.source.collage': 'Poster collage from this target', 'bg.collage.density': 'Collage density', 'bg.collage.sparse': 'Sparse', 'bg.collage.medium': 'Medium', 'bg.collage.dense': 'Dense', 'bg.collage.shuffle': 'Shuffle', 'bg.collage.livetv': 'Live TV has no posters to collage.',
                 'card.templates': 'Templates', 'tpl.load': 'Load template', 'tpl.delete': 'Delete', 'tpl.save': 'Save current design', 'tpl.savebtn': 'Save', 'tpl.nameph': 'Template name', 'tpl.hint': 'Templates store the design but not the title — each target keeps its own name.', 'tpl.saved': 'Template saved.', 'tpl.named': 'Enter a template name first.',
                 'card.batch': 'Batch apply', 'batch.hint': 'Apply the current design (or loaded template) to several targets at once. Each cover is titled with its target\'s name.', 'batch.apply': 'Apply to selected', 'batch.none': 'Select at least one target.', 'batch.running': 'Applying…', 'batch.done': 'Done: {0} ok, {1} failed.',
                 'fmt.animated': 'Animated GIF', 'anim.kenburns': 'Ken Burns pan/zoom', 'anim.frames': 'Frames', 'anim.delay': 'Frame delay (ms)', 'anim.dir': 'Zoom direction', 'anim.in': 'Zoom in', 'anim.out': 'Zoom out', 'anim.hint': 'Animated GIFs are larger and only animate in views that render GIFs. Capped at 30 frames.'
@@ -688,9 +897,16 @@
                 'lede': 'Ontwerp een cover voor een bibliotheek, bekijk het live en pas het toe.',
                 'card.target': 'Doel', 'target.type': 'Type', 'target.library': 'Bibliotheek', 'target.collection': 'Verzameling', 'target.playlist': 'Afspeellijst', 'target.livetv': 'Live-tv',
                 'card.library': 'Bibliotheek', 'lib.choose': 'Kies', 'lib.selectOption': 'Selecteer…',
+                'step.target': 'Doel & start', 'step.background': 'Achtergrond', 'step.text': 'Tekst & logo\'s',
+                'step.effects': 'Effecten', 'step.output': 'Uitvoer & toepassen',
+                'group.startFrom': 'Beginnen met een opgeslagen ontwerp', 'group.selectedLayer': 'Geselecteerde laag',
+                'group.saveTemplate': 'Dit ontwerp opslaan', 'group.batch': 'Toepassen op meerdere doelen',
+                'ui.advanced': 'Geavanceerd', 'ui.undo': 'Ongedaan maken', 'ui.redo': 'Opnieuw',
+                'ui.inContext': 'In context', 'ui.inContextHint': 'Hoe de cover er in andere verhoudingen uitziet. Het canvas hierboven is het echte ontwerp.',
+                'ctx.wide': 'Breed', 'ctx.square': 'Vierkant', 'ctx.poster': 'Poster',
                 'card.layers': 'Lagen', 'layer.addText': 'Tekst toevoegen', 'layer.addImage': 'Logo/pictogram toevoegen',
                 'layer.show': 'Tonen', 'layer.hide': 'Verbergen', 'layer.up': 'Omhoog', 'layer.down': 'Omlaag', 'layer.dup': 'Dupliceren', 'layer.del': 'Verwijderen',
-                'layer.text': 'Tekst', 'layer.logo': 'Logo', 'layer.none': 'Geen laag geselecteerd — voeg er een toe in de kaart Lagen hierboven.',
+                'layer.text': 'Tekst', 'layer.logo': 'Logo', 'layer.more': 'Meer acties', 'layer.none': 'Geen laag geselecteerd — voeg er een toe in de kaart Lagen hierboven.',
                 'layer.opacity': 'Dekking', 'layer.rotation': 'Rotatie',
                 'hint.logo': 'PNG met transparantie · max. 5 MB. De bovenste rij wordt als laatste getekend, boven op de andere.',
                 'hint.logoSize': 'Sleep de hoekgrepen in het voorbeeld om het logo te vergroten of verkleinen, of de knop erboven om te draaien.',
@@ -705,7 +921,7 @@
                 'fx.jellyfin': 'Jellyfin-stijl', 'fx.presetHint': 'Past een donker verloop met strakke witte tekst toe — daarna vrij aanpasbaar.',
                 'fx.autopalette': 'Automatisch kleurenpalet', 'fx.paletteHint': 'Klik op een kleur om die toe te passen op de geselecteerde tekstlaag, of op het kleurwaas als er geen tekstlaag geselecteerd is.',
                 'card.background': 'Achtergrond', 'bg.dim': 'Dimmen', 'bg.blur': 'Vervaging', 'bg.dimcolor': 'Dim- / basiskleur',
-                'bg.gradient': 'Verloop-achtergrond inschakelen', 'bg.gtype': 'Verlooptype', 'g.linear': 'Lineair', 'g.radial': 'Radiaal',
+                'bg.gtype': 'Verlooptype', 'g.linear': 'Lineair', 'g.radial': 'Radiaal',
                 'bg.startcolor': 'Startkleur', 'bg.endcolor': 'Eindkleur',
                 'bg.angle': 'Hoek', 'bg.colors': 'Kleuren', 'bg.addcolor': 'Kleur toevoegen',
                 'bg.image': 'Achtergrondafbeelding (optioneel)', 'f.chooseImage': 'Kies afbeelding…', 'f.none': 'Geen bestand gekozen',
@@ -728,7 +944,7 @@
                 'dyn.uploadFail': 'Uploaden mislukt: {0}', 'dyn.fontFail': 'Lettertype uploaden mislukt: {0}', 'dyn.useImgFail': 'Kon die afbeelding niet gebruiken: {0}',
                 'dyn.unknown': 'onbekende fout',
                 'restore.button': 'Originele cover herstellen', 'restore.none': 'Nog geen back-up', 'restore.available': 'Er is een back-up', 'restore.done': 'Originele cover hersteld.', 'restore.fail': 'Geen back-up gevonden om te herstellen.',
-                'bg.source': 'Achtergrondbron', 'bg.source.upload': 'Upload / poster', 'bg.source.collage': 'Postercollage van dit doel', 'bg.collage.density': 'Collagedichtheid', 'bg.collage.sparse': 'Dun', 'bg.collage.medium': 'Gemiddeld', 'bg.collage.dense': 'Dicht', 'bg.collage.shuffle': 'Schudden', 'bg.collage.livetv': 'Live TV heeft geen posters voor een collage.',
+                'bg.source': 'Achtergrondbron', 'bg.source.image': 'Afbeelding', 'bg.source.gradient': 'Verloop', 'bg.source.solid': 'Effen kleur', 'bg.source.collage': 'Postercollage van dit doel', 'bg.collage.density': 'Collagedichtheid', 'bg.collage.sparse': 'Dun', 'bg.collage.medium': 'Gemiddeld', 'bg.collage.dense': 'Dicht', 'bg.collage.shuffle': 'Schudden', 'bg.collage.livetv': 'Live TV heeft geen posters voor een collage.',
                 'card.templates': 'Sjablonen', 'tpl.load': 'Sjabloon laden', 'tpl.delete': 'Verwijderen', 'tpl.save': 'Huidig ontwerp opslaan', 'tpl.savebtn': 'Opslaan', 'tpl.nameph': 'Sjabloonnaam', 'tpl.hint': 'Sjablonen bewaren het ontwerp maar niet de titel — elk doel houdt zijn eigen naam.', 'tpl.saved': 'Sjabloon opgeslagen.', 'tpl.named': 'Voer eerst een sjabloonnaam in.',
                 'card.batch': 'Bulk toepassen', 'batch.hint': 'Pas het huidige ontwerp (of geladen sjabloon) in één keer toe op meerdere doelen. Elke cover krijgt de naam van zijn doel als titel.', 'batch.apply': 'Toepassen op selectie', 'batch.none': 'Selecteer minstens één doel.', 'batch.running': 'Bezig met toepassen…', 'batch.done': 'Klaar: {0} gelukt, {1} mislukt.',
                 'fmt.animated': 'Geanimeerde GIF', 'anim.kenburns': 'Ken Burns pan/zoom', 'anim.frames': 'Frames', 'anim.delay': 'Framevertraging (ms)', 'anim.dir': 'Zoomrichting', 'anim.in': 'Inzoomen', 'anim.out': 'Uitzoomen', 'anim.hint': 'Geanimeerde GIFs zijn groter en bewegen alleen in weergaven die GIFs tonen. Max. 30 frames.'
@@ -816,6 +1032,75 @@
 
         function el(id) { return page.querySelector('#' + id); }
 
+        // --- Step accordion -----------------------------------------------
+        // Owns .ccaStepBody and NOTHING else. Every other visibility helper
+        // (updateBackgroundVisibility, updateEffectsVisibility, updateAnimVisibility, the
+        // .ccaTextOnly/.ccaImageOnly toggles) writes style.display on elements INSIDE a
+        // body; if this controller touched those too, the two owners would fight and a
+        // control could reappear inside a collapsed step.
+        var STEP_KEY = 'cca.lastStep';
+
+        function openStep(n) {
+            page.querySelectorAll('.ccaStep').forEach(function (section) {
+                var isTarget = section.getAttribute('data-step') === String(n);
+                var head = section.querySelector('.ccaStepHead');
+                var body = section.querySelector('.ccaStepBody');
+                head.setAttribute('aria-expanded', isTarget ? 'true' : 'false');
+                if (isTarget) { body.removeAttribute('hidden'); } else { body.setAttribute('hidden', ''); }
+            });
+            try { localStorage.setItem(STEP_KEY, String(n)); } catch (e) { /* private mode */ }
+            // Step 5 may have just become visible, and its thumbnails skip drawing
+            // while collapsed.
+            if (typeof renderPreviewContexts === 'function') { renderPreviewContexts(); }
+        }
+
+        function currentOpenStep() {
+            var open = page.querySelector('.ccaStepHead[aria-expanded="true"]');
+            return open ? open.parentNode.getAttribute('data-step') : null;
+        }
+
+        function initSteps() {
+            page.querySelectorAll('.ccaStep').forEach(function (section) {
+                var n = section.getAttribute('data-step');
+                section.querySelector('.ccaStepHead').addEventListener('click', function () {
+                    // Clicking the open step collapses it: all-closed is a valid state, and
+                    // it is how you give the canvas the whole screen on a phone.
+                    if (currentOpenStep() === n) {
+                        section.querySelector('.ccaStepBody').setAttribute('hidden', '');
+                        this.setAttribute('aria-expanded', 'false');
+                        return;
+                    }
+                    openStep(n);
+                });
+            });
+            restoreLastStep();
+        }
+
+        // Advanced disclosures are independent of the step accordion and of each other:
+        // opening a step does not reveal its advanced controls, and the state is not
+        // persisted. In the Effects step they are nested INSIDE each effect's row, because
+        // updateEffectsVisibility owns that row's display — pulling softness out to a
+        // step-level block would show it even with the vignette switched off.
+        function initAdvanced() {
+            page.querySelectorAll('.ccaAdvHead').forEach(function (head) {
+                head.addEventListener('click', function () {
+                    var body = this.parentNode.querySelector('.ccaAdvBody');
+                    var open = this.getAttribute('aria-expanded') === 'true';
+                    this.setAttribute('aria-expanded', open ? 'false' : 'true');
+                    if (open) { body.setAttribute('hidden', ''); } else { body.removeAttribute('hidden'); }
+                });
+            });
+        }
+
+        // Step 1 when nothing is selected yet, otherwise wherever you left off — a first
+        // run starts at the beginning, a return visit lands where you were working.
+        function restoreLastStep() {
+            var saved = null;
+            try { saved = localStorage.getItem(STEP_KEY); } catch (e) { /* ignore */ }
+            var exists = saved && page.querySelector('.ccaStep[data-step="' + saved + '"]');
+            openStep((state.libraryId && exists) ? saved : '1');
+        }
+
         var state = { libraryId: '', aspectRatio: 1, collageSeed: 1 };
         var browser = { page: 1, pageSize: 24, totalPages: 1 };
 
@@ -871,12 +1156,27 @@
             return d;
         }
 
+        // Client mirror of DocumentMigration.NormalizeBackgroundSource — same rules, same
+        // order. Runs on LOAD only (init and template load), never on every change: it
+        // derives Source from the old fields, so running it mid-edit would flip the user's
+        // chosen source out from under them the moment they cleared an image.
+        function normalizeBackgroundSource(d) {
+            var bg = d.Background;
+            var source = String(bg.Source || '').trim().toLowerCase();
+            if (source === 'collage') { bg.Source = 'collage'; return d; }
+            if (bg.ImagePath) { bg.Source = 'upload'; return d; }
+            bg.Source = (bg.Gradient && bg.Gradient.IsEnabled) ? 'gradient' : 'solid';
+            return d;
+        }
+
         function defaultDocument() {
             return {
                 Version: 2,
                 Canvas: { Width: 1280, Height: 720, Format: 'auto', DimensionPreset: 'landscape' },
                 Background: {
-                    Source: 'upload', ImagePath: '', Fit: 'cover',
+                    // The default design is the Jellyfin brand gradient, so the source says
+                    // so rather than claiming to be an image that was never chosen.
+                    Source: 'gradient', ImagePath: '', Fit: 'cover',
                     Transform: { OffsetX: 0, OffsetY: 0, Scale: 1 },
                     Blur: 0, Dim: 0.25, DimColor: '#000000',
                     Gradient: {
@@ -948,6 +1248,8 @@
             doc._selectedId = id;
             renderLayersPanel();
             syncControlsFromDocument();
+            // The starting document is the base history entry.
+            snapshot();
             scheduleRender();
         }
 
@@ -980,6 +1282,11 @@
                     row.appendChild(vis);
                     row.appendChild(name);
 
+                    // Actions live in their own container so a narrow screen can collapse
+                    // them behind one toggle, leaving the whole row as the tap target for
+                    // the action people actually want most: selecting the layer.
+                    var actions = document.createElement('div');
+                    actions.className = 'ccaLayerActions';
                     ['up', 'down', 'dup', 'del'].forEach(function (act) {
                         var b = document.createElement('button');
                         b.type = 'button'; b.className = 'ccaLayerBtn';
@@ -993,8 +1300,21 @@
                             else if (act === 'dup') { duplicateLayer(layer.Id); }
                             else { deleteLayer(layer.Id); }
                         });
-                        row.appendChild(b);
+                        actions.appendChild(b);
                     });
+
+                    var more = document.createElement('button');
+                    more.type = 'button';
+                    more.className = 'ccaLayerBtn ccaLayerMore';
+                    more.textContent = '⋯';
+                    more.title = t('layer.more');
+                    more.addEventListener('click', function (e) {
+                        e.stopPropagation();
+                        row.classList.toggle('ccaLayerActionsOpen');
+                    });
+
+                    row.appendChild(actions);
+                    row.appendChild(more);
 
                     row.addEventListener('click', function () { selectLayerById(layer.Id); });
                     box.appendChild(row);
@@ -1107,6 +1427,13 @@
             if (_rafPending) { return; }
             _rafPending = true;
             requestAnimationFrame(function () { _rafPending = false; renderDocument(); });
+            // Every mutation of `doc` funnels through here, so this is the one place undo
+            // history can be captured without hunting down thirty individual handlers and
+            // missing one. It is safe for the non-edits that also re-render (selection
+            // changes, hydration, resize): snapshot() compares against the current entry
+            // and ignores an identical document, which is also what preserves the redo
+            // tail when restoreSnapshot re-renders after an undo.
+            if (typeof commit === 'function') { commit(); }
         }
 
         function renderDocument() {
@@ -1141,8 +1468,9 @@
             // downloadPreview() clears the selection before exporting so it never bakes in.
             drawSelectionHandles(ctx, W, H);
 
-            // Keep the swatches in step with whatever the background has become.
+            // Keep the swatches and the in-context thumbnails in step with the design.
             refreshPalette();
+            renderPreviewContexts();
 
             var ph = el('ccaPreviewPlaceholder');
             if (ph) { ph.style.display = 'none'; }
@@ -1305,6 +1633,112 @@
             }
             ctx.restore();
         }
+
+        // --- Preview contexts ---------------------------------------------
+        // The SAME document drawn at other aspect ratios. Layer coordinates are
+        // normalized, so a design re-flows rather than being letterboxed — which is
+        // exactly what you want to check before applying it to a library.
+        var PREVIEW_CONTEXTS = [
+            { key: 'wide', w: 320, h: 180 },
+            { key: 'square', w: 200, h: 200 },
+            { key: 'poster', w: 150, h: 225 }
+        ];
+
+        // Background + effects + layers into an arbitrary-sized context, reusing the very
+        // functions renderDocument uses so the two cannot drift. Deliberately omits the
+        // selection chrome — this is the design, not the editor.
+        function drawDocInto(ctx, W, H) {
+            ctx.clearRect(0, 0, W, H);
+            paintBackgroundOnly(ctx, W, H);
+            drawSoftLight(ctx, W, H);
+            doc.Layers.forEach(function (layer) {
+                if (!layer.Visible) { return; }
+                if (layer.Type === 'text') { drawTextLayer(ctx, layer, W, H); }
+                else if (layer.Type === 'image') { drawImageLayer(ctx, layer, W, H); }
+            });
+            drawVignette(ctx, W, H);
+            drawGrain(ctx, W, H);
+            drawBorder(ctx, W, H);
+        }
+
+        var renderPreviewContexts = debounce(function () {
+            var box = el('ccaContexts');
+            // offsetParent is null while step 5 is collapsed: no point drawing three
+            // canvases nobody can see on every edit.
+            if (!box || box.offsetParent === null) { return; }
+            box.innerHTML = '';
+            PREVIEW_CONTEXTS.forEach(function (c) {
+                var wrap = document.createElement('div');
+                wrap.className = 'ccaContext';
+                var cv = document.createElement('canvas');
+                cv.width = c.w; cv.height = c.h;
+                drawDocInto(cv.getContext('2d'), c.w, c.h);
+                var cap = document.createElement('div');
+                cap.className = 'ccaContextCap';
+                cap.textContent = t('ctx.' + c.key);
+                wrap.appendChild(cv); wrap.appendChild(cap);
+                box.appendChild(wrap);
+            });
+        }, 300);
+        // ------------------------------------------------------------------
+
+        // --- Undo/redo ----------------------------------------------------
+        // A snapshot stack of the serialized document. UI-only keys are stripped, so a
+        // snapshot can never capture a decoded <img> or the transient selection.
+        var HISTORY_CAP = 50;
+        var history = { stack: [], index: -1 };
+
+        function snapshot() {
+            var json = JSON.stringify(stripUiKeys(doc));
+            if (history.index >= 0 && history.stack[history.index] === json) { return; }
+            // Any new edit truncates the redo tail.
+            history.stack = history.stack.slice(0, history.index + 1);
+            history.stack.push(json);
+            if (history.stack.length > HISTORY_CAP) { history.stack.shift(); }
+            history.index = history.stack.length - 1;
+            updateHistoryButtons();
+        }
+
+        // Bursts of slider input collapse into ONE entry; discrete actions call snapshot()
+        // directly so they land immediately.
+        var commit = debounce(snapshot, 400);
+
+        function restoreSnapshot(json) {
+            var selected = doc._selectedId;
+            doc = JSON.parse(json);
+            // A snapshot is a plain serialized document, so it needs the same normalization
+            // a template load gets before anything dereferences it.
+            normalizeEffects(doc);
+            normalizeBackgroundSource(doc);
+            doc._selectedId = selected;
+            // It carries server paths but no decoded bitmaps.
+            bgImageEl = null;
+            hydrateLayerImages();
+            renderLayersPanel();
+            syncControlsFromDocument();
+            scheduleRender();
+        }
+
+        function undo() {
+            if (history.index <= 0) { return; }
+            history.index--;
+            restoreSnapshot(history.stack[history.index]);
+            updateHistoryButtons();
+        }
+
+        function redo() {
+            if (history.index >= history.stack.length - 1) { return; }
+            history.index++;
+            restoreSnapshot(history.stack[history.index]);
+            updateHistoryButtons();
+        }
+
+        function updateHistoryButtons() {
+            var u = el('ccaUndo'), r = el('ccaRedo');
+            if (u) { u.disabled = history.index <= 0; }
+            if (r) { r.disabled = history.index >= history.stack.length - 1; }
+        }
+        // ------------------------------------------------------------------
 
         // --- Colour palette (Phase 3) -------------------------------------
         // Dominant colours of the BACKGROUND, extracted entirely client-side — no new
@@ -1493,6 +1927,54 @@
             ctx.restore();
         }
 
+        // The font a layer should be drawn AND measured with. Both callers must agree:
+        // drawing with one face and measuring with another puts the selection box and the
+        // hit-test somewhere the glyphs are not. Custom uploads are registered lazily by
+        // ensureLayerFont(); until one arrives we fall back to the bundled Noto Sans, which
+        // is also what the server does when a font fails to load.
+        var _customFonts = {};   // server path -> { family: string, state: 'loading'|'ready'|'failed' }
+
+        function customFontFamily(path) {
+            return 'ccaFont' + String(path).replace(/[^a-zA-Z0-9]/g, '').slice(-24);
+        }
+
+        function fontFamilyFor(layer) {
+            var path = layer && layer.FontPath;
+            var entry = path && _customFonts[path];
+            if (entry && entry.state === 'ready') {
+                return '"' + entry.family + '", "Noto Sans", sans-serif';
+            }
+            return '"Noto Sans", sans-serif';
+        }
+
+        function canvasFont(layer, fontPx) {
+            return layer.Weight + ' ' + fontPx + 'px ' + fontFamilyFor(layer);
+        }
+
+        // Fetches an uploaded font through the authenticated endpoint and registers it with
+        // the FontFace API, then re-renders so the canvas picks it up. Best-effort: on
+        // failure the canvas keeps Noto Sans while the server still renders the real face.
+        function ensureLayerFont(layer) {
+            var path = layer && layer.FontPath;
+            if (!path || _customFonts[path]) { return; }
+            var family = customFontFamily(path);
+            _customFonts[path] = { family: family, state: 'loading' };
+            authFetch('CustomCoverArt/customFont?path=' + encodeURIComponent(path))
+                .then(function (r) {
+                    if (!r.ok) { throw new Error('custom font returned ' + r.status); }
+                    return r.arrayBuffer();
+                })
+                .then(function (buf) {
+                    var ff = new FontFace(family, buf);
+                    return ff.load().then(function (loaded) {
+                        document.fonts.add(loaded);
+                        _customFonts[path].state = 'ready';
+                        scheduleRender();
+                    });
+                })
+                .catch(function () { _customFonts[path].state = 'failed'; });
+        }
+
         // One text layer: outline (multi-pass strokeText), shadow (ctx.shadow*),
         // then fill — mirroring RenderTextLayer. Font px keys off doc.Canvas.Height
         // (the design's reference resolution), matching the server's font sizing.
@@ -1505,23 +1987,30 @@
             // the same pivot the server uses (RenderTextLayer's SetDrawingTransform).
             ctx.translate(px, py);
             if (layer.Rotation) { ctx.rotate(layer.Rotation * Math.PI / 180); }
-            ctx.font = layer.Weight + ' ' + fontPx + 'px "Noto Sans", sans-serif';
+            ensureLayerFont(layer);
+            ctx.font = canvasFont(layer, fontPx);
             ctx.textAlign = layer.Align === 0 ? 'left' : (layer.Align === 2 ? 'right' : 'center');
             ctx.textBaseline = 'middle';
 
+            // Draw order mirrors RenderTextLayer: shadow, then outline, then fill. The
+            // shadow used to be switched on between the outline and the fill, which put it
+            // OVER the outline — the server has always drawn it underneath.
+            ctx.fillStyle = layer.Color;
+            if (layer.Shadow && layer.Shadow.Enabled) {
+                ctx.save();
+                ctx.shadowColor = layer.Shadow.Color;
+                ctx.shadowBlur = layer.Shadow.Blur;
+                ctx.shadowOffsetX = layer.Shadow.OffsetX;
+                ctx.shadowOffsetY = layer.Shadow.OffsetY;
+                ctx.fillText(layer.Content, 0, 0);
+                ctx.restore();
+            }
             if (layer.Outline && layer.Outline.Enabled) {
                 ctx.lineWidth = layer.Outline.Width * 2;
                 ctx.strokeStyle = layer.Outline.Color;
                 ctx.lineJoin = 'round';
                 ctx.strokeText(layer.Content, 0, 0);
             }
-            if (layer.Shadow && layer.Shadow.Enabled) {
-                ctx.shadowColor = layer.Shadow.Color;
-                ctx.shadowBlur = layer.Shadow.Blur;
-                ctx.shadowOffsetX = layer.Shadow.OffsetX;
-                ctx.shadowOffsetY = layer.Shadow.OffsetY;
-            }
-            ctx.fillStyle = layer.Color;
             ctx.fillText(layer.Content, 0, 0);
             ctx.restore();
         }
@@ -1549,7 +2038,7 @@
         function textLayerBounds(ctx, layer, W, H) {
             var fontPx = Math.max(8, Math.min(1024, layer.Size * doc.Canvas.Height));
             ctx.save();
-            ctx.font = layer.Weight + ' ' + fontPx + 'px "Noto Sans", sans-serif';
+            ctx.font = canvasFont(layer, fontPx);
             var m = ctx.measureText(layer.Content || '');
             ctx.restore();
             var tw = m.width;
@@ -1591,9 +2080,38 @@
             return { x: dx * c - dy * s, y: dx * s + dy * c };
         }
 
-        // Handle sizes in CANVAS pixels — the canvas is displayed CSS-scaled, so these
-        // are derived from the backing-store height to stay visually constant.
-        function handleSize(H) { return Math.max(7, H / 55); }
+        // Canvas backing-store pixels per CSS pixel. Greater than 1 whenever the canvas is
+        // displayed smaller than its export size, which is almost always — and
+        // dramatically so on a phone, where a 1400px canvas shown at ~340px scales by ~4.
+        function canvasScale() {
+            var cv = el('ccaCanvas');
+            if (!cv) { return 1; }
+            var rect = cv.getBoundingClientRect();
+            if (!rect.width || !cv.width) { return 1; }
+            return cv.width / rect.width;
+        }
+
+        // Handle size is chosen in SCREEN pixels and converted into canvas units, so it
+        // renders at a constant on-screen size however far the canvas is scaled down.
+        // Deriving it from the backing store (the Phase 2 behaviour) meant the handles
+        // shrank with the display and ended up a few pixels across on a phone — the one
+        // mobile problem that no amount of CSS could fix.
+        var HANDLE_SCREEN_PX = 11;      // drawn size
+        var TOUCH_TARGET_PX = 44;       // minimum comfortable touch target
+        function handleSize(H) {
+            var byScreen = HANDLE_SCREEN_PX * canvasScale();
+            // Never so large on a tiny canvas that the handles swamp the layer itself.
+            return Math.max(6, Math.min(byScreen, H / 8));
+        }
+
+        // Grab radius. Touch gets the full 44px target; a mouse is precise, so it uses the
+        // drawn handle size rather than a sloppy oversized hit area.
+        function hitTolerance(ev) {
+            var scale = canvasScale();
+            var isTouch = ev && (ev.pointerType === 'touch' || ev.pointerType === 'pen');
+            return isTouch ? (TOUCH_TARGET_PX / 2) * scale : HANDLE_SCREEN_PX * scale;
+        }
+
         function rotateKnobGap(H) { return Math.max(18, H / 16); }
 
         // The four corner handles plus the rotate knob, in canvas coordinates, tagged
@@ -1654,13 +2172,13 @@
         }
 
         // The handle under the pointer, if any, for the currently selected layer.
-        function hitTestHandle(pt) {
+        function hitTestHandle(pt, ev) {
             var layer = selectedLayer();
             var cv = el('ccaCanvas');
             if (!layer || !layer.Visible || !cv) { return null; }
             var ctx = cv.getContext('2d');
             var r = layerRect(ctx, layer, cv.width, cv.height);
-            var tol = handleSize(cv.height);
+            var tol = hitTolerance(ev);
             var found = null;
             layerHandles(r, cv.height).forEach(function (p) {
                 var dx = pt.x - p.x, dy = pt.y - p.y;
@@ -1681,15 +2199,17 @@
         // Topmost (last-drawn) visible layer whose padded box contains the point. The
         // point is mapped into each layer's own rotated space, so a turned layer is
         // grabbed where it actually appears rather than by its upright footprint.
-        function hitTestLayer(pt) {
+        function hitTestLayer(pt, ev) {
             var cv = el('ccaCanvas'); if (!cv) { return null; }
             var ctx = cv.getContext('2d');
+            // A finger is much blunter than a cursor, so widen the grab area for touch.
+            var touchPad = hitTolerance(ev) * 0.5;
             for (var i = doc.Layers.length - 1; i >= 0; i--) {
                 var layer = doc.Layers[i];
                 if (!layer.Visible) { continue; }
                 var r = layerRect(ctx, layer, cv.width, cv.height);
                 var local = canvasToRect(r, pt);
-                var pad = layer.Type === 'text' ? Math.max(8, r.h * 0.3) : 0;
+                var pad = layer.Type === 'text' ? Math.max(touchPad, r.h * 0.3) : touchPad;
                 if (local.x >= r.lx - pad && local.x <= r.lx + r.w + pad &&
                     local.y >= r.ly - pad && local.y <= r.ly + r.h + pad) {
                     return layer;
@@ -1745,7 +2265,7 @@
             // Handles belong to the already-selected layer and sit OUTSIDE its box, so
             // they must win over a plain hit-test — otherwise a corner handle that
             // overlaps a layer below would select that layer instead of resizing.
-            var grip = hitTestHandle(pt);
+            var grip = hitTestHandle(pt, ev);
             if (grip) {
                 _handleDrag = {
                     kind: grip.handle.id === 'rot' ? 'rotate' : 'resize',
@@ -1762,7 +2282,7 @@
                 return;
             }
 
-            var hit = hitTestLayer(pt);
+            var hit = hitTestLayer(pt, ev);
             if (!hit) { return; }
             if (doc._selectedId !== hit.Id) {
                 doc._selectedId = hit.Id;
@@ -1929,7 +2449,7 @@
                 TextShadow: el('ccaShadow').checked,
                 TextOutline: el('ccaOutline').checked,
                 BackgroundGradient: {
-                    IsEnabled: el('ccaGradient').checked,
+                    IsEnabled: doc.Background.Source === 'gradient',
                     Type: parseInt(el('ccaGradientType').value, 10),
                     Angle: parseFloat(el('ccaGradientAngle').value) || 0,
                     Stops: collectGradientStops(),
@@ -2101,13 +2621,10 @@
             el('ccaBgSource').value = bg.Source || 'upload';
             var g = bg.Gradient;
             if (g) {
-                el('ccaGradient').checked = !!g.IsEnabled;
                 el('ccaGradientType').value = String(g.Type || 0);
                 el('ccaGradientAngle').value = g.Angle || 0;
                 el('ccaGradientAngleVal').textContent = (g.Angle || 0) + '°';
                 rebuildGradientStopsUI(g.Stops);
-            } else {
-                el('ccaGradient').checked = false;
             }
             if (bg.Collage) { el('ccaCollageDensity').value = bg.Collage.Density || 'medium'; }
 
@@ -2145,7 +2662,7 @@
 
             // Re-sync dependent visibility + labels.
             updateUI();
-            updateCollageVisibility();
+            updateBackgroundVisibility();
             updateAnimVisibility();
             updateEffectsVisibility();
         }
@@ -2166,7 +2683,7 @@
 
         function applyJellyfinPreset() {
             var p = JELLYFIN_PRESET;
-            doc.Background.Source = 'upload';
+            doc.Background.Source = 'gradient';
             doc.Background.Gradient = {
                 IsEnabled: true, Type: 0, Angle: p.gradientAngle,
                 Stops: [{ Color: p.gradientStart, Position: 0 }, { Color: p.gradientEnd, Position: 1 }],
@@ -2224,27 +2741,37 @@
         }
         // ------------------------------------------------------------------
 
-        // Enable/disable controls based on current selection.
+        // Enable/disable controls based on current selection. Deliberately does NOT touch
+        // the gradient rows — updateBackgroundVisibility owns those, and two owners of the
+        // same element fight.
         function updateUI() {
             el('ccaApplyBtn').disabled = !state.libraryId;
             el('ccaCustomDims').style.display = el('ccaPreset').value === 'custom' ? '' : 'none';
-            el('ccaGradientOpts').style.display = el('ccaGradient').checked ? '' : 'none';
-            el('ccaGradientAngleRow').style.display = el('ccaGradientType').value === '0' ? '' : 'none';
         }
 
-        // Shows/hides the collage controls and disables collage for Live TV
-        // (which has no child posters to build a mosaic from).
-        function updateCollageVisibility() {
-            var isCollage = el('ccaBgSource').value === 'collage';
+        // Single owner of which background controls are visible: only the chosen source's
+        // own controls are shown. A control belonging to an unchosen source is hidden
+        // outright rather than demoted to "advanced" — before v3.3.0.0 the gradient lived
+        // behind its own checkbox alongside the source dropdown, so two controls answered
+        // one question.
+        function updateBackgroundVisibility() {
+            var source = el('ccaBgSource').value;
             var type = el('ccaTargetType') ? el('ccaTargetType').value : 'library';
-            var opt = el('ccaBgSource').querySelector('option[value="collage"]');
-            if (opt) { opt.disabled = (type === 'livetv'); }
-            if (type === 'livetv' && isCollage) { el('ccaBgSource').value = 'upload'; isCollage = false; }
-            el('ccaCollageRow').style.display = isCollage ? '' : 'none';
-            // A collage supplies the whole background, so the upload/gradient/fit
-            // controls don't apply — hide them to keep the card focused.
-            var up = el('ccaUploadControls');
-            if (up) { up.style.display = isCollage ? 'none' : ''; }
+
+            // Live TV has no child posters to build a mosaic from.
+            var collageOpt = el('ccaBgSource').querySelector('option[value="collage"]');
+            if (collageOpt) { collageOpt.disabled = (type === 'livetv'); }
+            if (type === 'livetv' && source === 'collage') {
+                el('ccaBgSource').value = 'upload';
+                doc.Background.Source = 'upload';
+                source = 'upload';
+            }
+
+            el('ccaUploadControls').style.display = source === 'upload' ? '' : 'none';
+            el('ccaCollageRow').style.display = source === 'collage' ? '' : 'none';
+            el('ccaGradientOpts').style.display = source === 'gradient' ? '' : 'none';
+            el('ccaGradientAngleRow').style.display =
+                (source === 'gradient' && el('ccaGradientType').value === '0') ? '' : 'none';
             updateUI();
         }
 
@@ -2695,13 +3222,9 @@
             el('ccaBgFit').addEventListener('change', function () {
                 doc.Background.Fit = this.value; scheduleRender();
             });
-            el('ccaGradient').addEventListener('change', function () {
-                if (doc.Background.Gradient) { doc.Background.Gradient.IsEnabled = this.checked; }
-                updateUI(); scheduleRender();
-            });
             el('ccaGradientType').addEventListener('change', function () {
                 if (doc.Background.Gradient) { doc.Background.Gradient.Type = parseInt(this.value, 10); }
-                updateUI(); scheduleRender();
+                updateBackgroundVisibility(); scheduleRender();
             });
             el('ccaGradientAngle').addEventListener('input', function () {
                 el('ccaGradientAngleVal').textContent = this.value + '°';
@@ -2714,7 +3237,20 @@
             el('ccaBgSource').addEventListener('change', function () {
                 doc.Background.Source = this.value;
                 if (this.value === 'collage') { doc.Background.Collage = buildCollageFromControls(); }
-                updateCollageVisibility(); scheduleRender();
+                // Two-way compatibility: an older server reading this document decides on
+                // IsEnabled, so keep it in step with Source.
+                if (doc.Background.Gradient) {
+                    doc.Background.Gradient.IsEnabled = (this.value === 'gradient');
+                }
+                // A gradient or solid background must not keep painting a stale bitmap.
+                if (this.value === 'gradient' || this.value === 'solid') {
+                    bgImageEl = null;
+                    doc.Background.ImagePath = '';
+                    state.backgroundImagePath = '';
+                    var selBg = el('ccaSelectedBg');
+                    if (selBg) { selBg.style.display = 'none'; }
+                }
+                updateBackgroundVisibility(); scheduleRender();
             });
             el('ccaCollageDensity').addEventListener('change', function () {
                 if (doc.Background.Collage) { doc.Background.Collage.Density = this.value; } scheduleRender();
@@ -2805,7 +3341,7 @@
             el('ccaTargetType').addEventListener('change', function () {
                 Dashboard.showLoadingMsg();
                 loadLibraries()
-                    .then(function () { updateUI(); updateCollageVisibility(); refreshRestoreState(); loadBatchList(); Dashboard.hideLoadingMsg(); })
+                    .then(function () { updateUI(); updateBackgroundVisibility(); refreshRestoreState(); loadBatchList(); Dashboard.hideLoadingMsg(); })
                     .catch(function () { Dashboard.hideLoadingMsg(); });
             });
 
@@ -2853,6 +3389,25 @@
                         Dashboard.alert(t('dyn.fontFail', pick(res, 'ErrorMessage') || t('dyn.unknown')));
                     }
                 }).catch(function (e) { Dashboard.hideLoadingMsg(); Dashboard.alert(e.message); });
+            });
+
+            // Handle sizes and hit tolerances are derived from the canvas's CSS display
+            // size, so a viewport change (rotating a phone, resizing a window) must redraw
+            // or the handles keep the size they had at the old width.
+            window.addEventListener('resize', debounce(function () { scheduleRender(); }, 150));
+
+            el('ccaUndo').addEventListener('click', undo);
+            el('ccaRedo').addEventListener('click', redo);
+
+            document.addEventListener('keydown', function (ev) {
+                if (!(ev.ctrlKey || ev.metaKey)) { return; }
+                // Never hijack text editing: inside a field the browser's own undo is the
+                // one the user means.
+                var target = ev.target;
+                if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) { return; }
+                var k = String(ev.key || '').toLowerCase();
+                if (k === 'z' && !ev.shiftKey) { ev.preventDefault(); undo(); }
+                else if (k === 'y' || (k === 'z' && ev.shiftKey)) { ev.preventDefault(); redo(); }
             });
 
             el('ccaApplyBtn').addEventListener('click', applyCoverArt);
@@ -2905,6 +3460,7 @@
                 // Templates saved before Phase 3 have no effect sub-objects; the draw
                 // functions dereference them, so fill them in like the server does.
                 normalizeEffects(doc);
+                normalizeBackgroundSource(doc);
                 var titleLayer = null;
                 for (var i = 0; i < doc.Layers.length; i++) {
                     if (doc.Layers[i].Id === 'title') { titleLayer = doc.Layers[i]; break; }
@@ -3107,6 +3663,8 @@
             applyI18n(page);
             if (!page.dataset.ccaInit) {
                 bindEvents();
+                initSteps();
+                initAdvanced();
                 page.dataset.ccaInit = 'true';
             }
             Dashboard.showLoadingMsg();
@@ -3122,7 +3680,7 @@
             loadBatchList();
             loadLibraries().then(function () {
                 updateUI();
-                updateCollageVisibility();
+                updateBackgroundVisibility();
                 refreshRestoreState();
                 Dashboard.hideLoadingMsg();
                 scheduleRender();

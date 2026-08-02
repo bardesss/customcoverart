@@ -1,5 +1,20 @@
 # Phase 4 — UI Polish (Undo/Redo, Mobile, Preview Modes) — Implementation Plan
 
+> # ⚠️ SUPERSEDED — DO NOT EXECUTE THIS PLAN
+>
+> Superseded on 2026-08-01 by `docs/superpowers/specs/2026-08-01-guided-editor-ux-design.md`,
+> which merges this phase into a guided-editor restructure and ships as **v3.3.0.0**.
+>
+> **Task 2 is actively wrong now.** Its collapsible-cards work is replaced by the numbered
+> accordion in the new design; building it first and then replacing it would be wasted work.
+>
+> **Tasks 1 (undo/redo) and 3 (preview modes) survive in substance** and are carried into the
+> merged plan, with one change: the undo/redo toolbar moves beside the canvas rather than into
+> the preview card header, so it is reachable from every step.
+>
+> This file is kept for the implementation detail in those two tasks. Execute the merged plan
+> instead.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. **Depends on Phases 1–3** (`CoverDocument`, canvas engine, layers, effects).
 
 **Goal:** Full undo/redo over the whole design (Ctrl+Z / Ctrl+Y + buttons), a significantly more mobile-friendly configuration page (responsive layout, larger touch targets, collapsible sections), and a preview mode showing the cover in common aspect ratios and simulated client contexts (home screen, library grid, details page).
