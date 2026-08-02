@@ -64,7 +64,7 @@ public class ConfigPageStructureTests
         "ccaSelectedBgName", "ccaServerRender", "ccaServerRenderImg", "ccaServerRenderWrap",
         "ccaSettings", "ccaShadow", "ccaSwatches", "ccaTargetType", "ccaTemplateDelete",
         "ccaTemplateName", "ccaTemplateSave", "ccaTemplateSelect", "ccaTextAlign", "ccaTextColor",
-        "ccaTextSize", "ccaTextSizeVal", "ccaTextWeight", "ccaTitle", "ccaUndo", "ccaRedo",
+        "ccaContexts", "ccaTextSize", "ccaTextSizeVal", "ccaTextWeight", "ccaTitle", "ccaUndo", "ccaRedo",
         "ccaUploadControls", "ccaWidth"
     };
 
