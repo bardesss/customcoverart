@@ -4,7 +4,7 @@
 
 **A Jellyfin plugin for designing and applying custom cover art to your media libraries.**
 
-Text, gradients, blur, custom backgrounds and fonts — with a live preview, right inside the Jellyfin dashboard.
+Layered text and logos, backgrounds, composition effects — designed on a live canvas, right inside the Jellyfin dashboard.
 
 `Jellyfin 10.11` · `.NET 9` · `SixLabors.ImageSharp`
 
@@ -16,8 +16,9 @@ Text, gradients, blur, custom backgrounds and fonts — with a live preview, rig
 >
 > This plugin was substantially rebuilt and refactored with the help of an AI assistant
 > (Anthropic's Claude). The code **compiles cleanly and passes an automated unit-test suite**
-> (image generation, upload validation, the path-traversal sandbox, and plugin wiring), and
-> the runtime paths have been tested against a live Jellyfin server.
+> covering rendering, the client/server parity contracts, upload validation, the path-traversal
+> sandbox, config-page structure and translation completeness — and the runtime paths have been
+> tested against a live Jellyfin server.
 
 ---
 
@@ -38,18 +39,18 @@ Text, gradients, blur, custom backgrounds and fonts — with a live preview, rig
 | 🧭 | **Guided steps** | Five numbered steps, essentials up front and advanced controls one click away |
 | ↩️ | **Undo / redo** | Ctrl+Z and Ctrl+Y across the whole design |
 | 📱 | **Mobile-friendly** | Large touch targets, sticky preview, full-screen poster browser, grabbable canvas handles |
-| 🖼️ | **In-context preview** | See the cover wide, square and poster-shaped before applying |
-| 🔠 | **Fonts** | Bundled Noto Sans (matches Jellyfin's UI, so text always renders) — or upload your own `.ttf` / `.otf` / `.woff` / `.woff2` |
-| 📐 | **Presets & sizes** | Square cover, portrait poster, wide banner, or custom dimensions |
+| 🔍 | **In-context preview** | See the cover wide, square and poster-shaped before applying |
+| 🔠 | **Fonts** | Bundled Noto Sans (matches Jellyfin's UI, so text always renders) — or upload your own `.ttf` / `.otf` / `.ttc` / `.woff` / `.woff2`, which the live canvas renders too |
+| 📐 | **Presets & sizes** | Landscape 16:9 (the default), square cover, portrait poster, wide banner, or custom dimensions |
 | 🖱️ | **Interactive canvas** | The preview is a live canvas — drag layers to position them, resize/rotate them with handles, drag/scroll/pinch to reposition and zoom the background |
 | 🎯 | **Authoritative server render** | The canvas is a fast approximation; "Show server render" renders the exact same design on the server before you apply |
 | 🧩 | **Poster collage** | Auto-build a grid-mosaic background from a target's own item posters |
 | 💾 | **Design templates** | Save a look and reuse it; each target keeps its own name as the title |
 | 📚 | **Batch apply** | Apply one design to many libraries/collections/playlists at once |
-| ↩️ | **Restore original** | One-click revert to a target's pre-plugin cover |
+| 🕗 | **Restore original** | One-click revert to a target's pre-plugin cover |
 | 🎞️ | **Animated GIF** | Export animated covers (animated-source passthrough or Ken Burns pan/zoom) |
 | 🌍 | **Localisation** | English and Dutch included; easy to add more |
-| 🪶 | **Lightweight** | Small footprint — the plugin DLL is ~1.6 MB (fonts are subset-embedded), so it stays easy on the server |
+| 🪶 | **Lightweight** | Small footprint — the plugin DLL is ~1.8 MB (fonts are subset-embedded), so it stays easy on the server |
 
 ## 📸 Screenshots
 
@@ -137,8 +138,9 @@ a fast approximation and the server render is authoritative.
 **Add text** stacks another independently styled text layer; **Add logo/icon** uploads a PNG
 (transparency preserved) as an image layer. The Layers list shows the top-most layer first — use
 ▲/▼ to restack, 👁 to hide a layer without deleting it, ⧉ to duplicate and ✕ to remove. Click any
-row to select it; the **Selected layer** card below edits that layer, and text-only controls hide
-when a logo is selected.
+row to select it; the **Selected layer** section below edits that layer, and text-only controls
+hide when a logo is selected. On a narrow screen those actions sit behind the row's **⋯** button,
+so tapping anywhere else on the row simply selects it.
 
 On the canvas the selected layer gets **corner handles** (drag to resize — a logo scales about its
 centre, text scales its font size) and a **knob above it to rotate**. Hold **Shift** while dragging
@@ -153,7 +155,7 @@ never a direct reference to your media files.
 
 ### Effects and colours
 
-The **Effects** card holds four composition effects, each off until you tick it: a **colour
+Step 4 holds four composition effects, each off until you tick it: a **colour
 wash** that tints everything under your layers, a **vignette** that darkens toward the edges, **film
 grain**, and a **border** with optional rounded corners and a second inner line. Sliding an effect
 back to zero restores the cover exactly — nothing is baked in.
@@ -172,15 +174,15 @@ runs entirely in your browser — nothing is uploaded — and stays off until yo
 
 ### Poster-collage backgrounds
 
-In the Background card, set **Background source** to *Poster collage from this target* to build a
+In step 2, set **Background source** to *Poster collage from this target* to build a
 dimmed grid of that library's own posters. Use **Shuffle** to re-roll the arrangement. (Live TV
 has no posters, so collage is unavailable there.)
 
 ### Templates and batch apply
 
-Design a cover, then **Save current design** in the Templates card. In **Batch apply**, tick
-several targets and apply your design (or a saved template) to all of them at once — each cover
-is titled with its target's own name. Templates saved before the canvas editor still load fine —
+Design a cover, then **Save this design** under **Advanced** in step 5. **Apply to several
+targets**, in the same place, applies your design (or a saved template) to many libraries at once —
+each cover titled with its target's own name. To start from a saved design, pick it in step 1. Templates saved before the canvas editor still load fine —
 they're migrated to the new design format automatically the first time you pick them.
 
 ### Animated covers
@@ -192,7 +194,7 @@ animate in the Jellyfin views that render GIFs.
 ### Restoring the original
 
 Applying a cover automatically backs up the target's previous image once. Use **Restore original
-cover** on the Target card to revert.
+cover** in step 1 to revert.
 
 ## 🔒 Security & privacy
 
@@ -207,19 +209,45 @@ cover** on the Target card to revert.
 
 ## 🌐 Adding a translation
 
-1. Add `Resources/<language-code>.json` (copy `en.json` as a starting point).
+Strings live in **two** places, and a language needs both — translating only the first
+leaves the whole configuration page in English.
+
+**1. Server messages** — `Resources/<language-code>.json`:
+
+1. Copy `Resources/en.json` as a starting point.
 2. Translate the values; keep the keys identical.
 3. Use `{0}`, `{1}` for interpolated values (e.g. `"File is too large. Maximum {0}MB."`).
-4. Rebuild. Detection order: `JELLYFIN_LANGUAGE` → `LANG` → system culture → English fallback.
+4. Detection order: `JELLYFIN_LANGUAGE` → `LANG` → system culture → English fallback.
+
+**2. The configuration page** — the `I18N` object near the top of the `<script>` block in
+`Configuration/configPage.html`. This is the larger of the two and covers every label,
+button and hint you see in the dashboard. Add a block alongside `en` and `nl`, keyed by
+the two-letter language code; the page picks it from Jellyfin's stored UI language.
+
+Then rebuild. `PresetTests.EveryI18nKeyUsedInMarkup_ExistsInBothLanguages` fails the build
+if a key used in the markup is missing from `en` or `nl`, so a forgotten string is caught
+before it ships.
 
 Included: `en` (English), `nl` (Dutch).
 
 ## 🧪 Development
 
-The core logic is covered by unit tests (image generation, upload validation, the path
-sandbox, and plugin metadata/wiring). Because the plugin references the Jellyfin server
-assemblies with `ExcludeAssets=runtime`, a test project should reference
-`Jellyfin.Common` / `Jellyfin.Controller` / `Jellyfin.Model` directly to supply them at test time.
+```bash
+dotnet test tests/CustomCoverArt.Tests
+```
+
+The suite covers rendering (backgrounds, layers, effects, and the client/server parity
+contracts), upload validation, the path-traversal sandbox, document migration, plugin
+wiring, and the configuration page's structure and translation completeness.
+
+Because the plugin references the Jellyfin server assemblies with `ExcludeAssets=runtime`,
+the test project references `Jellyfin.Common` / `Jellyfin.Controller` / `Jellyfin.Model`
+directly to supply them at test time.
+
+Two guards are worth knowing about before editing `Configuration/configPage.html`:
+`ConfigPageStructureTests` pins every `cca*` element id, so a control cannot be silently
+dropped while markup is moved — add new ids to that list. And the translation check fails
+the build if a `data-i18n` key in the markup is missing from either language.
 
 ## 📦 Releasing
 
@@ -235,10 +263,15 @@ already been released, the workflow is a no-op.
 |---|---|
 | `Plugin.cs` | Plugin entry point (`BasePlugin` + `IHasWebPages`) |
 | `PluginServiceRegistrator.cs` | DI registration (`IPluginServiceRegistrator`) |
-| `Configuration/configPage.html` | The dashboard config UI (static, embedded) |
+| `Configuration/configPage.html` | The dashboard config UI — markup, styles, and the canvas engine (static, embedded) |
 | `Controllers/` | REST API endpoints (`ControllerBase`, admin‑only) |
+| `Models/CoverDocument.cs` | The layered design document shared by the client canvas and the server renderer |
+| `Services/DocumentRenderer.cs` | The compositor: backgrounds, text and image layers |
+| `Services/EffectsComposer.cs` | Composition effects (colour wash, vignette, grain, border) |
 | `Services/` | Cover‑art generation, image processing, library/media access, etc. |
 | `Common/PluginPaths.cs` | Data‑directory resolution and the path sandbox |
+| `Resources/` | Server message translations and the bundled Noto Sans faces |
+| `tests/CustomCoverArt.Tests/` | xUnit suite (`dotnet test`) |
 
 ## 🤝 Contributing
 
