@@ -18,8 +18,13 @@
 
                 <div class="ccaControls">
 
-                    <section class="ccaCard">
-                        <div class="ccaCardHead" data-i18n="card.target">Target</div>
+                    <section class="ccaStep" data-step="1">
+                        <button type="button" class="ccaStepHead" aria-expanded="false" aria-controls="ccaStepBody1">
+                            <span class="ccaStepNum">1</span>
+                            <span class="ccaStepTitle" data-i18n="step.target">Target &amp; start</span>
+                            <span class="ccaStepChevron" aria-hidden="true">&#9662;</span>
+                        </button>
+                        <div class="ccaStepBody" id="ccaStepBody1" hidden>
                         <div class="ccaGrid">
                             <div class="inputContainer">
                                 <label for="ccaTargetType" data-i18n="target.type">Type</label>
@@ -43,88 +48,27 @@
                             </button>
                             <span class="ccaFileName" id="ccaRestoreHint" data-i18n="restore.none">No backup yet</span>
                         </div>
-                    </section>
-
-                    <section class="ccaCard">
-                        <div class="ccaCardHead" data-i18n="card.layers">Layers</div>
-                        <div id="ccaLayerList" class="ccaLayerList"></div>
-                        <div class="ccaFileRow">
-                            <button is="emby-button" type="button" id="ccaAddText" class="raised"><span data-i18n="layer.addText">Add text</span></button>
-                            <button is="emby-button" type="button" id="ccaAddImage" class="raised"><span data-i18n="layer.addImage">Add logo/icon</span></button>
-                            <input type="file" id="ccaLayerImage" accept=".png" class="ccaHiddenFile" />
-                        </div>
-                        <div class="fieldDescription" data-i18n="hint.logo">PNG with transparency · up to 5 MB. The topmost row is drawn last, on top of the others.</div>
-                    </section>
-
-                    <section class="ccaCard" id="ccaSettings">
-                        <div class="ccaCardHead" data-i18n="card.selected">Selected layer</div>
-                        <div class="inputContainer ccaTextOnly">
-                            <label for="ccaTitle" data-i18n="text.title">Title</label>
-                            <input is="emby-input" type="text" id="ccaTitle" value="Movies" />
-                        </div>
-                        <div class="ccaGrid ccaTextOnly">
-                            <div class="inputContainer">
-                                <label for="ccaTextWeight" data-i18n="text.weight">Font weight</label>
-                                <select is="emby-select" id="ccaTextWeight" class="emby-select">
-                                    <option value="300" data-i18n="w.light">Light</option>
-                                    <option value="400" selected data-i18n="w.normal">Normal</option>
-                                    <option value="500" data-i18n="w.medium">Medium</option>
-                                    <option value="600" data-i18n="w.semibold">SemiBold</option>
-                                    <option value="700" data-i18n="w.bold">Bold</option>
-                                    <option value="800" data-i18n="w.extrabold">ExtraBold</option>
-                                </select>
-                            </div>
-                            <div class="inputContainer">
-                                <label for="ccaTextAlign" data-i18n="text.align">Alignment</label>
-                                <select is="emby-select" id="ccaTextAlign" class="emby-select">
-                                    <option value="0" data-i18n="a.left">Left</option>
-                                    <option value="1" selected data-i18n="a.center">Center</option>
-                                    <option value="2" data-i18n="a.right">Right</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="inputContainer ccaTextOnly">
-                            <label for="ccaTextSize"><span data-i18n="text.size">Text size</span> <span class="ccaVal" id="ccaTextSizeVal">120</span></label>
-                            <input type="range" class="ccaRange" id="ccaTextSize" min="20" max="300" value="120" />
-                        </div>
-                        <div class="ccaGrid ccaTextOnly">
-                            <div class="inputContainer">
-                                <label for="ccaTextColor" data-i18n="text.color">Text color</label>
-                                <input type="color" id="ccaTextColor" value="#ffffff" />
-                            </div>
-                            <div class="inputContainer">
-                                <label data-i18n="text.effects">Effects</label>
-                                <div class="ccaChecks">
-                                    <label class="ccaCheck"><input is="emby-checkbox" type="checkbox" id="ccaShadow" /><span data-i18n="e.shadow">Shadow</span></label>
-                                    <label class="ccaCheck"><input is="emby-checkbox" type="checkbox" id="ccaOutline" /><span data-i18n="e.outline">Outline</span></label>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="inputContainer ccaTextOnly">
-                            <label data-i18n="text.font">Custom font (optional)</label>
+                        <div class="ccaStepGroup">
+                            <div class="ccaStepGroupHead" data-i18n="group.startFrom">Start from a saved design</div>
+                        <div class="inputContainer">
+                            <label for="ccaTemplateSelect" data-i18n="tpl.load">Load template</label>
                             <div class="ccaFileRow">
-                                <button is="emby-button" type="button" id="ccaFontBtn" class="raised"><span data-i18n="f.chooseFont">Choose font…</span></button>
-                                <span class="ccaFileName" id="ccaFontName" data-i18n="f.none">No file chosen</span>
-                            </div>
-                            <div class="fieldDescription" data-i18n="hint.font">TTF, OTF, TTC, WOFF or WOFF2 · up to 5 MB. Leave empty to use the bundled Noto Sans.</div>
-                            <input type="file" id="ccaFont" accept=".ttf,.otf,.ttc,.woff,.woff2" class="ccaHiddenFile" />
-                        </div>
-                        <div class="ccaGrid">
-                            <div class="inputContainer">
-                                <label for="ccaLayerOpacity"><span data-i18n="layer.opacity">Opacity</span> <span class="ccaVal" id="ccaLayerOpacityVal">100</span></label>
-                                <input type="range" class="ccaRange" id="ccaLayerOpacity" min="0" max="100" step="1" value="100" />
-                            </div>
-                            <div class="inputContainer">
-                                <label for="ccaLayerRotation"><span data-i18n="layer.rotation">Rotation</span> <span class="ccaVal" id="ccaLayerRotationVal">0°</span></label>
-                                <input type="range" class="ccaRange" id="ccaLayerRotation" min="-180" max="180" step="1" value="0" />
+                                <select is="emby-select" id="ccaTemplateSelect" class="emby-select ccaGrow"></select>
+                                <button is="emby-button" type="button" id="ccaTemplateDelete" class="raised">
+                                    <span data-i18n="tpl.delete">Delete</span>
+                                </button>
                             </div>
                         </div>
-                        <div class="fieldDescription ccaImageOnly" data-i18n="hint.logoSize">Drag the corner handles on the preview to resize the logo, or the knob above it to rotate.</div>
-                        <div class="fieldDescription" id="ccaNoLayerHint" data-i18n="layer.none" style="display:none">No layer selected — add one in the Layers card above.</div>
+                        </div>
+                        </div>
                     </section>
-
-                    <section class="ccaCard">
-                        <div class="ccaCardHead" data-i18n="card.background">Background</div>
+                    <section class="ccaStep" data-step="2">
+                        <button type="button" class="ccaStepHead" aria-expanded="false" aria-controls="ccaStepBody2">
+                            <span class="ccaStepNum">2</span>
+                            <span class="ccaStepTitle" data-i18n="step.background">Background</span>
+                            <span class="ccaStepChevron" aria-hidden="true">&#9662;</span>
+                        </button>
+                        <div class="ccaStepBody" id="ccaStepBody2" hidden>
                         <div class="inputContainer">
                             <label for="ccaBgSource" data-i18n="bg.source">Background source</label>
                             <select is="emby-select" id="ccaBgSource" class="emby-select">
@@ -206,10 +150,99 @@
                             <div id="ccaSelectedBg" class="ccaSelected" style="display:none;"><span data-i18n="bg.selected">Selected background:</span> <strong id="ccaSelectedBgName"></strong></div>
                         </div>
                         </div>
+                        </div>
                     </section>
-
-                    <section class="ccaCard">
-                        <div class="ccaCardHead" data-i18n="card.effects">Effects</div>
+                    <section class="ccaStep" data-step="3">
+                        <button type="button" class="ccaStepHead" aria-expanded="false" aria-controls="ccaStepBody3">
+                            <span class="ccaStepNum">3</span>
+                            <span class="ccaStepTitle" data-i18n="step.text">Text &amp; logos</span>
+                            <span class="ccaStepChevron" aria-hidden="true">&#9662;</span>
+                        </button>
+                        <div class="ccaStepBody" id="ccaStepBody3" hidden>
+                        <div id="ccaLayerList" class="ccaLayerList"></div>
+                        <div class="ccaFileRow">
+                            <button is="emby-button" type="button" id="ccaAddText" class="raised"><span data-i18n="layer.addText">Add text</span></button>
+                            <button is="emby-button" type="button" id="ccaAddImage" class="raised"><span data-i18n="layer.addImage">Add logo/icon</span></button>
+                            <input type="file" id="ccaLayerImage" accept=".png" class="ccaHiddenFile" />
+                        </div>
+                        <div class="fieldDescription" data-i18n="hint.logo">PNG with transparency · up to 5 MB. The topmost row is drawn last, on top of the others.</div>
+                        <div class="ccaStepGroup">
+                            <div class="ccaStepGroupHead" data-i18n="group.selectedLayer">Selected layer</div>
+                        <div id="ccaSettings">
+                        <div class="inputContainer ccaTextOnly">
+                            <label for="ccaTitle" data-i18n="text.title">Title</label>
+                            <input is="emby-input" type="text" id="ccaTitle" value="Movies" />
+                        </div>
+                        <div class="ccaGrid ccaTextOnly">
+                            <div class="inputContainer">
+                                <label for="ccaTextWeight" data-i18n="text.weight">Font weight</label>
+                                <select is="emby-select" id="ccaTextWeight" class="emby-select">
+                                    <option value="300" data-i18n="w.light">Light</option>
+                                    <option value="400" selected data-i18n="w.normal">Normal</option>
+                                    <option value="500" data-i18n="w.medium">Medium</option>
+                                    <option value="600" data-i18n="w.semibold">SemiBold</option>
+                                    <option value="700" data-i18n="w.bold">Bold</option>
+                                    <option value="800" data-i18n="w.extrabold">ExtraBold</option>
+                                </select>
+                            </div>
+                            <div class="inputContainer">
+                                <label for="ccaTextAlign" data-i18n="text.align">Alignment</label>
+                                <select is="emby-select" id="ccaTextAlign" class="emby-select">
+                                    <option value="0" data-i18n="a.left">Left</option>
+                                    <option value="1" selected data-i18n="a.center">Center</option>
+                                    <option value="2" data-i18n="a.right">Right</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="inputContainer ccaTextOnly">
+                            <label for="ccaTextSize"><span data-i18n="text.size">Text size</span> <span class="ccaVal" id="ccaTextSizeVal">120</span></label>
+                            <input type="range" class="ccaRange" id="ccaTextSize" min="20" max="300" value="120" />
+                        </div>
+                        <div class="ccaGrid ccaTextOnly">
+                            <div class="inputContainer">
+                                <label for="ccaTextColor" data-i18n="text.color">Text color</label>
+                                <input type="color" id="ccaTextColor" value="#ffffff" />
+                            </div>
+                            <div class="inputContainer">
+                                <label data-i18n="text.effects">Effects</label>
+                                <div class="ccaChecks">
+                                    <label class="ccaCheck"><input is="emby-checkbox" type="checkbox" id="ccaShadow" /><span data-i18n="e.shadow">Shadow</span></label>
+                                    <label class="ccaCheck"><input is="emby-checkbox" type="checkbox" id="ccaOutline" /><span data-i18n="e.outline">Outline</span></label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="inputContainer ccaTextOnly">
+                            <label data-i18n="text.font">Custom font (optional)</label>
+                            <div class="ccaFileRow">
+                                <button is="emby-button" type="button" id="ccaFontBtn" class="raised"><span data-i18n="f.chooseFont">Choose font…</span></button>
+                                <span class="ccaFileName" id="ccaFontName" data-i18n="f.none">No file chosen</span>
+                            </div>
+                            <div class="fieldDescription" data-i18n="hint.font">TTF, OTF, TTC, WOFF or WOFF2 · up to 5 MB. Leave empty to use the bundled Noto Sans.</div>
+                            <input type="file" id="ccaFont" accept=".ttf,.otf,.ttc,.woff,.woff2" class="ccaHiddenFile" />
+                        </div>
+                        <div class="ccaGrid">
+                            <div class="inputContainer">
+                                <label for="ccaLayerOpacity"><span data-i18n="layer.opacity">Opacity</span> <span class="ccaVal" id="ccaLayerOpacityVal">100</span></label>
+                                <input type="range" class="ccaRange" id="ccaLayerOpacity" min="0" max="100" step="1" value="100" />
+                            </div>
+                            <div class="inputContainer">
+                                <label for="ccaLayerRotation"><span data-i18n="layer.rotation">Rotation</span> <span class="ccaVal" id="ccaLayerRotationVal">0°</span></label>
+                                <input type="range" class="ccaRange" id="ccaLayerRotation" min="-180" max="180" step="1" value="0" />
+                            </div>
+                        </div>
+                        <div class="fieldDescription ccaImageOnly" data-i18n="hint.logoSize">Drag the corner handles on the preview to resize the logo, or the knob above it to rotate.</div>
+                        <div class="fieldDescription" id="ccaNoLayerHint" data-i18n="layer.none" style="display:none">No layer selected — add one in the Layers card above.</div>
+                        </div>
+                        </div>
+                        </div>
+                    </section>
+                    <section class="ccaStep" data-step="4">
+                        <button type="button" class="ccaStepHead" aria-expanded="false" aria-controls="ccaStepBody4">
+                            <span class="ccaStepNum">4</span>
+                            <span class="ccaStepTitle" data-i18n="step.effects">Effects</span>
+                            <span class="ccaStepChevron" aria-hidden="true">&#9662;</span>
+                        </button>
+                        <div class="ccaStepBody" id="ccaStepBody4" hidden>
 
                         <div class="ccaFileRow">
                             <button is="emby-button" type="button" id="ccaPresetJf" class="raised"><span data-i18n="fx.jellyfin">Jellyfin style</span></button>
@@ -274,10 +307,15 @@
                         <label class="ccaCheck ccaCheckBlock"><input is="emby-checkbox" type="checkbox" id="ccaAutoPalette" /><span data-i18n="fx.autopalette">Auto palette</span></label>
                         <div id="ccaSwatches" class="ccaSwatches"></div>
                         <div class="fieldDescription" data-i18n="fx.paletteHint">Click a colour to apply it to the selected text layer, or to the colour wash when no text layer is selected.</div>
+                        </div>
                     </section>
-
-                    <section class="ccaCard">
-                        <div class="ccaCardHead" data-i18n="card.output">Output</div>
+                    <section class="ccaStep" data-step="5">
+                        <button type="button" class="ccaStepHead" aria-expanded="false" aria-controls="ccaStepBody5">
+                            <span class="ccaStepNum">5</span>
+                            <span class="ccaStepTitle" data-i18n="step.output">Output &amp; apply</span>
+                            <span class="ccaStepChevron" aria-hidden="true">&#9662;</span>
+                        </button>
+                        <div class="ccaStepBody" id="ccaStepBody5" hidden>
                         <div class="ccaGrid">
                             <div class="inputContainer">
                                 <label for="ccaPreset" data-i18n="out.dims">Dimensions</label>
@@ -328,19 +366,8 @@
                                 <input is="emby-input" type="number" id="ccaHeight" min="100" max="2048" value="1400" />
                             </div>
                         </div>
-                    </section>
-
-                    <section class="ccaCard">
-                        <div class="ccaCardHead" data-i18n="card.templates">Templates</div>
-                        <div class="inputContainer">
-                            <label for="ccaTemplateSelect" data-i18n="tpl.load">Load template</label>
-                            <div class="ccaFileRow">
-                                <select is="emby-select" id="ccaTemplateSelect" class="emby-select ccaGrow"></select>
-                                <button is="emby-button" type="button" id="ccaTemplateDelete" class="raised">
-                                    <span data-i18n="tpl.delete">Delete</span>
-                                </button>
-                            </div>
-                        </div>
+                        <div class="ccaStepGroup">
+                            <div class="ccaStepGroupHead" data-i18n="group.saveTemplate">Save this design</div>
                         <div class="inputContainer">
                             <label for="ccaTemplateName" data-i18n="tpl.save">Save current design</label>
                             <div class="ccaFileRow">
@@ -351,10 +378,9 @@
                             </div>
                         </div>
                         <div class="fieldDescription" data-i18n="tpl.hint">Templates store the design but not the title — each target keeps its own name.</div>
-                    </section>
-
-                    <section class="ccaCard">
-                        <div class="ccaCardHead" data-i18n="card.batch">Batch apply</div>
+                        </div>
+                        <div class="ccaStepGroup">
+                            <div class="ccaStepGroupHead" data-i18n="group.batch">Apply to several targets</div>
                         <div class="fieldDescription" data-i18n="batch.hint">Apply the current design (or loaded template) to several targets at once. Each cover is titled with its target's name.</div>
                         <div id="ccaBatchList" class="ccaBatchList"></div>
                         <div class="ccaFileRow">
@@ -362,6 +388,8 @@
                                 <span data-i18n="batch.apply">Apply to selected</span>
                             </button>
                             <span class="ccaFileName" id="ccaBatchStatus"></span>
+                        </div>
+                        </div>
                         </div>
                     </section>
 
@@ -374,7 +402,6 @@
                         <div class="ccaPreviewWrap">
                             <canvas id="ccaCanvas" class="ccaCanvas" width="1400" height="1400" aria-label="Cover art canvas"></canvas>
                             <div id="ccaPreviewPlaceholder" class="ccaPreviewPlaceholder" data-i18n="preview.placeholder">Generate a preview to see your cover art.</div>
-                            <div id="ccaPreviewSpinner" class="ccaSpinner" style="display:none" aria-hidden="true"></div>
                         </div>
                         <div class="ccaActions">
                             <button is="emby-button" type="button" id="ccaApplyBtn" class="raised block button-submit" disabled><span data-i18n="action.apply">Apply to library</span></button>
@@ -514,6 +541,31 @@
         }
         #CustomCoverArtConfigPage .ccaStopRemove:hover { opacity: 1; }
 
+        /* Numbered accordion steps. One open at a time; the header is the map. */
+        #CustomCoverArtConfigPage .ccaStep { margin: 0 0 .6em; border: 1px solid rgba(127,127,127,.2); border-radius: 10px; overflow: hidden; }
+        #CustomCoverArtConfigPage .ccaStepHead {
+            display: flex; align-items: center; gap: .75em; width: 100%;
+            min-height: 3em; padding: .8em 1em; box-sizing: border-box;
+            background: transparent; border: 0; color: inherit; cursor: pointer;
+            font-size: 1.05em; text-align: left;
+        }
+        #CustomCoverArtConfigPage .ccaStepHead:hover { background: rgba(127,127,127,.08); }
+        #CustomCoverArtConfigPage .ccaStepNum {
+            flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
+            width: 1.8em; height: 1.8em; border-radius: 50%;
+            background: var(--theme-primary-color, #00a4dc); color: #fff; font-size: .85em;
+        }
+        #CustomCoverArtConfigPage .ccaStepTitle { flex: 1 1 auto; }
+        #CustomCoverArtConfigPage .ccaStepChevron { flex: 0 0 auto; opacity: .6; transition: transform .18s ease; }
+        #CustomCoverArtConfigPage .ccaStepHead[aria-expanded="true"] .ccaStepChevron { transform: rotate(180deg); }
+        #CustomCoverArtConfigPage .ccaStepBody { padding: 0 1em 1.1em; }
+        #CustomCoverArtConfigPage .ccaStepBody[hidden] { display: none; }
+        #CustomCoverArtConfigPage .ccaStepGroup { margin-top: 1.3em; padding-top: 1.1em; border-top: 1px solid rgba(127,127,127,.15); }
+        #CustomCoverArtConfigPage .ccaStepGroupHead { font-size: .9em; opacity: .6; margin-bottom: .6em; }
+        @media (prefers-reduced-motion: reduce) {
+            #CustomCoverArtConfigPage .ccaStepChevron { transition: none; }
+        }
+
         /* Palette swatches extracted from the background. */
         #CustomCoverArtConfigPage .ccaSwatches { display: flex; flex-wrap: wrap; gap: .4em; margin: .3em 0 0; }
         #CustomCoverArtConfigPage .ccaSwatches:empty { display: none; }
@@ -640,6 +692,10 @@
                 'lede': 'Design a cover for a library, preview it live, then apply it.',
                 'card.target': 'Target', 'target.type': 'Type', 'target.library': 'Library', 'target.collection': 'Collection', 'target.playlist': 'Playlist', 'target.livetv': 'Live TV',
                 'card.library': 'Library', 'lib.choose': 'Choose', 'lib.selectOption': 'Select…',
+                'step.target': 'Target & start', 'step.background': 'Background', 'step.text': 'Text & logos',
+                'step.effects': 'Effects', 'step.output': 'Output & apply',
+                'group.startFrom': 'Start from a saved design', 'group.selectedLayer': 'Selected layer',
+                'group.saveTemplate': 'Save this design', 'group.batch': 'Apply to several targets',
                 'card.layers': 'Layers', 'layer.addText': 'Add text', 'layer.addImage': 'Add logo/icon',
                 'layer.show': 'Show', 'layer.hide': 'Hide', 'layer.up': 'Move up', 'layer.down': 'Move down', 'layer.dup': 'Duplicate', 'layer.del': 'Delete',
                 'layer.text': 'Text', 'layer.logo': 'Logo', 'layer.none': 'No layer selected — add one in the Layers card above.',
@@ -689,6 +745,10 @@
                 'lede': 'Ontwerp een cover voor een bibliotheek, bekijk het live en pas het toe.',
                 'card.target': 'Doel', 'target.type': 'Type', 'target.library': 'Bibliotheek', 'target.collection': 'Verzameling', 'target.playlist': 'Afspeellijst', 'target.livetv': 'Live-tv',
                 'card.library': 'Bibliotheek', 'lib.choose': 'Kies', 'lib.selectOption': 'Selecteer…',
+                'step.target': 'Doel & start', 'step.background': 'Achtergrond', 'step.text': 'Tekst & logo\'s',
+                'step.effects': 'Effecten', 'step.output': 'Uitvoer & toepassen',
+                'group.startFrom': 'Beginnen met een opgeslagen ontwerp', 'group.selectedLayer': 'Geselecteerde laag',
+                'group.saveTemplate': 'Dit ontwerp opslaan', 'group.batch': 'Toepassen op meerdere doelen',
                 'card.layers': 'Lagen', 'layer.addText': 'Tekst toevoegen', 'layer.addImage': 'Logo/pictogram toevoegen',
                 'layer.show': 'Tonen', 'layer.hide': 'Verbergen', 'layer.up': 'Omhoog', 'layer.down': 'Omlaag', 'layer.dup': 'Dupliceren', 'layer.del': 'Verwijderen',
                 'layer.text': 'Tekst', 'layer.logo': 'Logo', 'layer.none': 'Geen laag geselecteerd — voeg er een toe in de kaart Lagen hierboven.',
@@ -816,6 +876,56 @@
         }
 
         function el(id) { return page.querySelector('#' + id); }
+
+        // --- Step accordion -----------------------------------------------
+        // Owns .ccaStepBody and NOTHING else. Every other visibility helper
+        // (updateBackgroundVisibility, updateEffectsVisibility, updateAnimVisibility, the
+        // .ccaTextOnly/.ccaImageOnly toggles) writes style.display on elements INSIDE a
+        // body; if this controller touched those too, the two owners would fight and a
+        // control could reappear inside a collapsed step.
+        var STEP_KEY = 'cca.lastStep';
+
+        function openStep(n) {
+            page.querySelectorAll('.ccaStep').forEach(function (section) {
+                var isTarget = section.getAttribute('data-step') === String(n);
+                var head = section.querySelector('.ccaStepHead');
+                var body = section.querySelector('.ccaStepBody');
+                head.setAttribute('aria-expanded', isTarget ? 'true' : 'false');
+                if (isTarget) { body.removeAttribute('hidden'); } else { body.setAttribute('hidden', ''); }
+            });
+            try { localStorage.setItem(STEP_KEY, String(n)); } catch (e) { /* private mode */ }
+        }
+
+        function currentOpenStep() {
+            var open = page.querySelector('.ccaStepHead[aria-expanded="true"]');
+            return open ? open.parentNode.getAttribute('data-step') : null;
+        }
+
+        function initSteps() {
+            page.querySelectorAll('.ccaStep').forEach(function (section) {
+                var n = section.getAttribute('data-step');
+                section.querySelector('.ccaStepHead').addEventListener('click', function () {
+                    // Clicking the open step collapses it: all-closed is a valid state, and
+                    // it is how you give the canvas the whole screen on a phone.
+                    if (currentOpenStep() === n) {
+                        section.querySelector('.ccaStepBody').setAttribute('hidden', '');
+                        this.setAttribute('aria-expanded', 'false');
+                        return;
+                    }
+                    openStep(n);
+                });
+            });
+            restoreLastStep();
+        }
+
+        // Step 1 when nothing is selected yet, otherwise wherever you left off — a first
+        // run starts at the beginning, a return visit lands where you were working.
+        function restoreLastStep() {
+            var saved = null;
+            try { saved = localStorage.getItem(STEP_KEY); } catch (e) { /* ignore */ }
+            var exists = saved && page.querySelector('.ccaStep[data-step="' + saved + '"]');
+            openStep((state.libraryId && exists) ? saved : '1');
+        }
 
         var state = { libraryId: '', aspectRatio: 1, collageSeed: 1 };
         var browser = { page: 1, pageSize: 24, totalPages: 1 };
@@ -3140,6 +3250,7 @@
             applyI18n(page);
             if (!page.dataset.ccaInit) {
                 bindEvents();
+                initSteps();
                 page.dataset.ccaInit = 'true';
             }
             Dashboard.showLoadingMsg();
