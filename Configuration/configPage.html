@@ -1927,6 +1927,54 @@
             ctx.restore();
         }
 
+        // The font a layer should be drawn AND measured with. Both callers must agree:
+        // drawing with one face and measuring with another puts the selection box and the
+        // hit-test somewhere the glyphs are not. Custom uploads are registered lazily by
+        // ensureLayerFont(); until one arrives we fall back to the bundled Noto Sans, which
+        // is also what the server does when a font fails to load.
+        var _customFonts = {};   // server path -> { family: string, state: 'loading'|'ready'|'failed' }
+
+        function customFontFamily(path) {
+            return 'ccaFont' + String(path).replace(/[^a-zA-Z0-9]/g, '').slice(-24);
+        }
+
+        function fontFamilyFor(layer) {
+            var path = layer && layer.FontPath;
+            var entry = path && _customFonts[path];
+            if (entry && entry.state === 'ready') {
+                return '"' + entry.family + '", "Noto Sans", sans-serif';
+            }
+            return '"Noto Sans", sans-serif';
+        }
+
+        function canvasFont(layer, fontPx) {
+            return layer.Weight + ' ' + fontPx + 'px ' + fontFamilyFor(layer);
+        }
+
+        // Fetches an uploaded font through the authenticated endpoint and registers it with
+        // the FontFace API, then re-renders so the canvas picks it up. Best-effort: on
+        // failure the canvas keeps Noto Sans while the server still renders the real face.
+        function ensureLayerFont(layer) {
+            var path = layer && layer.FontPath;
+            if (!path || _customFonts[path]) { return; }
+            var family = customFontFamily(path);
+            _customFonts[path] = { family: family, state: 'loading' };
+            authFetch('CustomCoverArt/customFont?path=' + encodeURIComponent(path))
+                .then(function (r) {
+                    if (!r.ok) { throw new Error('custom font returned ' + r.status); }
+                    return r.arrayBuffer();
+                })
+                .then(function (buf) {
+                    var ff = new FontFace(family, buf);
+                    return ff.load().then(function (loaded) {
+                        document.fonts.add(loaded);
+                        _customFonts[path].state = 'ready';
+                        scheduleRender();
+                    });
+                })
+                .catch(function () { _customFonts[path].state = 'failed'; });
+        }
+
         // One text layer: outline (multi-pass strokeText), shadow (ctx.shadow*),
         // then fill — mirroring RenderTextLayer. Font px keys off doc.Canvas.Height
         // (the design's reference resolution), matching the server's font sizing.
@@ -1939,23 +1987,30 @@
             // the same pivot the server uses (RenderTextLayer's SetDrawingTransform).
             ctx.translate(px, py);
             if (layer.Rotation) { ctx.rotate(layer.Rotation * Math.PI / 180); }
-            ctx.font = layer.Weight + ' ' + fontPx + 'px "Noto Sans", sans-serif';
+            ensureLayerFont(layer);
+            ctx.font = canvasFont(layer, fontPx);
             ctx.textAlign = layer.Align === 0 ? 'left' : (layer.Align === 2 ? 'right' : 'center');
             ctx.textBaseline = 'middle';
 
+            // Draw order mirrors RenderTextLayer: shadow, then outline, then fill. The
+            // shadow used to be switched on between the outline and the fill, which put it
+            // OVER the outline — the server has always drawn it underneath.
+            ctx.fillStyle = layer.Color;
+            if (layer.Shadow && layer.Shadow.Enabled) {
+                ctx.save();
+                ctx.shadowColor = layer.Shadow.Color;
+                ctx.shadowBlur = layer.Shadow.Blur;
+                ctx.shadowOffsetX = layer.Shadow.OffsetX;
+                ctx.shadowOffsetY = layer.Shadow.OffsetY;
+                ctx.fillText(layer.Content, 0, 0);
+                ctx.restore();
+            }
             if (layer.Outline && layer.Outline.Enabled) {
                 ctx.lineWidth = layer.Outline.Width * 2;
                 ctx.strokeStyle = layer.Outline.Color;
                 ctx.lineJoin = 'round';
                 ctx.strokeText(layer.Content, 0, 0);
             }
-            if (layer.Shadow && layer.Shadow.Enabled) {
-                ctx.shadowColor = layer.Shadow.Color;
-                ctx.shadowBlur = layer.Shadow.Blur;
-                ctx.shadowOffsetX = layer.Shadow.OffsetX;
-                ctx.shadowOffsetY = layer.Shadow.OffsetY;
-            }
-            ctx.fillStyle = layer.Color;
             ctx.fillText(layer.Content, 0, 0);
             ctx.restore();
         }
@@ -1983,7 +2038,7 @@
         function textLayerBounds(ctx, layer, W, H) {
             var fontPx = Math.max(8, Math.min(1024, layer.Size * doc.Canvas.Height));
             ctx.save();
-            ctx.font = layer.Weight + ' ' + fontPx + 'px "Noto Sans", sans-serif';
+            ctx.font = canvasFont(layer, fontPx);
             var m = ctx.measureText(layer.Content || '');
             ctx.restore();
             var tw = m.width;

@@ -553,6 +553,59 @@ public class CustomCoverArtController : ControllerBase
         return PhysicalFile(full, contentType);
     }
 
+    /// <summary>
+    /// Streams a previously uploaded custom font so the config-page canvas can register it
+    /// and both DRAW and MEASURE text with the same face the server renders with.
+    ///
+    /// Without this the canvas fell back to Noto Sans whenever a custom font was chosen,
+    /// so the preview showed the wrong typeface and — worse — the selection box and
+    /// hit-testing were measured from the wrong metrics.
+    ///
+    /// Scoped to the fonts folder alone, mirroring <see cref="GetLayerImage"/>. Inherits
+    /// the class-level RequiresElevation policy.
+    /// </summary>
+    [HttpGet("customFont")]
+    public IActionResult GetCustomFont([FromQuery] string path)
+    {
+        var fonts = Path.GetFullPath(PluginPaths.Fonts(_applicationPaths))
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+
+        string full;
+        try
+        {
+            full = Path.GetFullPath(path ?? string.Empty);
+        }
+        catch
+        {
+            return BadRequest();
+        }
+
+        var comparison = System.OperatingSystem.IsWindows()
+            ? System.StringComparison.OrdinalIgnoreCase
+            : System.StringComparison.Ordinal;
+
+        if (!full.StartsWith(fonts, comparison) || !System.IO.File.Exists(full))
+        {
+            return NotFound();
+        }
+
+        var contentType = Path.GetExtension(full).ToLowerInvariant() switch
+        {
+            ".ttf" or ".ttc" => "font/ttf",
+            ".otf" => "font/otf",
+            ".woff" => "font/woff",
+            ".woff2" => "font/woff2",
+            _ => null
+        };
+
+        if (contentType is null)
+        {
+            return NotFound();
+        }
+
+        return PhysicalFile(full, contentType);
+    }
+
     /// <summary>Strip title and target-specific fields so a template is reusable across targets.</summary>
     public static SavedTemplate NormalizeTemplate(SavedTemplate template)
     {
