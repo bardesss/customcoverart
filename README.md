@@ -35,6 +35,10 @@ Text, gradients, blur, custom backgrounds and fonts — with a live preview, rig
 | ✨ | **Composition effects** | Colour wash, vignette, film grain and a square/rounded border — single or double-lined |
 | 🎨 | **Auto palette** | Pulls the dominant colours out of your background as clickable swatches |
 | ⚡ | **Jellyfin-style preset** | One click for the familiar dark-gradient look, editable afterwards |
+| 🧭 | **Guided steps** | Five numbered steps, essentials up front and advanced controls one click away |
+| ↩️ | **Undo / redo** | Ctrl+Z and Ctrl+Y across the whole design |
+| 📱 | **Mobile-friendly** | Large touch targets, sticky preview, full-screen poster browser, grabbable canvas handles |
+| 🖼️ | **In-context preview** | See the cover wide, square and poster-shaped before applying |
 | 🔠 | **Fonts** | Bundled Noto Sans (matches Jellyfin's UI, so text always renders) — or upload your own `.ttf` / `.otf` / `.woff` / `.woff2` |
 | 📐 | **Presets & sizes** | Square cover, portrait poster, wide banner, or custom dimensions |
 | 🖱️ | **Interactive canvas** | The preview is a live canvas — drag layers to position them, resize/rotate them with handles, drag/scroll/pinch to reposition and zoom the background |
@@ -102,13 +106,31 @@ The output is in `bin/Release/net9.0/`. Copy `CustomCoverArt.dll` plus the
 
 ## 🎬 Usage
 
-1. Go to **Dashboard → Plugins → Custom Cover Art**.
-2. Pick a **library** from the dropdown.
-3. Design directly on the **canvas**: adjust the settings on the left, or click a layer and **drag** it to reposition. The canvas updates live as you go.
-4. Build the cover up in the **Layers** card — see *Text and logo layers* below.
-5. Toggle **Reposition background** to drag-pan the background image, and scroll (or pinch, on touch) to zoom it — up to 4×. With the **Fill** image fit you can pan straight away to choose which part of the picture the cover shows; **Fit** and **Stretch** show the whole image already, so there is nothing to pan into until you zoom in.
-6. Click **Show server render** to confirm the exact server-rendered output (the canvas is a fast approximation; the server render is authoritative).
-7. Click **Apply to library** to set it as the library's cover.
+Go to **Dashboard → Plugins → Custom Cover Art**. The page walks through five numbered steps.
+Nothing is locked — open any step at any time, and only one stays open so the page never becomes
+a wall of controls. Each step shows what most people need, with the rest under **Advanced**.
+
+1. **Target & start** — pick a library, collection, playlist or Live TV. Optionally start from a
+   saved template, or restore the target's original cover.
+2. **Background** — choose one source: an **image** (upload one or browse your library's posters),
+   a **poster collage** built from the target's own items, a **gradient**, or a **solid colour**.
+   Only the chosen source's controls are shown.
+3. **Text & logos** — stack as many text layers and PNG logos as you like; see *Text and logo
+   layers* below.
+4. **Effects** — colour wash, vignette, film grain and a border, plus the Jellyfin-style preset
+   and Auto palette.
+5. **Output & apply** — size and format, a preview of the cover **in context** at other shapes,
+   then Apply or Download. Saving a template and batch-applying live under Advanced here.
+
+While you work, the canvas on the right (top, on a phone) updates live. Click a layer and **drag**
+it to reposition, or use its corner handles to resize and the knob to rotate. Toggle **Reposition
+background** to drag-pan the background image and scroll or pinch to zoom it — up to 4×. With the
+**Fill** image fit you can pan straight away to choose which part of the picture the cover shows;
+**Fit** and **Stretch** show the whole image already, so there is nothing to pan into until you
+zoom in. **Ctrl+Z** and **Ctrl+Y** undo and redo anything.
+
+Before applying, **Show server render** produces the exact server-rendered output — the canvas is
+a fast approximation and the server render is authoritative.
 
 ### Text and logo layers
 
