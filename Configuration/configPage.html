@@ -91,19 +91,9 @@
                                 </button>
                             </div>
                         </div>
-                        <div class="ccaGrid">
-                            <div class="inputContainer">
-                                <label for="ccaDim"><span data-i18n="bg.dim">Dimming</span> <span class="ccaVal" id="ccaDimVal">0.25</span></label>
-                                <input type="range" class="ccaRange" id="ccaDim" min="0" max="1" step="0.05" value="0.25" />
-                            </div>
-                            <div class="inputContainer">
-                                <label for="ccaBlur"><span data-i18n="bg.blur">Blur</span> <span class="ccaVal" id="ccaBlurVal">0</span></label>
-                                <input type="range" class="ccaRange" id="ccaBlur" min="0" max="20" step="0.5" value="0" />
-                            </div>
-                        </div>
                         <div class="inputContainer">
-                            <label for="ccaDimColor" data-i18n="bg.dimcolor">Dim / base color</label>
-                            <input type="color" id="ccaDimColor" value="#000000" />
+                            <label for="ccaDim"><span data-i18n="bg.dim">Dimming</span> <span class="ccaVal" id="ccaDimVal">0.25</span></label>
+                            <input type="range" class="ccaRange" id="ccaDim" min="0" max="1" step="0.05" value="0.25" />
                         </div>
 
                         <div id="ccaGradientOpts" class="ccaSub" style="display:none;">
@@ -150,6 +140,22 @@
                             <div id="ccaSelectedBg" class="ccaSelected" style="display:none;"><span data-i18n="bg.selected">Selected background:</span> <strong id="ccaSelectedBgName"></strong></div>
                         </div>
                         </div>
+                        <div class="ccaAdv">
+                            <button type="button" class="ccaAdvHead" aria-expanded="false">
+                                <span class="ccaStepChevron" aria-hidden="true">&#9662;</span>
+                                <span data-i18n="ui.advanced">Advanced</span>
+                            </button>
+                            <div class="ccaAdvBody" hidden>
+                                <div class="inputContainer">
+                                    <label for="ccaBlur"><span data-i18n="bg.blur">Blur</span> <span class="ccaVal" id="ccaBlurVal">0</span></label>
+                                    <input type="range" class="ccaRange" id="ccaBlur" min="0" max="20" step="0.5" value="0" />
+                                </div>
+                                <div class="inputContainer">
+                                    <label for="ccaDimColor" data-i18n="bg.dimcolor">Dim / base color</label>
+                                    <input type="color" id="ccaDimColor" value="#000000" />
+                                </div>
+                            </div>
+                        </div>
                         </div>
                     </section>
                     <section class="ccaStep" data-step="3">
@@ -173,7 +179,30 @@
                             <label for="ccaTitle" data-i18n="text.title">Title</label>
                             <input is="emby-input" type="text" id="ccaTitle" value="Movies" />
                         </div>
-                        <div class="ccaGrid ccaTextOnly">
+                        <div class="inputContainer ccaTextOnly">
+                                <label for="ccaTextAlign" data-i18n="text.align">Alignment</label>
+                                <select is="emby-select" id="ccaTextAlign" class="emby-select">
+                                    <option value="0" data-i18n="a.left">Left</option>
+                                    <option value="1" selected data-i18n="a.center">Center</option>
+                                    <option value="2" data-i18n="a.right">Right</option>
+                                </select>
+                        </div>
+                        <div class="inputContainer ccaTextOnly">
+                            <label for="ccaTextSize"><span data-i18n="text.size">Text size</span> <span class="ccaVal" id="ccaTextSizeVal">120</span></label>
+                            <input type="range" class="ccaRange" id="ccaTextSize" min="20" max="300" value="120" />
+                        </div>
+                        <div class="inputContainer ccaTextOnly">
+                            <label for="ccaTextColor" data-i18n="text.color">Text color</label>
+                            <input type="color" id="ccaTextColor" value="#ffffff" />
+                        </div>
+                        <div class="fieldDescription ccaImageOnly" data-i18n="hint.logoSize">Drag the corner handles on the preview to resize the logo, or the knob above it to rotate.</div>
+                        <div class="ccaAdv">
+                            <button type="button" class="ccaAdvHead" aria-expanded="false">
+                                <span class="ccaStepChevron" aria-hidden="true">&#9662;</span>
+                                <span data-i18n="ui.advanced">Advanced</span>
+                            </button>
+                            <div class="ccaAdvBody" hidden>
+                        <div class="inputContainer ccaTextOnly">
                             <div class="inputContainer">
                                 <label for="ccaTextWeight" data-i18n="text.weight">Font weight</label>
                                 <select is="emby-select" id="ccaTextWeight" class="emby-select">
@@ -185,24 +214,8 @@
                                     <option value="800" data-i18n="w.extrabold">ExtraBold</option>
                                 </select>
                             </div>
-                            <div class="inputContainer">
-                                <label for="ccaTextAlign" data-i18n="text.align">Alignment</label>
-                                <select is="emby-select" id="ccaTextAlign" class="emby-select">
-                                    <option value="0" data-i18n="a.left">Left</option>
-                                    <option value="1" selected data-i18n="a.center">Center</option>
-                                    <option value="2" data-i18n="a.right">Right</option>
-                                </select>
-                            </div>
                         </div>
                         <div class="inputContainer ccaTextOnly">
-                            <label for="ccaTextSize"><span data-i18n="text.size">Text size</span> <span class="ccaVal" id="ccaTextSizeVal">120</span></label>
-                            <input type="range" class="ccaRange" id="ccaTextSize" min="20" max="300" value="120" />
-                        </div>
-                        <div class="ccaGrid ccaTextOnly">
-                            <div class="inputContainer">
-                                <label for="ccaTextColor" data-i18n="text.color">Text color</label>
-                                <input type="color" id="ccaTextColor" value="#ffffff" />
-                            </div>
                             <div class="inputContainer">
                                 <label data-i18n="text.effects">Effects</label>
                                 <div class="ccaChecks">
@@ -230,7 +243,8 @@
                                 <input type="range" class="ccaRange" id="ccaLayerRotation" min="-180" max="180" step="1" value="0" />
                             </div>
                         </div>
-                        <div class="fieldDescription ccaImageOnly" data-i18n="hint.logoSize">Drag the corner handles on the preview to resize the logo, or the knob above it to rotate.</div>
+                            </div>
+                        </div>
                         <div class="fieldDescription" id="ccaNoLayerHint" data-i18n="layer.none" style="display:none">No layer selected — add one in the Layers card above.</div>
                         </div>
                         </div>
@@ -250,26 +264,42 @@
                         </div>
 
                         <label class="ccaCheck ccaCheckBlock"><input is="emby-checkbox" type="checkbox" id="ccaFxSoftLight" /><span data-i18n="fx.softlight">Colour wash</span></label>
-                        <div class="ccaGrid ccaFxRow" id="ccaFxSoftLightRow" style="display:none">
-                            <div class="inputContainer">
-                                <label for="ccaFxSoftLightColor" data-i18n="fx.color">Colour</label>
-                                <input type="color" id="ccaFxSoftLightColor" value="#ffffff" />
-                            </div>
+                        <div class="ccaFxRow" id="ccaFxSoftLightRow" style="display:none">
                             <div class="inputContainer">
                                 <label for="ccaFxSoftLightOpacity"><span data-i18n="fx.opacity">Strength</span> <span class="ccaVal" id="ccaFxSoftLightOpacityVal">15</span></label>
                                 <input type="range" class="ccaRange" id="ccaFxSoftLightOpacity" min="0" max="100" step="1" value="15" />
                             </div>
+                            <div class="ccaAdv">
+                                <button type="button" class="ccaAdvHead" aria-expanded="false">
+                                    <span class="ccaStepChevron" aria-hidden="true">&#9662;</span>
+                                    <span data-i18n="ui.advanced">Advanced</span>
+                                </button>
+                                <div class="ccaAdvBody" hidden>
+                                <div class="inputContainer">
+                                    <label for="ccaFxSoftLightColor" data-i18n="fx.color">Colour</label>
+                                    <input type="color" id="ccaFxSoftLightColor" value="#ffffff" />
+                                </div>
+                                </div>
+                            </div>
                         </div>
 
                         <label class="ccaCheck ccaCheckBlock"><input is="emby-checkbox" type="checkbox" id="ccaFxVignette" /><span data-i18n="fx.vignette">Vignette</span></label>
-                        <div class="ccaGrid ccaFxRow" id="ccaFxVignetteRow" style="display:none">
+                        <div class="ccaFxRow" id="ccaFxVignetteRow" style="display:none">
                             <div class="inputContainer">
                                 <label for="ccaFxVignetteAmount"><span data-i18n="fx.amount">Strength</span> <span class="ccaVal" id="ccaFxVignetteAmountVal">40</span></label>
                                 <input type="range" class="ccaRange" id="ccaFxVignetteAmount" min="0" max="100" step="1" value="40" />
                             </div>
-                            <div class="inputContainer">
-                                <label for="ccaFxVignetteSoftness"><span data-i18n="fx.softness">Softness</span> <span class="ccaVal" id="ccaFxVignetteSoftnessVal">50</span></label>
-                                <input type="range" class="ccaRange" id="ccaFxVignetteSoftness" min="1" max="100" step="1" value="50" />
+                            <div class="ccaAdv">
+                                <button type="button" class="ccaAdvHead" aria-expanded="false">
+                                    <span class="ccaStepChevron" aria-hidden="true">&#9662;</span>
+                                    <span data-i18n="ui.advanced">Advanced</span>
+                                </button>
+                                <div class="ccaAdvBody" hidden>
+                                <div class="inputContainer">
+                                    <label for="ccaFxVignetteSoftness"><span data-i18n="fx.softness">Softness</span> <span class="ccaVal" id="ccaFxVignetteSoftnessVal">50</span></label>
+                                    <input type="range" class="ccaRange" id="ccaFxVignetteSoftness" min="1" max="100" step="1" value="50" />
+                                </div>
+                                </div>
                             </div>
                         </div>
 
@@ -283,24 +313,30 @@
 
                         <label class="ccaCheck ccaCheckBlock"><input is="emby-checkbox" type="checkbox" id="ccaFxBorder" /><span data-i18n="fx.border">Border</span></label>
                         <div class="ccaFxRow" id="ccaFxBorderRow" style="display:none">
-                            <div class="ccaGrid">
+                            <div class="inputContainer">
+                                <label for="ccaFxBorderThickness"><span data-i18n="fx.thickness">Thickness</span> <span class="ccaVal" id="ccaFxBorderThicknessVal">8</span></label>
+                                <input type="range" class="ccaRange" id="ccaFxBorderThickness" min="0" max="64" step="1" value="8" />
+                            </div>
+                            <div class="ccaAdv">
+                                <button type="button" class="ccaAdvHead" aria-expanded="false">
+                                    <span class="ccaStepChevron" aria-hidden="true">&#9662;</span>
+                                    <span data-i18n="ui.advanced">Advanced</span>
+                                </button>
+                                <div class="ccaAdvBody" hidden>
                                 <div class="inputContainer">
                                     <label for="ccaFxBorderColor" data-i18n="fx.color">Colour</label>
                                     <input type="color" id="ccaFxBorderColor" value="#ffffff" />
                                 </div>
                                 <div class="inputContainer">
-                                    <label for="ccaFxBorderThickness"><span data-i18n="fx.thickness">Thickness</span> <span class="ccaVal" id="ccaFxBorderThicknessVal">8</span></label>
-                                    <input type="range" class="ccaRange" id="ccaFxBorderThickness" min="0" max="64" step="1" value="8" />
+                                    <label for="ccaFxBorderRadius"><span data-i18n="fx.radius">Corner radius</span> <span class="ccaVal" id="ccaFxBorderRadiusVal">0</span></label>
+                                    <input type="range" class="ccaRange" id="ccaFxBorderRadius" min="0" max="200" step="1" value="0" />
                                 </div>
-                            </div>
-                            <div class="inputContainer">
-                                <label for="ccaFxBorderRadius"><span data-i18n="fx.radius">Corner radius</span> <span class="ccaVal" id="ccaFxBorderRadiusVal">0</span></label>
-                                <input type="range" class="ccaRange" id="ccaFxBorderRadius" min="0" max="200" step="1" value="0" />
-                            </div>
-                            <label class="ccaCheck ccaCheckBlock"><input is="emby-checkbox" type="checkbox" id="ccaFxBorderDouble" /><span data-i18n="fx.double">Double line</span></label>
-                            <div class="inputContainer" id="ccaFxBorderGapRow" style="display:none">
-                                <label for="ccaFxBorderGap"><span data-i18n="fx.gap">Gap</span> <span class="ccaVal" id="ccaFxBorderGapVal">6</span></label>
-                                <input type="range" class="ccaRange" id="ccaFxBorderGap" min="0" max="32" step="1" value="6" />
+                                <label class="ccaCheck ccaCheckBlock"><input is="emby-checkbox" type="checkbox" id="ccaFxBorderDouble" /><span data-i18n="fx.double">Double line</span></label>
+                                <div class="inputContainer" id="ccaFxBorderGapRow" style="display:none">
+                                    <label for="ccaFxBorderGap"><span data-i18n="fx.gap">Gap</span> <span class="ccaVal" id="ccaFxBorderGapVal">6</span></label>
+                                    <input type="range" class="ccaRange" id="ccaFxBorderGap" min="0" max="32" step="1" value="6" />
+                                </div>
+                                </div>
                             </div>
                         </div>
 
@@ -337,6 +373,22 @@
                                 </select>
                             </div>
                         </div>
+                        <div class="ccaAdv">
+                            <button type="button" class="ccaAdvHead" aria-expanded="false">
+                                <span class="ccaStepChevron" aria-hidden="true">&#9662;</span>
+                                <span data-i18n="ui.advanced">Advanced</span>
+                            </button>
+                            <div class="ccaAdvBody" hidden>
+                        <div id="ccaCustomDims" class="ccaGrid ccaSub" style="display:none;">
+                            <div class="inputContainer">
+                                <label for="ccaWidth" data-i18n="out.width">Width</label>
+                                <input is="emby-input" type="number" id="ccaWidth" min="100" max="2048" value="1400" />
+                            </div>
+                            <div class="inputContainer">
+                                <label for="ccaHeight" data-i18n="out.height">Height</label>
+                                <input is="emby-input" type="number" id="ccaHeight" min="100" max="2048" value="1400" />
+                            </div>
+                        </div>
                         <div class="ccaGrid ccaSub" id="ccaAnimRow" style="display:none">
                             <label class="ccaCheck ccaCheckBlock"><input is="emby-checkbox" type="checkbox" id="ccaKenBurns" checked /><span data-i18n="anim.kenburns">Ken Burns pan/zoom</span></label>
                             <div class="inputContainer">
@@ -356,16 +408,6 @@
                             </div>
                         </div>
                         <div class="fieldDescription" id="ccaAnimHint" data-i18n="anim.hint" style="display:none">Animated GIFs are larger and only animate in views that render GIFs. Capped at 30 frames.</div>
-                        <div id="ccaCustomDims" class="ccaGrid ccaSub" style="display:none;">
-                            <div class="inputContainer">
-                                <label for="ccaWidth" data-i18n="out.width">Width</label>
-                                <input is="emby-input" type="number" id="ccaWidth" min="100" max="2048" value="1400" />
-                            </div>
-                            <div class="inputContainer">
-                                <label for="ccaHeight" data-i18n="out.height">Height</label>
-                                <input is="emby-input" type="number" id="ccaHeight" min="100" max="2048" value="1400" />
-                            </div>
-                        </div>
                         <div class="ccaStepGroup">
                             <div class="ccaStepGroupHead" data-i18n="group.saveTemplate">Save this design</div>
                         <div class="inputContainer">
@@ -390,6 +432,8 @@
                             <span class="ccaFileName" id="ccaBatchStatus"></span>
                         </div>
                         </div>
+                        </div>
+                            </div>
                         </div>
                     </section>
 
@@ -566,6 +610,21 @@
             #CustomCoverArtConfigPage .ccaStepChevron { transition: none; }
         }
 
+        /* "Advanced" disclosure inside a step. Independent of the step accordion and of
+           each other, and never persisted — advanced should feel closed by default. */
+        #CustomCoverArtConfigPage .ccaAdv { margin-top: 1.2em; border-top: 1px solid rgba(127,127,127,.18); }
+        #CustomCoverArtConfigPage .ccaAdvHead {
+            display: flex; align-items: center; gap: .5em; width: 100%;
+            min-height: 2.75em; padding: .6em 0; box-sizing: border-box;
+            background: transparent; border: 0; color: inherit; cursor: pointer;
+            font-size: .95em; opacity: .75; text-align: left;
+        }
+        #CustomCoverArtConfigPage .ccaAdvHead:hover { opacity: 1; }
+        #CustomCoverArtConfigPage .ccaAdvHead[aria-expanded="true"] .ccaStepChevron { transform: rotate(180deg); }
+        #CustomCoverArtConfigPage .ccaAdvBody[hidden] { display: none; }
+        /* Nested inside an effect row, the divider would double up with the row's own. */
+        #CustomCoverArtConfigPage .ccaFxRow .ccaAdv { margin-top: .5em; border-top: 0; }
+
         /* Palette swatches extracted from the background. */
         #CustomCoverArtConfigPage .ccaSwatches { display: flex; flex-wrap: wrap; gap: .4em; margin: .3em 0 0; }
         #CustomCoverArtConfigPage .ccaSwatches:empty { display: none; }
@@ -696,6 +755,7 @@
                 'step.effects': 'Effects', 'step.output': 'Output & apply',
                 'group.startFrom': 'Start from a saved design', 'group.selectedLayer': 'Selected layer',
                 'group.saveTemplate': 'Save this design', 'group.batch': 'Apply to several targets',
+                'ui.advanced': 'Advanced',
                 'card.layers': 'Layers', 'layer.addText': 'Add text', 'layer.addImage': 'Add logo/icon',
                 'layer.show': 'Show', 'layer.hide': 'Hide', 'layer.up': 'Move up', 'layer.down': 'Move down', 'layer.dup': 'Duplicate', 'layer.del': 'Delete',
                 'layer.text': 'Text', 'layer.logo': 'Logo', 'layer.none': 'No layer selected — add one in the Layers card above.',
@@ -749,6 +809,7 @@
                 'step.effects': 'Effecten', 'step.output': 'Uitvoer & toepassen',
                 'group.startFrom': 'Beginnen met een opgeslagen ontwerp', 'group.selectedLayer': 'Geselecteerde laag',
                 'group.saveTemplate': 'Dit ontwerp opslaan', 'group.batch': 'Toepassen op meerdere doelen',
+                'ui.advanced': 'Geavanceerd',
                 'card.layers': 'Lagen', 'layer.addText': 'Tekst toevoegen', 'layer.addImage': 'Logo/pictogram toevoegen',
                 'layer.show': 'Tonen', 'layer.hide': 'Verbergen', 'layer.up': 'Omhoog', 'layer.down': 'Omlaag', 'layer.dup': 'Dupliceren', 'layer.del': 'Verwijderen',
                 'layer.text': 'Tekst', 'layer.logo': 'Logo', 'layer.none': 'Geen laag geselecteerd — voeg er een toe in de kaart Lagen hierboven.',
@@ -916,6 +977,22 @@
                 });
             });
             restoreLastStep();
+        }
+
+        // Advanced disclosures are independent of the step accordion and of each other:
+        // opening a step does not reveal its advanced controls, and the state is not
+        // persisted. In the Effects step they are nested INSIDE each effect's row, because
+        // updateEffectsVisibility owns that row's display — pulling softness out to a
+        // step-level block would show it even with the vignette switched off.
+        function initAdvanced() {
+            page.querySelectorAll('.ccaAdvHead').forEach(function (head) {
+                head.addEventListener('click', function () {
+                    var body = this.parentNode.querySelector('.ccaAdvBody');
+                    var open = this.getAttribute('aria-expanded') === 'true';
+                    this.setAttribute('aria-expanded', open ? 'false' : 'true');
+                    if (open) { body.setAttribute('hidden', ''); } else { body.removeAttribute('hidden'); }
+                });
+            });
         }
 
         // Step 1 when nothing is selected yet, otherwise wherever you left off — a first
@@ -3251,6 +3328,7 @@
             if (!page.dataset.ccaInit) {
                 bindEvents();
                 initSteps();
+                initAdvanced();
                 page.dataset.ccaInit = 'true';
             }
             Dashboard.showLoadingMsg();
