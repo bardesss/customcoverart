@@ -443,6 +443,14 @@
                     <section class="ccaCard">
                         <div class="ccaCardHead" data-i18n="card.preview">Preview</div>
                         <label class="ccaCheck ccaCheckBlock"><input is="emby-checkbox" type="checkbox" id="ccaBgAdjust" /><span data-i18n="bg.adjust">Reposition background (drag to pan, scroll or pinch to zoom)</span></label>
+                        <div class="ccaHistoryBar">
+                            <button is="emby-button" type="button" id="ccaUndo" class="raised" disabled title="Ctrl+Z">
+                                <span data-i18n="ui.undo">Undo</span>
+                            </button>
+                            <button is="emby-button" type="button" id="ccaRedo" class="raised" disabled title="Ctrl+Y">
+                                <span data-i18n="ui.redo">Redo</span>
+                            </button>
+                        </div>
                         <div class="ccaPreviewWrap">
                             <canvas id="ccaCanvas" class="ccaCanvas" width="1400" height="1400" aria-label="Cover art canvas"></canvas>
                             <div id="ccaPreviewPlaceholder" class="ccaPreviewPlaceholder" data-i18n="preview.placeholder">Generate a preview to see your cover art.</div>
@@ -687,6 +695,11 @@
         #CustomCoverArtConfigPage .ccaLayerMore { display: none; }
         #CustomCoverArtConfigPage .ccaLayerActions { display: flex; gap: .2em; }
 
+        /* Undo/redo sits beside the canvas, not inside a step, so it is reachable
+           whichever step is open. */
+        #CustomCoverArtConfigPage .ccaHistoryBar { display: flex; gap: .5em; margin-bottom: .6em; }
+        #CustomCoverArtConfigPage .ccaHistoryBar .emby-button { margin: 0; }
+
         /* Palette swatches extracted from the background. */
         #CustomCoverArtConfigPage .ccaSwatches { display: flex; flex-wrap: wrap; gap: .4em; margin: .3em 0 0; }
         #CustomCoverArtConfigPage .ccaSwatches:empty { display: none; }
@@ -817,7 +830,7 @@
                 'step.effects': 'Effects', 'step.output': 'Output & apply',
                 'group.startFrom': 'Start from a saved design', 'group.selectedLayer': 'Selected layer',
                 'group.saveTemplate': 'Save this design', 'group.batch': 'Apply to several targets',
-                'ui.advanced': 'Advanced',
+                'ui.advanced': 'Advanced', 'ui.undo': 'Undo', 'ui.redo': 'Redo',
                 'card.layers': 'Layers', 'layer.addText': 'Add text', 'layer.addImage': 'Add logo/icon',
                 'layer.show': 'Show', 'layer.hide': 'Hide', 'layer.up': 'Move up', 'layer.down': 'Move down', 'layer.dup': 'Duplicate', 'layer.del': 'Delete',
                 'layer.text': 'Text', 'layer.logo': 'Logo', 'layer.more': 'More actions', 'layer.none': 'No layer selected — add one in the Layers card above.',
@@ -871,7 +884,7 @@
                 'step.effects': 'Effecten', 'step.output': 'Uitvoer & toepassen',
                 'group.startFrom': 'Beginnen met een opgeslagen ontwerp', 'group.selectedLayer': 'Geselecteerde laag',
                 'group.saveTemplate': 'Dit ontwerp opslaan', 'group.batch': 'Toepassen op meerdere doelen',
-                'ui.advanced': 'Geavanceerd',
+                'ui.advanced': 'Geavanceerd', 'ui.undo': 'Ongedaan maken', 'ui.redo': 'Opnieuw',
                 'card.layers': 'Lagen', 'layer.addText': 'Tekst toevoegen', 'layer.addImage': 'Logo/pictogram toevoegen',
                 'layer.show': 'Tonen', 'layer.hide': 'Verbergen', 'layer.up': 'Omhoog', 'layer.down': 'Omlaag', 'layer.dup': 'Dupliceren', 'layer.del': 'Verwijderen',
                 'layer.text': 'Tekst', 'layer.logo': 'Logo', 'layer.more': 'Meer acties', 'layer.none': 'Geen laag geselecteerd — voeg er een toe in de kaart Lagen hierboven.',
@@ -1213,6 +1226,8 @@
             doc._selectedId = id;
             renderLayersPanel();
             syncControlsFromDocument();
+            // The starting document is the base history entry.
+            snapshot();
             scheduleRender();
         }
 
@@ -1390,6 +1405,13 @@
             if (_rafPending) { return; }
             _rafPending = true;
             requestAnimationFrame(function () { _rafPending = false; renderDocument(); });
+            // Every mutation of `doc` funnels through here, so this is the one place undo
+            // history can be captured without hunting down thirty individual handlers and
+            // missing one. It is safe for the non-edits that also re-render (selection
+            // changes, hydration, resize): snapshot() compares against the current entry
+            // and ignores an identical document, which is also what preserves the redo
+            // tail when restoreSnapshot re-renders after an undo.
+            if (typeof commit === 'function') { commit(); }
         }
 
         function renderDocument() {
@@ -1588,6 +1610,64 @@
             }
             ctx.restore();
         }
+
+        // --- Undo/redo ----------------------------------------------------
+        // A snapshot stack of the serialized document. UI-only keys are stripped, so a
+        // snapshot can never capture a decoded <img> or the transient selection.
+        var HISTORY_CAP = 50;
+        var history = { stack: [], index: -1 };
+
+        function snapshot() {
+            var json = JSON.stringify(stripUiKeys(doc));
+            if (history.index >= 0 && history.stack[history.index] === json) { return; }
+            // Any new edit truncates the redo tail.
+            history.stack = history.stack.slice(0, history.index + 1);
+            history.stack.push(json);
+            if (history.stack.length > HISTORY_CAP) { history.stack.shift(); }
+            history.index = history.stack.length - 1;
+            updateHistoryButtons();
+        }
+
+        // Bursts of slider input collapse into ONE entry; discrete actions call snapshot()
+        // directly so they land immediately.
+        var commit = debounce(snapshot, 400);
+
+        function restoreSnapshot(json) {
+            var selected = doc._selectedId;
+            doc = JSON.parse(json);
+            // A snapshot is a plain serialized document, so it needs the same normalization
+            // a template load gets before anything dereferences it.
+            normalizeEffects(doc);
+            normalizeBackgroundSource(doc);
+            doc._selectedId = selected;
+            // It carries server paths but no decoded bitmaps.
+            bgImageEl = null;
+            hydrateLayerImages();
+            renderLayersPanel();
+            syncControlsFromDocument();
+            scheduleRender();
+        }
+
+        function undo() {
+            if (history.index <= 0) { return; }
+            history.index--;
+            restoreSnapshot(history.stack[history.index]);
+            updateHistoryButtons();
+        }
+
+        function redo() {
+            if (history.index >= history.stack.length - 1) { return; }
+            history.index++;
+            restoreSnapshot(history.stack[history.index]);
+            updateHistoryButtons();
+        }
+
+        function updateHistoryButtons() {
+            var u = el('ccaUndo'), r = el('ccaRedo');
+            if (u) { u.disabled = history.index <= 0; }
+            if (r) { r.disabled = history.index >= history.stack.length - 1; }
+        }
+        // ------------------------------------------------------------------
 
         // --- Colour palette (Phase 3) -------------------------------------
         // Dominant colours of the BACKGROUND, extracted entirely client-side — no new
@@ -3189,6 +3269,20 @@
             // size, so a viewport change (rotating a phone, resizing a window) must redraw
             // or the handles keep the size they had at the old width.
             window.addEventListener('resize', debounce(function () { scheduleRender(); }, 150));
+
+            el('ccaUndo').addEventListener('click', undo);
+            el('ccaRedo').addEventListener('click', redo);
+
+            document.addEventListener('keydown', function (ev) {
+                if (!(ev.ctrlKey || ev.metaKey)) { return; }
+                // Never hijack text editing: inside a field the browser's own undo is the
+                // one the user means.
+                var target = ev.target;
+                if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) { return; }
+                var k = String(ev.key || '').toLowerCase();
+                if (k === 'z' && !ev.shiftKey) { ev.preventDefault(); undo(); }
+                else if (k === 'y' || (k === 'z' && ev.shiftKey)) { ev.preventDefault(); redo(); }
+            });
 
             el('ccaApplyBtn').addEventListener('click', applyCoverArt);
             el('ccaServerRender').addEventListener('click', showServerRender);
