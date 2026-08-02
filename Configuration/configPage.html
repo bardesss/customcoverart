@@ -128,8 +128,10 @@
                         <div class="inputContainer">
                             <label for="ccaBgSource" data-i18n="bg.source">Background source</label>
                             <select is="emby-select" id="ccaBgSource" class="emby-select">
-                                <option value="upload" selected data-i18n="bg.source.upload">Upload / poster</option>
+                                <option value="upload" selected data-i18n="bg.source.image">Image</option>
                                 <option value="collage" data-i18n="bg.source.collage">Poster collage from this target</option>
+                                <option value="gradient" data-i18n="bg.source.gradient">Gradient</option>
+                                <option value="solid" data-i18n="bg.source.solid">Solid colour</option>
                             </select>
                         </div>
                         <div class="inputContainer" id="ccaCollageRow" style="display:none">
@@ -160,8 +162,6 @@
                             <input type="color" id="ccaDimColor" value="#000000" />
                         </div>
 
-                        <div id="ccaUploadControls">
-                        <label class="ccaCheck ccaCheckBlock"><input is="emby-checkbox" type="checkbox" id="ccaGradient" checked /><span data-i18n="bg.gradient">Enable gradient background</span></label>
                         <div id="ccaGradientOpts" class="ccaSub" style="display:none;">
                             <div class="inputContainer">
                                 <label for="ccaGradientType" data-i18n="bg.gtype">Gradient type</label>
@@ -181,6 +181,7 @@
                             </div>
                         </div>
 
+                        <div id="ccaUploadControls">
                         <div class="inputContainer">
                             <label data-i18n="bg.image">Background image (optional)</label>
                             <div class="ccaFileRow">
@@ -656,7 +657,7 @@
                 'fx.jellyfin': 'Jellyfin style', 'fx.presetHint': 'Applies a dark gradient with clean white text — editable afterwards.',
                 'fx.autopalette': 'Auto palette', 'fx.paletteHint': 'Click a colour to apply it to the selected text layer, or to the colour wash when no text layer is selected.',
                 'card.background': 'Background', 'bg.dim': 'Dimming', 'bg.blur': 'Blur', 'bg.dimcolor': 'Dim / base color',
-                'bg.gradient': 'Enable gradient background', 'bg.gtype': 'Gradient type', 'g.linear': 'Linear', 'g.radial': 'Radial',
+                'bg.gtype': 'Gradient type', 'g.linear': 'Linear', 'g.radial': 'Radial',
                 'bg.startcolor': 'Start color', 'bg.endcolor': 'End color',
                 'bg.angle': 'Angle', 'bg.colors': 'Colours', 'bg.addcolor': 'Add colour',
                 'bg.image': 'Background image (optional)', 'f.chooseImage': 'Choose image…', 'f.none': 'No file chosen',
@@ -679,7 +680,7 @@
                 'dyn.uploadFail': 'Upload failed: {0}', 'dyn.fontFail': 'Font upload failed: {0}', 'dyn.useImgFail': 'Could not use that image: {0}',
                 'dyn.unknown': 'unknown error',
                 'restore.button': 'Restore original cover', 'restore.none': 'No backup yet', 'restore.available': 'A backup exists', 'restore.done': 'Original cover restored.', 'restore.fail': 'No backup found to restore.',
-                'bg.source': 'Background source', 'bg.source.upload': 'Upload / poster', 'bg.source.collage': 'Poster collage from this target', 'bg.collage.density': 'Collage density', 'bg.collage.sparse': 'Sparse', 'bg.collage.medium': 'Medium', 'bg.collage.dense': 'Dense', 'bg.collage.shuffle': 'Shuffle', 'bg.collage.livetv': 'Live TV has no posters to collage.',
+                'bg.source': 'Background source', 'bg.source.image': 'Image', 'bg.source.gradient': 'Gradient', 'bg.source.solid': 'Solid colour', 'bg.source.collage': 'Poster collage from this target', 'bg.collage.density': 'Collage density', 'bg.collage.sparse': 'Sparse', 'bg.collage.medium': 'Medium', 'bg.collage.dense': 'Dense', 'bg.collage.shuffle': 'Shuffle', 'bg.collage.livetv': 'Live TV has no posters to collage.',
                 'card.templates': 'Templates', 'tpl.load': 'Load template', 'tpl.delete': 'Delete', 'tpl.save': 'Save current design', 'tpl.savebtn': 'Save', 'tpl.nameph': 'Template name', 'tpl.hint': 'Templates store the design but not the title — each target keeps its own name.', 'tpl.saved': 'Template saved.', 'tpl.named': 'Enter a template name first.',
                 'card.batch': 'Batch apply', 'batch.hint': 'Apply the current design (or loaded template) to several targets at once. Each cover is titled with its target\'s name.', 'batch.apply': 'Apply to selected', 'batch.none': 'Select at least one target.', 'batch.running': 'Applying…', 'batch.done': 'Done: {0} ok, {1} failed.',
                 'fmt.animated': 'Animated GIF', 'anim.kenburns': 'Ken Burns pan/zoom', 'anim.frames': 'Frames', 'anim.delay': 'Frame delay (ms)', 'anim.dir': 'Zoom direction', 'anim.in': 'Zoom in', 'anim.out': 'Zoom out', 'anim.hint': 'Animated GIFs are larger and only animate in views that render GIFs. Capped at 30 frames.'
@@ -705,7 +706,7 @@
                 'fx.jellyfin': 'Jellyfin-stijl', 'fx.presetHint': 'Past een donker verloop met strakke witte tekst toe — daarna vrij aanpasbaar.',
                 'fx.autopalette': 'Automatisch kleurenpalet', 'fx.paletteHint': 'Klik op een kleur om die toe te passen op de geselecteerde tekstlaag, of op het kleurwaas als er geen tekstlaag geselecteerd is.',
                 'card.background': 'Achtergrond', 'bg.dim': 'Dimmen', 'bg.blur': 'Vervaging', 'bg.dimcolor': 'Dim- / basiskleur',
-                'bg.gradient': 'Verloop-achtergrond inschakelen', 'bg.gtype': 'Verlooptype', 'g.linear': 'Lineair', 'g.radial': 'Radiaal',
+                'bg.gtype': 'Verlooptype', 'g.linear': 'Lineair', 'g.radial': 'Radiaal',
                 'bg.startcolor': 'Startkleur', 'bg.endcolor': 'Eindkleur',
                 'bg.angle': 'Hoek', 'bg.colors': 'Kleuren', 'bg.addcolor': 'Kleur toevoegen',
                 'bg.image': 'Achtergrondafbeelding (optioneel)', 'f.chooseImage': 'Kies afbeelding…', 'f.none': 'Geen bestand gekozen',
@@ -728,7 +729,7 @@
                 'dyn.uploadFail': 'Uploaden mislukt: {0}', 'dyn.fontFail': 'Lettertype uploaden mislukt: {0}', 'dyn.useImgFail': 'Kon die afbeelding niet gebruiken: {0}',
                 'dyn.unknown': 'onbekende fout',
                 'restore.button': 'Originele cover herstellen', 'restore.none': 'Nog geen back-up', 'restore.available': 'Er is een back-up', 'restore.done': 'Originele cover hersteld.', 'restore.fail': 'Geen back-up gevonden om te herstellen.',
-                'bg.source': 'Achtergrondbron', 'bg.source.upload': 'Upload / poster', 'bg.source.collage': 'Postercollage van dit doel', 'bg.collage.density': 'Collagedichtheid', 'bg.collage.sparse': 'Dun', 'bg.collage.medium': 'Gemiddeld', 'bg.collage.dense': 'Dicht', 'bg.collage.shuffle': 'Schudden', 'bg.collage.livetv': 'Live TV heeft geen posters voor een collage.',
+                'bg.source': 'Achtergrondbron', 'bg.source.image': 'Afbeelding', 'bg.source.gradient': 'Verloop', 'bg.source.solid': 'Effen kleur', 'bg.source.collage': 'Postercollage van dit doel', 'bg.collage.density': 'Collagedichtheid', 'bg.collage.sparse': 'Dun', 'bg.collage.medium': 'Gemiddeld', 'bg.collage.dense': 'Dicht', 'bg.collage.shuffle': 'Schudden', 'bg.collage.livetv': 'Live TV heeft geen posters voor een collage.',
                 'card.templates': 'Sjablonen', 'tpl.load': 'Sjabloon laden', 'tpl.delete': 'Verwijderen', 'tpl.save': 'Huidig ontwerp opslaan', 'tpl.savebtn': 'Opslaan', 'tpl.nameph': 'Sjabloonnaam', 'tpl.hint': 'Sjablonen bewaren het ontwerp maar niet de titel — elk doel houdt zijn eigen naam.', 'tpl.saved': 'Sjabloon opgeslagen.', 'tpl.named': 'Voer eerst een sjabloonnaam in.',
                 'card.batch': 'Bulk toepassen', 'batch.hint': 'Pas het huidige ontwerp (of geladen sjabloon) in één keer toe op meerdere doelen. Elke cover krijgt de naam van zijn doel als titel.', 'batch.apply': 'Toepassen op selectie', 'batch.none': 'Selecteer minstens één doel.', 'batch.running': 'Bezig met toepassen…', 'batch.done': 'Klaar: {0} gelukt, {1} mislukt.',
                 'fmt.animated': 'Geanimeerde GIF', 'anim.kenburns': 'Ken Burns pan/zoom', 'anim.frames': 'Frames', 'anim.delay': 'Framevertraging (ms)', 'anim.dir': 'Zoomrichting', 'anim.in': 'Inzoomen', 'anim.out': 'Uitzoomen', 'anim.hint': 'Geanimeerde GIFs zijn groter en bewegen alleen in weergaven die GIFs tonen. Max. 30 frames.'
@@ -871,12 +872,27 @@
             return d;
         }
 
+        // Client mirror of DocumentMigration.NormalizeBackgroundSource — same rules, same
+        // order. Runs on LOAD only (init and template load), never on every change: it
+        // derives Source from the old fields, so running it mid-edit would flip the user's
+        // chosen source out from under them the moment they cleared an image.
+        function normalizeBackgroundSource(d) {
+            var bg = d.Background;
+            var source = String(bg.Source || '').trim().toLowerCase();
+            if (source === 'collage') { bg.Source = 'collage'; return d; }
+            if (bg.ImagePath) { bg.Source = 'upload'; return d; }
+            bg.Source = (bg.Gradient && bg.Gradient.IsEnabled) ? 'gradient' : 'solid';
+            return d;
+        }
+
         function defaultDocument() {
             return {
                 Version: 2,
                 Canvas: { Width: 1280, Height: 720, Format: 'auto', DimensionPreset: 'landscape' },
                 Background: {
-                    Source: 'upload', ImagePath: '', Fit: 'cover',
+                    // The default design is the Jellyfin brand gradient, so the source says
+                    // so rather than claiming to be an image that was never chosen.
+                    Source: 'gradient', ImagePath: '', Fit: 'cover',
                     Transform: { OffsetX: 0, OffsetY: 0, Scale: 1 },
                     Blur: 0, Dim: 0.25, DimColor: '#000000',
                     Gradient: {
@@ -1929,7 +1945,7 @@
                 TextShadow: el('ccaShadow').checked,
                 TextOutline: el('ccaOutline').checked,
                 BackgroundGradient: {
-                    IsEnabled: el('ccaGradient').checked,
+                    IsEnabled: doc.Background.Source === 'gradient',
                     Type: parseInt(el('ccaGradientType').value, 10),
                     Angle: parseFloat(el('ccaGradientAngle').value) || 0,
                     Stops: collectGradientStops(),
@@ -2101,13 +2117,10 @@
             el('ccaBgSource').value = bg.Source || 'upload';
             var g = bg.Gradient;
             if (g) {
-                el('ccaGradient').checked = !!g.IsEnabled;
                 el('ccaGradientType').value = String(g.Type || 0);
                 el('ccaGradientAngle').value = g.Angle || 0;
                 el('ccaGradientAngleVal').textContent = (g.Angle || 0) + '°';
                 rebuildGradientStopsUI(g.Stops);
-            } else {
-                el('ccaGradient').checked = false;
             }
             if (bg.Collage) { el('ccaCollageDensity').value = bg.Collage.Density || 'medium'; }
 
@@ -2145,7 +2158,7 @@
 
             // Re-sync dependent visibility + labels.
             updateUI();
-            updateCollageVisibility();
+            updateBackgroundVisibility();
             updateAnimVisibility();
             updateEffectsVisibility();
         }
@@ -2166,7 +2179,7 @@
 
         function applyJellyfinPreset() {
             var p = JELLYFIN_PRESET;
-            doc.Background.Source = 'upload';
+            doc.Background.Source = 'gradient';
             doc.Background.Gradient = {
                 IsEnabled: true, Type: 0, Angle: p.gradientAngle,
                 Stops: [{ Color: p.gradientStart, Position: 0 }, { Color: p.gradientEnd, Position: 1 }],
@@ -2224,27 +2237,37 @@
         }
         // ------------------------------------------------------------------
 
-        // Enable/disable controls based on current selection.
+        // Enable/disable controls based on current selection. Deliberately does NOT touch
+        // the gradient rows — updateBackgroundVisibility owns those, and two owners of the
+        // same element fight.
         function updateUI() {
             el('ccaApplyBtn').disabled = !state.libraryId;
             el('ccaCustomDims').style.display = el('ccaPreset').value === 'custom' ? '' : 'none';
-            el('ccaGradientOpts').style.display = el('ccaGradient').checked ? '' : 'none';
-            el('ccaGradientAngleRow').style.display = el('ccaGradientType').value === '0' ? '' : 'none';
         }
 
-        // Shows/hides the collage controls and disables collage for Live TV
-        // (which has no child posters to build a mosaic from).
-        function updateCollageVisibility() {
-            var isCollage = el('ccaBgSource').value === 'collage';
+        // Single owner of which background controls are visible: only the chosen source's
+        // own controls are shown. A control belonging to an unchosen source is hidden
+        // outright rather than demoted to "advanced" — before v3.3.0.0 the gradient lived
+        // behind its own checkbox alongside the source dropdown, so two controls answered
+        // one question.
+        function updateBackgroundVisibility() {
+            var source = el('ccaBgSource').value;
             var type = el('ccaTargetType') ? el('ccaTargetType').value : 'library';
-            var opt = el('ccaBgSource').querySelector('option[value="collage"]');
-            if (opt) { opt.disabled = (type === 'livetv'); }
-            if (type === 'livetv' && isCollage) { el('ccaBgSource').value = 'upload'; isCollage = false; }
-            el('ccaCollageRow').style.display = isCollage ? '' : 'none';
-            // A collage supplies the whole background, so the upload/gradient/fit
-            // controls don't apply — hide them to keep the card focused.
-            var up = el('ccaUploadControls');
-            if (up) { up.style.display = isCollage ? 'none' : ''; }
+
+            // Live TV has no child posters to build a mosaic from.
+            var collageOpt = el('ccaBgSource').querySelector('option[value="collage"]');
+            if (collageOpt) { collageOpt.disabled = (type === 'livetv'); }
+            if (type === 'livetv' && source === 'collage') {
+                el('ccaBgSource').value = 'upload';
+                doc.Background.Source = 'upload';
+                source = 'upload';
+            }
+
+            el('ccaUploadControls').style.display = source === 'upload' ? '' : 'none';
+            el('ccaCollageRow').style.display = source === 'collage' ? '' : 'none';
+            el('ccaGradientOpts').style.display = source === 'gradient' ? '' : 'none';
+            el('ccaGradientAngleRow').style.display =
+                (source === 'gradient' && el('ccaGradientType').value === '0') ? '' : 'none';
             updateUI();
         }
 
@@ -2695,13 +2718,9 @@
             el('ccaBgFit').addEventListener('change', function () {
                 doc.Background.Fit = this.value; scheduleRender();
             });
-            el('ccaGradient').addEventListener('change', function () {
-                if (doc.Background.Gradient) { doc.Background.Gradient.IsEnabled = this.checked; }
-                updateUI(); scheduleRender();
-            });
             el('ccaGradientType').addEventListener('change', function () {
                 if (doc.Background.Gradient) { doc.Background.Gradient.Type = parseInt(this.value, 10); }
-                updateUI(); scheduleRender();
+                updateBackgroundVisibility(); scheduleRender();
             });
             el('ccaGradientAngle').addEventListener('input', function () {
                 el('ccaGradientAngleVal').textContent = this.value + '°';
@@ -2714,7 +2733,20 @@
             el('ccaBgSource').addEventListener('change', function () {
                 doc.Background.Source = this.value;
                 if (this.value === 'collage') { doc.Background.Collage = buildCollageFromControls(); }
-                updateCollageVisibility(); scheduleRender();
+                // Two-way compatibility: an older server reading this document decides on
+                // IsEnabled, so keep it in step with Source.
+                if (doc.Background.Gradient) {
+                    doc.Background.Gradient.IsEnabled = (this.value === 'gradient');
+                }
+                // A gradient or solid background must not keep painting a stale bitmap.
+                if (this.value === 'gradient' || this.value === 'solid') {
+                    bgImageEl = null;
+                    doc.Background.ImagePath = '';
+                    state.backgroundImagePath = '';
+                    var selBg = el('ccaSelectedBg');
+                    if (selBg) { selBg.style.display = 'none'; }
+                }
+                updateBackgroundVisibility(); scheduleRender();
             });
             el('ccaCollageDensity').addEventListener('change', function () {
                 if (doc.Background.Collage) { doc.Background.Collage.Density = this.value; } scheduleRender();
@@ -2805,7 +2837,7 @@
             el('ccaTargetType').addEventListener('change', function () {
                 Dashboard.showLoadingMsg();
                 loadLibraries()
-                    .then(function () { updateUI(); updateCollageVisibility(); refreshRestoreState(); loadBatchList(); Dashboard.hideLoadingMsg(); })
+                    .then(function () { updateUI(); updateBackgroundVisibility(); refreshRestoreState(); loadBatchList(); Dashboard.hideLoadingMsg(); })
                     .catch(function () { Dashboard.hideLoadingMsg(); });
             });
 
@@ -2905,6 +2937,7 @@
                 // Templates saved before Phase 3 have no effect sub-objects; the draw
                 // functions dereference them, so fill them in like the server does.
                 normalizeEffects(doc);
+                normalizeBackgroundSource(doc);
                 var titleLayer = null;
                 for (var i = 0; i < doc.Layers.length; i++) {
                     if (doc.Layers[i].Id === 'title') { titleLayer = doc.Layers[i]; break; }
@@ -3122,7 +3155,7 @@
             loadBatchList();
             loadLibraries().then(function () {
                 updateUI();
-                updateCollageVisibility();
+                updateBackgroundVisibility();
                 refreshRestoreState();
                 Dashboard.hideLoadingMsg();
                 scheduleRender();
