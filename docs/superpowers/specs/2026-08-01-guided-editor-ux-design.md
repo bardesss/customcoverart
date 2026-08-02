@@ -65,11 +65,16 @@ it is not merely "advanced".
 
 | Source | Essentials shown with it |
 |---|---|
-| Upload | choose-image button, file name, image fit, dimming |
-| Library poster | browse-posters button, selected name, image fit, dimming |
+| Image | choose-file **and** browse-posters buttons, selected name, image fit, dimming |
 | Poster collage | collage density, shuffle, dimming |
 | Gradient | gradient type, angle, colour stops, add-stop |
 | Solid colour | base colour |
+
+**Four sources, not five.** An uploaded file and a browsed library poster produce the
+identical document state — the poster is copied into the uploads directory — so listing
+them as two sources would create a value that cannot be reconstructed on reload, and two
+menu entries that lead to the same place. They are one source, *Image*, with two ways to
+pick the image.
 
 | | Controls |
 |---|---|
@@ -104,8 +109,9 @@ a background property, and belongs where the dragging happens.
 Today `Background.Source` is `upload | poster | collage | none` while `Gradient.IsEnabled`
 is a separate boolean. Two controls answer one question.
 
-**New:** `Source` becomes a single choice of `upload | poster | collage | gradient | solid`,
-and each source reveals only its own controls.
+**New:** `Source` becomes a single choice of `upload | collage | gradient | solid`, and each
+source reveals only its own controls. `upload` keeps its existing value and simply means
+"an image" — no rename, so documents that already say `upload` need no migration at all.
 
 ### Migration
 
@@ -113,16 +119,17 @@ Applied in `DocumentMigration.Normalize` (server) and a new `normalizeBackground
 on the client, called from the same places `normalizeEffects(d)` already is (template load
 and document init), so saved templates keep working:
 
+Evaluated in order; the first match wins:
+
 | Existing document | New `Source` |
 |---|---|
-| `Source == "collage"` | `collage` |
+| `Source == "collage"` | `collage` (unchanged) |
 | `ImagePath` is non-empty | `upload` |
 | `Gradient.IsEnabled == true` | `gradient` |
-| anything else (incl. `"none"`) | `solid` |
+| anything else (incl. `"none"`, `"poster"`, empty) | `solid` |
 
-`upload` and `poster` both resolve to `upload`: a browsed poster is copied into the
-uploads directory, so after selection the two are indistinguishable in the document. The
-UI keeps both buttons as separate ways to *pick* an image.
+A document that says `upload` with no image yet falls through to gradient or solid, which
+is correct: that is exactly what such a document renders today.
 
 **Back-compat both ways:** whenever the client writes `Source`, it also writes
 `Gradient.IsEnabled = (Source === 'gradient')`. An older server (or a rolled-back plugin)
