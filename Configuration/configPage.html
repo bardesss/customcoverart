@@ -1794,9 +1794,38 @@
             return { x: dx * c - dy * s, y: dx * s + dy * c };
         }
 
-        // Handle sizes in CANVAS pixels — the canvas is displayed CSS-scaled, so these
-        // are derived from the backing-store height to stay visually constant.
-        function handleSize(H) { return Math.max(7, H / 55); }
+        // Canvas backing-store pixels per CSS pixel. Greater than 1 whenever the canvas is
+        // displayed smaller than its export size, which is almost always — and
+        // dramatically so on a phone, where a 1400px canvas shown at ~340px scales by ~4.
+        function canvasScale() {
+            var cv = el('ccaCanvas');
+            if (!cv) { return 1; }
+            var rect = cv.getBoundingClientRect();
+            if (!rect.width || !cv.width) { return 1; }
+            return cv.width / rect.width;
+        }
+
+        // Handle size is chosen in SCREEN pixels and converted into canvas units, so it
+        // renders at a constant on-screen size however far the canvas is scaled down.
+        // Deriving it from the backing store (the Phase 2 behaviour) meant the handles
+        // shrank with the display and ended up a few pixels across on a phone — the one
+        // mobile problem that no amount of CSS could fix.
+        var HANDLE_SCREEN_PX = 11;      // drawn size
+        var TOUCH_TARGET_PX = 44;       // minimum comfortable touch target
+        function handleSize(H) {
+            var byScreen = HANDLE_SCREEN_PX * canvasScale();
+            // Never so large on a tiny canvas that the handles swamp the layer itself.
+            return Math.max(6, Math.min(byScreen, H / 8));
+        }
+
+        // Grab radius. Touch gets the full 44px target; a mouse is precise, so it uses the
+        // drawn handle size rather than a sloppy oversized hit area.
+        function hitTolerance(ev) {
+            var scale = canvasScale();
+            var isTouch = ev && (ev.pointerType === 'touch' || ev.pointerType === 'pen');
+            return isTouch ? (TOUCH_TARGET_PX / 2) * scale : HANDLE_SCREEN_PX * scale;
+        }
+
         function rotateKnobGap(H) { return Math.max(18, H / 16); }
 
         // The four corner handles plus the rotate knob, in canvas coordinates, tagged
@@ -1857,13 +1886,13 @@
         }
 
         // The handle under the pointer, if any, for the currently selected layer.
-        function hitTestHandle(pt) {
+        function hitTestHandle(pt, ev) {
             var layer = selectedLayer();
             var cv = el('ccaCanvas');
             if (!layer || !layer.Visible || !cv) { return null; }
             var ctx = cv.getContext('2d');
             var r = layerRect(ctx, layer, cv.width, cv.height);
-            var tol = handleSize(cv.height);
+            var tol = hitTolerance(ev);
             var found = null;
             layerHandles(r, cv.height).forEach(function (p) {
                 var dx = pt.x - p.x, dy = pt.y - p.y;
@@ -1884,15 +1913,17 @@
         // Topmost (last-drawn) visible layer whose padded box contains the point. The
         // point is mapped into each layer's own rotated space, so a turned layer is
         // grabbed where it actually appears rather than by its upright footprint.
-        function hitTestLayer(pt) {
+        function hitTestLayer(pt, ev) {
             var cv = el('ccaCanvas'); if (!cv) { return null; }
             var ctx = cv.getContext('2d');
+            // A finger is much blunter than a cursor, so widen the grab area for touch.
+            var touchPad = hitTolerance(ev) * 0.5;
             for (var i = doc.Layers.length - 1; i >= 0; i--) {
                 var layer = doc.Layers[i];
                 if (!layer.Visible) { continue; }
                 var r = layerRect(ctx, layer, cv.width, cv.height);
                 var local = canvasToRect(r, pt);
-                var pad = layer.Type === 'text' ? Math.max(8, r.h * 0.3) : 0;
+                var pad = layer.Type === 'text' ? Math.max(touchPad, r.h * 0.3) : touchPad;
                 if (local.x >= r.lx - pad && local.x <= r.lx + r.w + pad &&
                     local.y >= r.ly - pad && local.y <= r.ly + r.h + pad) {
                     return layer;
@@ -1948,7 +1979,7 @@
             // Handles belong to the already-selected layer and sit OUTSIDE its box, so
             // they must win over a plain hit-test — otherwise a corner handle that
             // overlaps a layer below would select that layer instead of resizing.
-            var grip = hitTestHandle(pt);
+            var grip = hitTestHandle(pt, ev);
             if (grip) {
                 _handleDrag = {
                     kind: grip.handle.id === 'rot' ? 'rotate' : 'resize',
@@ -1965,7 +1996,7 @@
                 return;
             }
 
-            var hit = hitTestLayer(pt);
+            var hit = hitTestLayer(pt, ev);
             if (!hit) { return; }
             if (doc._selectedId !== hit.Id) {
                 doc._selectedId = hit.Id;
@@ -3073,6 +3104,11 @@
                     }
                 }).catch(function (e) { Dashboard.hideLoadingMsg(); Dashboard.alert(e.message); });
             });
+
+            // Handle sizes and hit tolerances are derived from the canvas's CSS display
+            // size, so a viewport change (rotating a phone, resizing a window) must redraw
+            // or the handles keep the size they had at the old width.
+            window.addEventListener('resize', debounce(function () { scheduleRender(); }, 150));
 
             el('ccaApplyBtn').addEventListener('click', applyCoverArt);
             el('ccaServerRender').addEventListener('click', showServerRender);
