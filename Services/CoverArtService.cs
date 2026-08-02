@@ -15,19 +15,16 @@ namespace CustomCoverArt.Services;
 /// </summary>
 public class CoverArtService : ICoverArtService
 {
-    private readonly IImageProcessingService _imageProcessingService;
     private readonly IApplicationPaths _applicationPaths;
     private readonly ILoggingService _loggingService;
     private readonly IMediaItemService _mediaItemService;
     private readonly string _outputDirectory;
 
     public CoverArtService(
-        IImageProcessingService imageProcessingService,
         IApplicationPaths applicationPaths,
         ILoggingService loggingService,
         IMediaItemService mediaItemService)
     {
-        _imageProcessingService = imageProcessingService;
         _applicationPaths = applicationPaths;
         _loggingService = loggingService;
         _mediaItemService = mediaItemService;

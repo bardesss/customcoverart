@@ -74,6 +74,7 @@ public static class DocumentMigration
         doc.Canvas ??= new CanvasSettings();
         doc.Background ??= new BackgroundLayer();
         doc.Background.Transform ??= new BackgroundTransform();
+        NormalizeBackgroundSource(doc.Background);
         doc.Effects ??= new EffectSettings();
         // The effect sub-objects are dereferenced unconditionally by EffectsComposer,
         // and a client can POST any of them as explicit null (System.Text.Json does not
@@ -92,6 +93,39 @@ public static class DocumentMigration
             layer.Outline ??= new TextOutlineSettings();
         }
         return doc;
+    }
+
+    /// <summary>
+    /// Collapses the legacy "Source plus a separate Gradient.IsEnabled" pair into a single
+    /// Source value. Rules are evaluated in order, first match wins:
+    ///
+    ///   collage stays collage · a non-empty ImagePath means an image · otherwise the
+    ///   gradient flag decides between gradient and solid.
+    ///
+    /// A document saying "upload" with no image yet falls through to gradient or solid,
+    /// which is correct — that is exactly what such a document renders. Idempotent, so it
+    /// is safe on the already-migrated documents Normalize sees on every request.
+    /// </summary>
+    public static void NormalizeBackgroundSource(BackgroundLayer bg)
+    {
+        var source = (bg.Source ?? string.Empty).Trim().ToLowerInvariant();
+
+        // A collage supplies the whole background and never had the ambiguity.
+        if (source == BackgroundSources.Collage)
+        {
+            bg.Source = BackgroundSources.Collage;
+            return;
+        }
+
+        // An image beats everything else: it is what actually renders.
+        if (!string.IsNullOrEmpty(bg.ImagePath))
+        {
+            bg.Source = BackgroundSources.Upload;
+            return;
+        }
+
+        // No image, so the old gradient flag decides — exactly as the renderer used to.
+        bg.Source = bg.Gradient?.IsEnabled == true ? BackgroundSources.Gradient : BackgroundSources.Solid;
     }
 
     private static (float X, float Y) AnchorFor(TextAlign align, TextBaseline baseline, float padding)

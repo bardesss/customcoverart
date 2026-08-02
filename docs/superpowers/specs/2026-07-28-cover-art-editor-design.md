@@ -198,6 +198,14 @@ soft-light); preset populates expected document; palette quantization is pure JS
 
 ## Phase 4 — UI polish
 
+> **Revised 2026-08-01.** Phase 4 grew into a guided-editor restructure after the user
+> found the nine-card page overwhelming. See
+> `docs/superpowers/specs/2026-08-01-guided-editor-ux-design.md`, which supersedes this
+> section and the Phase 4 plan: the page becomes five numbered accordion steps, mobile
+> becomes a cross-cutting requirement rather than a bullet, and `Background.Source`
+> absorbs the separate gradient checkbox. Undo/redo and preview modes below are unchanged
+> and fold into that work.
+
 - **Undo/redo** over the whole document: snapshot history, `Ctrl+Z` / `Ctrl+Y`
   plus on-screen buttons.
 - **Mobile-friendly:** responsive layout, larger touch targets, collapsible
