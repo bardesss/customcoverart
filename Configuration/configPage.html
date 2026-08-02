@@ -373,6 +373,11 @@
                                 </select>
                             </div>
                         </div>
+                        <div class="inputContainer">
+                            <label data-i18n="ui.inContext">In context</label>
+                            <div class="ccaContexts" id="ccaContexts"></div>
+                            <div class="fieldDescription" data-i18n="ui.inContextHint">How the cover looks at other shapes. The canvas above is the real design.</div>
+                        </div>
                         <div class="ccaAdv">
                             <button type="button" class="ccaAdvHead" aria-expanded="false">
                                 <span class="ccaStepChevron" aria-hidden="true">&#9662;</span>
@@ -700,6 +705,16 @@
         #CustomCoverArtConfigPage .ccaHistoryBar { display: flex; gap: .5em; margin-bottom: .6em; }
         #CustomCoverArtConfigPage .ccaHistoryBar .emby-button { margin: 0; }
 
+        /* The same design drawn at other aspect ratios, so it can be judged in context
+           before applying. Scrolls sideways rather than wrapping on a phone. */
+        #CustomCoverArtConfigPage .ccaContexts { display: flex; gap: .8em; overflow-x: auto; padding: .4em 0; }
+        #CustomCoverArtConfigPage .ccaContext { flex: 0 0 auto; text-align: center; }
+        #CustomCoverArtConfigPage .ccaContext canvas {
+            display: block; max-width: 100%; border-radius: 6px;
+            border: 1px solid rgba(127,127,127,.25);
+        }
+        #CustomCoverArtConfigPage .ccaContextCap { font-size: .8em; opacity: .6; margin-top: .3em; }
+
         /* Palette swatches extracted from the background. */
         #CustomCoverArtConfigPage .ccaSwatches { display: flex; flex-wrap: wrap; gap: .4em; margin: .3em 0 0; }
         #CustomCoverArtConfigPage .ccaSwatches:empty { display: none; }
@@ -831,6 +846,8 @@
                 'group.startFrom': 'Start from a saved design', 'group.selectedLayer': 'Selected layer',
                 'group.saveTemplate': 'Save this design', 'group.batch': 'Apply to several targets',
                 'ui.advanced': 'Advanced', 'ui.undo': 'Undo', 'ui.redo': 'Redo',
+                'ui.inContext': 'In context', 'ui.inContextHint': 'How the cover looks at other shapes. The canvas above is the real design.',
+                'ctx.wide': 'Wide', 'ctx.square': 'Square', 'ctx.poster': 'Poster',
                 'card.layers': 'Layers', 'layer.addText': 'Add text', 'layer.addImage': 'Add logo/icon',
                 'layer.show': 'Show', 'layer.hide': 'Hide', 'layer.up': 'Move up', 'layer.down': 'Move down', 'layer.dup': 'Duplicate', 'layer.del': 'Delete',
                 'layer.text': 'Text', 'layer.logo': 'Logo', 'layer.more': 'More actions', 'layer.none': 'No layer selected — add one in the Layers card above.',
@@ -885,6 +902,8 @@
                 'group.startFrom': 'Beginnen met een opgeslagen ontwerp', 'group.selectedLayer': 'Geselecteerde laag',
                 'group.saveTemplate': 'Dit ontwerp opslaan', 'group.batch': 'Toepassen op meerdere doelen',
                 'ui.advanced': 'Geavanceerd', 'ui.undo': 'Ongedaan maken', 'ui.redo': 'Opnieuw',
+                'ui.inContext': 'In context', 'ui.inContextHint': 'Hoe de cover er in andere verhoudingen uitziet. Het canvas hierboven is het echte ontwerp.',
+                'ctx.wide': 'Breed', 'ctx.square': 'Vierkant', 'ctx.poster': 'Poster',
                 'card.layers': 'Lagen', 'layer.addText': 'Tekst toevoegen', 'layer.addImage': 'Logo/pictogram toevoegen',
                 'layer.show': 'Tonen', 'layer.hide': 'Verbergen', 'layer.up': 'Omhoog', 'layer.down': 'Omlaag', 'layer.dup': 'Dupliceren', 'layer.del': 'Verwijderen',
                 'layer.text': 'Tekst', 'layer.logo': 'Logo', 'layer.more': 'Meer acties', 'layer.none': 'Geen laag geselecteerd — voeg er een toe in de kaart Lagen hierboven.',
@@ -1030,6 +1049,9 @@
                 if (isTarget) { body.removeAttribute('hidden'); } else { body.setAttribute('hidden', ''); }
             });
             try { localStorage.setItem(STEP_KEY, String(n)); } catch (e) { /* private mode */ }
+            // Step 5 may have just become visible, and its thumbnails skip drawing
+            // while collapsed.
+            if (typeof renderPreviewContexts === 'function') { renderPreviewContexts(); }
         }
 
         function currentOpenStep() {
@@ -1446,8 +1468,9 @@
             // downloadPreview() clears the selection before exporting so it never bakes in.
             drawSelectionHandles(ctx, W, H);
 
-            // Keep the swatches in step with whatever the background has become.
+            // Keep the swatches and the in-context thumbnails in step with the design.
             refreshPalette();
+            renderPreviewContexts();
 
             var ph = el('ccaPreviewPlaceholder');
             if (ph) { ph.style.display = 'none'; }
@@ -1610,6 +1633,54 @@
             }
             ctx.restore();
         }
+
+        // --- Preview contexts ---------------------------------------------
+        // The SAME document drawn at other aspect ratios. Layer coordinates are
+        // normalized, so a design re-flows rather than being letterboxed — which is
+        // exactly what you want to check before applying it to a library.
+        var PREVIEW_CONTEXTS = [
+            { key: 'wide', w: 320, h: 180 },
+            { key: 'square', w: 200, h: 200 },
+            { key: 'poster', w: 150, h: 225 }
+        ];
+
+        // Background + effects + layers into an arbitrary-sized context, reusing the very
+        // functions renderDocument uses so the two cannot drift. Deliberately omits the
+        // selection chrome — this is the design, not the editor.
+        function drawDocInto(ctx, W, H) {
+            ctx.clearRect(0, 0, W, H);
+            paintBackgroundOnly(ctx, W, H);
+            drawSoftLight(ctx, W, H);
+            doc.Layers.forEach(function (layer) {
+                if (!layer.Visible) { return; }
+                if (layer.Type === 'text') { drawTextLayer(ctx, layer, W, H); }
+                else if (layer.Type === 'image') { drawImageLayer(ctx, layer, W, H); }
+            });
+            drawVignette(ctx, W, H);
+            drawGrain(ctx, W, H);
+            drawBorder(ctx, W, H);
+        }
+
+        var renderPreviewContexts = debounce(function () {
+            var box = el('ccaContexts');
+            // offsetParent is null while step 5 is collapsed: no point drawing three
+            // canvases nobody can see on every edit.
+            if (!box || box.offsetParent === null) { return; }
+            box.innerHTML = '';
+            PREVIEW_CONTEXTS.forEach(function (c) {
+                var wrap = document.createElement('div');
+                wrap.className = 'ccaContext';
+                var cv = document.createElement('canvas');
+                cv.width = c.w; cv.height = c.h;
+                drawDocInto(cv.getContext('2d'), c.w, c.h);
+                var cap = document.createElement('div');
+                cap.className = 'ccaContextCap';
+                cap.textContent = t('ctx.' + c.key);
+                wrap.appendChild(cv); wrap.appendChild(cap);
+                box.appendChild(wrap);
+            });
+        }, 300);
+        // ------------------------------------------------------------------
 
         // --- Undo/redo ----------------------------------------------------
         // A snapshot stack of the serialized document. UI-only keys are stripped, so a
