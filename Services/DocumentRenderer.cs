@@ -273,7 +273,14 @@ public static class DocumentRenderer
 
     internal static void CreateGradientBackground(Image<Rgba32> image, BackgroundLayer bg)
     {
-        if (bg.Gradient?.IsEnabled == true)
+        // Source is authoritative post-migration. The IsEnabled fallback keeps a document
+        // that never went through Normalize (an older client POSTing directly) rendering
+        // exactly as it did before — but an explicit "solid" always wins, so choosing
+        // Solid in the UI cannot be silently overridden by a stale flag left behind.
+        var useGradient = bg.Source == BackgroundSources.Gradient
+            || (bg.Source != BackgroundSources.Solid && bg.Gradient?.IsEnabled == true);
+
+        if (useGradient && bg.Gradient is not null)
         {
             ApplyGradientBackground(image, bg.Gradient);
         }
