@@ -447,7 +447,7 @@
                             <canvas id="ccaCanvas" class="ccaCanvas" width="1400" height="1400" aria-label="Cover art canvas"></canvas>
                             <div id="ccaPreviewPlaceholder" class="ccaPreviewPlaceholder" data-i18n="preview.placeholder">Generate a preview to see your cover art.</div>
                         </div>
-                        <div class="ccaActions">
+                        <div class="ccaActions ccaStickyApply">
                             <button is="emby-button" type="button" id="ccaApplyBtn" class="raised block button-submit" disabled><span data-i18n="action.apply">Apply to library</span></button>
                             <button is="emby-button" type="button" id="ccaServerRender" class="raised block"><span data-i18n="action.serverRender">Show server render</span></button>
                             <button is="emby-button" type="button" id="ccaDownloadBtn" class="raised block" disabled><span data-i18n="action.download">Download image</span></button>
@@ -625,6 +625,68 @@
         /* Nested inside an effect row, the divider would double up with the row's own. */
         #CustomCoverArtConfigPage .ccaFxRow .ccaAdv { margin-top: .5em; border-top: 0; }
 
+        /* ---- Mobile -------------------------------------------------------
+           Verified at 360x640. The rules here are about reach and hit size, not
+           just narrowness: everything interactive gets to 44x44 CSS px, the canvas
+           stays on screen while you work down the steps, and Apply stays reachable
+           without scrolling to the end of a long page. */
+        @media (max-width: 700px) {
+            /* Canvas first: it is the thing being edited. */
+            #CustomCoverArtConfigPage .ccaLayout { display: flex; flex-direction: column; }
+            #CustomCoverArtConfigPage .ccaPreviewCol {
+                order: -1; position: sticky; top: 0; z-index: 5;
+                background: var(--theme-body-background-color, #101010);
+                padding-bottom: .5em;
+            }
+            #CustomCoverArtConfigPage .ccaCanvas { max-height: 34vh; }
+            #CustomCoverArtConfigPage .ccaPreviewWrap { min-height: 0; padding: .5em; }
+
+            /* Touch targets. */
+            #CustomCoverArtConfigPage .ccaStepHead { min-height: 3.4em; }
+            #CustomCoverArtConfigPage .ccaAdvHead { min-height: 44px; }
+            #CustomCoverArtConfigPage .emby-select,
+            #CustomCoverArtConfigPage input[is="emby-input"],
+            #CustomCoverArtConfigPage .emby-input { min-height: 44px; }
+            #CustomCoverArtConfigPage input[type="color"] { min-height: 44px; min-width: 44px; }
+            #CustomCoverArtConfigPage input[type="range"] { height: 44px; }
+            #CustomCoverArtConfigPage .ccaSwatch { width: 44px; height: 44px; }
+            #CustomCoverArtConfigPage .emby-button { min-height: 44px; }
+            #CustomCoverArtConfigPage .ccaStopRemove { width: 44px; height: 44px; }
+
+            #CustomCoverArtConfigPage .ccaStickyApply {
+                position: sticky; bottom: 0; z-index: 6;
+                padding: .6em 0;
+                background: var(--theme-body-background-color, #101010);
+                border-top: 1px solid rgba(127,127,127,.2);
+            }
+
+            /* A layer row cannot fit a name plus five ~30px buttons. The row itself
+               becomes the tap target for selecting, and the actions move behind one
+               toggle so they are not competing for the same 40px of width. */
+            #CustomCoverArtConfigPage .ccaLayerRow { flex-wrap: wrap; min-height: 44px; }
+            #CustomCoverArtConfigPage .ccaLayerBtn { width: 44px; height: 44px; }
+            #CustomCoverArtConfigPage .ccaLayerActions { display: none; width: 100%; margin-top: .3em; }
+            #CustomCoverArtConfigPage .ccaLayerRow.ccaLayerActionsOpen .ccaLayerActions { display: flex; }
+            #CustomCoverArtConfigPage .ccaLayerMore { display: inline-flex; }
+
+            /* Full-screen poster browser: a centred dialog on a 360px viewport leaves
+               the grid a couple of tiles wide with the page scrolling behind it. */
+            #CustomCoverArtConfigPage .ccaModalBox {
+                width: 100%; max-width: none; height: 100%; max-height: none;
+                border-radius: 0; display: flex; flex-direction: column;
+            }
+            #CustomCoverArtConfigPage .ccaModalHead {
+                position: sticky; top: 0; z-index: 2;
+                background: var(--theme-body-background-color, #101010);
+            }
+            #CustomCoverArtConfigPage .ccaModalFilters { flex-wrap: wrap; gap: .5em; }
+            #CustomCoverArtConfigPage .ccaModalClose { min-width: 44px; min-height: 44px; }
+            #CustomCoverArtConfigPage .ccaPosterGrid { grid-template-columns: repeat(2, 1fr); }
+        }
+        /* The overflow toggle only exists on narrow screens. */
+        #CustomCoverArtConfigPage .ccaLayerMore { display: none; }
+        #CustomCoverArtConfigPage .ccaLayerActions { display: flex; gap: .2em; }
+
         /* Palette swatches extracted from the background. */
         #CustomCoverArtConfigPage .ccaSwatches { display: flex; flex-wrap: wrap; gap: .4em; margin: .3em 0 0; }
         #CustomCoverArtConfigPage .ccaSwatches:empty { display: none; }
@@ -758,7 +820,7 @@
                 'ui.advanced': 'Advanced',
                 'card.layers': 'Layers', 'layer.addText': 'Add text', 'layer.addImage': 'Add logo/icon',
                 'layer.show': 'Show', 'layer.hide': 'Hide', 'layer.up': 'Move up', 'layer.down': 'Move down', 'layer.dup': 'Duplicate', 'layer.del': 'Delete',
-                'layer.text': 'Text', 'layer.logo': 'Logo', 'layer.none': 'No layer selected — add one in the Layers card above.',
+                'layer.text': 'Text', 'layer.logo': 'Logo', 'layer.more': 'More actions', 'layer.none': 'No layer selected — add one in the Layers card above.',
                 'layer.opacity': 'Opacity', 'layer.rotation': 'Rotation',
                 'hint.logo': 'PNG with transparency · up to 5 MB. The topmost row is drawn last, on top of the others.',
                 'hint.logoSize': 'Drag the corner handles on the preview to resize the logo, or the knob above it to rotate.',
@@ -812,7 +874,7 @@
                 'ui.advanced': 'Geavanceerd',
                 'card.layers': 'Lagen', 'layer.addText': 'Tekst toevoegen', 'layer.addImage': 'Logo/pictogram toevoegen',
                 'layer.show': 'Tonen', 'layer.hide': 'Verbergen', 'layer.up': 'Omhoog', 'layer.down': 'Omlaag', 'layer.dup': 'Dupliceren', 'layer.del': 'Verwijderen',
-                'layer.text': 'Tekst', 'layer.logo': 'Logo', 'layer.none': 'Geen laag geselecteerd — voeg er een toe in de kaart Lagen hierboven.',
+                'layer.text': 'Tekst', 'layer.logo': 'Logo', 'layer.more': 'Meer acties', 'layer.none': 'Geen laag geselecteerd — voeg er een toe in de kaart Lagen hierboven.',
                 'layer.opacity': 'Dekking', 'layer.rotation': 'Rotatie',
                 'hint.logo': 'PNG met transparantie · max. 5 MB. De bovenste rij wordt als laatste getekend, boven op de andere.',
                 'hint.logoSize': 'Sleep de hoekgrepen in het voorbeeld om het logo te vergroten of verkleinen, of de knop erboven om te draaien.',
@@ -1183,6 +1245,11 @@
                     row.appendChild(vis);
                     row.appendChild(name);
 
+                    // Actions live in their own container so a narrow screen can collapse
+                    // them behind one toggle, leaving the whole row as the tap target for
+                    // the action people actually want most: selecting the layer.
+                    var actions = document.createElement('div');
+                    actions.className = 'ccaLayerActions';
                     ['up', 'down', 'dup', 'del'].forEach(function (act) {
                         var b = document.createElement('button');
                         b.type = 'button'; b.className = 'ccaLayerBtn';
@@ -1196,8 +1263,21 @@
                             else if (act === 'dup') { duplicateLayer(layer.Id); }
                             else { deleteLayer(layer.Id); }
                         });
-                        row.appendChild(b);
+                        actions.appendChild(b);
                     });
+
+                    var more = document.createElement('button');
+                    more.type = 'button';
+                    more.className = 'ccaLayerBtn ccaLayerMore';
+                    more.textContent = '⋯';
+                    more.title = t('layer.more');
+                    more.addEventListener('click', function (e) {
+                        e.stopPropagation();
+                        row.classList.toggle('ccaLayerActionsOpen');
+                    });
+
+                    row.appendChild(actions);
+                    row.appendChild(more);
 
                     row.addEventListener('click', function () { selectLayerById(layer.Id); });
                     box.appendChild(row);
