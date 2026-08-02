@@ -407,6 +407,36 @@ public static class DocumentRenderer
                 new System.Numerics.Vector2(textPosition.X, textPosition.Y))
             : System.Numerics.Matrix3x2.Identity;
 
+        // Text shadow. Clamp offsets to [-50, 50]px: the render-time parity equivalent of
+        // the legacy CoverArtSettings.TextShadowOffsetX/Y clamp.
+        var shadowColor = SafeColor(layer.Shadow.Color, Color.Black).WithAlpha(opacity);
+        var shadowBlur = Math.Clamp(layer.Shadow.Blur, 0, 50);
+        var shadowOptions = new RichTextOptions(font)
+        {
+            Origin = new PointF(
+                textPosition.X + Math.Clamp(layer.Shadow.OffsetX, -50, 50),
+                textPosition.Y + Math.Clamp(layer.Shadow.OffsetY, -50, 50)),
+            HorizontalAlignment = textOptions.HorizontalAlignment,
+            VerticalAlignment = textOptions.VerticalAlignment
+        };
+
+        // A blurred shadow needs its own surface: blurring has to happen before the glyphs
+        // are drawn on top, and it must not blur whatever is already on the canvas. Done
+        // OUTSIDE the main Mutate block below because that block sets the rotation
+        // transform — the scratch surface already has the rotation baked in, and drawing
+        // it through the transform as well would rotate the shadow twice.
+        if (layer.Shadow.Enabled && shadowBlur > 0)
+        {
+            using var shadowSurface = new Image<Rgba32>(canvas.Width, canvas.Height);
+            shadowSurface.Mutate(sc =>
+            {
+                if (!rotate.IsIdentity) { sc.SetDrawingTransform(rotate); }
+                sc.DrawText(shadowOptions, layer.Content, shadowColor);
+            });
+            shadowSurface.Mutate(sc => sc.GaussianBlur(shadowBlur));
+            canvas.Mutate(x => x.DrawImage(shadowSurface, Point.Empty, 1f));
+        }
+
         canvas.Mutate(ctx =>
         {
             if (!rotate.IsIdentity)
@@ -414,26 +444,10 @@ public static class DocumentRenderer
                 ctx.SetDrawingTransform(rotate);
             }
 
-            // Apply text effects
-            if (layer.Shadow.Enabled)
+            // An unblurred shadow is a plain offset copy, drawn first so it sits beneath
+            // the outline and the fill.
+            if (layer.Shadow.Enabled && shadowBlur <= 0)
             {
-                var shadowColor = SafeColor(layer.Shadow.Color, Color.Black).WithAlpha(opacity);
-                // Clamp to [-50, 50]px: the render-time parity equivalent of the
-                // legacy CoverArtSettings.TextShadowOffsetX/Y clamp.
-                var shadowOffsetX = Math.Clamp(layer.Shadow.OffsetX, -50, 50);
-                var shadowOffsetY = Math.Clamp(layer.Shadow.OffsetY, -50, 50);
-                var shadowPosition = new PointF(
-                    textPosition.X + shadowOffsetX,
-                    textPosition.Y + shadowOffsetY
-                );
-
-                var shadowOptions = new RichTextOptions(font)
-                {
-                    Origin = shadowPosition,
-                    HorizontalAlignment = textOptions.HorizontalAlignment,
-                    VerticalAlignment = textOptions.VerticalAlignment
-                };
-
                 ctx.DrawText(shadowOptions, layer.Content, shadowColor);
             }
 
