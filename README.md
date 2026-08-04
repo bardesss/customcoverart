@@ -54,6 +54,9 @@ Layered text and logos, backgrounds, composition effects — designed on a live 
 
 ## 📸 Screenshots
 
+*Taken with the Dutch UI — the page follows your Jellyfin display language, so it appears in
+English by default.*
+
 <div align="center">
 
 ![The Custom Cover Art configuration page inside the Jellyfin dashboard: step 1, Target & start, with the live preview beside it](screenshots/1.png)
