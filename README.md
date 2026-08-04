@@ -56,9 +56,42 @@ Layered text and logos, backgrounds, composition effects — designed on a live 
 
 <div align="center">
 
-![The Custom Cover Art configuration page inside the Jellyfin dashboard, with live preview](screenshots/1.png)
+![The Custom Cover Art configuration page inside the Jellyfin dashboard: step 1, Target & start, with the live preview beside it](screenshots/1.png)
 
-![The live preview showing an animated cover](screenshots/2.gif)
+*Step 1 — Target & start*
+
+</div>
+
+<details>
+<summary><b>The other four steps</b></summary>
+
+<div align="center">
+
+![Step 2, Background: a linear gradient with dimming, angle and colour stops](screenshots/5.png)
+
+*Step 2 — Background*
+
+![Step 3, Text & logos: the layers list and the selected layer's title, alignment, size and colour](screenshots/4.png)
+
+*Step 3 — Text & logos*
+
+![Step 4, Effects: the Jellyfin-style preset with colour wash, vignette, film grain, border and auto palette](screenshots/3.png)
+
+*Step 4 — Effects*
+
+![Step 5, Output & apply: size and format, the in-context previews, saving a template and batch apply](screenshots/2.png)
+
+*Step 5 — Output & apply*
+
+</div>
+
+</details>
+
+<div align="center">
+
+![An animated cover produced by the plugin, panning slowly across the artwork](screenshots/6.gif)
+
+*An example of what you can make — an animated cover*
 
 </div>
 
