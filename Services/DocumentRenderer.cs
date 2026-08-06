@@ -296,34 +296,43 @@ public static class DocumentRenderer
     /// </summary>
     internal static void ApplyGradientBackground(Image<Rgba32> image, GradientSettings gradient)
     {
+        var brush = CreateGradientBrush(gradient, image.Width, image.Height);
+        image.Mutate(x => x.Fill(brush));
+    }
+
+    /// <summary>
+    /// Builds the gradient brush: radial when the settings ask for it, otherwise a linear
+    /// ramp along a line through the centre at <c>Angle</c> degrees, long enough to span
+    /// the canvas corner to corner.
+    ///
+    /// <paramref name="forceLinear"/> exists for the background OVERLAY, which reuses this
+    /// same settings type but is deliberately linear-only — see the spec's inert-fields note.
+    /// Shared with <see cref="ApplyGradientOverlay"/> so the two cannot drift apart.
+    /// </summary>
+    public static Brush CreateGradientBrush(GradientSettings gradient, int width, int height, bool forceLinear = false)
+    {
         var stops = BuildColorStops(gradient);
 
-        if (gradient.Type == GradientType.Radial)
+        if (!forceLinear && gradient.Type == GradientType.Radial)
         {
-            var centerX = gradient.CenterX * image.Width;
-            var centerY = gradient.CenterY * image.Height;
-            var radius = Math.Max(1f, gradient.Radius * Math.Min(image.Width, image.Height));
+            var centerX = gradient.CenterX * width;
+            var centerY = gradient.CenterY * height;
+            var radius = Math.Max(1f, gradient.Radius * Math.Min(width, height));
 
-            var brush = new RadialGradientBrush(new PointF(centerX, centerY), radius, GradientRepetitionMode.None, stops);
-            image.Mutate(x => x.Fill(brush));
+            return new RadialGradientBrush(new PointF(centerX, centerY), radius, GradientRepetitionMode.None, stops);
         }
-        else
-        {
-            // Linear: a line through the centre at `Angle` degrees, long enough to
-            // span the whole canvas so the gradient covers it corner to corner.
-            var rad = gradient.Angle * Math.PI / 180.0;
-            var dx = (float)Math.Cos(rad);
-            var dy = (float)Math.Sin(rad);
-            var cx = image.Width / 2f;
-            var cy = image.Height / 2f;
-            var half = (Math.Abs(dx) * image.Width + Math.Abs(dy) * image.Height) / 2f;
 
-            var p0 = new PointF(cx - dx * half, cy - dy * half);
-            var p1 = new PointF(cx + dx * half, cy + dy * half);
+        var rad = gradient.Angle * Math.PI / 180.0;
+        var dx = (float)Math.Cos(rad);
+        var dy = (float)Math.Sin(rad);
+        var cx = width / 2f;
+        var cy = height / 2f;
+        var half = (Math.Abs(dx) * width + Math.Abs(dy) * height) / 2f;
 
-            var brush = new LinearGradientBrush(p0, p1, GradientRepetitionMode.None, stops);
-            image.Mutate(x => x.Fill(brush));
-        }
+        var p0 = new PointF(cx - dx * half, cy - dy * half);
+        var p1 = new PointF(cx + dx * half, cy + dy * half);
+
+        return new LinearGradientBrush(p0, p1, GradientRepetitionMode.None, stops);
     }
 
     /// <summary>
