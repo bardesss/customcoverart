@@ -330,13 +330,15 @@ public static class DocumentRenderer
     /// Builds the colour stops from the gradient settings — the explicit Stops
     /// list if it has 2+ entries, otherwise the Start/End colours as a fallback.
     /// </summary>
-    internal static ColorStop[] BuildColorStops(GradientSettings gradient)
+    public static ColorStop[] BuildColorStops(GradientSettings gradient)
     {
         if (gradient.Stops is { Count: >= 2 })
         {
             return gradient.Stops
                 .OrderBy(s => s.Position)
-                .Select(s => new ColorStop(Math.Clamp(s.Position, 0f, 1f), SafeColor(s.Color, Color.Gray)))
+                .Select(s => new ColorStop(
+                    Math.Clamp(s.Position, 0f, 1f),
+                    SafeColor(s.Color, Color.Gray).WithAlpha(Math.Clamp(s.Alpha, 0f, 1f))))
                 .ToArray();
         }
 
