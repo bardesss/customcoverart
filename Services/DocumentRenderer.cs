@@ -347,8 +347,11 @@ public static class DocumentRenderer
     /// their own alpha, drawn over the finished background and under the layers.
     ///
     /// Deliberately does NOT use BuildColorStops' Start/End fallback. That fallback yields
-    /// an OPAQUE black-to-white ramp, which for a background gradient is a reasonable
-    /// default and for an overlay would obliterate the poster. Fewer than two stops = off.
+    /// an OPAQUE ramp between StartColor/EndColor (Jellyfin brand purple/blue by default,
+    /// falling back further to black/white only if those hex values fail to parse), fully
+    /// covering the canvas edge to edge. That is a reasonable default for a background
+    /// gradient, but for an overlay it would obliterate the poster regardless of which
+    /// colours it resolves to. Fewer than two stops = off.
     /// </summary>
     internal static void ApplyGradientOverlay(Image<Rgba32> canvas, GradientSettings? overlay)
     {

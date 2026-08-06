@@ -1,3 +1,4 @@
+using System.Text.Json;
 using CustomCoverArt.Models;
 using CustomCoverArt.Services;
 using SixLabors.ImageSharp;
@@ -30,7 +31,30 @@ public class GradientOverlayTests
         var stops = DocumentRenderer.BuildColorStops(g);
 
         Assert.Equal(0, stops[0].Color.ToPixel<Rgba32>().A);
-        Assert.InRange(stops[1].Color.ToPixel<Rgba32>().A, 120, 136);
+        // 0.5f * 255 = 127.5; ImageSharp's own float->byte rounding lands on 127 or 128.
+        // A wide band here would also pass a wrong scale factor (e.g. treating Alpha as
+        // already 0..255, or applying it to the wrong channel), so this is deliberately
+        // tight around the two rounding candidates rather than a generous margin.
+        Assert.InRange(stops[1].Color.ToPixel<Rgba32>().A, 127, 128);
+    }
+
+    /// <summary>Alpha outside [0,1] must be clamped, not passed through raw or wrapped.</summary>
+    [Fact]
+    public void BuildColorStops_ClampsOutOfRangeAlpha()
+    {
+        var g = new GradientSettings
+        {
+            Stops = new()
+            {
+                new GradientStop { Color = "#ffffff", Position = 0f, Alpha = 2f },
+                new GradientStop { Color = "#ffffff", Position = 1f, Alpha = -1f }
+            }
+        };
+
+        var stops = DocumentRenderer.BuildColorStops(g);
+
+        Assert.Equal(255, stops[0].Color.ToPixel<Rgba32>().A);
+        Assert.Equal(0, stops[1].Color.ToPixel<Rgba32>().A);
     }
 
     /// <summary>Alpha defaults to 1, so every gradient written before overlays existed is opaque.</summary>
@@ -166,7 +190,10 @@ public class GradientOverlayTests
 
     /// <summary>
     /// The overlay lives in ComposeDocumentFrame, not inside ApplyBackgroundLayer, precisely
-    /// so it works for every source. ApplyBackgroundLayer runs only on the image path.
+    /// so it works for every source. ApplyBackgroundLayer runs only on the image path — which
+    /// ComposeDocumentFrame selects by whether a background <see cref="Image"/> was passed in,
+    /// not by <c>Source</c> — so the Upload case must actually be given one, or that path
+    /// (and the asymmetry this test exists to guard) never runs.
     /// </summary>
     [Theory]
     [InlineData(BackgroundSources.Solid)]
@@ -185,8 +212,14 @@ public class GradientOverlayTests
         };
         doc.Background.Overlay = BottomFadeBlack();
 
+        // Only Upload goes through ApplyBackgroundLayer (the image path); the other three
+        // sources render via CreateGradientBackground with no background image at all.
+        using Image<Rgba32>? background = source == BackgroundSources.Upload
+            ? new Image<Rgba32>(10, 10, Color.White)
+            : null;
+
         using var canvas = new Image<Rgba32>(40, 40);
-        DocumentRenderer.ComposeDocumentFrame(canvas, null, doc);
+        DocumentRenderer.ComposeDocumentFrame(canvas, background, doc);
 
         Assert.True(canvas[20, 39].R < 25, $"Overlay must apply for source '{source}'.");
     }
@@ -236,5 +269,60 @@ public class GradientOverlayTests
             }
         }
         Assert.True(foundRed, "Text must be drawn on top of the overlay.");
+    }
+
+    /// <summary>
+    /// A document POSTed without an Overlay (every document written before this release)
+    /// must deserialize with Overlay null and survive Normalize, which is the null-guard
+    /// chokepoint for client-supplied documents.
+    /// </summary>
+    [Fact]
+    public void Normalize_DocumentWithoutOverlay_LeavesItNull()
+    {
+        var json = """
+        {"Canvas":{"Width":40,"Height":40},
+         "Background":{"Source":"solid","DimColor":"#ffffff"},
+         "Layers":[]}
+        """;
+
+        var doc = JsonSerializer.Deserialize<CoverDocument>(json, new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true
+        })!;
+
+        DocumentMigration.Normalize(doc);
+
+        Assert.Null(doc.Background.Overlay);
+    }
+
+    /// <summary>Stops written before Alpha existed deserialize as fully opaque.</summary>
+    [Fact]
+    public void Deserialize_StopWithoutAlpha_DefaultsToOpaque()
+    {
+        var json = """{"Color":"#ff0000","Position":0.5}""";
+
+        var stop = JsonSerializer.Deserialize<GradientStop>(json, new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true
+        })!;
+
+        Assert.Equal(1f, stop.Alpha);
+    }
+
+    /// <summary>The overlay survives a serialize/deserialize round trip with its alphas.</summary>
+    [Fact]
+    public void Overlay_RoundTripsThroughJson()
+    {
+        var doc = WhiteDoc();
+        doc.Background.Overlay = BottomFadeBlack();
+
+        var json = JsonSerializer.Serialize(doc);
+        var back = JsonSerializer.Deserialize<CoverDocument>(json)!;
+
+        Assert.NotNull(back.Background.Overlay);
+        Assert.True(back.Background.Overlay!.IsEnabled);
+        Assert.Equal(2, back.Background.Overlay.Stops.Count);
+        Assert.Equal(0f, back.Background.Overlay.Stops[0].Alpha);
+        Assert.Equal(1f, back.Background.Overlay.Stops[1].Alpha);
     }
 }
