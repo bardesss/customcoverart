@@ -211,9 +211,9 @@ The angle is under **Advanced**. It works over every background type, including 
 animated covers.
 
 **Auto palette** samples the dominant colours from your background and shows them as swatches.
-Click one to recolour the selected text layer — or, with no text layer selected, the selected
-overlay-gradient stop, falling back to the colour wash. It runs entirely in your browser — nothing
-is uploaded — and stays off until you enable it.
+Click one to recolour the overlay-gradient stop you last touched, when the overlay is on and one of
+its stops has focus — otherwise the selected text layer, falling back to the colour wash. It runs
+entirely in your browser — nothing is uploaded — and stays off until you enable it.
 
 > Film grain is the one effect where the preview is an approximation: the canvas scales a noise
 > tile for speed, while the server draws true per-pixel noise. Use **Show server render** to see
