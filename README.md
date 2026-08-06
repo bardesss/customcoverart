@@ -205,9 +205,10 @@ since the gradient is the point.
 layers — the look where a poster resolves into a solid band of colour with the title sitting on top
 of it. Every colour stop carries its own **opacity**, so a fade can run from fully transparent to
 fully solid, use two colours for a duotone, or wash the whole cover evenly. Four presets — **Bottom
-fade**, **Top fade**, **Full wash** and **Duotone** — set it up in one click and keep the colours
-you have already chosen; the angle is under **Advanced**. It works over every background type,
-including poster collages and animated covers.
+fade**, **Top fade**, **Full wash** and **Duotone** — set it up in one click, and switching between
+them keeps the colours you have already chosen, so you can try all four without losing your palette.
+The angle is under **Advanced**. It works over every background type, including poster collages and
+animated covers.
 
 **Auto palette** samples the dominant colours from your background and shows them as swatches.
 Click one to recolour the selected text layer — or, with no text layer selected, the selected
