@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
 
 concurrency:
   group: release
@@ -91,8 +92,16 @@ jobs:
           --generate-notes
           --target "$GITHUB_SHA"
 
-      - name: Update manifest.json on main
+      # Opens a PR rather than pushing to main. The branch ruleset on main requires
+      # changes to go through a pull request and a passing "test" check, so the old
+      # direct `git push origin HEAD:main` is rejected with GH013 — which fails the
+      # workflow AFTER the release is already published, leaving the release live but
+      # invisible to Jellyfin (which reads manifest.json). Merging the PR this opens
+      # is the last step of a release.
+      - name: Open manifest.json PR
         if: steps.check.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           VER="${{ steps.ver.outputs.ver }}"
           URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${{ steps.ver.outputs.tag }}/${{ steps.pkg.outputs.zip }}"
@@ -116,7 +125,31 @@ jobs:
           git add manifest.json
           if git diff --cached --quiet; then
             echo "manifest already up to date"
-          else
-            git commit -m "chore: manifest $VER [skip ci]"
-            git push origin HEAD:main
+            exit 0
           fi
+
+          BRANCH="chore/manifest-$VER"
+          # Re-running a release must not fail on an existing branch from a prior attempt.
+          git checkout -b "$BRANCH"
+          git commit -m "chore: manifest $VER"
+          git push --force-with-lease origin "$BRANCH"
+
+          if gh pr view "$BRANCH" --json number >/dev/null 2>&1; then
+            echo "PR for $BRANCH already open — the push above updated it."
+            exit 0
+          fi
+
+          # Body via a heredoc into a file: a multi-line --body argument would have to
+          # dedent to column 0, which ends the YAML block scalar and breaks the workflow.
+          TAG="${{ steps.ver.outputs.tag }}"
+          cat > /tmp/pr-body.md <<EOF
+          Adds the \`$VER\` entry to \`manifest.json\`, so Jellyfin instances can see the release.
+
+          Generated automatically by the Release workflow after publishing [\`$TAG\`](https://github.com/${GITHUB_REPOSITORY}/releases/tag/$TAG). The checksum is the MD5 of the published asset.
+
+          **Merging this is the final step of the release** — until it lands, the release exists on GitHub but no Jellyfin server will offer it.
+          EOF
+
+          gh pr create --base main --head "$BRANCH" \
+            --title "chore: manifest $VER" \
+            --body-file /tmp/pr-body.md
