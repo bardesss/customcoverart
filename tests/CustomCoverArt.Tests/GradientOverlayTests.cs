@@ -38,9 +38,18 @@ public class GradientOverlayTests
         Assert.InRange(stops[1].Color.ToPixel<Rgba32>().A, 127, 128);
     }
 
-    /// <summary>Alpha outside [0,1] must be clamped, not passed through raw or wrapped.</summary>
+    /// <summary>
+    /// Out-of-range Alpha must saturate rather than wrap or throw. This is NOT a guard on
+    /// the explicit <c>Math.Clamp</c> in <c>BuildColorStops</c> — ImageSharp 3.1.12's own
+    /// <c>Color.WithAlpha</c> already saturates its float input (verified empirically:
+    /// <c>WithAlpha(2f).A == 255</c>, <c>WithAlpha(-1f).A == 0</c>), so an implementation
+    /// with the clamp removed produces byte-identical output for these inputs and this test
+    /// would still pass. The clamp stays in production code as belt-and-braces documentation
+    /// of intent, and in case a future ImageSharp version stops saturating; this test instead
+    /// pins the observable end-to-end contract, whichever layer currently enforces it.
+    /// </summary>
     [Fact]
-    public void BuildColorStops_ClampsOutOfRangeAlpha()
+    public void BuildColorStops_OutOfRangeAlpha_SaturatesToOpaqueAndTransparent()
     {
         var g = new GradientSettings
         {
@@ -167,9 +176,10 @@ public class GradientOverlayTests
     }
 
     /// <summary>
-    /// Guards the fallback divergence: BuildColorStops falls back to an opaque black-to-white
-    /// ramp when there are fewer than two stops, which for an overlay would obliterate the
-    /// background. Fewer than two stops must mean "off" instead.
+    /// Guards the fallback divergence: BuildColorStops falls back to an opaque ramp between
+    /// StartColor/EndColor (Jellyfin brand purple/blue by default) when there are fewer than
+    /// two stops, which for an overlay would obliterate the background. Fewer than two stops
+    /// must mean "off" instead.
     /// </summary>
     [Fact]
     public void ApplyGradientOverlay_FewerThanTwoStops_IsANoOp()
