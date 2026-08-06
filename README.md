@@ -31,6 +31,7 @@ Layered text and logos, backgrounds, composition effects — designed on a live 
 | 🗂️ | **Layers panel** | Show/hide, reorder, duplicate, delete and select every layer; the editor follows your selection |
 | 🌑 | **Text effects** | Drop shadow and outline for readability over busy backgrounds |
 | 🌈 | **Gradients** | Linear and radial gradient backgrounds |
+| 🌗 | **Overlay gradient** | Fade a colour in over any background, under your text — each stop with its own opacity, plus one-click presets |
 | 🖼️ | **Custom backgrounds** | Upload your own image, or pick an existing poster from any library |
 | 🌫️ | **Blur & dimming** | Soften and darken backgrounds so text stands out |
 | ✨ | **Composition effects** | Colour wash, vignette, film grain and a square/rounded border — single or double-lined |
@@ -200,9 +201,18 @@ back to zero restores the cover exactly — nothing is baked in.
 centred text) as an ordinary starting point you can keep editing. It clears any background image,
 since the gradient is the point.
 
+**Overlay gradient** (step 2, under Dimming) fades a colour in over the background and under your
+layers — the look where a poster resolves into a solid band of colour with the title sitting on top
+of it. Every colour stop carries its own **opacity**, so a fade can run from fully transparent to
+fully solid, use two colours for a duotone, or wash the whole cover evenly. Four presets — **Bottom
+fade**, **Top fade**, **Full wash** and **Duotone** — set it up in one click and keep the colours
+you have already chosen; the angle is under **Advanced**. It works over every background type,
+including poster collages and animated covers.
+
 **Auto palette** samples the dominant colours from your background and shows them as swatches.
-Click one to recolour the selected text layer, or the colour wash if no text layer is selected. It
-runs entirely in your browser — nothing is uploaded — and stays off until you enable it.
+Click one to recolour the selected text layer — or, with no text layer selected, the selected
+overlay-gradient stop, falling back to the colour wash. It runs entirely in your browser — nothing
+is uploaded — and stays off until you enable it.
 
 > Film grain is the one effect where the preview is an approximation: the canvas scales a noise
 > tile for speed, while the server draws true per-pixel noise. Use **Show server render** to see
