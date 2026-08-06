@@ -194,10 +194,13 @@ Sits directly below Dimming, shown for all four background sources.
 A static table of stop arrays. Selecting one replaces the stop list; hand-editing any stop
 switches the dropdown to *Custom*.
 
-**Presets set positions and alphas only — never colours.** Applying one keeps the colour of
-each existing stop, matched by index. Stops the preset adds beyond the ones already there
-take the last existing stop's colour, falling back to `Background.DimColor` when the overlay
-has no stops yet. This is what makes preset-switching non-destructive: a user who has picked
+**Presets set positions and alphas only — never colours.** Applying one keeps the colours of
+the existing stops, matched by RELATIVE POSITION rather than by raw index: stop `i` of the
+new list takes its colour from stop `Math.round(i * (m - 1) / (n - 1))` of the old one, so
+first maps to first and last maps to last whatever the two stop counts are. (Matching by
+index instead would drop the opaque end — the stop the palette targets by default — on any
+3-stop → 2-stop switch.) A stop with no source colour falls back to the last existing stop's
+colour, and to `Background.DimColor` when the overlay has no stops yet. This is what makes preset-switching non-destructive: a user who has picked
 their colour can try every preset without losing it.
 
 | Preset | Stops (position / alpha) | Angle |

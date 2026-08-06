@@ -618,7 +618,13 @@
 
         #CustomCoverArtConfigPage .ccaStop { display: flex; align-items: center; gap: .6em; margin-bottom: .5em; }
         #CustomCoverArtConfigPage .ccaStop input[type="color"] { flex: 0 0 auto; }
-        #CustomCoverArtConfigPage .ccaStop .ccaStopPos { flex: 1 1 auto; margin: 0; }
+        #CustomCoverArtConfigPage .ccaStop .ccaStopPos { flex: 1 1 auto; min-width: 0; margin: 0; }
+        /* The alpha slider shares the row with the position slider, so it needs its own
+           rule: the generic .ccaRange (width:100%; margin:.55em 0 0) would blow the row out
+           and sit the two sliders on different baselines. Narrower than the position slider
+           and tagged with a small glyph, so the two are told apart at a glance. */
+        #CustomCoverArtConfigPage .ccaStop .ccaStopAlpha { flex: 0 1 34%; min-width: 0; margin: 0; }
+        #CustomCoverArtConfigPage .ccaStopAlphaTag { flex: 0 0 auto; opacity: .55; font-size: .85em; line-height: 1; }
         #CustomCoverArtConfigPage .ccaStopRemove {
             flex: 0 0 auto; width: 1.9em; height: 1.9em; line-height: 1;
             border: 1px solid rgba(127, 127, 127, .35); border-radius: 6px;
@@ -1581,10 +1587,19 @@
         // 'overlay', versus true per-pixel noise on the server) because a full-canvas
         // per-pixel pass every frame would stall the live preview.
 
-        // Accepts #rgb, #rrggbb and #rrggbbaa. An 8-digit hex's own alpha is MULTIPLIED
-        // with the passed alpha, so a stop's Alpha field composes with a colour that
-        // already carries one rather than one silently winning.
-        function hexToRgba(hex, alpha) {
+        // Accepts #rgb, #rrggbb and #rrggbbaa, and returns the channels as numbers so
+        // callers that need to interpolate (overlayStopsCss) do not have to re-parse an
+        // rgba() string.
+        //
+        // A passed alpha REPLACES an 8-digit hex's own alpha rather than multiplying with
+        // it, matching the server: DocumentRenderer.BuildColorStops does
+        // SafeColor(s.Color).WithAlpha(s.Alpha), and ImageSharp's WithAlpha overwrites
+        // (measured: '#ff000080' + Alpha 0.5 => A=128, not 64). The hex's own alpha is
+        // therefore only used when no alpha is passed at all. NOTE: nothing in the editor
+        // currently emits 8-digit hex — <input type="color"> is always #rrggbb — so that
+        // branch is unreachable today and exists purely so a future 8-digit source cannot
+        // silently disagree with the server.
+        function parseHexRgba(hex, alpha) {
             var h = String(hex || '#000000').replace('#', '');
             if (h.length === 3) { h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2]; }
             var baseAlpha = 1;
@@ -1595,8 +1610,20 @@
             }
             var n = parseInt(h, 16);
             if (isNaN(n)) { n = 0; }
-            var a = Math.max(0, Math.min(1, (alpha == null ? 1 : alpha) * baseAlpha));
-            return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')';
+            return {
+                r: (n >> 16) & 255,
+                g: (n >> 8) & 255,
+                b: n & 255,
+                a: Math.max(0, Math.min(1, alpha == null ? baseAlpha : alpha))
+            };
+        }
+
+        function rgbaCss(c) {
+            return 'rgba(' + Math.round(c.r) + ',' + Math.round(c.g) + ',' + Math.round(c.b) + ',' + c.a + ')';
+        }
+
+        function hexToRgba(hex, alpha) {
+            return rgbaCss(parseHexRgba(hex, alpha));
         }
 
         function strokeRoundRect(ctx, x, y, w, h, r) {
@@ -1724,6 +1751,10 @@
             ctx.clearRect(0, 0, W, H);
             paintBackgroundOnly(ctx, W, H);
             drawSoftLight(ctx, W, H);
+            // Same slot as renderDocument (and the server): over the background and
+            // soft-light, under the layers. Omitting it here made the in-context previews
+            // the one place the overlay was invisible.
+            drawGradientOverlay(ctx, W, H);
             doc.Layers.forEach(function (layer) {
                 if (!layer.Visible) { return; }
                 if (layer.Type === 'text') { drawTextLayer(ctx, layer, W, H); }
@@ -1867,6 +1898,15 @@
                 s.className = 'ccaSwatch';
                 s.style.background = hex;
                 s.title = hex;
+                // Read the focus state one event EARLIER than the click: pressing the mouse
+                // on a button moves focus to it (Chrome/Edge/Firefox on Windows) before
+                // 'click' fires, and some browsers (Safari) do not focus buttons on click at
+                // all, so document.activeElement here is the only reading that is true in
+                // both. The focusout handler covers the keyboard path, where no mousedown
+                // ever happens.
+                s.addEventListener('mousedown', function () {
+                    _overlayStopFocused = isInOverlayStops(document.activeElement);
+                });
                 s.addEventListener('click', function () { applySwatch(hex); });
                 box.appendChild(s);
             });
@@ -1875,16 +1915,27 @@
         // Where a clicked swatch lands, in order: the selected text layer, then the selected
         // overlay stop when the overlay is on, then the colour wash when it is on. Each
         // updates its own control so the card and the canvas never disagree.
+        //
+        // ONE exception jumps the queue: the overlay stop wins over the selected text layer
+        // when the user is demonstrably in the overlay editor (a stop row holds focus, or
+        // held it up to this click — see _overlayStopFocused). Without it the overlay branch
+        // is dead code in practice, because the stock document always has a selected title
+        // layer and nothing ever deselects it: selectLayerById does not toggle off, and a
+        // canvas click that hits no layer returns early. A user would have to DELETE their
+        // title layer before a swatch could tint an overlay stop, which flatly contradicts
+        // the documented "click a palette swatch to tint your overlay". Users who are not
+        // touching the overlay never set the flag, so their text-layer behaviour is unchanged.
         function applySwatch(hex) {
+            var overlayOn = doc.Background.Overlay && doc.Background.Overlay.IsEnabled;
+            var idx = overlayOn ? overlayStopIndex() : -1;
+
             var l = selectedLayer();
-            if (l && l.Type === 'text') {
+            if (l && l.Type === 'text' && !(idx >= 0 && _overlayStopFocused)) {
                 l.Color = hex;
                 el('ccaTextColor').value = hex;
                 scheduleRender();
                 return;
             }
-            var overlayOn = doc.Background.Overlay && doc.Background.Overlay.IsEnabled;
-            var idx = overlayOn ? overlayStopIndex() : -1;
             if (idx >= 0) {
                 doc.Background.Overlay.Stops[idx].Color = hex;
                 var container = el('ccaOverlayStops');
@@ -1922,19 +1973,66 @@
             return [{ pos: 0, color: '#000000' }, { pos: 1, color: '#ffffff' }];
         }
 
+        // How many sub-segments each adjacent pair of overlay stops is split into. 8 is
+        // enough to make the two ramps described below visually indistinguishable while
+        // keeping the stop list small (3 stops -> 17 canvas stops).
+        var OVERLAY_RAMP_STEPS = 8;
+
         // Like gradientStops, but each stop's colour is an rgba() string carrying its Alpha.
         // No black->white fallback here: fewer than two stops means the overlay is off,
         // mirroring DocumentRenderer.ApplyGradientOverlay.
+        //
+        // WHY THE SUBDIVISION BELOW EXISTS — do not "simplify" it away:
+        // the two renderers interpolate colour stops in DIFFERENT alpha spaces.
+        //   * ImageSharp's LinearGradientBrush (the authoritative server render) lerps in
+        //     STRAIGHT / non-premultiplied alpha: r, g, b and a are each interpolated
+        //     independently, so a fully transparent stop's HUE still bleeds into the ramp.
+        //     Measured: '#ff0000' a=0 -> '#0000ff' a=1 gives Rgba32(150, 0, 105, 105) at
+        //     mid-canvas — note the red channel surviving from a stop with zero alpha.
+        //   * HTML Canvas 2D gradients interpolate in PREMULTIPLIED alpha, where a stop
+        //     with alpha 0 contributes no colour at all.
+        // The visible symptom: "Bottom fade" seeded from DimColor (three black stops) plus
+        // a palette swatch on the last stop gives black a0 · black a0 @0.45 · purple a0.9.
+        // The server muddies that ramp with the black it lerps through; the canvas showed
+        // clean purple. Roughly (178,161,184) server vs (216,181,228) canvas over white at
+        // the segment midpoint. Duotone had the same divergence.
+        // The fix: keep the original endpoints exactly, and insert intermediate stops whose
+        // r/g/b/a are lerped in STRAIGHT space (i.e. the way the server does it). Each
+        // sub-segment is then short enough that the canvas's own premultiplied lerp across
+        // it cannot visibly diverge from the straight-alpha line it is approximating.
         function overlayStopsCss(g) {
-            var stops = (g.Stops || []).slice().sort(function (a, b) { return a.Position - b.Position; });
-            if (stops.length < 2) { return null; }
-            return stops.map(function (s) {
+            var sorted = (g.Stops || []).slice().sort(function (a, b) { return a.Position - b.Position; });
+            if (sorted.length < 2) { return null; }
+
+            var pts = sorted.map(function (s) {
                 var a = (s.Alpha === undefined || s.Alpha === null) ? 1 : s.Alpha;
-                return {
-                    pos: Math.max(0, Math.min(1, s.Position)),
-                    color: hexToRgba(s.Color || '#808080', Math.max(0, Math.min(1, a)))
-                };
+                var c = parseHexRgba(s.Color || '#808080', Math.max(0, Math.min(1, a)));
+                c.pos = Math.max(0, Math.min(1, s.Position));
+                return c;
             });
+
+            var out = [{ pos: pts[0].pos, color: rgbaCss(pts[0]) }];
+            for (var i = 1; i < pts.length; i++) {
+                var p = pts[i - 1], q = pts[i];
+                // Coincident stops are a deliberate hard edge; subdividing them would emit
+                // several stops at one offset and let insertion order decide the colour.
+                if (q.pos > p.pos) {
+                    for (var k = 1; k < OVERLAY_RAMP_STEPS; k++) {
+                        var t = k / OVERLAY_RAMP_STEPS;
+                        out.push({
+                            pos: p.pos + (q.pos - p.pos) * t,
+                            color: rgbaCss({
+                                r: p.r + (q.r - p.r) * t,
+                                g: p.g + (q.g - p.g) * t,
+                                b: p.b + (q.b - p.b) * t,
+                                a: p.a + (q.a - p.a) * t
+                            })
+                        });
+                    }
+                }
+                out.push({ pos: q.pos, color: rgbaCss(q) });
+            }
+            return out;
         }
 
         // Mirrors DocumentRenderer.ApplyGradientOverlay: linear only, geometry identical to
@@ -2698,9 +2796,10 @@
             ]);
         }
 
-        // Presets set POSITIONS AND ALPHAS ONLY, never colours: applying one keeps each
-        // existing stop's colour by index, so a user can try every preset without losing
-        // the colour they picked. Extra stops take the last existing colour.
+        // Presets set POSITIONS AND ALPHAS ONLY, never colours: applying one keeps the
+        // existing stops' colours, matched by RELATIVE POSITION (see applyOverlayPreset), so
+        // a user can try every preset without losing the colour they picked. Stops with no
+        // source colour take the last existing colour.
         var OVERLAY_PRESETS = {
             bottom:  [{ pos: 0, alpha: 0 }, { pos: 0.45, alpha: 0 }, { pos: 1, alpha: 0.9 }],
             top:     [{ pos: 0, alpha: 0.9 }, { pos: 0.55, alpha: 0 }, { pos: 1, alpha: 0 }],
@@ -2715,6 +2814,28 @@
             return doc.Background.Overlay;
         }
 
+        // Writes an angle to the document AND to the Advanced angle control. Anything that
+        // changes the angle behind the user's back (applying a preset) must go through here,
+        // otherwise the slider keeps showing the old value while the render uses the new one.
+        function setOverlayAngle(ov, angle) {
+            ov.Angle = angle;
+            var slider = el('ccaOverlayAngle');
+            if (slider) { slider.value = angle; }
+            var out = el('ccaOverlayAngleVal');
+            if (out) { out.textContent = angle + '°'; }
+        }
+
+        // The two seed stops a brand-new overlay editor shows: a transparent-to-90% ramp in
+        // the current base colour. One definition, used by both rebuild paths, so the seeded
+        // rows can never drift apart.
+        function defaultOverlayStopRows() {
+            var c = doc.Background.DimColor || '#000000';
+            return [
+                { color: c, pos: 0, alpha: 0 },
+                { color: c, pos: 100, alpha: 90 }
+            ];
+        }
+
         function applyOverlayPreset(name) {
             var preset = OVERLAY_PRESETS[name];
             if (!preset) { return; }   // 'custom' keeps whatever is there
@@ -2722,7 +2843,7 @@
             var existing = ov.Stops || [];
             var n = preset.length, m = existing.length;
             var fallback = (m ? existing[m - 1].Color : null) || doc.Background.DimColor || '#000000';
-            ov.Angle = 90;
+            setOverlayAngle(ov, 90);
             ov.Stops = preset.map(function (p, i) {
                 // Map by RELATIVE position, not raw index, so the first and last stops
                 // always keep their colours regardless of how the old and new stop counts
@@ -2742,10 +2863,7 @@
 
         function rebuildOverlayStopsUI() {
             var ov = ensureOverlay();
-            rebuildStopsUI('ccaOverlayStops', ov.Stops, true, [
-                { color: doc.Background.DimColor || '#000000', pos: 0, alpha: 0 },
-                { color: doc.Background.DimColor || '#000000', pos: 100, alpha: 90 }
-            ]);
+            rebuildStopsUI('ccaOverlayStops', ov.Stops, true, defaultOverlayStopRows());
             // rebuildStopsUI may have seeded defaults; read them back so doc and DOM agree.
             syncOverlayStopsToDoc();
         }
@@ -2758,13 +2876,37 @@
         // the opaque end is the one people actually recolour.
         var _overlayStopIndex = -1;
 
+        // Whether the user is CURRENTLY working in the overlay stop editor — i.e. a stop row
+        // holds focus, or held it right up until the click being handled. applySwatch uses
+        // this to decide whether a swatch belongs to the overlay or to the selected text
+        // layer; see the precedence comment there for why that decision is needed at all.
+        var _overlayStopFocused = false;
+
+        function isInOverlayStops(node) {
+            return !!(node && node.closest && node.closest('#ccaOverlayStops'));
+        }
+
         function selectOverlayStopFrom(target) {
             var row = target.closest ? target.closest('.ccaStop') : null;
             var container = el('ccaOverlayStops');
             if (!row || !container) { return; }
             var rows = Array.prototype.slice.call(container.querySelectorAll('.ccaStop'));
             var i = rows.indexOf(row);
-            if (i >= 0) { _overlayStopIndex = i; }
+            if (i >= 0) {
+                _overlayStopIndex = i;
+                _overlayStopFocused = true;
+            }
+        }
+
+        // Focus leaving the stop editor ends the "working on the overlay" state — UNLESS it
+        // moved to another stop row, or into the palette itself. The palette exception is the
+        // whole point: clicking a swatch focuses the swatch button, so without it the state
+        // would always be false by the time the click handler runs.
+        function onOverlayStopsFocusOut(e) {
+            var to = e.relatedTarget;
+            if (isInOverlayStops(to)) { return; }
+            if (to && to.closest && to.closest('#ccaSwatches')) { return; }
+            _overlayStopFocused = false;
         }
 
         function overlayStopIndex() {
@@ -2800,10 +2942,7 @@
             el('ccaOverlayAngle').value = angle;
             el('ccaOverlayAngleVal').textContent = angle + '°';
 
-            rebuildStopsUI('ccaOverlayStops', (ov && ov.Stops) || [], true, [
-                { color: doc.Background.DimColor || '#000000', pos: 0, alpha: 0 },
-                { color: doc.Background.DimColor || '#000000', pos: 100, alpha: 90 }
-            ]);
+            rebuildStopsUI('ccaOverlayStops', (ov && ov.Stops) || [], true, defaultOverlayStopRows());
         }
 
         // LOAD-only: resets the parts of the overlay editor that only make sense when a
@@ -2819,6 +2958,7 @@
             var sel = el('ccaOverlayPreset');
             if (sel) { sel.value = (ov && ov.Stops && ov.Stops.length) ? 'custom' : 'bottom'; }
             _overlayStopIndex = -1;
+            _overlayStopFocused = false;
         }
 
         // Applies the Format control to the document (auto|png|gif, or animatedgif =>
@@ -3230,7 +3370,7 @@
             p.value = (posPercent == null ? 50 : posPercent);
             p.className = 'ccaRange ccaStopPos';
 
-            var a = null;
+            var a = null, aTag = null;
             if (withAlpha) {
                 a = document.createElement('input');
                 a.type = 'range';
@@ -3238,6 +3378,14 @@
                 a.value = (alphaPercent == null ? 100 : alphaPercent);
                 a.className = 'ccaRange ccaStopAlpha';
                 a.title = t('bg.overlay.alpha');
+                // Two identical range inputs per row: the title is hover-only, so name the
+                // second one for screen readers and automation, and mark it visually with a
+                // compact glyph (aria-hidden — the label above already says it).
+                a.setAttribute('aria-label', t('bg.overlay.alpha'));
+                aTag = document.createElement('span');
+                aTag.className = 'ccaStopAlphaTag';
+                aTag.setAttribute('aria-hidden', 'true');
+                aTag.textContent = 'α';
             }
 
             var rm = document.createElement('button');
@@ -3254,6 +3402,7 @@
 
             row.appendChild(c);
             row.appendChild(p);
+            if (aTag) { row.appendChild(aTag); }
             if (a) { row.appendChild(a); }
             row.appendChild(rm);
             if (containerId === 'ccaOverlayStops') {
@@ -3582,6 +3731,11 @@
                 el('ccaOverlayAngleVal').textContent = this.value + '°';
                 scheduleRender();
             });
+
+            // The container is static markup (only its rows are rebuilt), so one listener
+            // here outlives every rebuild. focusout bubbles, unlike blur.
+            var overlayStopsBox = el('ccaOverlayStops');
+            if (overlayStopsBox) { overlayStopsBox.addEventListener('focusout', onOverlayStopsFocusOut); }
             el('ccaBgSource').addEventListener('change', function () {
                 doc.Background.Source = this.value;
                 if (this.value === 'collage') { doc.Background.Collage = buildCollageFromControls(); }
