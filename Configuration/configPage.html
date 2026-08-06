@@ -1209,6 +1209,25 @@
             return d;
         }
 
+        // Runs on LOAD only (init, template load, restoreSnapshot), same as the two
+        // normalizers above, and for the same reason: it must never run from inside
+        // syncControlsFromDocument, which also fires on a plain selection change, or a
+        // history entry could be silently mutated outside of undo/redo (hydrate mutates doc
+        // -> scheduleRender -> commit -> snapshot sees a "changed" document -> the redo tail
+        // gets truncated for no user-visible edit).
+        //
+        // GradientSettings.Angle is a non-nullable float server-side, defaulting to 0 (a
+        // left-to-right fade) — but every client render treats a missing Angle as 90
+        // (top-to-bottom, see drawGradientOverlay/hydrateOverlayControls). A document whose
+        // Overlay predates this field, or was hand-built without it, would otherwise render
+        // one way in the editor and another way on the server, so it's backfilled once, here,
+        // at load.
+        function normalizeOverlay(d) {
+            var ov = d.Background && d.Background.Overlay;
+            if (ov && ov.Angle == null) { ov.Angle = 90; }
+            return d;
+        }
+
         function defaultDocument() {
             return {
                 Version: 2,
@@ -1764,12 +1783,14 @@
             // a template load gets before anything dereferences it.
             normalizeEffects(doc);
             normalizeBackgroundSource(doc);
+            normalizeOverlay(doc);
             doc._selectedId = selected;
             // It carries server paths but no decoded bitmaps.
             bgImageEl = null;
             hydrateLayerImages();
             renderLayersPanel();
             syncControlsFromDocument();
+            resetOverlayEditorState();
             scheduleRender();
         }
 
@@ -1859,11 +1880,16 @@
             if (l && l.Type === 'text') {
                 l.Color = hex;
                 el('ccaTextColor').value = hex;
-            } else if (doc.Background.Overlay && doc.Background.Overlay.IsEnabled && overlayStopIndex() >= 0) {
-                var i = overlayStopIndex();
-                doc.Background.Overlay.Stops[i].Color = hex;
-                var rows = el('ccaOverlayStops').querySelectorAll('.ccaStop');
-                if (rows[i]) { rows[i].querySelector('input[type="color"]').value = hex; }
+                scheduleRender();
+                return;
+            }
+            var overlayOn = doc.Background.Overlay && doc.Background.Overlay.IsEnabled;
+            var idx = overlayOn ? overlayStopIndex() : -1;
+            if (idx >= 0) {
+                doc.Background.Overlay.Stops[idx].Color = hex;
+                var container = el('ccaOverlayStops');
+                var rows = container ? container.querySelectorAll('.ccaStop') : null;
+                if (rows && rows[idx]) { rows[idx].querySelector('input[type="color"]').value = hex; }
             } else if (doc.Effects.SoftLight.Enabled) {
                 doc.Effects.SoftLight.Color = hex;
                 el('ccaFxSoftLightColor').value = hex;
@@ -2694,12 +2720,19 @@
             if (!preset) { return; }   // 'custom' keeps whatever is there
             var ov = ensureOverlay();
             var existing = ov.Stops || [];
-            var fallback = (existing.length ? existing[existing.length - 1].Color : null)
-                || doc.Background.DimColor || '#000000';
+            var n = preset.length, m = existing.length;
+            var fallback = (m ? existing[m - 1].Color : null) || doc.Background.DimColor || '#000000';
             ov.Angle = 90;
             ov.Stops = preset.map(function (p, i) {
+                // Map by RELATIVE position, not raw index, so the first and last stops
+                // always keep their colours regardless of how the old and new stop counts
+                // compare. Without this, "Bottom fade" (3 stops) -> "Full wash" (2 stops)
+                // drops index 2 — the opaque end, and the one overlayStopIndex() targets by
+                // default — and switching back never recovers it.
+                var srcIndex = m ? (n > 1 ? Math.round(i * (m - 1) / (n - 1)) : 0) : -1;
+                var color = (srcIndex >= 0 && existing[srcIndex]) ? existing[srcIndex].Color : null;
                 return {
-                    Color: (existing[i] && existing[i].Color) || fallback,
+                    Color: color || fallback,
                     Position: p.pos,
                     Alpha: p.alpha
                 };
@@ -2744,9 +2777,15 @@
         }
 
         // Sets every overlay control from doc.Background.Overlay. Called from
-        // syncControlsFromDocument, the same place that hydrates the background
-        // gradient's stop rows, so a loaded document, undo/redo snapshot, template or
-        // page load all land here.
+        // syncControlsFromDocument, which ALSO runs on plain selection changes (picking a
+        // different layer, deleting one, applying the Jellyfin style preset) — so this must
+        // be idempotent and side-effect-free on the document: no mutating doc, no resetting
+        // the preset dropdown or the targeted-stop index. Those are LOAD-only concerns and
+        // live in resetOverlayEditorState(), called separately by the genuine load paths.
+        //
+        // Stop rows are rebuilt from the document EVERY time, on or off, so switching to a
+        // document with a different (or no) overlay never leaves a previous document's rows
+        // sitting in the (hidden, when off) container.
         function hydrateOverlayControls() {
             var ov = doc.Background.Overlay;
             var on = !!(ov && ov.IsEnabled);
@@ -2755,22 +2794,30 @@
             var angleRow = el('ccaOverlayAngleRow');
             if (angleRow) { angleRow.style.display = on ? '' : 'none'; }
 
-            // Angle is a non-nullable float server-side (default 0, a left-to-right fade),
-            // while a missing Angle here would otherwise display as 90 (top-to-bottom).
-            // Backfill it onto the document itself so an overlay never round-trips with
-            // Angle absent and silently disagrees with the server on re-render.
-            if (ov && ov.Angle == null) { ov.Angle = 90; }
-            var angle = ov ? ov.Angle : 90;
+            // A missing Angle is backfilled onto the document by normalizeOverlay() at load
+            // time, not here — this only decides what to DISPLAY, never writes to doc.
+            var angle = (ov && ov.Angle != null) ? ov.Angle : 90;
             el('ccaOverlayAngle').value = angle;
             el('ccaOverlayAngleVal').textContent = angle + '°';
 
-            // A loaded design is whatever it is; naming a preset for it would be a guess.
-            el('ccaOverlayPreset').value = 'custom';
-
-            if (on) { rebuildStopsUI('ccaOverlayStops', ov.Stops, true, [
+            rebuildStopsUI('ccaOverlayStops', (ov && ov.Stops) || [], true, [
                 { color: doc.Background.DimColor || '#000000', pos: 0, alpha: 0 },
                 { color: doc.Background.DimColor || '#000000', pos: 100, alpha: 90 }
-            ]); }
+            ]);
+        }
+
+        // LOAD-only: resets the parts of the overlay editor that only make sense when a
+        // whole new document has arrived (a fresh page, a template, an undo/redo snapshot) —
+        // never from a plain selection change, which shares syncControlsFromDocument but
+        // must not silently flip a chosen preset name back to Custom just because the user
+        // clicked a different layer. Real stop data can't be attributed to a named preset
+        // (naming one would be a guess), so it resets to Custom; no data resets to the
+        // markup's own default, Bottom fade, rather than carrying over whatever the previous
+        // document happened to have selected.
+        function resetOverlayEditorState() {
+            var ov = doc.Background.Overlay;
+            var sel = el('ccaOverlayPreset');
+            if (sel) { sel.value = (ov && ov.Stops && ov.Stops.length) ? 'custom' : 'bottom'; }
             _overlayStopIndex = -1;
         }
 
@@ -3503,7 +3550,16 @@
                 var angleRow = el('ccaOverlayAngleRow');
                 if (angleRow) { angleRow.style.display = on ? '' : 'none'; }
                 if (on && (!doc.Background.Overlay.Stops || doc.Background.Overlay.Stops.length < 2)) {
-                    applyOverlayPreset(el('ccaOverlayPreset').value || 'bottom');
+                    // The select can legitimately read 'custom' here (e.g. hand-edited stops
+                    // from a previous check of the box) or, before any preset is ever
+                    // resolved, an unrecognised/empty value — 'custom' is a no-op for
+                    // applyOverlayPreset, so falling back to it would leave Stops empty and
+                    // the checkbox would visibly do nothing. Resolve to a REAL preset, and
+                    // write it back to the select so the control and the document agree.
+                    var presetSel = el('ccaOverlayPreset');
+                    var name = (presetSel && OVERLAY_PRESETS[presetSel.value]) ? presetSel.value : 'bottom';
+                    if (presetSel) { presetSel.value = name; }
+                    applyOverlayPreset(name);
                 }
                 scheduleRender();
             });
@@ -3753,6 +3809,7 @@
                 // functions dereference them, so fill them in like the server does.
                 normalizeEffects(doc);
                 normalizeBackgroundSource(doc);
+                normalizeOverlay(doc);
                 var titleLayer = null;
                 for (var i = 0; i < doc.Layers.length; i++) {
                     if (doc.Layers[i].Id === 'title') { titleLayer = doc.Layers[i]; break; }
@@ -3770,6 +3827,7 @@
                 // bitmap), so pull them back as blobs to preview them on the canvas.
                 hydrateLayerImages();
                 syncControlsFromDocument();
+                resetOverlayEditorState();
                 scheduleRender();
             });
             el('ccaTemplateSave').addEventListener('click', function () {
@@ -3962,8 +4020,10 @@
             Dashboard.showLoadingMsg();
             // Seed every control (incl. the brand gradient stops) from the default
             // document, so the UI and the live canvas start in agreement.
+            normalizeOverlay(doc);
             renderLayersPanel();
             syncControlsFromDocument();
+            resetOverlayEditorState();
             // Render immediately with a sane fallback, then re-render once the
             // bundled Noto weights register so canvas text metrics match the server.
             scheduleRender();
