@@ -2537,24 +2537,43 @@
             return stripUiKeys(doc);
         }
 
-        // Reads the gradient-stop DOM rows into the document (keeps canvas + the
-        // legacy collectSettings projection consistent as stops are edited).
-        function syncGradientStopsToDoc() {
-            if (!doc.Background.Gradient) { return; }
-            doc.Background.Gradient.Stops = collectGradientStops();
+        // Reads stop DOM rows into a document object that owns a Stops array. Parameterised
+        // by container so the background gradient and the background OVERLAY can each have
+        // their own editor without the two forking into near-duplicate copies.
+        function syncStopsToDoc(containerId, target) {
+            if (!target) { return; }
+            target.Stops = collectStops(containerId);
         }
 
-        // Rebuilds the gradient-stop DOM rows from a document stop list.
-        function rebuildGradientStopsUI(stops) {
-            var container = el('ccaGradientStops');
+        function syncGradientStopsToDoc() {
+            syncStopsToDoc('ccaGradientStops', doc.Background.Gradient);
+        }
+
+        // Rebuilds stop DOM rows from a document stop list. `withAlpha` adds the per-stop
+        // alpha slider (overlay only); `defaults` seeds two stops when there are fewer than two.
+        function rebuildStopsUI(containerId, stops, withAlpha, defaults) {
+            var container = el(containerId);
+            if (!container) { return; }
             container.innerHTML = '';
             (stops || []).forEach(function (st) {
-                addGradientStop(pick(st, 'Color') || '#888888', Math.round((pick(st, 'Position') || 0) * 100));
+                var a = pick(st, 'Alpha');
+                addStopRow(containerId,
+                    pick(st, 'Color') || '#888888',
+                    Math.round((pick(st, 'Position') || 0) * 100),
+                    Math.round((a === undefined || a === null ? 1 : a) * 100),
+                    withAlpha);
             });
             if (container.querySelectorAll('.ccaStop').length < 2) {
-                addGradientStop('#aa5cc3', 0);
-                addGradientStop('#00a4dc', 100);
+                addStopRow(containerId, defaults[0].color, defaults[0].pos, defaults[0].alpha, withAlpha);
+                addStopRow(containerId, defaults[1].color, defaults[1].pos, defaults[1].alpha, withAlpha);
             }
+        }
+
+        function rebuildGradientStopsUI(stops) {
+            rebuildStopsUI('ccaGradientStops', stops, false, [
+                { color: '#aa5cc3', pos: 0, alpha: 100 },
+                { color: '#00a4dc', pos: 100, alpha: 100 }
+            ]);
         }
 
         // Applies the Format control to the document (auto|png|gif, or animatedgif =>
@@ -2928,19 +2947,30 @@
             });
         }
 
-        function collectGradientStops() {
+        // NOTE the .ccaStopPos selector. Overlay rows carry a SECOND range input for alpha,
+        // so the old input[type="range"] lookup would silently read whichever came first.
+        function collectStops(containerId) {
             var stops = [];
-            page.querySelectorAll('#ccaGradientStops .ccaStop').forEach(function (row) {
+            var container = el(containerId);
+            if (!container) { return stops; }
+            container.querySelectorAll('.ccaStop').forEach(function (row) {
+                var alphaEl = row.querySelector('.ccaStopAlpha');
                 stops.push({
                     Color: row.querySelector('input[type="color"]').value,
-                    Position: (parseFloat(row.querySelector('input[type="range"]').value) || 0) / 100
+                    Position: (parseFloat(row.querySelector('.ccaStopPos').value) || 0) / 100,
+                    Alpha: alphaEl ? (parseFloat(alphaEl.value) || 0) / 100 : 1
                 });
             });
             return stops;
         }
 
-        function addGradientStop(color, posPercent) {
-            var container = el('ccaGradientStops');
+        function collectGradientStops() {
+            return collectStops('ccaGradientStops');
+        }
+
+        function addStopRow(containerId, color, posPercent, alphaPercent, withAlpha) {
+            var container = el(containerId);
+            if (!container) { return; }
             var row = document.createElement('div');
             row.className = 'ccaStop';
 
@@ -2954,6 +2984,16 @@
             p.value = (posPercent == null ? 50 : posPercent);
             p.className = 'ccaRange ccaStopPos';
 
+            var a = null;
+            if (withAlpha) {
+                a = document.createElement('input');
+                a.type = 'range';
+                a.min = '0'; a.max = '100'; a.step = '1';
+                a.value = (alphaPercent == null ? 100 : alphaPercent);
+                a.className = 'ccaRange ccaStopAlpha';
+                a.title = t('bg.overlay.alpha');
+            }
+
             var rm = document.createElement('button');
             rm.type = 'button';
             rm.className = 'ccaStopRemove';
@@ -2961,15 +3001,26 @@
             rm.addEventListener('click', function () {
                 if (container.querySelectorAll('.ccaStop').length > 2) {
                     container.removeChild(row);
-                    syncGradientStopsToDoc();
+                    onStopsEdited(containerId);
                     scheduleRender();
                 }
             });
 
             row.appendChild(c);
             row.appendChild(p);
+            if (a) { row.appendChild(a); }
             row.appendChild(rm);
             container.appendChild(row);
+        }
+
+        function addGradientStop(color, posPercent) {
+            addStopRow('ccaGradientStops', color, posPercent, 100, false);
+        }
+
+        // One place that knows which document object a given stop container edits.
+        // Task 6 extends this for the overlay container.
+        function onStopsEdited(containerId) {
+            if (containerId === 'ccaGradientStops') { syncGradientStopsToDoc(); }
         }
 
         function uploadFile(endpoint, file) {
@@ -3013,7 +3064,7 @@
             var target = e.target;
             if (!target || !target.closest) { return; }
             if (target.closest('#ccaGradientStops')) {
-                syncGradientStopsToDoc();
+                onStopsEdited('ccaGradientStops');
                 scheduleRender();
             }
         }
