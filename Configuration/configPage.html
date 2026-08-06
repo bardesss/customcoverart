@@ -370,7 +370,7 @@
 
                         <label class="ccaCheck ccaCheckBlock"><input is="emby-checkbox" type="checkbox" id="ccaAutoPalette" /><span data-i18n="fx.autopalette">Auto palette</span></label>
                         <div id="ccaSwatches" class="ccaSwatches"></div>
-                        <div class="fieldDescription" data-i18n="fx.paletteHint">Click a colour to apply it to the selected text layer, or to the colour wash when no text layer is selected.</div>
+                        <div class="fieldDescription" data-i18n="fx.paletteHint">Click a colour to apply it to the selected text layer — or, with no text layer selected, to the selected overlay stop, then the colour wash.</div>
                         </div>
                     </section>
                     <section class="ccaStep" data-step="5">
@@ -891,7 +891,7 @@
                 'fx.color': 'Colour', 'fx.opacity': 'Strength', 'fx.amount': 'Strength', 'fx.softness': 'Softness',
                 'fx.thickness': 'Thickness', 'fx.radius': 'Corner radius', 'fx.double': 'Double line', 'fx.gap': 'Gap',
                 'fx.jellyfin': 'Jellyfin style', 'fx.presetHint': 'Applies a dark gradient with clean white text — editable afterwards.',
-                'fx.autopalette': 'Auto palette', 'fx.paletteHint': 'Click a colour to apply it to the selected text layer, or to the colour wash when no text layer is selected.',
+                'fx.autopalette': 'Auto palette', 'fx.paletteHint': 'Click a colour to apply it to the selected text layer — or, with no text layer selected, to the selected overlay stop, then the colour wash.',
                 'card.background': 'Background', 'bg.dim': 'Dimming', 'bg.blur': 'Blur', 'bg.dimcolor': 'Dim / base color',
                 'bg.gtype': 'Gradient type', 'g.linear': 'Linear', 'g.radial': 'Radial',
                 'bg.startcolor': 'Start color', 'bg.endcolor': 'End color',
@@ -953,7 +953,7 @@
                 'fx.color': 'Kleur', 'fx.opacity': 'Sterkte', 'fx.amount': 'Sterkte', 'fx.softness': 'Zachtheid',
                 'fx.thickness': 'Dikte', 'fx.radius': 'Hoekafronding', 'fx.double': 'Dubbele lijn', 'fx.gap': 'Tussenruimte',
                 'fx.jellyfin': 'Jellyfin-stijl', 'fx.presetHint': 'Past een donker verloop met strakke witte tekst toe — daarna vrij aanpasbaar.',
-                'fx.autopalette': 'Automatisch kleurenpalet', 'fx.paletteHint': 'Klik op een kleur om die toe te passen op de geselecteerde tekstlaag, of op het kleurwaas als er geen tekstlaag geselecteerd is.',
+                'fx.autopalette': 'Automatisch kleurenpalet', 'fx.paletteHint': 'Klik op een kleur om die toe te passen op de geselecteerde tekstlaag — of, als er geen tekstlaag geselecteerd is, op de geselecteerde overlay-kleurstop en anders op het kleurwaas.',
                 'card.background': 'Achtergrond', 'bg.dim': 'Dimmen', 'bg.blur': 'Vervaging', 'bg.dimcolor': 'Dim- / basiskleur',
                 'bg.gtype': 'Verlooptype', 'g.linear': 'Lineair', 'g.radial': 'Radiaal',
                 'bg.startcolor': 'Startkleur', 'bg.endcolor': 'Eindkleur',
@@ -1851,14 +1851,19 @@
             });
         }
 
-        // Where a clicked swatch lands: the selected text layer if there is one,
-        // otherwise the colour wash when it is switched on. Both update their control
-        // so the card and the canvas never disagree.
+        // Where a clicked swatch lands, in order: the selected text layer, then the selected
+        // overlay stop when the overlay is on, then the colour wash when it is on. Each
+        // updates its own control so the card and the canvas never disagree.
         function applySwatch(hex) {
             var l = selectedLayer();
             if (l && l.Type === 'text') {
                 l.Color = hex;
                 el('ccaTextColor').value = hex;
+            } else if (doc.Background.Overlay && doc.Background.Overlay.IsEnabled && overlayStopIndex() >= 0) {
+                var i = overlayStopIndex();
+                doc.Background.Overlay.Stops[i].Color = hex;
+                var rows = el('ccaOverlayStops').querySelectorAll('.ccaStop');
+                if (rows[i]) { rows[i].querySelector('input[type="color"]').value = hex; }
             } else if (doc.Effects.SoftLight.Enabled) {
                 doc.Effects.SoftLight.Color = hex;
                 el('ccaFxSoftLightColor').value = hex;
@@ -1901,7 +1906,7 @@
                 var a = (s.Alpha === undefined || s.Alpha === null) ? 1 : s.Alpha;
                 return {
                     pos: Math.max(0, Math.min(1, s.Position)),
-                    color: hexToRgba(s.Color || '#000000', Math.max(0, Math.min(1, a)))
+                    color: hexToRgba(s.Color || '#808080', Math.max(0, Math.min(1, a)))
                 };
             });
         }
@@ -2667,6 +2672,108 @@
             ]);
         }
 
+        // Presets set POSITIONS AND ALPHAS ONLY, never colours: applying one keeps each
+        // existing stop's colour by index, so a user can try every preset without losing
+        // the colour they picked. Extra stops take the last existing colour.
+        var OVERLAY_PRESETS = {
+            bottom:  [{ pos: 0, alpha: 0 }, { pos: 0.45, alpha: 0 }, { pos: 1, alpha: 0.9 }],
+            top:     [{ pos: 0, alpha: 0.9 }, { pos: 0.55, alpha: 0 }, { pos: 1, alpha: 0 }],
+            wash:    [{ pos: 0, alpha: 0.35 }, { pos: 1, alpha: 0.85 }],
+            duotone: [{ pos: 0, alpha: 0.7 }, { pos: 1, alpha: 0.9 }]
+        };
+
+        function ensureOverlay() {
+            if (!doc.Background.Overlay) {
+                doc.Background.Overlay = { IsEnabled: false, Type: 0, Angle: 90, Stops: [] };
+            }
+            return doc.Background.Overlay;
+        }
+
+        function applyOverlayPreset(name) {
+            var preset = OVERLAY_PRESETS[name];
+            if (!preset) { return; }   // 'custom' keeps whatever is there
+            var ov = ensureOverlay();
+            var existing = ov.Stops || [];
+            var fallback = (existing.length ? existing[existing.length - 1].Color : null)
+                || doc.Background.DimColor || '#000000';
+            ov.Angle = 90;
+            ov.Stops = preset.map(function (p, i) {
+                return {
+                    Color: (existing[i] && existing[i].Color) || fallback,
+                    Position: p.pos,
+                    Alpha: p.alpha
+                };
+            });
+            rebuildOverlayStopsUI();
+        }
+
+        function rebuildOverlayStopsUI() {
+            var ov = ensureOverlay();
+            rebuildStopsUI('ccaOverlayStops', ov.Stops, true, [
+                { color: doc.Background.DimColor || '#000000', pos: 0, alpha: 0 },
+                { color: doc.Background.DimColor || '#000000', pos: 100, alpha: 90 }
+            ]);
+            // rebuildStopsUI may have seeded defaults; read them back so doc and DOM agree.
+            syncOverlayStopsToDoc();
+        }
+
+        function syncOverlayStopsToDoc() {
+            syncStopsToDoc('ccaOverlayStops', ensureOverlay());
+        }
+
+        // Which overlay stop a clicked palette swatch recolours. Defaults to the LAST stop:
+        // the opaque end is the one people actually recolour.
+        var _overlayStopIndex = -1;
+
+        function selectOverlayStopFrom(target) {
+            var row = target.closest ? target.closest('.ccaStop') : null;
+            var container = el('ccaOverlayStops');
+            if (!row || !container) { return; }
+            var rows = Array.prototype.slice.call(container.querySelectorAll('.ccaStop'));
+            var i = rows.indexOf(row);
+            if (i >= 0) { _overlayStopIndex = i; }
+        }
+
+        function overlayStopIndex() {
+            var ov = doc.Background.Overlay;
+            if (!ov || !ov.Stops || !ov.Stops.length) { return -1; }
+            if (_overlayStopIndex < 0 || _overlayStopIndex >= ov.Stops.length) {
+                return ov.Stops.length - 1;
+            }
+            return _overlayStopIndex;
+        }
+
+        // Sets every overlay control from doc.Background.Overlay. Called from
+        // syncControlsFromDocument, the same place that hydrates the background
+        // gradient's stop rows, so a loaded document, undo/redo snapshot, template or
+        // page load all land here.
+        function hydrateOverlayControls() {
+            var ov = doc.Background.Overlay;
+            var on = !!(ov && ov.IsEnabled);
+            el('ccaOverlay').checked = on;
+            el('ccaOverlayOpts').style.display = on ? '' : 'none';
+            var angleRow = el('ccaOverlayAngleRow');
+            if (angleRow) { angleRow.style.display = on ? '' : 'none'; }
+
+            // Angle is a non-nullable float server-side (default 0, a left-to-right fade),
+            // while a missing Angle here would otherwise display as 90 (top-to-bottom).
+            // Backfill it onto the document itself so an overlay never round-trips with
+            // Angle absent and silently disagrees with the server on re-render.
+            if (ov && ov.Angle == null) { ov.Angle = 90; }
+            var angle = ov ? ov.Angle : 90;
+            el('ccaOverlayAngle').value = angle;
+            el('ccaOverlayAngleVal').textContent = angle + '°';
+
+            // A loaded design is whatever it is; naming a preset for it would be a guess.
+            el('ccaOverlayPreset').value = 'custom';
+
+            if (on) { rebuildStopsUI('ccaOverlayStops', ov.Stops, true, [
+                { color: doc.Background.DimColor || '#000000', pos: 0, alpha: 0 },
+                { color: doc.Background.DimColor || '#000000', pos: 100, alpha: 90 }
+            ]); }
+            _overlayStopIndex = -1;
+        }
+
         // Applies the Format control to the document (auto|png|gif, or animatedgif =>
         // gif + an Animation object). Shared by the change handler and GIF autodetect.
         function applyFormatFromControl() {
@@ -2736,6 +2843,7 @@
                 el('ccaGradientAngleVal').textContent = (g.Angle || 0) + '°';
                 rebuildGradientStopsUI(g.Stops);
             }
+            hydrateOverlayControls();
             if (bg.Collage) { el('ccaCollageDensity').value = bg.Collage.Density || 'medium'; }
 
             // Output card
@@ -3101,6 +3209,9 @@
             row.appendChild(p);
             if (a) { row.appendChild(a); }
             row.appendChild(rm);
+            if (containerId === 'ccaOverlayStops') {
+                row.addEventListener('focusin', function () { selectOverlayStopFrom(row); });
+            }
             container.appendChild(row);
         }
 
@@ -3109,9 +3220,14 @@
         }
 
         // One place that knows which document object a given stop container edits.
-        // Task 6 extends this for the overlay container.
         function onStopsEdited(containerId) {
             if (containerId === 'ccaGradientStops') { syncGradientStopsToDoc(); }
+            else if (containerId === 'ccaOverlayStops') {
+                syncOverlayStopsToDoc();
+                // A hand-edit means the design no longer matches the named preset.
+                var sel = el('ccaOverlayPreset');
+                if (sel) { sel.value = 'custom'; }
+            }
         }
 
         function uploadFile(endpoint, file) {
@@ -3156,6 +3272,10 @@
             if (!target || !target.closest) { return; }
             if (target.closest('#ccaGradientStops')) {
                 onStopsEdited('ccaGradientStops');
+                scheduleRender();
+            } else if (target.closest('#ccaOverlayStops')) {
+                selectOverlayStopFrom(target);
+                onStopsEdited('ccaOverlayStops');
                 scheduleRender();
             }
         }
@@ -3375,6 +3495,36 @@
             });
             el('ccaAddStop').addEventListener('click', function () {
                 addGradientStop('#888888', 50); syncGradientStopsToDoc(); scheduleRender();
+            });
+            el('ccaOverlay').addEventListener('change', function () {
+                var on = this.checked;
+                ensureOverlay().IsEnabled = on;
+                el('ccaOverlayOpts').style.display = on ? '' : 'none';
+                var angleRow = el('ccaOverlayAngleRow');
+                if (angleRow) { angleRow.style.display = on ? '' : 'none'; }
+                if (on && (!doc.Background.Overlay.Stops || doc.Background.Overlay.Stops.length < 2)) {
+                    applyOverlayPreset(el('ccaOverlayPreset').value || 'bottom');
+                }
+                scheduleRender();
+            });
+
+            el('ccaOverlayPreset').addEventListener('change', function () {
+                applyOverlayPreset(this.value);
+                scheduleRender();
+            });
+
+            el('ccaOverlayAddStop').addEventListener('click', function () {
+                var ov = ensureOverlay();
+                var last = ov.Stops && ov.Stops.length ? ov.Stops[ov.Stops.length - 1] : null;
+                addStopRow('ccaOverlayStops', (last && last.Color) || doc.Background.DimColor || '#000000', 50, 50, true);
+                onStopsEdited('ccaOverlayStops');
+                scheduleRender();
+            });
+
+            el('ccaOverlayAngle').addEventListener('input', function () {
+                ensureOverlay().Angle = parseFloat(this.value) || 0;
+                el('ccaOverlayAngleVal').textContent = this.value + '°';
+                scheduleRender();
             });
             el('ccaBgSource').addEventListener('change', function () {
                 doc.Background.Source = this.value;
