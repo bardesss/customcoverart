@@ -185,6 +185,12 @@ public class GradientStop
 {
     public string Color { get; set; } = "#000000";
     public float Position { get; set; } = 0f; // 0..1
+
+    /// <summary>
+    /// Per-stop opacity, 0..1. Defaults to 1 so every gradient written before the
+    /// background overlay existed renders byte-for-byte as it always did.
+    /// </summary>
+    public float Alpha { get; set; } = 1f;
 }
 
 public enum GradientType
