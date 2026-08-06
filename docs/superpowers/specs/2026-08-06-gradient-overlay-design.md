@@ -231,8 +231,11 @@ defaulting to the last stop — the opaque end is the one users actually recolou
 
 ### Localisation
 
-New control labels get keys in both `Resources/en.json` and `Resources/nl.json`.
-`ConfigPageStructureTests` already asserts en/nl completeness.
+New control labels get keys in the **in-page `I18N` object** in `configPage.html` (the `en:`
+block at line 840 and the `nl:` block at line 896) — *not* in `Resources/en.json` /
+`Resources/nl.json`, which are embedded resources the config page never reads.
+`PresetTests.EveryI18nKeyUsedInMarkup_ExistsInBothLanguages` (line 64) parses those two
+in-page blocks and fails on any `data-i18n` key missing from either, so this is enforced.
 
 ## 5. Migration & back-compat
 
@@ -261,7 +264,10 @@ New `tests/CustomCoverArt.Tests/GradientOverlayTests.cs`:
 6. Existing background gradients unchanged when `Alpha` defaults to 1.
 7. Ordering: the overlay sits over soft-light and under text — a text pixel keeps its colour.
 
-`ConfigPageStructureTests` gains the new control ids and the en/nl key assertions.
+`ConfigPageStructureTests.RequiredIds` (line 42) gains the new control ids. The en/nl key
+check needs no new test — `PresetTests.EveryI18nKeyUsedInMarkup_ExistsInBothLanguages`
+already scans every `data-i18n` attribute in the page and will fail on an untranslated new
+control automatically.
 
 The client canvas has no automated test; parity with the server render is verified
 manually, as is already the practice in this repo.
