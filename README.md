@@ -317,11 +317,20 @@ For larger changes, opening an issue first to discuss the approach is appreciate
 
 ## 📄 License
 
-MIT — see [`LICENSE`](LICENSE).
+[GPLv3](LICENSE) — Copyright © 2026 Bardesss.
+
+Why GPLv3 and not something more permissive: this plugin is compiled against Jellyfin's shared
+libraries (`Jellyfin.Controller` and `Jellyfin.Model`, both published under GPL‑3.0‑only) and is
+loaded into the Jellyfin server process at runtime. The result is a combined work, so the plugin
+inherits the same copyleft terms. Matching Jellyfin's licence keeps that unambiguous — and it also
+satisfies the open‑source qualification of the Six Labors Split License, under which ImageSharp is
+free to use.
 
 ## 🙏 Credits
 
 - [**Jellyfin**](https://jellyfin.org/) — the media server platform this plugin extends.
-- [**SixLabors ImageSharp**](https://github.com/SixLabors/ImageSharp) — image rendering and text drawing.
+- [**SixLabors ImageSharp**](https://github.com/SixLabors/ImageSharp) — image rendering and text drawing,
+  licensed under the [Six Labors Split License 1.0](https://github.com/SixLabors/ImageSharp/blob/main/LICENSE)
+  (free for open‑source projects such as this one; commercial use may require a paid licence).
 - [**Noto Sans**](https://fonts.google.com/noto/specimen/Noto+Sans) by Google — bundled default font, licensed under the
   [SIL Open Font License 1.1](https://openfontlicense.org/).
