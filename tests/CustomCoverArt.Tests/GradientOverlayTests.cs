@@ -83,4 +83,158 @@ public class GradientOverlayTests
         Assert.True(linear[5, 0].R < 40 && linear[35, 0].R < 40, "Top row should be the near stop across its width.");
         Assert.True(linear[5, 39].R > 215 && linear[35, 39].R > 215, "Bottom row should be the far stop across its width.");
     }
+
+    /// <summary>A 40x40 document whose background is solid white, with no layers.</summary>
+    private static CoverDocument WhiteDoc()
+    {
+        var doc = new CoverDocument { Canvas = new CanvasSettings { Width = 40, Height = 40 } };
+        doc.Background.Source = BackgroundSources.Solid;
+        doc.Background.DimColor = "#ffffff";
+        return doc;
+    }
+
+    /// <summary>A bottom-fade overlay: transparent at the top, fully opaque black at the bottom.</summary>
+    private static GradientSettings BottomFadeBlack() => new()
+    {
+        IsEnabled = true,
+        Angle = 90f,
+        Stops = new()
+        {
+            new GradientStop { Color = "#000000", Position = 0f, Alpha = 0f },
+            new GradientStop { Color = "#000000", Position = 1f, Alpha = 1f }
+        }
+    };
+
+    /// <summary>
+    /// THE important one. Filling the canvas directly with a semi-transparent brush is the
+    /// trap that once blacked out dimmed backgrounds — ImageSharp's Fill ignores brush alpha
+    /// on alpha-less pixel formats. If that happens here the middle row goes solid black
+    /// instead of mid-grey, so this assertion is the regression guard for the whole feature.
+    /// </summary>
+    [Fact]
+    public void ApplyGradientOverlay_RampsAlphaAcrossTheCanvas()
+    {
+        var doc = WhiteDoc();
+        doc.Background.Overlay = BottomFadeBlack();
+
+        using var canvas = new Image<Rgba32>(40, 40);
+        DocumentRenderer.ComposeDocumentFrame(canvas, null, doc);
+
+        Assert.True(canvas[20, 0].R > 230, "Top must stay near the white background.");
+        Assert.True(canvas[20, 39].R < 25, "Bottom must reach the opaque overlay colour.");
+        Assert.InRange(canvas[20, 20].R, 90, 165);   // a genuine blend, not 0 and not 255
+    }
+
+    [Fact]
+    public void ApplyGradientOverlay_NullOrDisabled_LeavesTheCanvasUntouched()
+    {
+        using var withoutOverlay = new Image<Rgba32>(40, 40);
+        DocumentRenderer.ComposeDocumentFrame(withoutOverlay, null, WhiteDoc());
+
+        var disabledDoc = WhiteDoc();
+        disabledDoc.Background.Overlay = BottomFadeBlack();
+        disabledDoc.Background.Overlay.IsEnabled = false;
+
+        using var withDisabled = new Image<Rgba32>(40, 40);
+        DocumentRenderer.ComposeDocumentFrame(withDisabled, null, disabledDoc);
+
+        Assert.Equal(withoutOverlay[20, 39], withDisabled[20, 39]);
+        Assert.Equal(withoutOverlay[20, 20], withDisabled[20, 20]);
+    }
+
+    /// <summary>
+    /// Guards the fallback divergence: BuildColorStops falls back to an opaque black-to-white
+    /// ramp when there are fewer than two stops, which for an overlay would obliterate the
+    /// background. Fewer than two stops must mean "off" instead.
+    /// </summary>
+    [Fact]
+    public void ApplyGradientOverlay_FewerThanTwoStops_IsANoOp()
+    {
+        var doc = WhiteDoc();
+        doc.Background.Overlay = new GradientSettings
+        {
+            IsEnabled = true,
+            Angle = 90f,
+            Stops = new() { new GradientStop { Color = "#000000", Position = 1f, Alpha = 1f } }
+        };
+
+        using var canvas = new Image<Rgba32>(40, 40);
+        DocumentRenderer.ComposeDocumentFrame(canvas, null, doc);
+
+        Assert.True(canvas[20, 39].R > 230, "A one-stop overlay must not paint anything.");
+    }
+
+    /// <summary>
+    /// The overlay lives in ComposeDocumentFrame, not inside ApplyBackgroundLayer, precisely
+    /// so it works for every source. ApplyBackgroundLayer runs only on the image path.
+    /// </summary>
+    [Theory]
+    [InlineData(BackgroundSources.Solid)]
+    [InlineData(BackgroundSources.Gradient)]
+    [InlineData(BackgroundSources.Collage)]
+    [InlineData(BackgroundSources.Upload)]
+    public void ApplyGradientOverlay_AppliesToEverySource(string source)
+    {
+        var doc = WhiteDoc();
+        doc.Background.Source = source;
+        doc.Background.Gradient = new GradientSettings
+        {
+            IsEnabled = true,
+            Stops = new() { new GradientStop { Color = "#ffffff", Position = 0f },
+                            new GradientStop { Color = "#ffffff", Position = 1f } }
+        };
+        doc.Background.Overlay = BottomFadeBlack();
+
+        using var canvas = new Image<Rgba32>(40, 40);
+        DocumentRenderer.ComposeDocumentFrame(canvas, null, doc);
+
+        Assert.True(canvas[20, 39].R < 25, $"Overlay must apply for source '{source}'.");
+    }
+
+    /// <summary>Type is inert on an overlay: a radial one still renders as a linear ramp.</summary>
+    [Fact]
+    public void ApplyGradientOverlay_RadialType_StillRendersLinear()
+    {
+        var doc = WhiteDoc();
+        doc.Background.Overlay = BottomFadeBlack();
+        doc.Background.Overlay.Type = GradientType.Radial;
+
+        using var canvas = new Image<Rgba32>(40, 40);
+        DocumentRenderer.ComposeDocumentFrame(canvas, null, doc);
+
+        // Under a linear 90-degree ramp the whole bottom row is opaque, corners included.
+        // A radial brush would leave the bottom corners far lighter than the bottom centre.
+        Assert.True(canvas[0, 39].R < 25 && canvas[39, 39].R < 25, "Bottom corners must be opaque, so the ramp is linear.");
+    }
+
+    /// <summary>Ordering: the overlay sits over soft-light and under the text.</summary>
+    [Fact]
+    public void ApplyGradientOverlay_SitsUnderTextLayers()
+    {
+        var doc = WhiteDoc();
+        doc.Background.Overlay = BottomFadeBlack();
+        doc.Effects.SoftLight = new SoftLightSettings { Enabled = true, Color = "#ffffff", Opacity = 1f };
+        doc.Layers.Add(new CoverLayer
+        {
+            Id = "t", Type = "text", Content = "MMMM", Color = "#ff0000",
+            X = 0.5f, Y = 0.9f, Size = 0.25f, Align = TextAlign.Center
+        });
+
+        using var canvas = new Image<Rgba32>(40, 40);
+        DocumentRenderer.ComposeDocumentFrame(canvas, null, doc);
+
+        // A fully opaque white soft-light wash would erase the overlay if it ran after it.
+        Assert.True(canvas[20, 39].R < 60, "Overlay must be applied after soft-light.");
+
+        // Somewhere in the text band a red text pixel must have survived the overlay.
+        var foundRed = false;
+        for (var y = 28; y < 40 && !foundRed; y++)
+        {
+            for (var x = 0; x < 40; x++)
+            {
+                if (canvas[x, y].R > 120 && canvas[x, y].G < 80) { foundRed = true; break; }
+            }
+        }
+        Assert.True(foundRed, "Text must be drawn on top of the overlay.");
+    }
 }
