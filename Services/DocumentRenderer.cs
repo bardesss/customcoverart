@@ -35,6 +35,13 @@ public static class DocumentRenderer
         // top of the tint rather than under it. The client mirrors this order exactly.
         EffectsComposer.ApplySoftLight(canvas, doc.Effects.SoftLight);
 
+        // The overlay goes last before the layers: its colour must be authoritative (a
+        // soft-light wash after it would desaturate it) and it must be the last thing
+        // under the text, which is the whole legibility contract. It lives HERE rather
+        // than in ApplyBackgroundLayer so it applies to all four background sources —
+        // ApplyBackgroundLayer runs only on the image path.
+        ApplyGradientOverlay(canvas, doc.Background.Overlay);
+
         foreach (var layer in doc.Layers)
         {
             if (!layer.Visible) { continue; }
@@ -296,47 +303,87 @@ public static class DocumentRenderer
     /// </summary>
     internal static void ApplyGradientBackground(Image<Rgba32> image, GradientSettings gradient)
     {
+        var brush = CreateGradientBrush(gradient, image.Width, image.Height);
+        image.Mutate(x => x.Fill(brush));
+    }
+
+    /// <summary>
+    /// Builds the gradient brush: radial when the settings ask for it, otherwise a linear
+    /// ramp along a line through the centre at <c>Angle</c> degrees, long enough to span
+    /// the canvas corner to corner.
+    ///
+    /// <paramref name="forceLinear"/> exists for the background OVERLAY, which reuses this
+    /// same settings type but is deliberately linear-only — see the spec's inert-fields note.
+    /// Shared with <see cref="ApplyGradientOverlay"/> so the two cannot drift apart.
+    /// </summary>
+    public static Brush CreateGradientBrush(GradientSettings gradient, int width, int height, bool forceLinear = false)
+    {
         var stops = BuildColorStops(gradient);
 
-        if (gradient.Type == GradientType.Radial)
+        if (!forceLinear && gradient.Type == GradientType.Radial)
         {
-            var centerX = gradient.CenterX * image.Width;
-            var centerY = gradient.CenterY * image.Height;
-            var radius = Math.Max(1f, gradient.Radius * Math.Min(image.Width, image.Height));
+            var centerX = gradient.CenterX * width;
+            var centerY = gradient.CenterY * height;
+            var radius = Math.Max(1f, gradient.Radius * Math.Min(width, height));
 
-            var brush = new RadialGradientBrush(new PointF(centerX, centerY), radius, GradientRepetitionMode.None, stops);
-            image.Mutate(x => x.Fill(brush));
+            return new RadialGradientBrush(new PointF(centerX, centerY), radius, GradientRepetitionMode.None, stops);
         }
-        else
-        {
-            // Linear: a line through the centre at `Angle` degrees, long enough to
-            // span the whole canvas so the gradient covers it corner to corner.
-            var rad = gradient.Angle * Math.PI / 180.0;
-            var dx = (float)Math.Cos(rad);
-            var dy = (float)Math.Sin(rad);
-            var cx = image.Width / 2f;
-            var cy = image.Height / 2f;
-            var half = (Math.Abs(dx) * image.Width + Math.Abs(dy) * image.Height) / 2f;
 
-            var p0 = new PointF(cx - dx * half, cy - dy * half);
-            var p1 = new PointF(cx + dx * half, cy + dy * half);
+        var rad = gradient.Angle * Math.PI / 180.0;
+        var dx = (float)Math.Cos(rad);
+        var dy = (float)Math.Sin(rad);
+        var cx = width / 2f;
+        var cy = height / 2f;
+        var half = (Math.Abs(dx) * width + Math.Abs(dy) * height) / 2f;
 
-            var brush = new LinearGradientBrush(p0, p1, GradientRepetitionMode.None, stops);
-            image.Mutate(x => x.Fill(brush));
-        }
+        var p0 = new PointF(cx - dx * half, cy - dy * half);
+        var p1 = new PointF(cx + dx * half, cy + dy * half);
+
+        return new LinearGradientBrush(p0, p1, GradientRepetitionMode.None, stops);
+    }
+
+    /// <summary>
+    /// Composites the background overlay: a linear multi-stop gradient whose stops carry
+    /// their own alpha, drawn over the finished background and under the layers.
+    ///
+    /// Deliberately does NOT use BuildColorStops' Start/End fallback. That fallback yields
+    /// an OPAQUE ramp between StartColor/EndColor (Jellyfin brand purple/blue by default,
+    /// falling back further to black/white only if those hex values fail to parse), fully
+    /// covering the canvas edge to edge. That is a reasonable default for a background
+    /// gradient, but for an overlay it would obliterate the poster regardless of which
+    /// colours it resolves to. Fewer than two stops = off.
+    /// </summary>
+    internal static void ApplyGradientOverlay(Image<Rgba32> canvas, GradientSettings? overlay)
+    {
+        if (overlay is null || !overlay.IsEnabled) { return; }
+        if (overlay.Stops is not { Count: >= 2 }) { return; }
+
+        var brush = CreateGradientBrush(overlay, canvas.Width, canvas.Height, forceLinear: true);
+
+        // Rendered into its OWN transparent Rgba32 buffer, then composited. Filling the
+        // canvas directly with a semi-transparent brush is the trap that once blacked out
+        // dimmed backgrounds (see ApplyBackgroundLayer): Fill ignores brush alpha on
+        // alpha-less pixel formats. This buffer is explicitly Rgba32, and SrcOver onto a
+        // zero-alpha destination resolves exactly to the source, so the default graphics
+        // options are already correct — no custom GraphicsOptions needed.
+        using var scrim = new Image<Rgba32>(canvas.Width, canvas.Height);
+        scrim.Mutate(x => x.Fill(brush));
+        canvas.Mutate(x => x.DrawImage(scrim, Point.Empty, 1f));
     }
 
     /// <summary>
     /// Builds the colour stops from the gradient settings — the explicit Stops
     /// list if it has 2+ entries, otherwise the Start/End colours as a fallback.
     /// </summary>
-    internal static ColorStop[] BuildColorStops(GradientSettings gradient)
+    public static ColorStop[] BuildColorStops(GradientSettings gradient)
     {
         if (gradient.Stops is { Count: >= 2 })
         {
             return gradient.Stops
                 .OrderBy(s => s.Position)
-                .Select(s => new ColorStop(Math.Clamp(s.Position, 0f, 1f), SafeColor(s.Color, Color.Gray)))
+                .Select(s => new ColorStop(
+                    Math.Clamp(s.Position, 0f, 1f),
+                    SafeColor(s.Color, Color.Gray).WithAlpha(Math.Clamp(s.Alpha, 0f, 1f))))
                 .ToArray();
         }
 
