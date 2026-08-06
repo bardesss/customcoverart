@@ -35,6 +35,13 @@ public static class DocumentRenderer
         // top of the tint rather than under it. The client mirrors this order exactly.
         EffectsComposer.ApplySoftLight(canvas, doc.Effects.SoftLight);
 
+        // The overlay goes last before the layers: its colour must be authoritative (a
+        // soft-light wash after it would desaturate it) and it must be the last thing
+        // under the text, which is the whole legibility contract. It lives HERE rather
+        // than in ApplyBackgroundLayer so it applies to all four background sources —
+        // ApplyBackgroundLayer runs only on the image path.
+        ApplyGradientOverlay(canvas, doc.Background.Overlay);
+
         foreach (var layer in doc.Layers)
         {
             if (!layer.Visible) { continue; }
@@ -333,6 +340,32 @@ public static class DocumentRenderer
         var p1 = new PointF(cx + dx * half, cy + dy * half);
 
         return new LinearGradientBrush(p0, p1, GradientRepetitionMode.None, stops);
+    }
+
+    /// <summary>
+    /// Composites the background overlay: a linear multi-stop gradient whose stops carry
+    /// their own alpha, drawn over the finished background and under the layers.
+    ///
+    /// Deliberately does NOT use BuildColorStops' Start/End fallback. That fallback yields
+    /// an OPAQUE black-to-white ramp, which for a background gradient is a reasonable
+    /// default and for an overlay would obliterate the poster. Fewer than two stops = off.
+    /// </summary>
+    internal static void ApplyGradientOverlay(Image<Rgba32> canvas, GradientSettings? overlay)
+    {
+        if (overlay is null || !overlay.IsEnabled) { return; }
+        if (overlay.Stops is not { Count: >= 2 }) { return; }
+
+        var brush = CreateGradientBrush(overlay, canvas.Width, canvas.Height, forceLinear: true);
+
+        // Rendered into its OWN transparent Rgba32 buffer, then composited. Filling the
+        // canvas directly with a semi-transparent brush is the trap that once blacked out
+        // dimmed backgrounds (see ApplyBackgroundLayer): Fill ignores brush alpha on
+        // alpha-less pixel formats. This buffer is explicitly Rgba32, and SrcOver onto a
+        // zero-alpha destination resolves exactly to the source, so the default graphics
+        // options are already correct — no custom GraphicsOptions needed.
+        using var scrim = new Image<Rgba32>(canvas.Width, canvas.Height);
+        scrim.Mutate(x => x.Fill(brush));
+        canvas.Mutate(x => x.DrawImage(scrim, Point.Empty, 1f));
     }
 
     /// <summary>
