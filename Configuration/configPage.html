@@ -95,6 +95,30 @@
                             <label for="ccaDim"><span data-i18n="bg.dim">Dimming</span> <span class="ccaVal" id="ccaDimVal">0.25</span></label>
                             <input type="range" class="ccaRange" id="ccaDim" min="0" max="1" step="0.05" value="0.25" />
                         </div>
+                        <div class="inputContainer">
+                            <label class="checkboxContainer">
+                                <input is="emby-checkbox" type="checkbox" id="ccaOverlay" />
+                                <span data-i18n="bg.overlay">Overlay gradient</span>
+                            </label>
+                            <div class="fieldDescription" data-i18n="hint.overlay">Fades a colour over the background, under your text — for the look where a poster resolves into solid colour.</div>
+                        </div>
+                        <div id="ccaOverlayOpts" class="ccaSub" style="display:none;">
+                            <div class="inputContainer">
+                                <label for="ccaOverlayPreset" data-i18n="bg.overlay.preset">Overlay preset</label>
+                                <select is="emby-select" id="ccaOverlayPreset" class="emby-select">
+                                    <option value="custom" data-i18n="bg.overlay.custom">Custom</option>
+                                    <option value="bottom" selected data-i18n="bg.overlay.bottom">Bottom fade</option>
+                                    <option value="top" data-i18n="bg.overlay.top">Top fade</option>
+                                    <option value="wash" data-i18n="bg.overlay.wash">Full wash</option>
+                                    <option value="duotone" data-i18n="bg.overlay.duotone">Duotone</option>
+                                </select>
+                            </div>
+                            <div class="inputContainer">
+                                <label data-i18n="bg.overlay.colors">Colours and opacity</label>
+                                <div id="ccaOverlayStops"></div>
+                                <button is="emby-button" type="button" id="ccaOverlayAddStop" class="raised"><span data-i18n="bg.addcolor">Add colour</span></button>
+                            </div>
+                        </div>
 
                         <div id="ccaGradientOpts" class="ccaSub" style="display:none;">
                             <div class="inputContainer">
@@ -153,6 +177,10 @@
                                 <div class="inputContainer">
                                     <label for="ccaDimColor" data-i18n="bg.dimcolor">Dim / base color</label>
                                     <input type="color" id="ccaDimColor" value="#000000" />
+                                </div>
+                                <div class="inputContainer" id="ccaOverlayAngleRow">
+                                    <label for="ccaOverlayAngle"><span data-i18n="bg.overlay.angle">Overlay angle</span> <span class="ccaVal" id="ccaOverlayAngleVal">90°</span></label>
+                                    <input type="range" class="ccaRange" id="ccaOverlayAngle" min="0" max="360" step="5" value="90" />
                                 </div>
                             </div>
                         </div>
@@ -868,6 +896,12 @@
                 'bg.gtype': 'Gradient type', 'g.linear': 'Linear', 'g.radial': 'Radial',
                 'bg.startcolor': 'Start color', 'bg.endcolor': 'End color',
                 'bg.angle': 'Angle', 'bg.colors': 'Colours', 'bg.addcolor': 'Add colour',
+                'bg.overlay': 'Overlay gradient', 'bg.overlay.preset': 'Overlay preset',
+                'bg.overlay.custom': 'Custom', 'bg.overlay.bottom': 'Bottom fade',
+                'bg.overlay.top': 'Top fade', 'bg.overlay.wash': 'Full wash', 'bg.overlay.duotone': 'Duotone',
+                'bg.overlay.colors': 'Colours and opacity', 'bg.overlay.angle': 'Overlay angle',
+                'bg.overlay.alpha': 'Opacity',
+                'hint.overlay': 'Fades a colour over the background, under your text — for the look where a poster resolves into solid colour.',
                 'bg.image': 'Background image (optional)', 'f.chooseImage': 'Choose image…', 'f.none': 'No file chosen',
                 'hint.image': 'JPG, PNG, GIF, BMP, WebP or TIFF · up to 5 MB.',
                 'bg.fit': 'Image fit', 'fit.cover': 'Fill (crop to fit)', 'fit.contain': 'Fit (show whole image)', 'fit.stretch': 'Stretch to fill',
@@ -924,6 +958,12 @@
                 'bg.gtype': 'Verlooptype', 'g.linear': 'Lineair', 'g.radial': 'Radiaal',
                 'bg.startcolor': 'Startkleur', 'bg.endcolor': 'Eindkleur',
                 'bg.angle': 'Hoek', 'bg.colors': 'Kleuren', 'bg.addcolor': 'Kleur toevoegen',
+                'bg.overlay': 'Verloop-overlay', 'bg.overlay.preset': 'Overlay-voorinstelling',
+                'bg.overlay.custom': 'Aangepast', 'bg.overlay.bottom': 'Vervaging onder',
+                'bg.overlay.top': 'Vervaging boven', 'bg.overlay.wash': 'Volledige waas', 'bg.overlay.duotone': 'Duotoon',
+                'bg.overlay.colors': 'Kleuren en dekking', 'bg.overlay.angle': 'Overlay-hoek',
+                'bg.overlay.alpha': 'Dekking',
+                'hint.overlay': 'Laat een kleur over de achtergrond vervagen, onder je tekst — voor de stijl waarbij een poster overgaat in een egale kleur.',
                 'bg.image': 'Achtergrondafbeelding (optioneel)', 'f.chooseImage': 'Kies afbeelding…', 'f.none': 'Geen bestand gekozen',
                 'hint.image': 'JPG, PNG, GIF, BMP, WebP of TIFF · max. 5 MB.',
                 'bg.fit': 'Afbeelding passen', 'fit.cover': 'Vullen (bijsnijden)', 'fit.contain': 'Passen (volledig tonen)', 'fit.stretch': 'Uitrekken',
@@ -1184,6 +1224,7 @@
                         Stops: [{ Color: '#aa5cc3', Position: 0 }, { Color: '#00a4dc', Position: 1 }],
                         CenterX: 0.5, CenterY: 0.5, Radius: 0.5
                     },
+                    Overlay: null,
                     Collage: null, Animation: null
                 },
                 Effects: defaultEffects(),
@@ -1453,6 +1494,9 @@
             // soft-light UNDER the layers, then vignette -> grain -> border on top.
             drawSoftLight(ctx, W, H);
 
+            // Over the background and soft-light, under the layers — same slot as the server.
+            drawGradientOverlay(ctx, W, H);
+
             // Visible layers, in array order (draw order matches the server loop).
             doc.Layers.forEach(function (layer) {
                 if (!layer.Visible) { return; }
@@ -1518,12 +1562,22 @@
         // 'overlay', versus true per-pixel noise on the server) because a full-canvas
         // per-pixel pass every frame would stall the live preview.
 
+        // Accepts #rgb, #rrggbb and #rrggbbaa. An 8-digit hex's own alpha is MULTIPLIED
+        // with the passed alpha, so a stop's Alpha field composes with a colour that
+        // already carries one rather than one silently winning.
         function hexToRgba(hex, alpha) {
             var h = String(hex || '#000000').replace('#', '');
             if (h.length === 3) { h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2]; }
+            var baseAlpha = 1;
+            if (h.length === 8) {
+                baseAlpha = parseInt(h.slice(6, 8), 16) / 255;
+                if (isNaN(baseAlpha)) { baseAlpha = 1; }
+                h = h.slice(0, 6);
+            }
             var n = parseInt(h, 16);
             if (isNaN(n)) { n = 0; }
-            return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + alpha + ')';
+            var a = Math.max(0, Math.min(1, (alpha == null ? 1 : alpha) * baseAlpha));
+            return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')';
         }
 
         function strokeRoundRect(ctx, x, y, w, h, r) {
@@ -1835,6 +1889,43 @@
                 });
             }
             return [{ pos: 0, color: '#000000' }, { pos: 1, color: '#ffffff' }];
+        }
+
+        // Like gradientStops, but each stop's colour is an rgba() string carrying its Alpha.
+        // No black->white fallback here: fewer than two stops means the overlay is off,
+        // mirroring DocumentRenderer.ApplyGradientOverlay.
+        function overlayStopsCss(g) {
+            var stops = (g.Stops || []).slice().sort(function (a, b) { return a.Position - b.Position; });
+            if (stops.length < 2) { return null; }
+            return stops.map(function (s) {
+                var a = (s.Alpha === undefined || s.Alpha === null) ? 1 : s.Alpha;
+                return {
+                    pos: Math.max(0, Math.min(1, s.Position)),
+                    color: hexToRgba(s.Color || '#000000', Math.max(0, Math.min(1, a)))
+                };
+            });
+        }
+
+        // Mirrors DocumentRenderer.ApplyGradientOverlay: linear only, geometry identical to
+        // drawGradient's linear branch. Called from renderDocument between drawSoftLight and
+        // the layer loop, which is the same slot the server uses.
+        function drawGradientOverlay(ctx, W, H) {
+            var g = doc.Background && doc.Background.Overlay;
+            if (!g || !g.IsEnabled) { return; }
+            var stops = overlayStopsCss(g);
+            if (!stops) { return; }
+
+            var rad = (g.Angle == null ? 90 : g.Angle) * Math.PI / 180;
+            var dx = Math.cos(rad), dy = Math.sin(rad);
+            var mx = W / 2, my = H / 2;
+            var half = (Math.abs(dx) * W + Math.abs(dy) * H) / 2;
+            var grad = ctx.createLinearGradient(mx - dx * half, my - dy * half, mx + dx * half, my + dy * half);
+            stops.forEach(function (s) { grad.addColorStop(s.pos, s.color); });
+
+            ctx.save();
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, W, H);
+            ctx.restore();
         }
 
         // Linear (a line through the centre at Angle degrees spanning the canvas) or
