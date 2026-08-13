@@ -47,7 +47,8 @@ public class ConfigPageStructureTests
         "ccaBgFit", "ccaBgImage", "ccaBgImageBtn", "ccaBgImageName", "ccaBgSource", "ccaBlur",
         "ccaBlurVal", "ccaBrowseBtn", "ccaBrowserClose", "ccaBrowserGrid", "ccaBrowserModal",
         "ccaBrowserNext", "ccaBrowserPage", "ccaBrowserPrev", "ccaBrowserSearch", "ccaBrowserType",
-        "ccaCanvas", "ccaCollageDensity", "ccaCollageRow", "ccaCollageShuffle", "ccaCustomDims",
+        "ccaCanvas", "ccaCollageDensity", "ccaCollageLiveTvHint", "ccaCollageRow", "ccaCollageShuffle",
+        "ccaCustomDims",
         "ccaDim", "ccaDimColor", "ccaDimVal", "ccaDownloadBtn", "ccaFont", "ccaFontBtn",
         "ccaFontName", "ccaFormat", "ccaFxBorder", "ccaFxBorderColor", "ccaFxBorderDouble",
         "ccaFxBorderGap", "ccaFxBorderGapRow", "ccaFxBorderGapVal", "ccaFxBorderRadius",
@@ -70,6 +71,34 @@ public class ConfigPageStructureTests
         "ccaContexts", "ccaTextSize", "ccaTextSizeVal", "ccaTextWeight", "ccaTitle", "ccaUndo", "ccaRedo",
         "ccaUploadControls", "ccaWidth"
     };
+
+    /// <summary>
+    /// Live TV has no child posters, so updateBackgroundVisibility disables the collage
+    /// option and force-reverts an already-selected collage back to an image. Both are
+    /// correct and both used to happen in total silence — the user's background choice
+    /// changed under them with nothing said. The explanation string existed all along and
+    /// was bound to nothing, so this pins the binding rather than the string.
+    /// </summary>
+    [Fact]
+    public void LiveTvCollageHint_ExistsAndIsOwnedByTheBackgroundVisibilityFunction()
+    {
+        Assert.Contains("id=\"ccaCollageLiveTvHint\"", Markup(), System.StringComparison.Ordinal);
+        Assert.Contains("data-i18n=\"bg.collage.livetv\"", Markup(), System.StringComparison.Ordinal);
+
+        // The codebase's one-owner-per-element rule: the function that hides the collage
+        // controls is the only thing allowed to show the hint explaining why.
+        var page = ConfigPage();
+        var fn = page.IndexOf("function updateBackgroundVisibility()", System.StringComparison.Ordinal);
+        Assert.True(fn > 0, "updateBackgroundVisibility not found.");
+        var end = page.IndexOf("\n        }", fn, System.StringComparison.Ordinal);
+        Assert.True(end > fn, "Could not find the end of updateBackgroundVisibility.");
+
+        var body = page.Substring(fn, end - fn);
+        Assert.Contains("ccaCollageLiveTvHint", body, System.StringComparison.Ordinal);
+
+        var owners = Regex.Matches(page, @"ccaCollageLiveTvHint").Count;
+        Assert.True(owners == 2, $"Expected ccaCollageLiveTvHint in exactly the markup and its owner; found {owners} references.");
+    }
 
     [Fact]
     public void NoControlWasLostInTheRestructure()
