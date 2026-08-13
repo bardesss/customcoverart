@@ -150,6 +150,36 @@ public class PresetTests
     }
 
     /// <summary>
+    /// applyI18n returns early for English, so the text sitting in the markup is exactly
+    /// what an English user reads — the en block is never applied over it. When the two
+    /// drift, English and every translation quietly say different things.
+    /// </summary>
+    [Fact]
+    public void MarkupDefaultText_MatchesTheEnglishDictionary()
+    {
+        var page = ConfigPage();
+        var en = I18nLocales()["en"];
+
+        var mismatched = new List<string>();
+        foreach (Match m in Regex.Matches(page, @"<(\w+)([^>]*\sdata-i18n=""([^""]+)""[^>]*)>([^<>]*)</\1>"))
+        {
+            var key = m.Groups[3].Value;
+            if (!en.TryGetValue(key, out var expected))
+            {
+                continue;
+            }
+
+            var markup = System.Net.WebUtility.HtmlDecode(m.Groups[4].Value.Trim());
+            if (markup != expected.Replace("\\'", "'", System.StringComparison.Ordinal))
+            {
+                mismatched.Add($"{key} (markup \"{markup}\" vs en \"{expected}\")");
+            }
+        }
+
+        Assert.True(mismatched.Count == 0, "Markup text disagrees with the en dictionary: " + string.Join("; ", mismatched));
+    }
+
+    /// <summary>
     /// Guards the cleanup that removed the strings left behind by the v3 editor rewrite:
     /// an unused key is dead weight every future translator has to translate.
     /// </summary>
