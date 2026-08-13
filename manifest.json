@@ -9,6 +9,14 @@
     "imageUrl": "",
     "versions": [
       {
+        "version": "3.5.0.0",
+        "changelog": "Adds **Spanish**. The whole configuration page — every step, label, button, hint and message, plus the server's upload and validation errors — is now translated, joining English and Dutch. The page follows your Jellyfin display language, and regional variants come along for the ride: `es-MX` and `es-419` get Spanish just like `es-ES`. Alongside it, the translation files themselves were **cleaned up and put under test**. Roughly a hundred strings left behind by the v3 editor rewrite were still being carried (and would have had to be translated into every new language) — those are gone, and five new build-time checks now fail if a language drifts out of sync with English, if a `{0}` placeholder goes missing, or if a string is defined but never shown. No change to how covers look or render.",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://github.com/bardesss/customcoverart/releases/download/v3.5.0.0/customcoverart_3.5.0.0.zip",
+        "checksum": "14658c820cd4dd29b6fdd4556d5d9d22",
+        "timestamp": "2026-08-13T13:39:54Z"
+      },
+      {
         "version": "3.4.0.0",
         "changelog": "Adds an **overlay gradient** to the Background step — a colour that fades in over your background and sits under your text. It is the missing piece behind the look where a poster **resolves into a solid band of colour** at the bottom, with the title on top of it and readable no matter what the poster shows underneath. Each colour stop has its own **opacity**, so you can go from fully transparent to fully solid, use **two colours** for a duotone fade, or wash the whole cover. Four **presets** — Bottom fade, Top fade, Full wash and Duotone — get you there in one click, and switching between them keeps the colours you have already picked so you can try all four without losing your palette. The **Auto palette** swatches now recolour the selected overlay stop, so you can tint a cover with a colour taken straight out of its own artwork. The overlay works with every background type — image, poster collage, gradient or solid — and with animated covers. Existing designs and saved templates are unaffected and render exactly as before.",
         "targetAbi": "10.11.0.0",
