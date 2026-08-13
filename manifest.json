@@ -9,6 +9,14 @@
     "imageUrl": "",
     "versions": [
       {
+        "version": "3.5.1.0",
+        "changelog": "Fixes a small but confusing moment with **Live TV** targets. Live TV has no posters to build a mosaic from, so the **Poster collage** background is unavailable there — and if you had already chosen a collage and then switched the target to Live TV, the background silently changed back to **Image** without a word. The option is now greyed out with a line explaining why, in all three languages, so the change no longer happens behind your back. Nothing else about how covers render has changed.",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://github.com/bardesss/customcoverart/releases/download/v3.5.1.0/customcoverart_3.5.1.0.zip",
+        "checksum": "83aca37943116cbe3e5a894444f7187c",
+        "timestamp": "2026-08-13T14:08:24Z"
+      },
+      {
         "version": "3.5.0.0",
         "changelog": "Adds **Spanish**. The whole configuration page — every step, label, button, hint and message, plus the server's upload and validation errors — is now translated, joining English and Dutch. The page follows your Jellyfin display language, and regional variants come along for the ride: `es-MX` and `es-419` get Spanish just like `es-ES`. Alongside it, the translation files themselves were **cleaned up and put under test**. Roughly a hundred strings left behind by the v3 editor rewrite were still being carried (and would have had to be translated into every new language) — those are gone, and five new build-time checks now fail if a language drifts out of sync with English, if a `{0}` placeholder goes missing, or if a string is defined but never shown. No change to how covers look or render.",
         "targetAbi": "10.11.0.0",
