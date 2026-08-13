@@ -12,6 +12,12 @@ public interface ILocalizationService
 
 public class LocalizationService : ILocalizationService
 {
+    /// <summary>
+    /// Language codes shipped as Resources/&lt;code&gt;.json. Keep in sync with the
+    /// I18N blocks in Configuration/configPage.html, which localizes the UI itself.
+    /// </summary>
+    public static readonly string[] SupportedLanguageCodes = { "en", "nl", "es" };
+
     private readonly ILoggingService _loggingService;
     private readonly Dictionary<string, Dictionary<string, string>> _translations;
     private string _currentLanguage = "en";
@@ -71,12 +77,14 @@ public class LocalizationService : ILocalizationService
     {
         try
         {
-            // Load English translations (default)
-            LoadLanguageFile("en");
-            
-            // Load Dutch translations
-            LoadLanguageFile("nl");
-            
+            // English is the fallback and must load first; the rest are optional.
+            // Adding a language means dropping Resources/<code>.json in and listing
+            // the code here — the csproj embeds Resources\**\*.json automatically.
+            foreach (var code in SupportedLanguageCodes)
+            {
+                LoadLanguageFile(code);
+            }
+
             _loggingService.LogInformation("Loaded translations for {Count} languages: {Languages}", 
                 _translations.Count, string.Join(", ", _translations.Keys));
         }

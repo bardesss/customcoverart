@@ -1,0 +1,8 @@
+{
+  "errors.no_file_uploaded": "No se ha subido ningún archivo",
+  "errors.file_too_large": "El archivo es demasiado grande. El tamaño máximo es {0}MB.",
+  "errors.font_too_large": "El archivo de fuente es demasiado grande. El tamaño máximo es 5MB.",
+  "errors.invalid_file_format": "Formato de archivo no válido. Solo se permiten JPG, PNG, GIF, BMP, WebP y TIFF.",
+  "errors.too_many_uploads": "Demasiadas subidas. Inténtalo de nuevo dentro de un minuto.",
+  "errors.suspicious_content": "El archivo contiene contenido sospechoso y ha sido rechazado"
+}

@@ -50,7 +50,7 @@ Layered text and logos, backgrounds, composition effects — designed on a live 
 | 📚 | **Batch apply** | Apply one design to many libraries/collections/playlists at once |
 | 🕗 | **Restore original** | One-click revert to a target's pre-plugin cover |
 | 🎞️ | **Animated GIF** | Export animated covers (animated-source passthrough or Ken Burns pan/zoom) |
-| 🌍 | **Localisation** | English and Dutch included; easy to add more |
+| 🌍 | **Localisation** | English, Dutch and Spanish included; easy to add more |
 | 🪶 | **Lightweight** | Small footprint — the plugin DLL is ~1.8 MB (fonts are subset-embedded), so it stays easy on the server |
 
 ## 📸 Screenshots
@@ -259,23 +259,33 @@ cover** in step 1 to revert.
 Strings live in **two** places, and a language needs both — translating only the first
 leaves the whole configuration page in English.
 
-**1. Server messages** — `Resources/<language-code>.json`:
+**1. Server messages** — `Resources/<language-code>.json`. A short file: the six upload
+and validation errors the server returns.
 
 1. Copy `Resources/en.json` as a starting point.
 2. Translate the values; keep the keys identical.
 3. Use `{0}`, `{1}` for interpolated values (e.g. `"File is too large. Maximum {0}MB."`).
-4. Detection order: `JELLYFIN_LANGUAGE` → `LANG` → system culture → English fallback.
+4. Add the language code to `LocalizationService.SupportedLanguageCodes`.
+5. Detection order: `JELLYFIN_LANGUAGE` → `LANG` → system culture → English fallback.
+   Note this is the **server's** locale, not the browser's — the two can disagree.
 
 **2. The configuration page** — the `I18N` object near the top of the `<script>` block in
-`Configuration/configPage.html`. This is the larger of the two and covers every label,
-button and hint you see in the dashboard. Add a block alongside `en` and `nl`, keyed by
-the two-letter language code; the page picks it from Jellyfin's stored UI language.
+`Configuration/configPage.html`. This is by far the larger of the two and covers every
+label, button and hint you see in the dashboard. Add a block alongside `en`, `nl` and
+`es`, keyed by the two-letter language code; the page picks it from Jellyfin's stored UI
+language. Regional codes fold to the base language, so `es-MX` and `es-419` both use `es`.
 
-Then rebuild. `PresetTests.EveryI18nKeyUsedInMarkup_ExistsInBothLanguages` fails the build
-if a key used in the markup is missing from `en` or `nl`, so a forgotten string is caught
-before it ships.
+Then rebuild — five guards fail the build before a half-finished translation can ship:
 
-Included: `en` (English), `nl` (Dutch).
+| Test | Catches |
+|---|---|
+| `EveryI18nKeyUsedInMarkup_ExistsInEveryLanguage` | a `data-i18n` key missing from a language |
+| `EveryLanguage_DefinesTheSameKeysAndPlaceholdersAsEnglish` | key drift and `{0}`/`{1}` mismatches vs `en` |
+| `EveryDefinedI18nKey_IsReachableFromTheMarkupOrScript` | strings left behind that nobody has to translate |
+| `EverySupportedLanguage_HasTheSameKeysAndPlaceholdersAsEnglish` | the same two checks for `Resources/*.json` |
+| `EveryKeyTheServerCodeUses_ResolvesToRealText` | a key the server asks for that no longer exists |
+
+Included: `en` (English), `nl` (Dutch), `es` (Spanish).
 
 ## 🧪 Development
 
@@ -293,8 +303,9 @@ directly to supply them at test time.
 
 Two guards are worth knowing about before editing `Configuration/configPage.html`:
 `ConfigPageStructureTests` pins every `cca*` element id, so a control cannot be silently
-dropped while markup is moved — add new ids to that list. And the translation check fails
-the build if a `data-i18n` key in the markup is missing from either language.
+dropped while markup is moved — add new ids to that list. And the translation checks fail
+the build if a `data-i18n` key in the markup is missing from any language, if a language
+drifts out of key parity with `en`, or if a defined key stops being used at all.
 
 ## 📦 Releasing
 
