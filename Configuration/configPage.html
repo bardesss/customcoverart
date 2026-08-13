@@ -77,6 +77,7 @@
                                 <option value="gradient" data-i18n="bg.source.gradient">Gradient</option>
                                 <option value="solid" data-i18n="bg.source.solid">Solid colour</option>
                             </select>
+                            <div class="fieldDescription" id="ccaCollageLiveTvHint" data-i18n="bg.collage.livetv" style="display:none">Live TV has no posters to collage.</div>
                         </div>
                         <div class="inputContainer" id="ccaCollageRow" style="display:none">
                             <label for="ccaCollageDensity" data-i18n="bg.collage.density">Collage density</label>
@@ -927,7 +928,7 @@
                 'dyn.uploadFail': 'Upload failed: {0}', 'dyn.fontFail': 'Font upload failed: {0}',
                 'dyn.unknown': 'unknown error',
                 'restore.button': 'Restore original cover', 'restore.none': 'No backup yet', 'restore.available': 'A backup exists', 'restore.done': 'Original cover restored.', 'restore.fail': 'No backup found to restore.',
-                'bg.source': 'Background source', 'bg.source.image': 'Image', 'bg.source.gradient': 'Gradient', 'bg.source.solid': 'Solid colour', 'bg.source.collage': 'Poster collage from this target', 'bg.collage.density': 'Collage density', 'bg.collage.sparse': 'Sparse', 'bg.collage.medium': 'Medium', 'bg.collage.dense': 'Dense', 'bg.collage.shuffle': 'Shuffle',
+                'bg.source': 'Background source', 'bg.source.image': 'Image', 'bg.source.gradient': 'Gradient', 'bg.source.solid': 'Solid colour', 'bg.source.collage': 'Poster collage from this target', 'bg.collage.density': 'Collage density', 'bg.collage.sparse': 'Sparse', 'bg.collage.medium': 'Medium', 'bg.collage.dense': 'Dense', 'bg.collage.shuffle': 'Shuffle', 'bg.collage.livetv': 'Live TV has no posters to collage.',
                 'tpl.load': 'Load template', 'tpl.delete': 'Delete', 'tpl.save': 'Save current design', 'tpl.savebtn': 'Save', 'tpl.nameph': 'Template name', 'tpl.hint': 'Templates store the design but not the title — each target keeps its own name.', 'tpl.saved': 'Template saved.', 'tpl.named': 'Enter a template name first.',
                 'batch.hint': 'Apply the current design (or loaded template) to several targets at once. Each cover is titled with its target\'s name.', 'batch.apply': 'Apply to selected', 'batch.none': 'Select at least one target.', 'batch.running': 'Applying…', 'batch.done': 'Done: {0} ok, {1} failed.',
                 'fmt.animated': 'Animated GIF', 'anim.kenburns': 'Ken Burns pan/zoom', 'anim.frames': 'Frames', 'anim.delay': 'Frame delay (ms)', 'anim.dir': 'Zoom direction', 'anim.in': 'Zoom in', 'anim.out': 'Zoom out', 'anim.hint': 'Animated GIFs are larger and only animate in views that render GIFs. Capped at 30 frames.'
@@ -988,7 +989,7 @@
                 'dyn.uploadFail': 'Uploaden mislukt: {0}', 'dyn.fontFail': 'Lettertype uploaden mislukt: {0}',
                 'dyn.unknown': 'onbekende fout',
                 'restore.button': 'Originele cover herstellen', 'restore.none': 'Nog geen back-up', 'restore.available': 'Er is een back-up', 'restore.done': 'Originele cover hersteld.', 'restore.fail': 'Geen back-up gevonden om te herstellen.',
-                'bg.source': 'Achtergrondbron', 'bg.source.image': 'Afbeelding', 'bg.source.gradient': 'Verloop', 'bg.source.solid': 'Effen kleur', 'bg.source.collage': 'Postercollage van dit doel', 'bg.collage.density': 'Collagedichtheid', 'bg.collage.sparse': 'Dun', 'bg.collage.medium': 'Gemiddeld', 'bg.collage.dense': 'Dicht', 'bg.collage.shuffle': 'Schudden',
+                'bg.source': 'Achtergrondbron', 'bg.source.image': 'Afbeelding', 'bg.source.gradient': 'Verloop', 'bg.source.solid': 'Effen kleur', 'bg.source.collage': 'Postercollage van dit doel', 'bg.collage.density': 'Collagedichtheid', 'bg.collage.sparse': 'Dun', 'bg.collage.medium': 'Gemiddeld', 'bg.collage.dense': 'Dicht', 'bg.collage.shuffle': 'Schudden', 'bg.collage.livetv': 'Live TV heeft geen posters voor een collage.',
                 'tpl.load': 'Sjabloon laden', 'tpl.delete': 'Verwijderen', 'tpl.save': 'Huidig ontwerp opslaan', 'tpl.savebtn': 'Opslaan', 'tpl.nameph': 'Sjabloonnaam', 'tpl.hint': 'Sjablonen bewaren het ontwerp maar niet de titel — elk doel houdt zijn eigen naam.', 'tpl.saved': 'Sjabloon opgeslagen.', 'tpl.named': 'Voer eerst een sjabloonnaam in.',
                 'batch.hint': 'Pas het huidige ontwerp (of geladen sjabloon) in één keer toe op meerdere doelen. Elke cover krijgt de naam van zijn doel als titel.', 'batch.apply': 'Toepassen op selectie', 'batch.none': 'Selecteer minstens één doel.', 'batch.running': 'Bezig met toepassen…', 'batch.done': 'Klaar: {0} gelukt, {1} mislukt.',
                 'fmt.animated': 'Geanimeerde GIF', 'anim.kenburns': 'Ken Burns pan/zoom', 'anim.frames': 'Frames', 'anim.delay': 'Framevertraging (ms)', 'anim.dir': 'Zoomrichting', 'anim.in': 'Inzoomen', 'anim.out': 'Uitzoomen', 'anim.hint': 'Geanimeerde GIFs zijn groter en bewegen alleen in weergaven die GIFs tonen. Max. 30 frames.'
@@ -1049,7 +1050,7 @@
                 'dyn.uploadFail': 'Error al subir: {0}', 'dyn.fontFail': 'Error al subir la fuente: {0}',
                 'dyn.unknown': 'error desconocido',
                 'restore.button': 'Restaurar la carátula original', 'restore.none': 'Aún no hay copia de seguridad', 'restore.available': 'Existe una copia de seguridad', 'restore.done': 'Carátula original restaurada.', 'restore.fail': 'No se ha encontrado ninguna copia de seguridad que restaurar.',
-                'bg.source': 'Origen del fondo', 'bg.source.image': 'Imagen', 'bg.source.gradient': 'Degradado', 'bg.source.solid': 'Color sólido', 'bg.source.collage': 'Collage de pósteres de este destino', 'bg.collage.density': 'Densidad del collage', 'bg.collage.sparse': 'Baja', 'bg.collage.medium': 'Media', 'bg.collage.dense': 'Alta', 'bg.collage.shuffle': 'Barajar',
+                'bg.source': 'Origen del fondo', 'bg.source.image': 'Imagen', 'bg.source.gradient': 'Degradado', 'bg.source.solid': 'Color sólido', 'bg.source.collage': 'Collage de pósteres de este destino', 'bg.collage.density': 'Densidad del collage', 'bg.collage.sparse': 'Baja', 'bg.collage.medium': 'Media', 'bg.collage.dense': 'Alta', 'bg.collage.shuffle': 'Barajar', 'bg.collage.livetv': 'La TV en directo no tiene pósteres para hacer un collage.',
                 'tpl.load': 'Cargar plantilla', 'tpl.delete': 'Eliminar', 'tpl.save': 'Guardar el diseño actual', 'tpl.savebtn': 'Guardar', 'tpl.nameph': 'Nombre de la plantilla', 'tpl.hint': 'Las plantillas guardan el diseño pero no el título — cada destino conserva su propio nombre.', 'tpl.saved': 'Plantilla guardada.', 'tpl.named': 'Introduce primero un nombre de plantilla.',
                 'batch.hint': 'Aplica el diseño actual (o la plantilla cargada) a varios destinos a la vez. Cada carátula se titula con el nombre de su destino.', 'batch.apply': 'Aplicar a la selección', 'batch.none': 'Selecciona al menos un destino.', 'batch.running': 'Aplicando…', 'batch.done': 'Listo: {0} correctas, {1} fallidas.',
                 'fmt.animated': 'GIF animado', 'anim.kenburns': 'Paneo/zoom Ken Burns', 'anim.frames': 'Fotogramas', 'anim.delay': 'Retardo entre fotogramas (ms)', 'anim.dir': 'Dirección del zoom', 'anim.in': 'Acercar', 'anim.out': 'Alejar', 'anim.hint': 'Los GIF animados son más grandes y solo se animan en vistas que muestran GIF. Máximo 30 fotogramas.'
@@ -3222,10 +3223,15 @@
             var source = el('ccaBgSource').value;
             var type = el('ccaTargetType') ? el('ccaTargetType').value : 'library';
 
-            // Live TV has no child posters to build a mosaic from.
+            // Live TV has no child posters to build a mosaic from. Disabling the option is
+            // not enough on its own: switching the target to Live TV while a collage is
+            // already chosen has to revert the source, which silently discarded the user's
+            // choice until the hint below explained it.
+            var isLiveTv = (type === 'livetv');
             var collageOpt = el('ccaBgSource').querySelector('option[value="collage"]');
-            if (collageOpt) { collageOpt.disabled = (type === 'livetv'); }
-            if (type === 'livetv' && source === 'collage') {
+            if (collageOpt) { collageOpt.disabled = isLiveTv; }
+            el('ccaCollageLiveTvHint').style.display = isLiveTv ? '' : 'none';
+            if (isLiveTv && source === 'collage') {
                 el('ccaBgSource').value = 'upload';
                 doc.Background.Source = 'upload';
                 source = 'upload';

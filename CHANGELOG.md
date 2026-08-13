@@ -4,6 +4,9 @@ The text under each version heading is published to the plugin's manifest by the
 release workflow (and shown as the version's changelog inside Jellyfin). Add a
 new `## <version>` section when you bump `<Version>` in the csproj.
 
+## 3.5.1.0
+Fixes a small but confusing moment with **Live TV** targets. Live TV has no posters to build a mosaic from, so the **Poster collage** background is unavailable there — and if you had already chosen a collage and then switched the target to Live TV, the background silently changed back to **Image** without a word. The option is now greyed out with a line explaining why, in all three languages, so the change no longer happens behind your back. Nothing else about how covers render has changed.
+
 ## 3.5.0.0
 Adds **Spanish**. The whole configuration page — every step, label, button, hint and message, plus the server's upload and validation errors — is now translated, joining English and Dutch. The page follows your Jellyfin display language, and regional variants come along for the ride: `es-MX` and `es-419` get Spanish just like `es-ES`. Alongside it, the translation files themselves were **cleaned up and put under test**. Roughly a hundred strings left behind by the v3 editor rewrite were still being carried (and would have had to be translated into every new language) — those are gone, and five new build-time checks now fail if a language drifts out of sync with English, if a `{0}` placeholder goes missing, or if a string is defined but never shown. No change to how covers look or render.
 
