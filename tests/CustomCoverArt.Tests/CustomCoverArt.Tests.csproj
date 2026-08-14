@@ -1,10 +1,14 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <!-- Mirrors the property in CustomCoverArt.csproj; see the comment there. -->
+    <PluginTargetFramework Condition="'$(PluginTargetFramework)' == ''">net9.0</PluginTargetFramework>
+    <TargetFramework>$(PluginTargetFramework)</TargetFramework>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
+    <!-- Mirrors the property in CustomCoverArt.csproj; see the comment there. -->
+    <JellyfinVersion Condition="'$(JellyfinVersion)' == ''">10.11.3</JellyfinVersion>
   </PropertyGroup>
 
   <ItemGroup>
@@ -15,9 +19,9 @@
     <!-- The main project references the Jellyfin assemblies with
          ExcludeAssets=runtime, so reference them directly here to supply them
          at test runtime. -->
-    <PackageReference Include="Jellyfin.Common" Version="10.11.3" />
-    <PackageReference Include="Jellyfin.Controller" Version="10.11.3" />
-    <PackageReference Include="Jellyfin.Model" Version="10.11.3" />
+    <PackageReference Include="Jellyfin.Common" Version="$(JellyfinVersion)" />
+    <PackageReference Include="Jellyfin.Controller" Version="$(JellyfinVersion)" />
+    <PackageReference Include="Jellyfin.Model" Version="$(JellyfinVersion)" />
   </ItemGroup>
 
   <ItemGroup>

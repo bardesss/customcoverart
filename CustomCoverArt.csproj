@@ -1,7 +1,14 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <!--
+      Indirection so the jellyfin-compat workflow can retarget the build (Jellyfin
+      12.x ships for net10.0). Overriding TargetFramework directly is unreliable:
+      MSBuild special-cases it during ProjectReference negotiation, so the test
+      project would not pass it through to this one. A custom property does.
+    -->
+    <PluginTargetFramework Condition="'$(PluginTargetFramework)' == ''">net9.0</PluginTargetFramework>
+    <TargetFramework>$(PluginTargetFramework)</TargetFramework>
     <RootNamespace>CustomCoverArt</RootNamespace>
     <AssemblyName>CustomCoverArt</AssemblyName>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -20,6 +27,13 @@
       so they are NOT copied (the server provides them).
     -->
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <!--
+      Single source of truth for the Jellyfin package versions. Overridable so the
+      jellyfin-compat workflow can build against a newer server release without
+      editing this file: dotnet build -p:JellyfinVersion=10.11.11
+      Keep this in sync with the same property in tests/CustomCoverArt.Tests.
+    -->
+    <JellyfinVersion Condition="'$(JellyfinVersion)' == ''">10.11.3</JellyfinVersion>
   </PropertyGroup>
 
   <!--
@@ -29,10 +43,10 @@
     Versions must match the target server's major version (10.11.x here).
   -->
   <ItemGroup>
-    <PackageReference Include="Jellyfin.Controller" Version="10.11.3">
+    <PackageReference Include="Jellyfin.Controller" Version="$(JellyfinVersion)">
       <ExcludeAssets>runtime</ExcludeAssets>
     </PackageReference>
-    <PackageReference Include="Jellyfin.Model" Version="10.11.3">
+    <PackageReference Include="Jellyfin.Model" Version="$(JellyfinVersion)">
       <ExcludeAssets>runtime</ExcludeAssets>
     </PackageReference>
   </ItemGroup>

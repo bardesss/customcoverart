@@ -307,6 +307,28 @@ dropped while markup is moved — add new ids to that list. And the translation 
 the build if a `data-i18n` key in the markup is missing from any language, if a language
 drifts out of key parity with `en`, or if a defined key stops being used at all.
 
+### Jellyfin version compatibility
+
+The Jellyfin package version lives in one place per project: `<JellyfinVersion>` in
+`CustomCoverArt.csproj` and in the test project. Override it to build against a different
+server release without editing anything:
+
+```bash
+dotnet test tests/CustomCoverArt.Tests -p:JellyfinVersion=10.11.11
+```
+
+The **Jellyfin compatibility** GitHub Action runs weekly (and on demand). It asks NuGet for
+the newest `Jellyfin.Controller`, and if that is ahead of the pin it builds and runs the full
+suite against it, opening a single `jellyfin-compat` issue if anything breaks — so a server
+update that breaks the plugin shows up here rather than in someone's server log. A second,
+advisory job does the same against the newest pre-release (currently the `12.0.0-rc` line)
+and is allowed to fail: it is early warning, not a broken build.
+
+Note that Jellyfin 12 targets `net10.0`, so the advisory job also retargets via
+`-p:PluginTargetFramework=net10.0`. That check is compile-and-unit-test only — it says
+nothing about whether the plugin still *loads* into a running server, and it deliberately
+never touches `targetAbi` in `manifest.json`, which stays a human decision.
+
 ## 📦 Releasing
 
 The version lives in one place: `<Version>` in `CustomCoverArt.csproj`. To ship a release,

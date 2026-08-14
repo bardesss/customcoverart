@@ -1,0 +1,166 @@
+name: Jellyfin compatibility
+
+# Builds and runs the test suite against Jellyfin releases NEWER than the version
+# pinned in the csprojs, so a server update that breaks the plugin surfaces here
+# instead of in a user's server log.
+#
+# This workflow never changes the pin, the targetAbi, or manifest.json — bumping
+# those stays a human decision (see the issue body it files).
+on:
+  schedule:
+    # Mondays, 06:00 UTC.
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: jellyfin-compat
+  cancel-in-progress: false
+
+env:
+  NUGET_INDEX: https://api.nuget.org/v3-flatcontainer/jellyfin.controller/index.json
+  # Jellyfin 12.x targets net10.0 while this plugin targets net9.0, so the preview
+  # job has to retarget or it only ever reports NU1202. Bump this when a future
+  # Jellyfin major moves the target framework again.
+  PREVIEW_TFM: net10.0
+
+jobs:
+  stable:
+    name: Latest stable Jellyfin
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Resolve pinned and latest stable versions
+        id: ver
+        run: |
+          set -euo pipefail
+          # `|| true` so a missing property reaches the check below instead of
+          # killing the step on grep's exit code under `set -e`.
+          PINNED=$(grep -oPm1 '(?<=>)[^<]+(?=</JellyfinVersion>)' CustomCoverArt.csproj || true)
+          if [ -z "$PINNED" ]; then
+            echo "No <JellyfinVersion> found in CustomCoverArt.csproj"; exit 1
+          fi
+          # The flat-container index is sorted ascending by SemVer, so the last
+          # entry with no '-' suffix is the newest stable release.
+          LATEST=$(curl -sSfL "$NUGET_INDEX" | jq -r '[.versions[] | select(test("-") | not)] | last')
+          if [ -z "$LATEST" ] || [ "$LATEST" = "null" ]; then
+            echo "Could not resolve a stable Jellyfin.Controller version from NuGet"; exit 1
+          fi
+          # Only build when NuGet is genuinely ahead of the pin.
+          NEWEST=$(printf '%s\n%s\n' "$PINNED" "$LATEST" | sort -V | tail -1)
+          if [ "$NEWEST" = "$PINNED" ]; then NEWER=false; else NEWER=true; fi
+          echo "pinned=$PINNED" >> "$GITHUB_OUTPUT"
+          echo "latest=$LATEST" >> "$GITHUB_OUTPUT"
+          echo "newer=$NEWER"   >> "$GITHUB_OUTPUT"
+          echo "Pinned: $PINNED | latest stable: $LATEST | newer available: $NEWER"
+
+      - name: Build and test against latest stable
+        id: test
+        if: steps.ver.outputs.newer == 'true'
+        # Not a hard failure: the next step needs to run so it can file the issue.
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          dotnet test tests/CustomCoverArt.Tests/CustomCoverArt.Tests.csproj \
+            -c Release \
+            -p:JellyfinVersion=${{ steps.ver.outputs.latest }} 2>&1 | tee /tmp/compat.log
+
+      - name: File an issue if it broke
+        if: steps.ver.outputs.newer == 'true' && steps.test.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LATEST: ${{ steps.ver.outputs.latest }}
+          PINNED: ${{ steps.ver.outputs.pinned }}
+        run: |
+          set -euo pipefail
+          TITLE="Jellyfin $LATEST breaks the build (pinned: $PINNED)"
+          # gh issue create rejects an unknown label, and the label may not exist yet.
+          gh label create jellyfin-compat \
+            --color B60205 \
+            --description "Plugin fails to build against a newer Jellyfin release" \
+            >/dev/null 2>&1 || true
+          # One issue per Jellyfin version: a weekly cron must not reopen the same
+          # report every Monday until the pin is bumped.
+          EXISTING=$(gh issue list --label jellyfin-compat --state open \
+            --json number,title \
+            --jq "[.[] | select(.title == \"$TITLE\")] | first | .number // empty")
+          if [ -n "$EXISTING" ]; then
+            echo "Issue #$EXISTING already tracks $LATEST — not filing a duplicate."
+            exit 0
+          fi
+          RUN_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          # Built with a command group rather than a heredoc so log output containing
+          # backticks or an EOF line cannot terminate or mangle the body.
+          {
+            echo "Jellyfin **$LATEST** is on NuGet. Building this plugin against it fails; the pin is currently \`$PINNED\`."
+            echo
+            echo "Failing run: $RUN_URL"
+            echo
+            echo "<details><summary>Last 60 lines of output</summary>"
+            echo
+            echo '```'
+            tail -60 /tmp/compat.log
+            echo '```'
+            echo
+            echo "</details>"
+            echo
+            echo "### What this does and does not tell you"
+            echo
+            echo "This is a **compile and unit-test** check. It says nothing about whether the plugin still *loads* into a running server, and it deliberately leaves \`targetAbi\` alone — \`manifest.json\` and the hardcoded ABI in \`release.yml\` are a separate, human decision."
+            echo
+            echo "To bump the pin once this is fixed, edit \`<JellyfinVersion>\` in \`CustomCoverArt.csproj\` and \`tests/CustomCoverArt.Tests/CustomCoverArt.Tests.csproj\`."
+          } > /tmp/issue.md
+          gh issue create --title "$TITLE" --label jellyfin-compat --body-file /tmp/issue.md
+
+      - name: Fail the job if the build broke
+        if: steps.ver.outputs.newer == 'true' && steps.test.outcome == 'failure'
+        run: exit 1
+
+  preview:
+    name: Jellyfin preview (advisory)
+    runs-on: ubuntu-latest
+    # Advisory only: a red preview job is early warning, not a broken repo. It
+    # never files an issue and never fails the workflow run.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            9.0.x
+            10.0.x
+
+      - name: Resolve newest preview version
+        id: ver
+        run: |
+          set -euo pipefail
+          ALL=$(curl -sSfL "$NUGET_INDEX" | jq -r '.versions | last')
+          STABLE=$(curl -sSfL "$NUGET_INDEX" | jq -r '[.versions[] | select(test("-") | not)] | last')
+          # Nothing to do when the newest package overall is the newest stable —
+          # that case is already covered by the stable job.
+          if [ "$ALL" = "$STABLE" ]; then
+            echo "No preview newer than stable ($STABLE)."
+            echo "preview=" >> "$GITHUB_OUTPUT"
+          else
+            echo "Newest preview: $ALL"
+            echo "preview=$ALL" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build and test against preview
+        if: steps.ver.outputs.preview != ''
+        run: |
+          dotnet test tests/CustomCoverArt.Tests/CustomCoverArt.Tests.csproj \
+            -c Release \
+            -p:JellyfinVersion=${{ steps.ver.outputs.preview }} \
+            -p:PluginTargetFramework=${{ env.PREVIEW_TFM }}
