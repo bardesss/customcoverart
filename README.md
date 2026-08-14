@@ -6,7 +6,16 @@
 
 Layered text and logos, backgrounds, composition effects — designed on a live canvas, right inside the Jellyfin dashboard.
 
-`Jellyfin 10.11` · `.NET 9` · `SixLabors.ImageSharp`
+[![Jellyfin 10.11](https://img.shields.io/badge/Jellyfin-10.11-00A4DC?style=flat-square&logo=jellyfin&logoColor=white)](https://jellyfin.org)
+[![.NET 9](https://img.shields.io/badge/.NET-9-512BD4?style=flat-square&logo=dotnet&logoColor=white)](https://dotnet.microsoft.com)
+[![SixLabors.ImageSharp](https://img.shields.io/badge/ImageSharp-3.1-31708E?style=flat-square)](https://github.com/SixLabors/ImageSharp)
+
+[![Tests](https://img.shields.io/github/actions/workflow/status/bardesss/customcoverart/ci.yml?branch=main&label=tests&style=flat-square&logo=github)](https://github.com/bardesss/customcoverart/actions/workflows/ci.yml)
+[![Jellyfin compatibility](https://img.shields.io/github/actions/workflow/status/bardesss/customcoverart/jellyfin-compat.yml?branch=main&label=Jellyfin%20compatibility&style=flat-square&logo=github)](https://github.com/bardesss/customcoverart/actions/workflows/jellyfin-compat.yml)
+[![Release](https://img.shields.io/github/v/release/bardesss/customcoverart?style=flat-square&color=success)](https://github.com/bardesss/customcoverart/releases/latest)
+[![License](https://img.shields.io/github/license/bardesss/customcoverart?style=flat-square)](LICENSE)
+
+<sub>The compatibility badge is a weekly build of the plugin against the newest Jellyfin release — see [Jellyfin version compatibility](#jellyfin-version-compatibility).</sub>
 
 </div>
 
