@@ -26,7 +26,7 @@ jobs:
 
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '9.0.x'
+          dotnet-version: '10.0.x'
 
       - name: Read version from csproj
         id: ver
@@ -58,8 +58,8 @@ jobs:
         run: |
           VER="${{ steps.ver.outputs.ver }}"
           mkdir -p dist/stage
-          cp bin/Release/net9.0/CustomCoverArt.dll dist/stage/
-          cp bin/Release/net9.0/SixLabors.*.dll dist/stage/
+          cp bin/Release/net10.0/CustomCoverArt.dll dist/stage/
+          cp bin/Release/net10.0/SixLabors.*.dll dist/stage/
           cat > dist/stage/meta.json <<EOF
           {
             "category": "General",
@@ -68,8 +68,8 @@ jobs:
             "description": "Create and manage custom cover art for Jellyfin libraries with advanced text effects and presets.",
             "overview": "Generate custom library cover art with text, gradients, blur and custom backgrounds.",
             "owner": "Bardesss",
-            "targetAbi": "10.11.0.0",
-            "framework": "net9.0",
+            "targetAbi": "12.0.0.0",
+            "framework": "net10.0",
             "version": "$VER",
             "timestamp": "$(date -u +%FT%TZ)",
             "status": "Active",
@@ -110,7 +110,7 @@ jobs:
           NEW=$(jq -n \
             --arg v "$VER" \
             --arg cl "$CHANGELOG" \
-            --arg abi "10.11.0.0" \
+            --arg abi "12.0.0.0" \
             --arg url "$URL" \
             --arg chk "${{ steps.pkg.outputs.chk }}" \
             --arg ts "$(date -u +%FT%TZ)" \

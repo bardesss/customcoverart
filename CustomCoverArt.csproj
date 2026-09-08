@@ -2,12 +2,13 @@
 
   <PropertyGroup>
     <!--
-      Indirection so the jellyfin-compat workflow can retarget the build (Jellyfin
-      12.x ships for net10.0). Overriding TargetFramework directly is unreliable:
+      Indirection so the jellyfin-compat workflow can retarget the build when a
+      future Jellyfin major moves the target framework again (12.x ships for
+      net10.0). Overriding TargetFramework directly is unreliable:
       MSBuild special-cases it during ProjectReference negotiation, so the test
       project would not pass it through to this one. A custom property does.
     -->
-    <PluginTargetFramework Condition="'$(PluginTargetFramework)' == ''">net9.0</PluginTargetFramework>
+    <PluginTargetFramework Condition="'$(PluginTargetFramework)' == ''">net10.0</PluginTargetFramework>
     <TargetFramework>$(PluginTargetFramework)</TargetFramework>
     <RootNamespace>CustomCoverArt</RootNamespace>
     <AssemblyName>CustomCoverArt</AssemblyName>
@@ -20,7 +21,7 @@
     <Copyright>Copyright © 2026 Bardesss — licensed under GPL-3.0-only</Copyright>
     <!-- Single source of truth for the plugin version. Bump this in a PR;
          merging to main triggers a release of the new version. -->
-    <Version>3.5.1.0</Version>
+    <Version>4.0.0.0</Version>
     <!--
       Copy runtime dependencies (SixLabors.*) into the build output so they can be
       packaged with the plugin. The Jellyfin.* references use ExcludeAssets=runtime,
@@ -30,17 +31,17 @@
     <!--
       Single source of truth for the Jellyfin package versions. Overridable so the
       jellyfin-compat workflow can build against a newer server release without
-      editing this file: dotnet build -p:JellyfinVersion=10.11.11
+      editing this file: dotnet build -p:JellyfinVersion=12.0.1
       Keep this in sync with the same property in tests/CustomCoverArt.Tests.
     -->
-    <JellyfinVersion Condition="'$(JellyfinVersion)' == ''">10.11.3</JellyfinVersion>
+    <JellyfinVersion Condition="'$(JellyfinVersion)' == ''">12.0.0</JellyfinVersion>
   </PropertyGroup>
 
   <!--
     Jellyfin plugin references. ExcludeAssets=runtime is REQUIRED: these
     assemblies are provided by the Jellyfin server at runtime, and shipping
     our own copies would break plugin loading.
-    Versions must match the target server's major version (10.11.x here).
+    Versions must match the target server's major version (12.x here).
   -->
   <ItemGroup>
     <PackageReference Include="Jellyfin.Controller" Version="$(JellyfinVersion)">
