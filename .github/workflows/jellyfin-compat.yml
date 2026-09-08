@@ -21,9 +21,10 @@ concurrency:
 
 env:
   NUGET_INDEX: https://api.nuget.org/v3-flatcontainer/jellyfin.controller/index.json
-  # Jellyfin 12.x targets net10.0 while this plugin targets net9.0, so the preview
-  # job has to retarget or it only ever reports NU1202. Bump this when a future
-  # Jellyfin major moves the target framework again.
+  # The framework the preview job builds against. It matches the plugin's own
+  # target (net10.0) as long as the newest pre-release is in the same Jellyfin
+  # major; bump it when a future major moves the target framework, or the preview
+  # job only ever reports NU1202.
   PREVIEW_TFM: net10.0
 
 jobs:
@@ -38,7 +39,7 @@ jobs:
 
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '9.0.x'
+          dotnet-version: '10.0.x'
 
       - name: Resolve pinned and latest stable versions
         id: ver
@@ -137,9 +138,7 @@ jobs:
 
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: |
-            9.0.x
-            10.0.x
+          dotnet-version: '10.0.x'
 
       - name: Resolve newest preview version
         id: ver

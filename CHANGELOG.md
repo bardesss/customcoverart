@@ -4,6 +4,9 @@ The text under each version heading is published to the plugin's manifest by the
 release workflow (and shown as the version's changelog inside Jellyfin). Add a
 new `## <version>` section when you bump `<Version>` in the csproj.
 
+## 4.0.0.0
+**Support for Jellyfin 12.** Jellyfin 12 moved to .NET 10 and changed its plugin ABI, so a plugin built for 10.11 cannot be built for both — this release is built against Jellyfin 12 and requires it. Nothing about designing or rendering covers has changed: your saved templates, applied covers and settings all carry over untouched. If you are **still on Jellyfin 10.11**, stay on **3.5.1.0** — your server will keep being offered that version and will not see this one, so nothing breaks by leaving it alone.
+
 ## 3.5.1.0
 Fixes a small but confusing moment with **Live TV** targets. Live TV has no posters to build a mosaic from, so the **Poster collage** background is unavailable there — and if you had already chosen a collage and then switched the target to Live TV, the background silently changed back to **Image** without a word. The option is now greyed out with a line explaining why, in all three languages, so the change no longer happens behind your back. Nothing else about how covers render has changed.
 

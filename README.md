@@ -6,8 +6,8 @@
 
 Layered text and logos, backgrounds, composition effects — designed on a live canvas, right inside the Jellyfin dashboard.
 
-[![Jellyfin 10.11](https://img.shields.io/badge/Jellyfin-10.11-00A4DC?style=flat-square&logo=jellyfin&logoColor=white)](https://jellyfin.org)
-[![.NET 9](https://img.shields.io/badge/.NET-9-512BD4?style=flat-square&logo=dotnet&logoColor=white)](https://dotnet.microsoft.com)
+[![Jellyfin 12](https://img.shields.io/badge/Jellyfin-12-00A4DC?style=flat-square&logo=jellyfin&logoColor=white)](https://jellyfin.org)
+[![.NET 10](https://img.shields.io/badge/.NET-10-512BD4?style=flat-square&logo=dotnet&logoColor=white)](https://dotnet.microsoft.com)
 [![SixLabors.ImageSharp](https://img.shields.io/badge/ImageSharp-3.1-31708E?style=flat-square)](https://github.com/SixLabors/ImageSharp)
 
 [![Tests](https://img.shields.io/github/actions/workflow/status/bardesss/customcoverart/ci.yml?branch=main&label=tests&style=flat-square&logo=github)](https://github.com/bardesss/customcoverart/actions/workflows/ci.yml)
@@ -110,8 +110,12 @@ English by default.*
 
 ## 📋 Requirements
 
-- **Jellyfin Server 10.11.x** (the plugin is ABI‑locked to this major version)
-- The **.NET 9 SDK** — only needed if you build from source; the runtime ships with Jellyfin
+- **Jellyfin Server 12.x** (the plugin is ABI‑locked to this major version)
+- The **.NET 10 SDK** — only needed if you build from source; the runtime ships with Jellyfin
+
+> **Still on Jellyfin 10.11?** Version **3.5.1.0** is the last release for it, and it keeps
+> working — `manifest.json` still carries that entry with `targetAbi 10.11.0.0`, so a 10.11
+> server is offered 3.5.1.0 and never 4.x. New features land on 12.x only.
 
 ## 🚀 Installation
 
@@ -147,7 +151,7 @@ dotnet restore
 dotnet build -c Release
 ```
 
-The output is in `bin/Release/net9.0/`. Copy `CustomCoverArt.dll` plus the
+The output is in `bin/Release/net10.0/`. Copy `CustomCoverArt.dll` plus the
 `SixLabors.ImageSharp*.dll` and `SixLabors.Fonts.dll` files into the plugin folder above.
 *(The `Jellyfin.*` assemblies are provided by the server and are intentionally **not** shipped.)*
 
@@ -323,20 +327,22 @@ The Jellyfin package version lives in one place per project: `<JellyfinVersion>`
 server release without editing anything:
 
 ```bash
-dotnet test tests/CustomCoverArt.Tests -p:JellyfinVersion=10.11.11
+dotnet test tests/CustomCoverArt.Tests -p:JellyfinVersion=12.0.1
 ```
 
 The **Jellyfin compatibility** GitHub Action runs weekly (and on demand). It asks NuGet for
 the newest `Jellyfin.Controller`, and if that is ahead of the pin it builds and runs the full
 suite against it, opening a single `jellyfin-compat` issue if anything breaks — so a server
 update that breaks the plugin shows up here rather than in someone's server log. A second,
-advisory job does the same against the newest pre-release (currently the `12.0.0-rc` line)
-and is allowed to fail: it is early warning, not a broken build.
+advisory job does the same against the newest pre-release and is allowed to fail: it is
+early warning, not a broken build.
 
-Note that Jellyfin 12 targets `net10.0`, so the advisory job also retargets via
-`-p:PluginTargetFramework=net10.0`. That check is compile-and-unit-test only — it says
-nothing about whether the plugin still *loads* into a running server, and it deliberately
-never touches `targetAbi` in `manifest.json`, which stays a human decision.
+Should a future Jellyfin major move the target framework again, the advisory job can
+retarget via `-p:PluginTargetFramework=…` (the `PREVIEW_TFM` env var in the workflow) —
+that is how the net9.0 → net10.0 move was caught ahead of Jellyfin 12. Either way the check
+is compile-and-unit-test only: it says nothing about whether the plugin still *loads* into a
+running server, and it deliberately never touches `targetAbi` in `manifest.json`, which
+stays a human decision.
 
 ## 📦 Releasing
 
