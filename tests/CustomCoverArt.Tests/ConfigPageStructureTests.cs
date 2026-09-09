@@ -100,6 +100,43 @@ public class ConfigPageStructureTests
         Assert.True(owners == 2, $"Expected ccaCollageLiveTvHint in exactly the markup and its owner; found {owners} references.");
     }
 
+    /// <summary>
+    /// Jellyfin 12 no longer accepts the legacy <c>X-Emby-Token</c> header: a request
+    /// carrying it is challenged by <c>CustomAuthenticationHandler</c> and comes back as a
+    /// 401 with an EMPTY body, so the page's <c>.json()</c> throws "Unexpected end of JSON
+    /// input" and every plugin call fails with an error that names neither auth nor the
+    /// status code. Verified against a live 12.0.0 server: X-Emby-Token → 401,
+    /// the MediaBrowser Authorization scheme → 200.
+    ///
+    /// The scheme is what Jellyfin Web itself sends and is accepted by 10.11 and 12 alike,
+    /// so this is a straight replacement, not a version fork.
+    /// </summary>
+    [Fact]
+    public void AuthenticatesWithTheMediaBrowserAuthorizationScheme()
+    {
+        var page = ConfigPage();
+        // Match the header being SENT (a quoted key in a headers object), not the name
+        // appearing in the comment above authHeader() that explains why it is gone.
+        Assert.DoesNotContain("'X-Emby-Token'", page, System.StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("\"X-Emby-Token\"", page, System.StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("MediaBrowser Client=", page, System.StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Every authenticated request must go through the one header builder. A raw
+    /// <c>fetch(</c> that assembles its own headers is how the poster-image download at the
+    /// end of the browser flow kept the dead token header after the API calls were fixed.
+    /// </summary>
+    [Fact]
+    public void NoFetchBuildsItsOwnAuthorizationHeader()
+    {
+        var page = ConfigPage();
+        // The builder's own return statement is the one legitimate place the literal appears.
+        var occurrences = Regex.Matches(page, @"MediaBrowser Client=").Count;
+        Assert.True(occurrences == 1,
+            $"Expected the MediaBrowser header to be built in exactly one place; found {occurrences}.");
+    }
+
     [Fact]
     public void NoControlWasLostInTheRestructure()
     {
