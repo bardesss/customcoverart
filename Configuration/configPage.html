@@ -1122,9 +1122,28 @@
 
         function apiUrl(path) { return ApiClient.getUrl(path); }
 
+        // Jellyfin 12 no longer accepts the legacy X-Emby-Token header: a request carrying
+        // it is challenged by CustomAuthenticationHandler and returns 401 with an EMPTY
+        // body, so .json() below dies with "Unexpected end of JSON input" and nothing in
+        // the message mentions auth. The MediaBrowser scheme is what Jellyfin Web itself
+        // sends and is accepted by 10.11 and 12 alike, so it replaces the old header
+        // outright rather than being a version fork.
+        //
+        // Build it in ONE place: every authenticated request must come through here.
+        function authHeader() {
+            // The scheme has no escaping rules, so a quote inside a value would end the
+            // field early. Strip rather than escape.
+            function q(v) { return String(v === null || v === undefined ? '' : v).replace(/"/g, ''); }
+            return 'MediaBrowser Client="' + q(ApiClient.appName ? ApiClient.appName() : 'Jellyfin Web') +
+                '", Device="' + q(ApiClient.deviceName ? ApiClient.deviceName() : 'Web') +
+                '", DeviceId="' + q(ApiClient.deviceId ? ApiClient.deviceId() : '') +
+                '", Version="' + q(ApiClient.appVersion ? ApiClient.appVersion() : '') +
+                '", Token="' + q(ApiClient.accessToken()) + '"';
+        }
+
         function authFetch(path, options) {
             options = options || {};
-            options.headers = Object.assign({ 'X-Emby-Token': ApiClient.accessToken() }, options.headers || {});
+            options.headers = Object.assign({ 'Authorization': authHeader() }, options.headers || {});
             return fetch(apiUrl(path), options);
         }
 
@@ -4190,7 +4209,7 @@
             // normal background. Using FormData.append(blob, filename) avoids the
             // File constructor, which isn't reliable in every webview.
             var posterBlob = null;
-            fetch(imgUrl, { headers: { 'X-Emby-Token': ApiClient.accessToken() }, credentials: 'include' })
+            fetch(imgUrl, { headers: { 'Authorization': authHeader() }, credentials: 'include' })
                 .then(function (r) { if (!r.ok) { throw new Error('image fetch returned ' + r.status); } return r.blob(); })
                 .then(function (blob) {
                     if (!blob || blob.size === 0) { throw new Error('the downloaded image was empty'); }
