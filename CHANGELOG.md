@@ -4,6 +4,9 @@ The text under each version heading is published to the plugin's manifest by the
 release workflow (and shown as the version's changelog inside Jellyfin). Add a
 new `## <version>` section when you bump `<Version>` in the csproj.
 
+## 4.0.1.0
+Fixes the configuration page on Jellyfin 12, where **nothing worked**. Jellyfin 12 stopped accepting the older of its two ways of proving who you are, and the page was still using it — so every request it made was rejected before it reached the plugin. Libraries did not load, saved templates did not appear, the bundled fonts did not arrive, applying a cover did nothing, and opening the poster browser produced the cryptic message *"Failed to execute 'json' on 'Response': Unexpected end of JSON input"*, which was the rejection with no explanation attached. The page now identifies itself the same way the Jellyfin web client does, which works on Jellyfin 10.11 and 12 alike. **If you installed 4.0.0.0, update** — nothing was wrong with your settings or your covers, the page simply could not reach the server.
+
 ## 4.0.0.0
 **Support for Jellyfin 12.** Jellyfin 12 moved to .NET 10 and changed its plugin ABI, so a plugin built for 10.11 cannot be built for both — this release is built against Jellyfin 12 and requires it. Nothing about designing or rendering covers has changed: your saved templates, applied covers and settings all carry over untouched. If you are **still on Jellyfin 10.11**, stay on **3.5.1.0** — your server will keep being offered that version and will not see this one, so nothing breaks by leaving it alone.
 
