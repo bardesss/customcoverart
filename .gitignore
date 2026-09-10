@@ -17,3 +17,8 @@ dist/
 
 # SDD scratch workspace (ledger, briefs, review packages)
 .superpowers/
+
+# Design docs (plans + specs). Kept locally, deliberately not published: they are
+# working notes for how features were built, not documentation for users of the
+# plugin. Untracked in 4.0.1.0; the copies already in git history are unaffected.
+docs/superpowers/
