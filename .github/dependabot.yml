@@ -1,0 +1,51 @@
+# Dependency update PRs. Deliberately low-noise: monthly, grouped, and with the
+# two dependency families that are NOT ours to bump left alone (see below).
+version: 2
+
+updates:
+  # ---------------------------------------------------------------------------
+  # NuGet. There is no .sln, so both project files are listed explicitly.
+  # ---------------------------------------------------------------------------
+  - package-ecosystem: nuget
+    directories:
+      - "/"                              # CustomCoverArt.csproj
+      - "/tests/CustomCoverArt.Tests"    # test-only packages
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore
+    labels:
+      - dependencies
+    groups:
+      # One PR a month for the safe bumps. Majors are deliberately excluded so
+      # they arrive as their own PR and get read properly -- ImageSharp 4.x in
+      # particular is a breaking change, and ImageSharp.Drawing is versioned
+      # separately but must stay on the matching ImageSharp line.
+      nuget-minor-and-patch:
+        update-types:
+          - minor
+          - patch
+    ignore:
+      # The Jellyfin.* packages pin the plugin to a server major -- moving them
+      # is a deliberate cutover (that was the whole of v4.0.0.0), not a version
+      # bump. They also read their version from the $(JellyfinVersion) MSBuild
+      # property rather than a literal, which Dependabot cannot rewrite.
+      - dependency-name: "Jellyfin.*"
+
+  # ---------------------------------------------------------------------------
+  # Workflow actions (actions/checkout, actions/setup-dotnet).
+  # ---------------------------------------------------------------------------
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore
+    labels:
+      - dependencies
+    groups:
+      github-actions:
+        patterns:
+          - "*"
