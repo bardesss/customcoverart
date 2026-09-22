@@ -32,6 +32,17 @@ updates:
       # bump. They also read their version from the $(JellyfinVersion) MSBuild
       # property rather than a literal, which Dependabot cannot rewrite.
       - dependency-name: "Jellyfin.*"
+      # ImageSharp 4.x and ImageSharp.Drawing 3.x enforce a Six Labors licence
+      # key at BUILD time -- the build dies inside the package's own targets with
+      # "No Six Labors license found" before any of our code compiles. Adopting
+      # them is a licensing decision, not a version bump: a free Community tier
+      # exists (licensing.sixlabors.com) but it puts a build-time credential in
+      # the chain and every fork would need its own key. 3.1.x / 2.1.x build
+      # green and are not end-of-life, so only MAJORS are ignored here --
+      # minor and patch updates still come through. See PR #42 for the detail.
+      - dependency-name: "SixLabors.*"
+        update-types:
+          - version-update:semver-major
 
   # ---------------------------------------------------------------------------
   # Workflow actions (actions/checkout, actions/setup-dotnet).
