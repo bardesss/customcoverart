@@ -54,7 +54,7 @@ public class CoverArtService : ICoverArtService
             DocumentMigration.Normalize(document);
 
             if (document.Canvas.Width <= 0 || document.Canvas.Height <= 0)
-                throw new ArgumentException("Invalid dimensions");
+                throw new CoverValidationException("Invalid dimensions");
 
             // Housekeeping: drop stale preview/generated files.
             PruneOldGenerated();
@@ -115,7 +115,7 @@ public class CoverArtService : ICoverArtService
 
             if (!dimensionValidation.IsValid)
             {
-                throw new ArgumentException(dimensionValidation.ErrorMessage);
+                throw new CoverValidationException(dimensionValidation.ErrorMessage);
             }
 
             // A large-file-size estimate (dimensionValidation.WarningMessage) is
@@ -182,6 +182,11 @@ public class CoverArtService : ICoverArtService
                 // Always release the decoded background image.
                 backgroundImage?.Dispose();
             }
+        }
+        catch (CoverValidationException)
+        {
+            // User-fixable: let the message through unwrapped so the controller can show it.
+            throw;
         }
         catch (Exception ex)
         {
