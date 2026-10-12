@@ -233,8 +233,18 @@ public class CoverArtService : ICoverArtService
         return c;
     }
 
-    /// <summary>Source crop rectangle for a Ken Burns frame at progress t (0..1).</summary>
+    /// <summary>Source crop rectangle for a Ken Burns frame at progress t (0..1), at the source's own aspect.</summary>
     public static Rectangle KenBurnsCrop(int srcW, int srcH, float t, float zoomAmount, string direction)
+        => KenBurnsCrop(srcW, srcH, srcW, srcH, t, zoomAmount, direction);
+
+    /// <summary>
+    /// Source crop rectangle for a Ken Burns frame at progress t (0..1). The window has the
+    /// CANVAS aspect (<paramref name="dstW"/>:<paramref name="dstH"/>): the largest such window
+    /// that fits inside the source, shrunk by the zoom and kept centred. It is then resized to
+    /// the canvas without distortion. Cropping at the source aspect and resizing to the canvas
+    /// stretched any background whose shape differed from the cover.
+    /// </summary>
+    public static Rectangle KenBurnsCrop(int srcW, int srcH, int dstW, int dstH, float t, float zoomAmount, string direction)
     {
         var z = System.Math.Clamp(zoomAmount, 0f, 1f);
         // progress from wide (0) to tight (1)
@@ -243,8 +253,29 @@ public class CoverArtService : ICoverArtService
 
         // scale goes 1.0 (full) → 1/(1+z) (tight)
         var scale = 1f - p * (1f - 1f / (1f + z));
-        var w = (int)System.Math.Round(srcW * scale);
-        var h = (int)System.Math.Round(srcH * scale);
+
+        // Largest canvas-aspect window inside the source.
+        int baseW, baseH;
+        if (dstW <= 0 || dstH <= 0)
+        {
+            baseW = srcW;
+            baseH = srcH;
+        }
+        else if ((long)srcW * dstH > (long)srcH * dstW)
+        {
+            // Source is wider than the canvas: full height, trimmed width.
+            baseH = srcH;
+            baseW = (int)System.Math.Round(srcH * (double)dstW / dstH);
+        }
+        else
+        {
+            // Source is taller (or equal): full width, trimmed height.
+            baseW = srcW;
+            baseH = (int)System.Math.Round(srcW * (double)dstH / dstW);
+        }
+
+        var w = System.Math.Clamp((int)System.Math.Round(baseW * scale), 1, System.Math.Max(1, srcW));
+        var h = System.Math.Clamp((int)System.Math.Round(baseH * scale), 1, System.Math.Max(1, srcH));
         var x = (srcW - w) / 2;
         var y = (srcH - h) / 2;
         return new Rectangle(x, y, w, h);
@@ -341,6 +372,7 @@ public class CoverArtService : ICoverArtService
 
         // Passthrough when the source background is itself animated.
         var animatedSource = background is not null && background.Frames.Count > 1;
+        var kenBurns = !animatedSource && background is not null && document.Background.Animation!.KenBurns;
 
         // An animated source drives its own frame count (so its motion isn't
         // truncated or padded); Ken Burns / static sources use the requested count.
@@ -349,61 +381,68 @@ public class CoverArtService : ICoverArtService
             : System.Math.Clamp(document.Background.Animation!.FrameCount, 2, 30);
         var delayCentis = System.Math.Max(2, document.Background.Animation!.DelayMs / 10); // GIF delay is 1/100s
 
+        // A still background without Ken Burns gives the same picture on every frame:
+        // compose it once and repeat it, instead of cloning the full-size source and
+        // re-running the whole compositor for each frame. ApplyBackgroundLayer mutates the
+        // background it is given, which is fine here because it is used exactly once.
+        Image<Rgba32>? staticFrame = null;
         Image<Rgba32>? output = null;
         try
         {
+            if (!animatedSource && !kenBurns)
+            {
+                staticFrame = new Image<Rgba32>(w, h);
+                ComposeFrame(staticFrame, background, composeDocument);
+            }
+
             for (int i = 0; i < frameCount; i++)
             {
                 var t = frameCount == 1 ? 0f : i / (float)(frameCount - 1);
                 var frameDelay = delayCentis;
 
-                using var frameCanvas = new Image<Rgba32>(w, h);
-                Image? frameBg = null;
-                Image<Rgba32>? tempBg = null;
-                try
+                using var frameCanvas = staticFrame is not null ? staticFrame.Clone() : new Image<Rgba32>(w, h);
+                if (staticFrame is null)
                 {
-                    if (animatedSource)
+                    Image? frameBg = null;
+                    try
                     {
-                        var srcIndex = i % background!.Frames.Count;
-                        tempBg = background.Frames.CloneFrame(srcIndex).CloneAs<Rgba32>();
-                        frameBg = tempBg;
-                        // Preserve the source GIF's own timing so playback speed matches.
-                        var srcDelay = background.Frames[srcIndex].Metadata.GetGifMetadata().FrameDelay;
-                        if (srcDelay > 0) { frameDelay = srcDelay; }
-                    }
-                    else if (document.Background.Animation!.KenBurns && background is not null)
-                    {
-                        var crop = KenBurnsCrop(background.Width, background.Height, t,
-                            document.Background.Animation.ZoomAmount, document.Background.Animation.Direction);
-                        tempBg = background.CloneAs<Rgba32>();
-                        tempBg.Mutate(x => x.Crop(crop).Resize(w, h));
-                        frameBg = tempBg;
-                    }
-                    else if (background is not null)
-                    {
-                        tempBg = background.CloneAs<Rgba32>();
-                        frameBg = tempBg;
-                    }
+                        if (animatedSource)
+                        {
+                            var srcIndex = i % background!.Frames.Count;
+                            // One clone of one frame, in the source's own pixel format.
+                            frameBg = background.Frames.CloneFrame(srcIndex);
+                            // Preserve the source GIF's own timing so playback speed matches.
+                            var srcDelay = background.Frames[srcIndex].Metadata.GetGifMetadata().FrameDelay;
+                            if (srcDelay > 0) { frameDelay = srcDelay; }
+                        }
+                        else
+                        {
+                            var crop = KenBurnsCrop(background!.Width, background.Height, w, h, t,
+                                document.Background.Animation.ZoomAmount, document.Background.Animation.Direction);
+                            // Crop first, then resize: the clone is the small window, never the full source.
+                            frameBg = background.Clone(x => x.Crop(crop).Resize(w, h));
+                        }
 
-                    ComposeFrame(frameCanvas, frameBg, composeDocument);
-
-                    if (output is null)
-                    {
-                        output = frameCanvas.Clone();
-                        var gm = output.Metadata.GetGifMetadata();
-                        gm.RepeatCount = (ushort)(document.Background.Animation!.Loop ? 0 : 1);
-                        output.Frames.RootFrame.Metadata.GetGifMetadata().FrameDelay = frameDelay;
+                        ComposeFrame(frameCanvas, frameBg, composeDocument);
                     }
-                    else
+                    finally
                     {
-                        var added = frameCanvas.Frames.RootFrame;
-                        added.Metadata.GetGifMetadata().FrameDelay = frameDelay;
-                        output.Frames.AddFrame(added);
+                        frameBg?.Dispose();
                     }
                 }
-                finally
+
+                if (output is null)
                 {
-                    tempBg?.Dispose();
+                    output = frameCanvas.Clone();
+                    var gm = output.Metadata.GetGifMetadata();
+                    gm.RepeatCount = (ushort)(document.Background.Animation!.Loop ? 0 : 1);
+                    output.Frames.RootFrame.Metadata.GetGifMetadata().FrameDelay = frameDelay;
+                }
+                else
+                {
+                    var added = frameCanvas.Frames.RootFrame;
+                    added.Metadata.GetGifMetadata().FrameDelay = frameDelay;
+                    output.Frames.AddFrame(added);
                 }
             }
 
@@ -413,6 +452,7 @@ public class CoverArtService : ICoverArtService
         }
         finally
         {
+            staticFrame?.Dispose();
             output?.Dispose();
         }
     }

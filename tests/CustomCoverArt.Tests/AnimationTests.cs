@@ -255,4 +255,104 @@ public class AnimationTests
         Assert.True(minY <= maxY, $"Expected to find rendered text pixels in {path}.");
         return (maxY - minY + 1) / (float)img.Height;
     }
+
+    [Fact]
+    public void KenBurnsCrop_WideSourceSquareCanvas_CropsAtCanvasAspect()
+    {
+        var wide = CoverArtService.KenBurnsCrop(2000, 1000, 500, 500, 0f, 0.2f, "in");
+        Assert.Equal(new SixLabors.ImageSharp.Rectangle(500, 0, 1000, 1000), wide);
+
+        var tight = CoverArtService.KenBurnsCrop(2000, 1000, 500, 500, 1f, 0.2f, "in");
+        Assert.Equal(833, tight.Width);
+        Assert.Equal(833, tight.Height);
+        Assert.Equal((2000 - 833) / 2, tight.X);
+        Assert.Equal((1000 - 833) / 2, tight.Y);
+    }
+
+    [Fact]
+    public void KenBurnsCrop_ExtremeStrip_StaysInsideSourceAndNonEmpty()
+    {
+        foreach (var t in new[] { 0f, 0.5f, 1f })
+        {
+            var r = CoverArtService.KenBurnsCrop(4000, 10, 100, 1000, t, 1f, "in");
+            Assert.True(r.Width >= 1 && r.Height >= 1, $"empty crop at t={t}");
+            Assert.True(r.X >= 0 && r.Y >= 0 && r.Right <= 4000 && r.Bottom <= 10, $"crop {r} escapes the source at t={t}");
+        }
+    }
+
+    /// <summary>
+    /// A4: a 2:1 source on a square Ken Burns cover was squashed (whole source resized to the
+    /// canvas). With a canvas-aspect crop, the centre square shows only the middle stripe.
+    /// </summary>
+    [Fact]
+    public async System.Threading.Tasks.Task KenBurns_WideSource_IsCroppedNotSquashed()
+    {
+        var (svc, dataDir) = AnimationTestHost.New();
+        try
+        {
+            var uploads = System.IO.Path.Combine(dataDir, "customcoverart", "uploads");
+            System.IO.Directory.CreateDirectory(uploads);
+            var bgPath = System.IO.Path.Combine(uploads, "stripes.png");
+            using (var bg = new SixLabors.ImageSharp.Image<SixLabors.ImageSharp.PixelFormats.Rgba32>(200, 100))
+            {
+                for (int y = 0; y < 100; y++)
+                {
+                    for (int x = 0; x < 200; x++)
+                    {
+                        bg[x, y] = x < 50
+                            ? new SixLabors.ImageSharp.PixelFormats.Rgba32(255, 0, 0)
+                            : x < 150
+                                ? new SixLabors.ImageSharp.PixelFormats.Rgba32(0, 255, 0)
+                                : new SixLabors.ImageSharp.PixelFormats.Rgba32(0, 0, 255);
+                    }
+                }
+                bg.SaveAsPng(bgPath);
+            }
+
+            var doc = new CustomCoverArt.Models.CoverDocument
+            {
+                Canvas = new CustomCoverArt.Models.CanvasSettings { Width = 100, Height = 100, Format = "gif" },
+            };
+            doc.Background.ImagePath = bgPath;
+            doc.Background.Dim = 0f;
+            doc.Background.Animation = new CustomCoverArt.Models.AnimationSettings
+            {
+                Enabled = true, KenBurns = true, ZoomAmount = 0f, FrameCount = 2, DelayMs = 80
+            };
+
+            var path = await svc.GenerateFromDocumentAsync(doc);
+            using var gif = SixLabors.ImageSharp.Image.Load<SixLabors.ImageSharp.PixelFormats.Rgba32>(path);
+            var leftEdge = gif[5, 50];
+            Assert.True(leftEdge.G > 150 && leftEdge.R < 100,
+                $"Left edge should be the green middle stripe, got {leftEdge} - background was squashed.");
+        }
+        finally { try { System.IO.Directory.Delete(dataDir, true); } catch { } }
+    }
+
+    /// <summary>
+    /// A5 regression guard (passes before and after): a still background without Ken Burns is
+    /// composed once and repeated, so frame count and pixels must be unchanged.
+    /// </summary>
+    [Fact]
+    public async System.Threading.Tasks.Task StaticAnimatedCover_RepeatsOneComposedFrame()
+    {
+        var settings = new CustomCoverArt.Models.CoverArtSettings
+        {
+            Title = "S", ExportWidth = 120, ExportHeight = 120, OutputFormat = "gif",
+            Animation = new CustomCoverArt.Models.AnimationSettings { Enabled = true, KenBurns = false, FrameCount = 5, DelayMs = 80 }
+        };
+
+        var path = await AnimationTestHost.NewCoverArtService().GenerateCoverArtAsync(settings);
+        using var gif = SixLabors.ImageSharp.Image.Load<SixLabors.ImageSharp.PixelFormats.Rgba32>(path);
+
+        Assert.Equal(5, gif.Frames.Count);
+        var first = gif.Frames[0];
+        for (int f = 1; f < gif.Frames.Count; f++)
+        {
+            Assert.Equal(first[60, 60], gif.Frames[f][60, 60]);
+            Assert.Equal(first[5, 5], gif.Frames[f][5, 5]);
+        }
+
+        try { System.IO.File.Delete(path); } catch { }
+    }
 }
