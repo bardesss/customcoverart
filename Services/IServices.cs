@@ -31,6 +31,10 @@ public interface ICoverArtService
     /// <summary>Persists the cover into the per-library folder and returns that
     /// stable path (or null on failure) so it can be applied to the library.</summary>
     Task<string?> SaveCoverArtAsync(string libraryId, string coverArtPath);
+
+    /// <summary>Deletes every file in the target's output folder except <paramref name="keepPath"/>.
+    /// Call only after the target has been pointed at <paramref name="keepPath"/>.</summary>
+    void PruneLibraryOutputs(string libraryId, string keepPath);
 }
 
 public interface IImageProcessingService

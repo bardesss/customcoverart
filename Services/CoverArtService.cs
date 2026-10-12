@@ -293,7 +293,7 @@ public class CoverArtService : ICoverArtService
 
     // Best-effort cleanup of stale generated/preview files so the folder does
     // not grow without bound (preview fires on every UI tweak). Only prunes the
-    // flat generated root; the per-library copies under Libraries/ are kept.
+    // flat generated root; the per-library folders under Libraries/ are pruned by PruneLibraryOutputs after each successful apply.
     private void PruneOldGenerated()
     {
         try
@@ -342,6 +342,46 @@ public class CoverArtService : ICoverArtService
         catch
         {
             return Task.FromResult<string?>(null);
+        }
+    }
+
+    public void PruneLibraryOutputs(string libraryId, string keepPath)
+    {
+        string libraryDirectory;
+        try
+        {
+            libraryDirectory = LibraryDir(libraryId);
+        }
+        catch (ArgumentException)
+        {
+            return; // not a GUID: nothing of ours to prune
+        }
+
+        if (!Directory.Exists(libraryDirectory))
+        {
+            return;
+        }
+
+        var keep = Path.GetFullPath(keepPath);
+        foreach (var file in Directory.EnumerateFiles(libraryDirectory))
+        {
+            if (string.Equals(Path.GetFullPath(file), keep, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            try
+            {
+                File.Delete(file);
+            }
+            catch (IOException)
+            {
+                // In use: the next successful apply retries it.
+            }
+            catch (UnauthorizedAccessException)
+            {
+                // Not ours to delete; leave it.
+            }
         }
     }
 
