@@ -146,42 +146,7 @@ public class CustomCoverArtController : ControllerBase
             return Fail<bool>(_localizationService.GetString("errors.too_many_uploads"));
         }
 
-        // Validate the library id up front, before it is used anywhere.
-        if (!Guid.TryParse(request.LibraryId, out _))
-        {
-            return Fail<bool>("Invalid library id");
-        }
-
-        try
-        {
-            var userName = _userContextService.GetCurrentUserName() ?? "unknown";
-            _logger.LogInformation("User {UserName} applying document cover art to library {LibraryId}", userName, request.LibraryId);
-
-            var coverArtPath = await _coverArtService.GenerateFromDocumentAsync(request.Document).ConfigureAwait(false);
-
-            // Persist into the per-library folder; apply THAT stable path.
-            var savedPath = await _coverArtService.SaveCoverArtAsync(request.LibraryId, coverArtPath).ConfigureAwait(false);
-            if (savedPath is null)
-            {
-                return Fail<bool>("Failed to save cover art");
-            }
-
-            // Preserve the target's current image once, so Restore can undo later.
-            await _libraryService.BackupCurrentCoverArtAsync(request.LibraryId).ConfigureAwait(false);
-
-            var updated = await _libraryService.UpdateLibraryCoverArtAsync(request.LibraryId, savedPath).ConfigureAwait(false);
-            if (!updated)
-            {
-                return Fail<bool>("Failed to update library cover art");
-            }
-
-            return Success(true);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to apply document to {LibraryId}", request.LibraryId);
-            return Fail<bool>("Failed to apply cover art.");
-        }
+        return await ApplyDocumentInternal(request.LibraryId, request.Document).ConfigureAwait(false);
     }
 
     /// <summary>Apply cover art to a library (used by the config page).</summary>
@@ -200,7 +165,7 @@ public class CustomCoverArtController : ControllerBase
     private Task<ApiResponse<bool>> ApplyInternal(string libraryId, CoverArtSettings settings)
         => ApplyRenderedAsync(libraryId, () => _coverArtService.GenerateCoverArtAsync(settings));
 
-    /// <summary>Batch equivalent of the document/apply endpoint, for layered designs.</summary>
+    /// <summary>Render a layered design and apply it (document/apply and batch apply).</summary>
     private Task<ApiResponse<bool>> ApplyDocumentInternal(string libraryId, CoverDocument document)
         => ApplyRenderedAsync(libraryId, () => _coverArtService.GenerateFromDocumentAsync(document));
 
@@ -237,6 +202,8 @@ public class CustomCoverArtController : ControllerBase
                 return Fail<bool>("Failed to update library cover art");
             }
 
+            // Only now is the new cover live, so every older copy in the folder is garbage.
+            _coverArtService.PruneLibraryOutputs(libraryId, savedPath);
             return Success(true);
         }
         catch (Exception ex)
