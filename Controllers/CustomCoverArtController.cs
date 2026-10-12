@@ -98,6 +98,10 @@ public class CustomCoverArtController : ControllerBase
             var contentType = settings.OutputFormat?.ToLowerInvariant() == "gif" ? "image/gif" : "image/png";
             return File(imageBytes, contentType);
         }
+        catch (CoverValidationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to generate preview");
@@ -121,6 +125,10 @@ public class CustomCoverArtController : ControllerBase
             var imageBytes = await System.IO.File.ReadAllBytesAsync(coverArtPath).ConfigureAwait(false);
             var contentType = document.Canvas.Format?.ToLowerInvariant() == "gif" ? "image/gif" : "image/png";
             return File(imageBytes, contentType);
+        }
+        catch (CoverValidationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
         }
         catch (Exception ex)
         {
@@ -211,6 +219,10 @@ public class CustomCoverArtController : ControllerBase
             }
 
             return Success(true);
+        }
+        catch (CoverValidationException ex)
+        {
+            return Fail<bool>(ex.Message);
         }
         catch (Exception ex)
         {
