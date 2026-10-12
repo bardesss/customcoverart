@@ -58,13 +58,13 @@ public class LibraryDetectionService : ILibraryDetectionService
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError("Error processing library {Name}: {Error}", vf.Name ?? "unknown", ex.Message);
+                    _logger.LogError(ex, "Error processing library {Name}", vf.Name ?? "unknown");
                 }
             }
         }
         catch (Exception ex)
         {
-            _logger.LogError("Failed to get libraries: {Error}", ex.Message);
+            _logger.LogError(ex, "Failed to get libraries");
         }
 
         return Task.FromResult<IEnumerable<LibraryInfo>>(libraries);
@@ -84,7 +84,7 @@ public class LibraryDetectionService : ILibraryDetectionService
         }
         catch (Exception ex)
         {
-            _logger.LogError("Failed to get targets ({Type}): {Error}", type ?? "?", ex.Message);
+            _logger.LogError(ex, "Failed to get targets ({Type})", type ?? "?");
             return Task.FromResult(Enumerable.Empty<LibraryInfo>());
         }
     }

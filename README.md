@@ -256,8 +256,12 @@ animate in the Jellyfin views that render GIFs.
 Applying a cover automatically backs up the target's previous image once. Use **Restore original
 cover** in step 1 to revert — you can restore, apply and restore again as often as you like.
 Applied covers are handed to Jellyfin's own image store (the same as uploading an image in the
-dashboard), so they keep working even if the plugin's data folder is cleared; the backups live in
-that folder under `customcoverart/backups`. Applies to the same target run one at a time.
+dashboard), so covers applied or restored from version 4.0.2.0 on keep working even if the
+plugin's data folder is cleared (covers applied by 4.0.1.0 and never re-applied still live in
+that folder). The first backup keeps the cover you had before you first used the plugin, so it
+can always be restored; a cover you set in the dashboard after an earlier apply is replaced by
+the next apply, as with Jellyfin's own upload. The backups live in the data folder under
+`customcoverart/backups`. Applies to the same target run one at a time.
 
 ## 🔒 Security & privacy
 
@@ -287,8 +291,8 @@ that folder under `customcoverart/backups`. Applies to the same target run one a
 Strings live in **two** places, and a language needs both — translating only the first
 leaves the whole configuration page in English.
 
-**1. Server messages** — `Resources/<language-code>.json`. A short file: the seven upload
-and validation errors the server returns.
+**1. Server messages** — `Resources/<language-code>.json`. A short file: the eight upload,
+validation and apply errors the server returns.
 
 1. Copy `Resources/en.json` as a starting point.
 2. Translate the values; keep the keys identical.

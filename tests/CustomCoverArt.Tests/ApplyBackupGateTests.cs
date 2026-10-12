@@ -35,7 +35,7 @@ public class ApplyBackupGateTests
             .ApplyDocument(new ApplyDocumentRequest { LibraryId = LibraryId, Document = new CoverDocument() });
 
         Assert.False(result.Success);
-        Assert.Equal("Could not back up the current cover, so it was left unchanged.", result.ErrorMessage);
+        Assert.Equal("errors.backup_failed", result.ErrorMessage);
         await library.DidNotReceive().UpdateLibraryCoverArtAsync(Arg.Any<string>(), Arg.Any<string>());
         coverArt.DidNotReceive().PruneLibraryOutputs(Arg.Any<string>(), Arg.Any<string>());
     }
