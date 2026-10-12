@@ -1,6 +1,7 @@
 using CustomCoverArt.Common;
 using CustomCoverArt.Models;
 using MediaBrowser.Common.Configuration;
+using Microsoft.Extensions.Logging;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats.Gif;
 using SixLabors.ImageSharp.PixelFormats;
@@ -16,17 +17,17 @@ namespace CustomCoverArt.Services;
 public class CoverArtService : ICoverArtService
 {
     private readonly IApplicationPaths _applicationPaths;
-    private readonly ILoggingService _loggingService;
+    private readonly ILogger<CoverArtService> _logger;
     private readonly IMediaItemService _mediaItemService;
     private readonly string _outputDirectory;
 
     public CoverArtService(
         IApplicationPaths applicationPaths,
-        ILoggingService loggingService,
+        ILogger<CoverArtService> logger,
         IMediaItemService mediaItemService)
     {
         _applicationPaths = applicationPaths;
-        _loggingService = loggingService;
+        _logger = logger;
         _mediaItemService = mediaItemService;
 
         // Data location comes from Jellyfin's application paths (via DI) — no
@@ -65,7 +66,7 @@ public class CoverArtService : ICoverArtService
             {
                 if (!string.IsNullOrEmpty(document.Background.ImagePath))
                 {
-                    _loggingService.LogWarning("Background path rejected (outside plugin data dir): {Path}", document.Background.ImagePath);
+                    _logger.LogWarning("Background path rejected (outside plugin data dir): {Path}", document.Background.ImagePath);
                 }
                 document.Background.ImagePath = string.Empty;
             }
@@ -76,7 +77,7 @@ public class CoverArtService : ICoverArtService
             const int maxLayers = 40;
             if (document.Layers.Count > maxLayers)
             {
-                _loggingService.LogWarning("Dropping {Count} excess layers (max {Max})", document.Layers.Count - maxLayers, maxLayers);
+                _logger.LogWarning("Dropping {Count} excess layers (max {Max})", document.Layers.Count - maxLayers, maxLayers);
                 document.Layers = document.Layers.Take(maxLayers).ToList();
             }
 
@@ -94,7 +95,7 @@ public class CoverArtService : ICoverArtService
                 {
                     if (!string.IsNullOrEmpty(layer.ImagePath))
                     {
-                        _loggingService.LogWarning("Layer image rejected (outside plugin data dir): {Path}", layer.ImagePath);
+                        _logger.LogWarning("Layer image rejected (outside plugin data dir): {Path}", layer.ImagePath);
                     }
                     layer.ImagePath = string.Empty;
                 }
@@ -151,7 +152,7 @@ public class CoverArtService : ICoverArtService
                 {
                     if (!File.Exists(document.Background.ImagePath))
                     {
-                        _loggingService.LogWarning("Background file not found: {Path}", document.Background.ImagePath);
+                        _logger.LogWarning("Background file not found: {Path}", document.Background.ImagePath);
                     }
                     else
                     {
@@ -167,12 +168,12 @@ public class CoverArtService : ICoverArtService
                             }
                             else
                             {
-                                _loggingService.LogWarning("Background image ignored, too large: {Width}x{Height}", info.Width, info.Height);
+                                _logger.LogWarning("Background image ignored, too large: {Width}x{Height}", info.Width, info.Height);
                             }
                         }
                         catch (Exception ex)
                         {
-                            _loggingService.LogWarning("Failed to decode background {Path}: {Error}", document.Background.ImagePath, ex.Message);
+                            _logger.LogWarning("Failed to decode background {Path}: {Error}", document.Background.ImagePath, ex.Message);
                         }
                     }
                 }

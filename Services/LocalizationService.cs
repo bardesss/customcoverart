@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 
 namespace CustomCoverArt.Services;
 
@@ -18,14 +19,14 @@ public class LocalizationService : ILocalizationService
     /// </summary>
     public static readonly string[] SupportedLanguageCodes = { "en", "nl", "es" };
 
-    private readonly ILoggingService _loggingService;
+    private readonly ILogger<LocalizationService> _logger;
     private readonly Dictionary<string, Dictionary<string, string>> _translations;
     private string _currentLanguage = "en";
     private readonly string _fallbackLanguage = "en";
 
-    public LocalizationService(ILoggingService loggingService)
+    public LocalizationService(ILogger<LocalizationService> logger)
     {
-        _loggingService = loggingService;
+        _logger = logger;
         _translations = new Dictionary<string, Dictionary<string, string>>();
         
         LoadTranslations();
@@ -48,17 +49,17 @@ public class LocalizationService : ILocalizationService
                 _translations.TryGetValue(_fallbackLanguage, out var fallbackDict) &&
                 fallbackDict.TryGetValue(key, out var fallbackValue))
             {
-                _loggingService.LogDebug("Using fallback translation for key: {Key}", key);
+                _logger.LogDebug("Using fallback translation for key: {Key}", key);
                 return FormatString(fallbackValue, args);
             }
 
             // If no translation found, return the key itself
-            _loggingService.LogWarning("Translation not found for key: {Key} in language: {Language}", key, _currentLanguage);
+            _logger.LogWarning("Translation not found for key: {Key} in language: {Language}", key, _currentLanguage);
             return key;
         }
         catch (Exception ex)
         {
-            _loggingService.LogError("Error getting translation for key: {Key}", ex, key);
+            _logger.LogError(ex, "Error getting translation for key: {Key}", key);
             return key;
         }
     }
@@ -85,12 +86,12 @@ public class LocalizationService : ILocalizationService
                 LoadLanguageFile(code);
             }
 
-            _loggingService.LogInformation("Loaded translations for {Count} languages: {Languages}", 
+            _logger.LogInformation("Loaded translations for {Count} languages: {Languages}", 
                 _translations.Count, string.Join(", ", _translations.Keys));
         }
         catch (Exception ex)
         {
-            _loggingService.LogError("Failed to load translations", ex);
+            _logger.LogError(ex, "Failed to load translations");
         }
     }
 
@@ -104,7 +105,7 @@ public class LocalizationService : ILocalizationService
             using var stream = assembly.GetManifestResourceStream(resourceName);
             if (stream == null)
             {
-                _loggingService.LogWarning("Translation file not found: {ResourceName}", resourceName);
+                _logger.LogWarning("Translation file not found: {ResourceName}", resourceName);
                 return;
             }
 
@@ -115,13 +116,13 @@ public class LocalizationService : ILocalizationService
             if (translations != null)
             {
                 _translations[languageCode] = translations;
-                _loggingService.LogDebug("Loaded {Count} translations for language: {Language}", 
+                _logger.LogDebug("Loaded {Count} translations for language: {Language}", 
                     translations.Count, languageCode);
             }
         }
         catch (Exception ex)
         {
-            _loggingService.LogError("Failed to load language file: {LanguageCode}", ex, languageCode);
+            _logger.LogError(ex, "Failed to load language file: {LanguageCode}", languageCode);
         }
     }
 
@@ -140,16 +141,16 @@ public class LocalizationService : ILocalizationService
             if (!string.IsNullOrEmpty(systemLanguage) && _translations.ContainsKey(systemLanguage))
             {
                 _currentLanguage = systemLanguage;
-                _loggingService.LogInformation("Detected system language: {Language}", systemLanguage);
+                _logger.LogInformation("Detected system language: {Language}", systemLanguage);
             }
             else
             {
-                _loggingService.LogInformation("Using default language: {Language}", _fallbackLanguage);
+                _logger.LogInformation("Using default language: {Language}", _fallbackLanguage);
             }
         }
         catch (Exception ex)
         {
-            _loggingService.LogError("Failed to detect system language", ex);
+            _logger.LogError(ex, "Failed to detect system language");
         }
     }
 
