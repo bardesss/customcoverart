@@ -214,10 +214,10 @@ public class CoverArtService : ICoverArtService
     // actual (capped) working dimensions keeps text proportional automatically —
     // no separate text-size scaling needed (unlike the legacy flat TextSize,
     // which was an absolute pixel value tied to the ORIGINAL ExportHeight and
-    // required pre-shrinking to compensate). Shadow/outline pixel offsets are
-    // still absolute values on CoverLayer, so those are scaled explicitly to
+    // required pre-shrinking to compensate). Shadow/outline offsets, background blur and
+    // the border are absolute pixel values, so those are scaled explicitly to
     // preserve their visual proportions on the smaller canvas.
-    private static CoverDocument ScaleDocumentForCanvas(CoverDocument doc, int width, int height, float scale)
+    internal static CoverDocument ScaleDocumentForCanvas(CoverDocument doc, int width, int height, float scale)
     {
         var json = System.Text.Json.JsonSerializer.Serialize(doc);
         var c = System.Text.Json.JsonSerializer.Deserialize<CoverDocument>(json) ?? doc;
@@ -230,8 +230,18 @@ public class CoverArtService : ICoverArtService
             layer.Shadow.OffsetY = (int)System.Math.Round(layer.Shadow.OffsetY * scale);
             layer.Outline.Width = (int)System.Math.Round(layer.Outline.Width * scale);
         }
+        // Background blur and the border are absolute pixels too.
+        c.Background.Blur *= scale;
+        var border = c.Effects.Border;
+        border.Thickness = ScaleNonZero(border.Thickness, scale);
+        border.Radius = (int)System.Math.Round(border.Radius * scale);
+        border.Gap = ScaleNonZero(border.Gap, scale);
         return c;
     }
+
+    // A border the user switched on stays at least 1px instead of rounding away.
+    private static int ScaleNonZero(int value, float scale)
+        => value <= 0 ? value : System.Math.Max(1, (int)System.Math.Round(value * scale));
 
     /// <summary>Source crop rectangle for a Ken Burns frame at progress t (0..1), at the source's own aspect.</summary>
     public static Rectangle KenBurnsCrop(int srcW, int srcH, float t, float zoomAmount, string direction)
