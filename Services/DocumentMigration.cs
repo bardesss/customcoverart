@@ -6,6 +6,12 @@ namespace CustomCoverArt.Services;
 /// Pure (no I/O) so every legacy path can route through the document renderer.</summary>
 public static class DocumentMigration
 {
+    /// <summary>Most colour stops kept per gradient. The editor never makes more than a handful.</summary>
+    public const int MaxGradientStops = 16;
+
+    /// <summary>Most UTF-16 units kept per text layer. A cover title is a few words.</summary>
+    public const int MaxTextLength = 500;
+
     public static CoverDocument FromSettings(CoverArtSettings s)
     {
         var doc = new CoverDocument
@@ -84,6 +90,8 @@ public static class DocumentMigration
         doc.Effects.Vignette ??= new VignetteSettings();
         doc.Effects.Grain ??= new GrainSettings();
         doc.Effects.SoftLight ??= new SoftLightSettings();
+        NormalizeGradient(doc.Background.Gradient);
+        NormalizeGradient(doc.Background.Overlay);
         doc.Layers = (doc.Layers ?? new List<CoverLayer>())
             .Where(l => l is not null)
             .ToList();
@@ -91,8 +99,36 @@ public static class DocumentMigration
         {
             layer.Shadow ??= new TextShadowSettings();
             layer.Outline ??= new TextOutlineSettings();
+            layer.Content = CapText(layer.Content);
         }
         return doc;
+    }
+
+    // Null entries NRE'd BuildColorStops, and an unbounded list is unbounded brush work.
+    private static void NormalizeGradient(GradientSettings? gradient)
+    {
+        if (gradient is null)
+        {
+            return;
+        }
+
+        gradient.Stops = (gradient.Stops ?? new List<GradientStop>())
+            .Where(s => s is not null)
+            .Take(MaxGradientStops)
+            .ToList();
+    }
+
+    // Caps text without leaving half a surrogate pair (an emoji) at the cut.
+    private static string CapText(string? content)
+    {
+        content ??= string.Empty;
+        if (content.Length <= MaxTextLength)
+        {
+            return content;
+        }
+
+        var cut = char.IsHighSurrogate(content[MaxTextLength - 1]) ? MaxTextLength - 1 : MaxTextLength;
+        return content[..cut];
     }
 
     /// <summary>

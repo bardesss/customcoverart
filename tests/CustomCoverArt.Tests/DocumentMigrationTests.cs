@@ -110,4 +110,48 @@ public class DocumentMigrationTests
         Assert.True(System.IO.File.Exists(path));
         try { System.IO.File.Delete(path); } catch { }
     }
+
+    [Fact]
+    public void Normalize_DropsNullStops_AndCapsStopCount()
+    {
+        var doc = new CoverDocument();
+        doc.Background.Gradient = new GradientSettings { Stops = new System.Collections.Generic.List<GradientStop>() };
+        doc.Background.Gradient.Stops.Add(null!);
+        for (int i = 0; i < 40; i++) { doc.Background.Gradient.Stops.Add(new GradientStop { Position = i / 40f }); }
+        doc.Background.Overlay = new GradientSettings { Stops = null! };
+
+        DocumentMigration.Normalize(doc);
+
+        Assert.Equal(DocumentMigration.MaxGradientStops, doc.Background.Gradient.Stops.Count);
+        Assert.DoesNotContain(null, doc.Background.Gradient.Stops);
+        Assert.NotNull(doc.Background.Overlay.Stops);
+        Assert.Empty(doc.Background.Overlay.Stops);
+    }
+
+    [Fact]
+    public void Normalize_CapsTextContent_WithoutSplittingASurrogatePair()
+    {
+        var doc = new CoverDocument();
+        // 499 'a' followed by an emoji (2 UTF-16 units): a naive cut at 500 would keep half of it.
+        doc.Layers.Add(new CoverLayer { Type = "text", Content = new string('a', 499) + "\U0001F600" + "tail" });
+        doc.Layers.Add(new CoverLayer { Type = "text", Content = null! });
+
+        DocumentMigration.Normalize(doc);
+
+        Assert.Equal(499, doc.Layers[0].Content.Length);
+        Assert.Equal(string.Empty, doc.Layers[1].Content);
+    }
+
+    [Fact]
+    public void BuildColorStops_IgnoresNullStops()
+    {
+        var g = new GradientSettings { Stops = new System.Collections.Generic.List<GradientStop>
+        {
+            null!, new GradientStop { Color = "#000000", Position = 0f }, new GradientStop { Color = "#ffffff", Position = 1f }
+        } };
+
+        var stops = DocumentRenderer.BuildColorStops(g);
+
+        Assert.Equal(2, stops.Length);
+    }
 }
