@@ -69,6 +69,11 @@
     <Compile Remove="tests/**/*.cs" />
   </ItemGroup>
 
+  <!-- Lets the test project pin internal render/limit helpers without widening the public API. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="CustomCoverArt.Tests" />
+  </ItemGroup>
+
   <ItemGroup>
     <EmbeddedResource Include="Configuration\configPage.html" />
     <EmbeddedResource Include="Resources\**\*.json" />
