@@ -116,7 +116,7 @@ public class ImageProcessingService : IImageProcessingService
         // never pixel data.
         try
         {
-            var info = Image.Identify(bytes);
+            var info = SafeImageLoader.TryIdentify(bytes);
             if (info is null || info.Width <= 0 || info.Height <= 0)
             {
                 result.IsValid = false;
