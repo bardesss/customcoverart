@@ -97,6 +97,15 @@ public class LocalizationResourceTests
         Assert.True(unused.Count == 0, "Resource keys defined but never requested: " + string.Join(", ", unused));
     }
 
+    [Theory]
+    [InlineData("en")]
+    [InlineData("nl")]
+    [InlineData("es")]
+    public void InvalidFormatMessage_DoesNotAdvertiseTiff(string code)
+    {
+        Assert.DoesNotContain("TIFF", Load(code)["errors.invalid_file_format"]);
+    }
+
     [Fact]
     public void LoadedLanguages_MatchTheSupportedList()
     {

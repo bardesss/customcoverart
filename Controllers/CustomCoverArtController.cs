@@ -249,9 +249,12 @@ public class CustomCoverArtController : ControllerBase
         return Success(_libraryService.HasBackup(id));
     }
 
-    /// <summary>Restore a target's original (pre-plugin) primary image.</summary>
+    /// <summary>
+    /// Restore a target's original (pre-plugin) primary image. The <c>{type}</c> segment stays
+    /// in the route because the config page sends it; the restore needs only the id.
+    /// </summary>
     [HttpPost("targets/{type}/{id}/restore")]
-    public async Task<ApiResponse<bool>> RestoreOriginal(string type, string id)
+    public async Task<ApiResponse<bool>> RestoreOriginal(string id)
     {
         if (!Guid.TryParse(id, out _))
         {

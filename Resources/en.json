@@ -2,7 +2,7 @@
   "errors.no_file_uploaded": "No file uploaded",
   "errors.file_too_large": "File is too large. Maximum size is {0}MB.",
   "errors.font_too_large": "Font file is too large. Maximum size is 5MB.",
-  "errors.invalid_file_format": "Invalid file format. Only JPG, PNG, GIF, BMP, WebP, TIFF are allowed.",
+  "errors.invalid_file_format": "Invalid file format. Only JPG, PNG, GIF, BMP and WebP are allowed.",
   "errors.too_many_uploads": "Too many uploads. Please try again in a minute.",
   "errors.suspicious_content": "File contains suspicious content and has been rejected",
   "errors.image_too_large": "Image is too large to process. Use a smaller image, or an animation with fewer frames."

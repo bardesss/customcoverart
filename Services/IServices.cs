@@ -39,7 +39,6 @@ public interface ICoverArtService
 
 public interface IImageProcessingService
 {
-    Task<string> DetermineOptimalFormatAsync(CoverArtSettings settings);
     Task<ValidationResult> ValidateFileAsync(IFormFile file);
 
     // NOTE: IsValidFileSize / ValidateCoverArtDimensions are pure helpers exposed
