@@ -123,9 +123,7 @@ public class CoverArtService : ICoverArtService
 
             // Whitelist the output format. The extension is NEVER derived from the
             // raw client string (which could contain path-traversal segments) —
-            // anything that is not "gif" becomes "png". (This subsumes the old
-            // "auto"-format optimizer: DetermineOptimalFormatAsync always resolved
-            // to "png" unconditionally, so this mapping is exactly equivalent.)
+            // anything that is not "gif" (including "auto") becomes "png".
             var outputFormat = document.Canvas.Format?.ToLowerInvariant() == "gif" ? "gif" : "png";
             document.Canvas.Format = outputFormat;
 

@@ -2,7 +2,7 @@
   "errors.no_file_uploaded": "Geen bestand geüpload",
   "errors.file_too_large": "Bestand is te groot. Maximum grootte is {0}MB.",
   "errors.font_too_large": "Font bestand is te groot. Maximum grootte is 5MB.",
-  "errors.invalid_file_format": "Ongeldig bestandsformaat. Alleen JPG, PNG, GIF, BMP, WebP, TIFF zijn toegestaan.",
+  "errors.invalid_file_format": "Ongeldig bestandsformaat. Alleen JPG, PNG, GIF, BMP en WebP zijn toegestaan.",
   "errors.too_many_uploads": "Te veel uploads. Probeer het over een minuut opnieuw.",
   "errors.suspicious_content": "Bestand bevat verdachte inhoud en wordt geweigerd",
   "errors.image_too_large": "Afbeelding is te groot om te verwerken. Gebruik een kleinere afbeelding of een animatie met minder frames."

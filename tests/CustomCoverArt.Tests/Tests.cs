@@ -110,6 +110,8 @@ public class UploadValidationTests
     [InlineData("normal.png", true)]
     [InlineData("weird<name>.png", false)]
     [InlineData("double.ext.png", false)]
+    [InlineData("scan.tiff", false)]
+    [InlineData("scan.tif", false)]
     public void FileNameValidation(string name, bool expected)
     {
         Assert.Equal(expected, ImageProcessingService.IsValidImageFormat(name));
