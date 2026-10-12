@@ -128,9 +128,85 @@ public class ProviderSaveImageTests : IDisposable
         finally { Directory.Delete(Path.GetDirectoryName(foreign)!, true); }
     }
 
+    /// <summary>
+    /// The detach runs before SaveImage. If SaveImage then fails, the item must not be left
+    /// without its image reference.
+    /// </summary>
+    [Fact]
+    public async Task Apply_SaveImageThrows_ReattachesTheDetachedImage()
+    {
+        var h = NewHost();
+        var backup = WriteFile(Path.Combine(PluginPaths.Backups(h.Paths), h.Item.Id.ToString()), "original.png", new byte[] { 9 });
+        h.Item.SetImage(new ItemImageInfo { Path = backup, Type = ImageType.Primary }, 0);
+        var cover = WriteFile(Path.Combine(_dataDir, "customcoverart", "generated"), "cover.png", new byte[] { 1 });
+        h.Provider.SaveImage(h.Item, Arg.Any<Stream>(), Arg.Any<string>(), ImageType.Primary, Arg.Any<int?>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException(new IOException("disk full")));
+
+        var ok = await h.Svc.UpdateLibraryCoverArtAsync(h.Item.Id.ToString(), cover);
+
+        Assert.False(ok);
+        Assert.Equal(backup, h.Item.GetImageInfo(ImageType.Primary, 0)?.Path);
+    }
+
+    [Fact]
+    public async Task Backup_ForeignImage_IsBackedUp()
+    {
+        var h = NewHost();
+        var foreign = WriteFile(Path.Combine(_dataDir, "metadata", "library"), "poster.jpg", new byte[] { 5 });
+        h.Item.SetImage(new ItemImageInfo { Path = foreign, Type = ImageType.Primary }, 0);
+
+        Assert.Equal(BackupOutcome.BackedUp, await h.Svc.BackupCurrentCoverArtAsync(h.Item.Id.ToString()));
+        Assert.True(h.Svc.HasBackup(h.Item.Id.ToString()));
+    }
+
+    [Fact]
+    public async Task Backup_ItemWithoutAnImage_NeedsNoBackup()
+    {
+        var h = NewHost();
+
+        Assert.Equal(BackupOutcome.NotNeeded, await h.Svc.BackupCurrentCoverArtAsync(h.Item.Id.ToString()));
+    }
+
+    /// <summary>
+    /// Jellyfin's image saver deletes the previous local image. If that image is not ours and
+    /// could not be copied, applying would destroy the only copy of the original.
+    /// </summary>
+    [Fact]
+    public async Task Backup_ForeignImageThatCannotBeCopied_ReportsFailure()
+    {
+        var h = NewHost();
+        var foreign = WriteFile(Path.Combine(_dataDir, "metadata", "library"), "poster.jpg", new byte[] { 5 });
+        h.Item.SetImage(new ItemImageInfo { Path = foreign, Type = ImageType.Primary }, 0);
+        BlockBackupsDir(h.Paths);
+
+        Assert.Equal(BackupOutcome.Failed, await h.Svc.BackupCurrentCoverArtAsync(h.Item.Id.ToString()));
+    }
+
+    /// <summary>A plugin-owned image is detached before saving, so Jellyfin never deletes it: no backup is required.</summary>
+    [Fact]
+    public async Task Backup_PluginOwnedImageThatCannotBeCopied_NeedsNoBackup()
+    {
+        var h = NewHost();
+        var ours = WriteFile(Path.Combine(_dataDir, "customcoverart", "generated", "Libraries", h.Item.Id.ToString("N")), "cover.png", new byte[] { 5 });
+        h.Item.SetImage(new ItemImageInfo { Path = ours, Type = ImageType.Primary }, 0);
+        BlockBackupsDir(h.Paths);
+
+        Assert.Equal(BackupOutcome.NotNeeded, await h.Svc.BackupCurrentCoverArtAsync(h.Item.Id.ToString()));
+    }
+
+    // A file where the backups directory should be makes every backup write fail.
+    private static void BlockBackupsDir(IApplicationPaths paths)
+    {
+        var backups = PluginPaths.Backups(paths);
+        Directory.CreateDirectory(Path.GetDirectoryName(backups)!);
+        File.WriteAllText(backups, "not a directory");
+    }
+
     [Theory]
     [InlineData("a.gif", "image/gif")]
     [InlineData("a.JPG", "image/jpeg")]
+    [InlineData("a.jpe", "image/jpeg")]
+    [InlineData("a.tbn", "image/jpeg")]
     [InlineData("a.webp", "image/webp")]
     [InlineData("a.bmp", "image/bmp")]
     [InlineData("a.png", "image/png")]

@@ -224,15 +224,27 @@ public class LibraryDetectionService : ILibraryDetectionService
         // so Jellyfin can never delete a restore point. Images outside our dir (Jellyfin's
         // own, or the user's) are left for Jellyfin to manage, after Backup has copied them.
         var current = item.GetImageInfo(ImageType.Primary, 0);
+        ItemImageInfo? detached = null;
         if (current is not null && PluginPaths.IsInsideBase(_applicationPaths, current.Path))
         {
             item.RemoveImage(current);
+            detached = current;
         }
 
-        await using var stream = new FileStream(sourcePath, FileMode.Open, FileAccess.Read, FileShare.Read);
-        await _providerManager
-            .SaveImage(item, stream, MimeTypeFor(sourcePath), ImageType.Primary, null, CancellationToken.None)
-            .ConfigureAwait(false);
+        try
+        {
+            await using var stream = new FileStream(sourcePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+            await _providerManager
+                .SaveImage(item, stream, MimeTypeFor(sourcePath), ImageType.Primary, null, CancellationToken.None)
+                .ConfigureAwait(false);
+        }
+        catch when (detached is not null)
+        {
+            // The save failed: put the detached image back so the item keeps its cover.
+            item.SetImage(detached, 0);
+            throw;
+        }
+
         await item.UpdateToRepositoryAsync(ItemUpdateType.ImageUpdate, CancellationToken.None)
             .ConfigureAwait(false);
     }
@@ -241,7 +253,7 @@ public class LibraryDetectionService : ILibraryDetectionService
     internal static string MimeTypeFor(string path) => Path.GetExtension(path).ToLowerInvariant() switch
     {
         ".gif" => "image/gif",
-        ".jpg" or ".jpeg" => "image/jpeg",
+        ".jpg" or ".jpeg" or ".jpe" or ".tbn" => "image/jpeg",
         ".webp" => "image/webp",
         ".bmp" => "image/bmp",
         _ => "image/png",
@@ -274,43 +286,49 @@ public class LibraryDetectionService : ILibraryDetectionService
 
     public bool HasBackup(string libraryId) => ExistingBackupPath(libraryId) is not null;
 
-    public Task<string?> BackupCurrentCoverArtAsync(string libraryId)
+    public Task<BackupOutcome> BackupCurrentCoverArtAsync(string libraryId)
     {
+        string? currentPath = null;
         try
         {
             if (!Guid.TryParse(libraryId, out var id))
             {
-                return Task.FromResult<string?>(null);
+                // Fail closed: no restore point can be made for a malformed id.
+                return Task.FromResult(BackupOutcome.Failed);
             }
 
             // Never overwrite an existing backup: the first one is the true original.
-            var existing = ExistingBackupPath(libraryId);
-            if (existing is not null)
+            if (ExistingBackupPath(libraryId) is not null)
             {
-                return Task.FromResult<string?>(existing);
+                return Task.FromResult(BackupOutcome.BackedUp);
             }
 
             var item = _libraryManager.GetItemById<BaseItem>(id);
             if (item is null || !item.HasImage(ImageType.Primary))
             {
-                return Task.FromResult<string?>(null);
+                return Task.FromResult(BackupOutcome.NotNeeded);
             }
 
-            var currentPath = item.GetImagePath(ImageType.Primary, 0);
+            currentPath = item.GetImagePath(ImageType.Primary, 0);
             if (string.IsNullOrEmpty(currentPath) || !File.Exists(currentPath))
             {
-                return Task.FromResult<string?>(null);
+                // No local file, so Jellyfin's image saver has nothing to delete.
+                return Task.FromResult(BackupOutcome.NotNeeded);
             }
 
             var backupPath = BackupPathFor(libraryId, Path.GetExtension(currentPath));
             Directory.CreateDirectory(Path.GetDirectoryName(backupPath)!);
             File.Copy(currentPath, backupPath, overwrite: false);
-            return Task.FromResult<string?>(backupPath);
+            return Task.FromResult(BackupOutcome.BackedUp);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to back up cover art for {LibraryId}", libraryId);
-            return Task.FromResult<string?>(null);
+
+            // A plugin-owned image is detached before saving (SetPrimaryImageAsync), so
+            // Jellyfin never deletes it; anything else would be lost if the apply went ahead.
+            var pluginOwned = currentPath is not null && PluginPaths.IsInsideBase(_applicationPaths, currentPath);
+            return Task.FromResult(pluginOwned ? BackupOutcome.NotNeeded : BackupOutcome.Failed);
         }
     }
 
