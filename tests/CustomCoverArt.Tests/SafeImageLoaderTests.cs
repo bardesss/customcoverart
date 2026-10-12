@@ -184,6 +184,79 @@ public class SafeImageLoaderTests
         finally { File.Delete(path); }
     }
 
+    /// <summary>PNG signature + a syntactically valid IHDR chunk header, then <paramref name="tail"/>.</summary>
+    private static byte[] PngHeadThen(int width, int height, byte[] tail)
+    {
+        var head = new byte[]
+        {
+            0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
+            0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
+            (byte)(width >> 24), (byte)(width >> 16), (byte)(width >> 8), (byte)width,
+            (byte)(height >> 24), (byte)(height >> 16), (byte)(height >> 8), (byte)height,
+        };
+        var all = new byte[head.Length + tail.Length];
+        head.CopyTo(all, 0);
+        tail.CopyTo(all, head.Length);
+        return all;
+    }
+
+    private static async Task<ValidationResult> UploadAsync(byte[] bytes)
+    {
+        var loc = Substitute.For<ILocalizationService>();
+        loc.GetString(Arg.Any<string>(), Arg.Any<object[]>()).Returns(ci => (string)ci[0]);
+        var file = new FormFile(new MemoryStream(bytes), 0, bytes.Length, "file", "x.png");
+        return await new ImageProcessingService(loc).ValidateFileAsync(file);
+    }
+
+    [Fact]
+    public async Task Upload_RejectsPngHeaderFollowedByGarbage()
+    {
+        var bytes = PngHeadThen(16, 16, new byte[64]);
+
+        var result = await UploadAsync(bytes);
+
+        Assert.False(result.IsValid);
+        Assert.Equal("errors.invalid_file_format", result.ErrorMessage);
+
+        var path = TestImages.TempPath(".png");
+        File.WriteAllBytes(path, bytes);
+        try { Assert.Null(SafeImageLoader.TryLoad(path, maxFrames: 1)); }
+        finally { File.Delete(path); }
+    }
+
+    [Fact]
+    public async Task Upload_RejectsPngHeaderPolyglotWithScript()
+    {
+        var tail = System.Text.Encoding.UTF8.GetBytes("<html><script>alert(document.cookie)</script></html>");
+
+        var result = await UploadAsync(PngHeadThen(16, 16, tail));
+
+        Assert.False(result.IsValid);
+        Assert.Equal("errors.invalid_file_format", result.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task OversizePngHeader_IsTooLarge_AndNeverLoaded()
+    {
+        var bytes = PngHeadThen(65535, 65535, new byte[64]);
+
+        var result = await UploadAsync(bytes);
+
+        Assert.False(result.IsValid);
+        Assert.Equal("errors.image_too_large", result.ErrorMessage);
+
+        var path = TestImages.TempPath(".png");
+        File.WriteAllBytes(path, bytes);
+        try { Assert.Null(SafeImageLoader.TryLoad(path, maxFrames: 1)); }
+        finally { File.Delete(path); }
+    }
+
+    [Fact]
+    public void TryIdentify_NullBytes_ReturnsNull()
+    {
+        Assert.Null(SafeImageLoader.TryIdentify((byte[])null!));
+    }
+
     /// <summary>A2: a still cover decodes one frame; only an animated export takes up to 60.</summary>
     [Fact]
     public void BackgroundMaxFrames_IsOneUnlessAnimating()

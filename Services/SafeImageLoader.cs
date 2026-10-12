@@ -82,15 +82,47 @@ public static class SafeImageLoader
     }
 
     /// <summary>Header-only inspection of in-memory bytes (uploads); null when not a supported image.</summary>
-    public static ImageInfo? TryIdentify(byte[] bytes)
+    public static ImageInfo? TryIdentify(byte[] bytes) => TryIdentify(bytes, out _);
+
+    /// <summary>
+    /// As <see cref="TryIdentify(byte[])"/>, and reports whether the result came from the
+    /// PNG IHDR fallback. That result only proves a header, not a decodable image, so the
+    /// caller must follow it with <see cref="CanDecodeFirstFrame"/>.
+    /// </summary>
+    public static ImageInfo? TryIdentify(byte[] bytes, out bool viaHeaderFallback)
     {
+        viaHeaderFallback = false;
+        if (bytes is null)
+        {
+            return null;
+        }
+
         try
         {
             return Image.Identify(bytes);
         }
         catch
         {
-            return TryIdentifyPngHeader(bytes.AsSpan(0, Math.Min(24, bytes.Length)));
+            var info = TryIdentifyPngHeader(bytes.AsSpan(0, Math.Min(24, bytes.Length)));
+            viaHeaderFallback = info is not null;
+            return info;
+        }
+    }
+
+    /// <summary>
+    /// Proves the bytes decode by decoding a single frame (bounded: callers check the budget
+    /// first, so one frame always fits). True when the decode succeeds.
+    /// </summary>
+    public static bool CanDecodeFirstFrame(byte[] bytes)
+    {
+        try
+        {
+            using var image = Image.Load(Options(1), bytes);
+            return true;
+        }
+        catch
+        {
+            return false;
         }
     }
 
