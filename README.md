@@ -254,25 +254,40 @@ animate in the Jellyfin views that render GIFs.
 ### Restoring the original
 
 Applying a cover automatically backs up the target's previous image once. Use **Restore original
-cover** in step 1 to revert.
+cover** in step 1 to revert — you can restore, apply and restore again as often as you like.
+Applied covers are handed to Jellyfin's own image store (the same as uploading an image in the
+dashboard), so they keep working even if the plugin's data folder is cleared; the backups live in
+that folder under `customcoverart/backups`. Applies to the same target run one at a time.
 
 ## 🔒 Security & privacy
 
 - All endpoints require an authenticated **administrator** (`RequiresElevation` policy).
-- Uploads are **rate‑limited**, size‑capped, and validated by **content** (not just extension) —
-  executables and non‑image payloads are rejected even if renamed to `.png`.
+- Uploads are **rate‑limited** (rejected uploads count too), size‑capped and validated by
+  **content** (not just extension) — executables and non‑image payloads are rejected even if
+  renamed to `.png`. Accepted image formats: JPG, PNG, GIF, BMP and WebP. The background limit is
+  5 MB by default; set `MaxUploadSizeMb` (1–50) in `plugins/configurations/CustomCoverArt.xml` to
+  change it (the editor's hint text keeps saying 5 MB). Values above about 28 MB may be blocked
+  earlier by the web server's own request-size limit.
+- Every image is checked for **decompression bombs** before it is decoded: only the frames a
+  render needs are decoded (one for a still cover, at most 60 for an animated one), and an
+  animation with more frames than fit the memory budget is cut to the frames that do. A single
+  frame larger than 8192×8192 pixels is refused at upload.
 - Background, font and layer-image paths supplied by the browser are **sandboxed** to the
   plugin's data directory, so the generator cannot be pointed at arbitrary files on the server.
 - Uploaded files are stored under Jellyfin's data path using randomised names.
 - The number of layers per cover is **capped at 40** server-side, so a crafted request cannot
   turn one render into unbounded work.
+- Gradients keep at most **16 colour stops** and a text layer at most **500 characters**; poster
+  search returns at most **100 items** per page.
+- The `/health` endpoint reports only whether the plugin can write to its data folder, and its
+  version — no paths or error details.
 
 ## 🌐 Adding a translation
 
 Strings live in **two** places, and a language needs both — translating only the first
 leaves the whole configuration page in English.
 
-**1. Server messages** — `Resources/<language-code>.json`. A short file: the six upload
+**1. Server messages** — `Resources/<language-code>.json`. A short file: the seven upload
 and validation errors the server returns.
 
 1. Copy `Resources/en.json` as a starting point.
