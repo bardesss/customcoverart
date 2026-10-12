@@ -12,13 +12,32 @@ public interface ILibraryDetectionService
 
     Task<LibraryInfo?> GetLibraryByIdAsync(string libraryId);
     Task<bool> UpdateLibraryCoverArtAsync(string libraryId, string coverArtPath);
-    Task<string?> BackupCurrentCoverArtAsync(string libraryId);
+    /// <summary>
+    /// Copies the target's current primary image to its restore point, once. Applying may
+    /// only proceed unless this returns <see cref="BackupOutcome.Failed"/>.
+    /// </summary>
+    Task<BackupOutcome> BackupCurrentCoverArtAsync(string libraryId);
 
     /// <summary>Whether an original-cover restore point exists for a target.</summary>
     bool HasBackup(string libraryId);
 
     /// <summary>Restore a target's original (pre-plugin) primary image, if backed up.</summary>
     Task<bool> RestoreOriginalCoverArtAsync(string libraryId);
+}
+
+/// <summary>Result of backing up a target's current cover before it is replaced.</summary>
+public enum BackupOutcome
+{
+    /// <summary>A restore point exists (just made, or kept from an earlier apply).</summary>
+    BackedUp,
+
+    /// <summary>Nothing would be lost: no current local image, or it is plugin-owned
+    /// (detached before saving, so Jellyfin's image saver never deletes it).</summary>
+    NotNeeded,
+
+    /// <summary>The current image is not ours and could not be copied; replacing it
+    /// could lose the original for good.</summary>
+    Failed,
 }
 
 public interface ICoverArtService
