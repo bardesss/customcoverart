@@ -29,6 +29,7 @@ public class LocalizationResourceTests
         "errors.invalid_file_format",
         "errors.too_many_uploads",
         "errors.suspicious_content",
+        "errors.image_too_large",
     };
 
     private static Dictionary<string, string> Load(string code)

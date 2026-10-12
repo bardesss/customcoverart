@@ -87,15 +87,14 @@ public static class DocumentRenderer
 
         try
         {
-            // Decompression-bomb guard: inspect the header before a full decode.
-            var info = Image.Identify(layer.ImagePath);
-            const long maxSourcePixels = 8192L * 8192L;
-            if ((long)info.Width * info.Height > maxSourcePixels)
+            // Shared decompression-bomb guard; a logo is always drawn as a still, so only
+            // its first frame is ever decoded.
+            using var logo = SafeImageLoader.TryLoadRgba32(layer.ImagePath, maxFrames: 1);
+            if (logo is null)
             {
                 return;
             }
 
-            using var logo = Image.Load<Rgba32>(layer.ImagePath);
             logo.Mutate(x => x.Resize(w, h));
 
             // Rotation grows the bounding box, so the top-left must be derived from the
