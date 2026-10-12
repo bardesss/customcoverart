@@ -542,7 +542,8 @@ public static class DocumentRenderer
     }
 
     /// <summary>
-    /// Renders a text layer with fallback mechanisms if the primary render throws.
+    /// Renders a text layer, retrying once without effects if the full render throws. If
+    /// that fails too the layer is skipped: one bad layer must never cost the rest of the cover.
     /// </summary>
     internal static void RenderTextLayerWithFallback(Image<Rgba32> canvas, CoverLayer layer, CoverDocument doc)
     {
@@ -555,8 +556,7 @@ public static class DocumentRenderer
             // Fallback: simple text overlay without advanced effects.
             try
             {
-                var fallbackFontPx = Math.Max(12, layer.Size * doc.Canvas.Height * 0.5f);
-                var font = BundledFamily(FontWeight.Normal).CreateFont(fallbackFontPx);
+                var font = BundledFamily(FontWeight.Normal).CreateFont(FallbackFontPixelSize(layer, doc));
                 var textColor = SafeColor(layer.Color, Color.White);
                 var position = new PointF(canvas.Width / 2f, canvas.Height / 2f);
 
@@ -564,12 +564,18 @@ public static class DocumentRenderer
             }
             catch
             {
-                // Ultimate fallback: Just fill with the dim/background color
-                var backgroundColor = SafeColor(doc.Background.DimColor, Color.Black);
-                canvas.Mutate(x => x.Fill(backgroundColor));
+                // Skip this layer. Filling the canvas here (as this once did) erased the
+                // background and every layer already drawn.
             }
         }
     }
+
+    /// <summary>
+    /// Font size for the effects-free fallback: half the layer's size, clamped to the same
+    /// [8, 1024]px range as the main render so a bad layer cannot drive huge rasterisation.
+    /// </summary>
+    internal static float FallbackFontPixelSize(CoverLayer layer, CoverDocument doc)
+        => Math.Clamp(layer.Size * doc.Canvas.Height * 0.5f, 8f, 1024f);
 
     private static HorizontalAlignment GetHorizontalAlignment(TextAlign textAlign)
     {
