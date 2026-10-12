@@ -78,12 +78,9 @@ public static class DocumentRenderer
             return;
         }
 
-        // Clamp the normalized size before it becomes an allocation: Width/Height are
-        // client-supplied, and an absurd fraction would drive a giant Resize buffer.
-        var normW = Math.Clamp(layer.Width, 0f, 4f);
-        var normH = Math.Clamp(layer.Height, 0f, 4f);
-        var w = Math.Max(1, (int)Math.Round(normW * canvas.Width));
-        var h = Math.Max(1, (int)Math.Round(normH * canvas.Height));
+        var size = ImageLayerPixelSize(layer, canvas.Width, canvas.Height);
+        var w = size.Width;
+        var h = size.Height;
 
         try
         {
@@ -124,6 +121,23 @@ public static class DocumentRenderer
         {
             // Unreadable/undecodable logo: skip it, never break the whole render.
         }
+    }
+
+    /// <summary>Largest an image layer may be, as a multiple of the canvas on each axis.</summary>
+    internal const float MaxImageLayerScale = 1.5f;
+
+    /// <summary>
+    /// Pixel size an image layer is resized to. Width/Height are client-supplied fractions,
+    /// so they are clamped before they become an allocation: a layer bigger than 1.5× the
+    /// canvas is mostly off-canvas anyway, and Rotate grows the buffer further still.
+    /// </summary>
+    internal static Size ImageLayerPixelSize(CoverLayer layer, int canvasWidth, int canvasHeight)
+    {
+        var normW = Math.Clamp(layer.Width, 0f, MaxImageLayerScale);
+        var normH = Math.Clamp(layer.Height, 0f, MaxImageLayerScale);
+        return new Size(
+            Math.Max(1, (int)Math.Round(normW * canvasWidth)),
+            Math.Max(1, (int)Math.Round(normH * canvasHeight)));
     }
 
     // Parses a #rrggbb colour, falling back to a default instead of throwing so
