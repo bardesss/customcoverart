@@ -26,6 +26,26 @@ internal static class TestImages
         0x3B,                                                       // trailer
     };
 
+    /// <summary>
+    /// Like <see cref="GifWithScreen"/> but repeating the 1×1 frame <paramref name="frames"/> times,
+    /// so a header-only file can claim a long animation over a big logical screen.
+    /// </summary>
+    public static byte[] GifWithScreenFrames(ushort width, ushort height, int frames)
+    {
+        var single = GifWithScreen(width, height);
+        const int headerLen = 19;                 // signature + screen + colour table
+        int blockLen = single.Length - headerLen - 1; // one frame block, minus trailer
+        var bytes = new byte[headerLen + blockLen * frames + 1];
+        Array.Copy(single, 0, bytes, 0, headerLen);
+        for (int i = 0; i < frames; i++)
+        {
+            Array.Copy(single, headerLen, bytes, headerLen + i * blockLen, blockLen);
+        }
+
+        bytes[^1] = 0x3B;
+        return bytes;
+    }
+
     /// <summary>Writes an animated GIF whose frames alternate red (even) / blue (odd).</summary>
     public static void SaveMultiFrameGif(string path, int width, int height, int frames)
     {
