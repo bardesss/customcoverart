@@ -7,27 +7,30 @@ namespace CustomCoverArt.Services;
 public class ImageProcessingService : IImageProcessingService
 {
     private readonly ILocalizationService _localizationService;
+    private readonly Func<int> _maxUploadSizeMb;
 
+    /// <summary>DI constructor: the background-upload limit comes from the plugin configuration.</summary>
     public ImageProcessingService(ILocalizationService localizationService)
+        : this(localizationService, () => Plugin.Instance?.Configuration.MaxUploadSizeMb ?? 5)
+    {
+    }
+
+    internal ImageProcessingService(ILocalizationService localizationService, Func<int> maxUploadSizeMb)
     {
         _localizationService = localizationService;
+        _maxUploadSizeMb = maxUploadSizeMb;
     }
 
     /// <summary>
-    /// Determines the output format for "auto". The generator always produces a
-    /// single (non-animated) frame, so PNG is used unconditionally: it is 24-bit
-    /// and lossless, whereas GIF is limited to 256 colours and would badly band
-    /// photographic backgrounds, blurs and gradients. Users can still force GIF
-    /// explicitly, but "auto" never chooses it.
+    /// The configured background-upload limit, clamped to 1..50 MB. Below 1 nothing could be
+    /// uploaded; far above 50 the server holds the whole file in memory for the content scan.
     /// </summary>
-    public Task<string> DetermineOptimalFormatAsync(CoverArtSettings settings)
-    {
-        return Task.FromResult("png");
-    }
+    public static int EffectiveMaxUploadMb(int configured) => Math.Clamp(configured, 1, 50);
 
     public static bool IsValidImageFormat(string fileName)
     {
-        var supportedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".tiff", ".tif" };
+        // No TIFF: browsers cannot decode it, so it could never be drawn on the editor canvas.
+        var supportedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp" };
         var extension = Path.GetExtension(fileName).ToLowerInvariant();
 
         // Reject double extensions and path/shell metacharacters.
@@ -56,10 +59,11 @@ public class ImageProcessingService : IImageProcessingService
             return result;
         }
 
-        if (!IsValidFileSize(file.Length, maxSizeInMB: 5))
+        var maxMb = EffectiveMaxUploadMb(_maxUploadSizeMb());
+        if (!IsValidFileSize(file.Length, maxMb))
         {
             result.IsValid = false;
-            result.ErrorMessage = _localizationService.GetString("errors.file_too_large", 5);
+            result.ErrorMessage = _localizationService.GetString("errors.file_too_large", maxMb);
             return result;
         }
 
@@ -70,10 +74,10 @@ public class ImageProcessingService : IImageProcessingService
             return result;
         }
 
-        // Content-based validation. This is NOT antivirus — it verifies the
-        // bytes are actually a decodable image and rejects obvious executable
-        // content, which is what closes the "wrong file with an image extension"
-        // gap that an extension check alone leaves open.
+        // Content-based validation. This is NOT antivirus — it verifies the bytes are
+        // an identifiable image (a PNG identified only by its header must also decode
+        // its first frame) and rejects obvious executable content, which is what closes
+        // the "wrong file with an image extension" gap that an extension check alone leaves open.
         return await ScanContentAsync(file);
     }
 
@@ -107,12 +111,28 @@ public class ImageProcessingService : IImageProcessingService
             }
         }
 
-        // The real check: the bytes must decode as a supported image. Image.Identify
-        // reads only the header, so it is cheap and not a decompression-bomb risk.
+        // The real check: the bytes must be a supported image, and a single frame must fit
+        // the decode budget. Image.Identify reads headers and frame metadata only, never
+        // pixel data. When Identify failed and only the PNG header fallback identified the
+        // file (it throws on some valid APNGs), a header proves nothing, so after the budget
+        // check one frame is decoded to prove the file is really an image.
         try
         {
-            var info = Image.Identify(bytes);
+            var info = SafeImageLoader.TryIdentify(bytes, out var viaHeaderFallback);
             if (info is null || info.Width <= 0 || info.Height <= 0)
+            {
+                result.IsValid = false;
+                result.ErrorMessage = _localizationService.GetString("errors.invalid_file_format");
+            }
+            else if (!SafeImageLoader.IsWithinBudget(info, SafeImageLoader.MaxAnimatedFrames))
+            {
+                // Same budget the renderer applies. Only a single frame over budget is
+                // refused (it could never be decoded); a long animation is accepted and
+                // the renderer decodes as many of its frames as fit.
+                result.IsValid = false;
+                result.ErrorMessage = _localizationService.GetString("errors.image_too_large");
+            }
+            else if (viaHeaderFallback && !SafeImageLoader.CanDecodeFirstFrame(bytes))
             {
                 result.IsValid = false;
                 result.ErrorMessage = _localizationService.GetString("errors.invalid_file_format");

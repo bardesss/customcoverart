@@ -6,6 +6,7 @@ using MediaBrowser.Common.Configuration;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 
 namespace CustomCoverArt.Controllers;
 
@@ -24,7 +25,7 @@ public class CustomCoverArtController : ControllerBase
     private readonly IImageProcessingService _imageProcessingService;
     private readonly IMediaItemService _mediaItemService;
     private readonly IUserContextService _userContextService;
-    private readonly ILoggingService _loggingService;
+    private readonly ILogger<CustomCoverArtController> _logger;
     private readonly IRateLimitingService _rateLimitingService;
     private readonly IStartupValidationService _startupValidationService;
     private readonly ILocalizationService _localizationService;
@@ -36,7 +37,7 @@ public class CustomCoverArtController : ControllerBase
         IImageProcessingService imageProcessingService,
         IMediaItemService mediaItemService,
         IUserContextService userContextService,
-        ILoggingService loggingService,
+        ILogger<CustomCoverArtController> logger,
         IRateLimitingService rateLimitingService,
         IStartupValidationService startupValidationService,
         ILocalizationService localizationService,
@@ -47,29 +48,22 @@ public class CustomCoverArtController : ControllerBase
         _imageProcessingService = imageProcessingService;
         _mediaItemService = mediaItemService;
         _userContextService = userContextService;
-        _loggingService = loggingService;
+        _logger = logger;
         _rateLimitingService = rateLimitingService;
         _startupValidationService = startupValidationService;
         _localizationService = localizationService;
         _applicationPaths = applicationPaths;
     }
 
-    // Returns true if the caller has exceeded the limit for this action.
-    // Records the attempt on every call (so failed attempts also count).
+    // Identifies the caller for rate limiting: the Jellyfin user, else the remote IP.
+    private string ClientId() => _userContextService.GetCurrentUserId()
+        ?? HttpContext.Connection.RemoteIpAddress?.ToString()
+        ?? "unknown";
+
+    // Returns true if the caller has exceeded the limit for this action. Check and record
+    // are one atomic step, so a concurrent burst cannot all slip past the check.
     private bool RateLimited(string action, int maxRequests, TimeSpan window)
-    {
-        var clientId = _userContextService.GetCurrentUserId()
-            ?? HttpContext.Connection.RemoteIpAddress?.ToString()
-            ?? "unknown";
-
-        if (!_rateLimitingService.IsAllowed(clientId, action, maxRequests, window))
-        {
-            return true;
-        }
-
-        _rateLimitingService.RecordRequest(clientId, action);
-        return false;
-    }
+        => !_rateLimitingService.TryAcquire(ClientId(), action, maxRequests, window);
 
     /// <summary>Get cover-art targets of a type: "library", "collection" or "playlist".</summary>
     [HttpGet("targets/{type}")]
@@ -82,7 +76,7 @@ public class CustomCoverArtController : ControllerBase
         }
         catch (Exception ex)
         {
-            _loggingService.LogError("Failed to get targets", ex);
+            _logger.LogError(ex, "Failed to get targets");
             return Fail<IEnumerable<LibraryInfo>>("Failed to load targets.");
         }
     }
@@ -104,9 +98,13 @@ public class CustomCoverArtController : ControllerBase
             var contentType = settings.OutputFormat?.ToLowerInvariant() == "gif" ? "image/gif" : "image/png";
             return File(imageBytes, contentType);
         }
+        catch (CoverValidationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
         catch (Exception ex)
         {
-            _loggingService.LogError("Failed to generate preview", ex);
+            _logger.LogError(ex, "Failed to generate preview");
             return BadRequest(new { error = "Failed to generate preview." });
         }
     }
@@ -128,9 +126,13 @@ public class CustomCoverArtController : ControllerBase
             var contentType = document.Canvas.Format?.ToLowerInvariant() == "gif" ? "image/gif" : "image/png";
             return File(imageBytes, contentType);
         }
+        catch (CoverValidationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
         catch (Exception ex)
         {
-            _loggingService.LogError("Failed to generate document preview", ex);
+            _logger.LogError(ex, "Failed to generate document preview");
             return BadRequest(new { error = "Failed to generate preview." });
         }
     }
@@ -145,42 +147,7 @@ public class CustomCoverArtController : ControllerBase
             return Fail<bool>(_localizationService.GetString("errors.too_many_uploads"));
         }
 
-        // Validate the library id up front, before it is used anywhere.
-        if (!Guid.TryParse(request.LibraryId, out _))
-        {
-            return Fail<bool>("Invalid library id");
-        }
-
-        try
-        {
-            var userName = _userContextService.GetCurrentUserName() ?? "unknown";
-            _loggingService.LogInformation("User {UserName} applying document cover art to library {LibraryId}", userName, request.LibraryId);
-
-            var coverArtPath = await _coverArtService.GenerateFromDocumentAsync(request.Document).ConfigureAwait(false);
-
-            // Persist into the per-library folder; apply THAT stable path.
-            var savedPath = await _coverArtService.SaveCoverArtAsync(request.LibraryId, coverArtPath).ConfigureAwait(false);
-            if (savedPath is null)
-            {
-                return Fail<bool>("Failed to save cover art");
-            }
-
-            // Preserve the target's current image once, so Restore can undo later.
-            await _libraryService.BackupCurrentCoverArtAsync(request.LibraryId).ConfigureAwait(false);
-
-            var updated = await _libraryService.UpdateLibraryCoverArtAsync(request.LibraryId, savedPath).ConfigureAwait(false);
-            if (!updated)
-            {
-                return Fail<bool>("Failed to update library cover art");
-            }
-
-            return Success(true);
-        }
-        catch (Exception ex)
-        {
-            _loggingService.LogError("Failed to apply document to {LibraryId}", ex, request.LibraryId);
-            return Fail<bool>("Failed to apply cover art.");
-        }
+        return await ApplyDocumentInternal(request.LibraryId, request.Document).ConfigureAwait(false);
     }
 
     /// <summary>Apply cover art to a library (used by the config page).</summary>
@@ -199,7 +166,7 @@ public class CustomCoverArtController : ControllerBase
     private Task<ApiResponse<bool>> ApplyInternal(string libraryId, CoverArtSettings settings)
         => ApplyRenderedAsync(libraryId, () => _coverArtService.GenerateCoverArtAsync(settings));
 
-    /// <summary>Batch equivalent of the document/apply endpoint, for layered designs.</summary>
+    /// <summary>Render a layered design and apply it (document/apply and batch apply).</summary>
     private Task<ApiResponse<bool>> ApplyDocumentInternal(string libraryId, CoverDocument document)
         => ApplyRenderedAsync(libraryId, () => _coverArtService.GenerateFromDocumentAsync(document));
 
@@ -208,15 +175,19 @@ public class CustomCoverArtController : ControllerBase
     private async Task<ApiResponse<bool>> ApplyRenderedAsync(string libraryId, Func<Task<string>> render)
     {
         // Validate the library id up front, before it is used anywhere.
-        if (!Guid.TryParse(libraryId, out _))
+        if (!Guid.TryParse(libraryId, out var libraryGuid))
         {
             return Fail<bool>("Invalid library id");
         }
 
+        // Serialise applies per target: an interleaved prune would otherwise delete
+        // the cover another apply has just made live.
+        var gate = ApplyLocks.GetOrAdd(libraryGuid, _ => new SemaphoreSlim(1, 1));
+        await gate.WaitAsync().ConfigureAwait(false);
         try
         {
             var userName = _userContextService.GetCurrentUserName() ?? "unknown";
-            _loggingService.LogInformation("User {UserName} applying cover art to library {LibraryId}", userName, libraryId);
+            _logger.LogInformation("User {UserName} applying cover art to library {LibraryId}", userName, libraryId);
 
             var coverArtPath = await render().ConfigureAwait(false);
 
@@ -227,8 +198,14 @@ public class CustomCoverArtController : ControllerBase
                 return Fail<bool>("Failed to save cover art");
             }
 
-            // Preserve the target's current image once, so Restore can undo later.
-            await _libraryService.BackupCurrentCoverArtAsync(libraryId).ConfigureAwait(false);
+            // Preserve the target's current image once, so Restore can undo later. Jellyfin's
+            // image saver deletes the previous image, so without a backup the original
+            // would be gone for good: refuse instead.
+            var backup = await _libraryService.BackupCurrentCoverArtAsync(libraryId).ConfigureAwait(false);
+            if (backup == BackupOutcome.Failed)
+            {
+                return Fail<bool>(_localizationService.GetString("errors.backup_failed"));
+            }
 
             var updated = await _libraryService.UpdateLibraryCoverArtAsync(libraryId, savedPath).ConfigureAwait(false);
             if (!updated)
@@ -236,14 +213,35 @@ public class CustomCoverArtController : ControllerBase
                 return Fail<bool>("Failed to update library cover art");
             }
 
+            // Only now is the new cover live, so every older copy in the folder is garbage.
+            // Best effort: the cover is already live, so a cleanup failure is not an apply failure.
+            try
+            {
+                _coverArtService.PruneLibraryOutputs(libraryId, savedPath);
+            }
+            catch (Exception pruneEx)
+            {
+                _logger.LogWarning(pruneEx, "Failed to prune old covers for library {LibraryId}", libraryId);
+            }
+
             return Success(true);
+        }
+        catch (CoverValidationException ex)
+        {
+            return Fail<bool>(ex.Message);
         }
         catch (Exception ex)
         {
-            _loggingService.LogError("Failed to apply cover art to library {LibraryId}", ex, libraryId);
+            _logger.LogError(ex, "Failed to apply cover art to library {LibraryId}", libraryId);
             return Fail<bool>("Failed to apply cover art.");
         }
+        finally
+        {
+            gate.Release();
+        }
     }
+
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, SemaphoreSlim> ApplyLocks = new();
 
     /// <summary>Whether a restore point (original cover backup) exists for a target.</summary>
     [HttpGet("targets/{id}/backup")]
@@ -257,9 +255,12 @@ public class CustomCoverArtController : ControllerBase
         return Success(_libraryService.HasBackup(id));
     }
 
-    /// <summary>Restore a target's original (pre-plugin) primary image.</summary>
+    /// <summary>
+    /// Restore a target's original (pre-plugin) primary image. The <c>{type}</c> segment stays
+    /// in the route because the config page sends it; the restore needs only the id.
+    /// </summary>
     [HttpPost("targets/{type}/{id}/restore")]
-    public async Task<ApiResponse<bool>> RestoreOriginal(string type, string id)
+    public async Task<ApiResponse<bool>> RestoreOriginal(string id)
     {
         if (!Guid.TryParse(id, out _))
         {
@@ -273,7 +274,7 @@ public class CustomCoverArtController : ControllerBase
         }
         catch (Exception ex)
         {
-            _loggingService.LogError("Failed to restore original cover for {Id}", ex, id);
+            _logger.LogError(ex, "Failed to restore original cover for {Id}", id);
             return Fail<bool>("Failed to restore original cover.");
         }
     }
@@ -360,15 +361,12 @@ public class CustomCoverArtController : ControllerBase
         Func<IFormFile, Task<ValidationResult>> validate)
     {
         var userName = _userContextService.GetCurrentUserName() ?? "unknown";
-        var clientId = _userContextService.GetCurrentUserId()
-            ?? HttpContext.Connection.RemoteIpAddress?.ToString()
-            ?? "unknown";
 
         try
         {
-            if (!_rateLimitingService.IsAllowed(clientId, rateLimitAction, maxRequests, window))
+            if (RateLimited(rateLimitAction, maxRequests, window))
             {
-                _loggingService.LogWarning("Rate limit exceeded for {Action} by {UserName}", rateLimitAction, userName);
+                _logger.LogWarning("Rate limit exceeded for {Action} by {UserName}", rateLimitAction, userName);
                 return Fail<string>(_localizationService.GetString("errors.too_many_uploads"));
             }
 
@@ -383,8 +381,6 @@ public class CustomCoverArtController : ControllerBase
                 return Fail<string>(validation.ErrorMessage);
             }
 
-            _rateLimitingService.RecordRequest(clientId, rateLimitAction);
-
             Directory.CreateDirectory(directory);
             var sanitized = ImageProcessingService.SanitizeFileName(file.FileName);
             var fileName = $"{filePrefix}{Guid.NewGuid():N}_{sanitized}";
@@ -395,12 +391,12 @@ public class CustomCoverArtController : ControllerBase
                 await file.CopyToAsync(stream).ConfigureAwait(false);
             }
 
-            _loggingService.LogInformation("User {UserName} uploaded {FileName}", userName, fileName);
+            _logger.LogInformation("User {UserName} uploaded {FileName}", userName, fileName);
             return Success(filePath);
         }
         catch (Exception ex)
         {
-            _loggingService.LogError("Upload failed for user {UserName}", ex, userName);
+            _logger.LogError(ex, "Upload failed for user {UserName}", userName);
             return Fail<string>("Could not save the uploaded file.");
         }
     }
@@ -416,7 +412,7 @@ public class CustomCoverArtController : ControllerBase
         }
         catch (Exception ex)
         {
-            _loggingService.LogError("Failed to search items", ex);
+            _logger.LogError(ex, "Failed to search items");
             return Fail<ItemSearchResponse>("Failed to search items.");
         }
     }
@@ -427,25 +423,12 @@ public class CustomCoverArtController : ControllerBase
     {
         try
         {
-            if (_startupValidationService.IsPluginReady)
-            {
-                return Success<object>(new { PluginReady = true, Version = Plugin.Instance?.Version.ToString() });
-            }
-
-            var config = await _startupValidationService.ValidateConfigurationAsync().ConfigureAwait(false);
-            var deps = await _startupValidationService.ValidateDependenciesAsync().ConfigureAwait(false);
-            var perms = await _startupValidationService.ValidatePermissionsAsync().ConfigureAwait(false);
-
-            return Success<object>(new
-            {
-                PluginReady = config.IsValid && deps.IsValid && perms.IsValid,
-                Version = Plugin.Instance?.Version.ToString(),
-                ValidationResults = new { Configuration = config, Dependencies = deps, Permissions = perms }
-            });
+            var ready = await _startupValidationService.IsPluginReadyAsync().ConfigureAwait(false);
+            return Success<object>(new { PluginReady = ready, Version = Plugin.Instance?.Version.ToString() });
         }
         catch (Exception ex)
         {
-            _loggingService.LogError("Health check failed", ex);
+            _logger.LogError(ex, "Health check failed");
             return Fail<object>("Health check failed.");
         }
     }
@@ -464,7 +447,7 @@ public class CustomCoverArtController : ControllerBase
         }
         catch (Exception ex)
         {
-            _loggingService.LogError("Failed to get language info", ex);
+            _logger.LogError(ex, "Failed to get language info");
             return Fail<object>("Failed to get language info.");
         }
     }
@@ -708,8 +691,7 @@ public class CustomCoverArtController : ControllerBase
         CoverArtSettings? baseSettings = request.Settings;
         if (!string.IsNullOrWhiteSpace(request.TemplateName))
         {
-            var tpl = Plugin.Instance?.Configuration.Templates
-                .FirstOrDefault(t => string.Equals(t.Name, request.TemplateName, StringComparison.OrdinalIgnoreCase));
+            var tpl = Plugin.Instance is { } plugin ? TemplateStore.Find(plugin.Configuration, request.TemplateName) : null;
             if (tpl is null)
             {
                 return Fail<List<BatchApplyResult>>("Template not found: " + request.TemplateName);
@@ -754,8 +736,8 @@ public class CustomCoverArtController : ControllerBase
     [HttpGet("templates")]
     public ApiResponse<List<SavedTemplate>> GetTemplates()
     {
-        var list = Plugin.Instance?.Configuration.Templates ?? new List<SavedTemplate>();
-        return Success(list);
+        var cfg = Plugin.Instance?.Configuration;
+        return Success(cfg is null ? new List<SavedTemplate>() : TemplateStore.Snapshot(cfg));
     }
 
     /// <summary>Save (upsert by name) a design template.</summary>
@@ -774,9 +756,7 @@ public class CustomCoverArtController : ControllerBase
         }
 
         var normalized = NormalizeTemplate(template);
-        cfg.Templates.RemoveAll(t => string.Equals(t.Name, normalized.Name, StringComparison.OrdinalIgnoreCase));
-        cfg.Templates.Add(normalized);
-        Plugin.Instance!.SaveConfiguration();
+        TemplateStore.Upsert(cfg, normalized, () => Plugin.Instance!.SaveConfiguration());
         return Success(true);
     }
 
@@ -790,8 +770,7 @@ public class CustomCoverArtController : ControllerBase
             return Fail<bool>("Plugin not initialized.");
         }
 
-        cfg.Templates.RemoveAll(t => string.Equals(t.Name, name, StringComparison.OrdinalIgnoreCase));
-        Plugin.Instance!.SaveConfiguration();
+        TemplateStore.Remove(cfg, name, () => Plugin.Instance!.SaveConfiguration());
         return Success(true);
     }
 

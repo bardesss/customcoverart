@@ -6,6 +6,7 @@ using CustomCoverArt.Models;
 using CustomCoverArt.Services;
 using MediaBrowser.Common.Configuration;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
@@ -109,6 +110,8 @@ public class UploadValidationTests
     [InlineData("normal.png", true)]
     [InlineData("weird<name>.png", false)]
     [InlineData("double.ext.png", false)]
+    [InlineData("scan.tiff", false)]
+    [InlineData("scan.tif", false)]
     public void FileNameValidation(string name, bool expected)
     {
         Assert.Equal(expected, ImageProcessingService.IsValidImageFormat(name));
@@ -124,7 +127,7 @@ public class CoverArtGenerationTests
         var paths = Substitute.For<IApplicationPaths>();
         paths.DataPath.Returns(Path.Combine(Path.GetTempPath(), "cca_test_" + Guid.NewGuid().ToString("N")));
 
-        var service = new CoverArtService(paths, Substitute.For<ILoggingService>(), Substitute.For<IMediaItemService>());
+        var service = new CoverArtService(paths, NullLogger<CoverArtService>.Instance, Substitute.For<IMediaItemService>());
 
         var settings = new CoverArtSettings
         {
@@ -160,7 +163,7 @@ public class CoverArtGenerationTests
         var paths = Substitute.For<IApplicationPaths>();
         paths.DataPath.Returns(Path.Combine(Path.GetTempPath(), "cca_test_" + Guid.NewGuid().ToString("N")));
 
-        var service = new CoverArtService(paths, Substitute.For<ILoggingService>(), Substitute.For<IMediaItemService>());
+        var service = new CoverArtService(paths, NullLogger<CoverArtService>.Instance, Substitute.For<IMediaItemService>());
         var settings = new CoverArtSettings
         {
             Title = "Hi",

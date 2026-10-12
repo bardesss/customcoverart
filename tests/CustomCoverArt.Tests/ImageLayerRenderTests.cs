@@ -120,4 +120,24 @@ public class ImageLayerRenderTests
             foreach (var p in new[] { red, blue, green }) { try { System.IO.File.Delete(p); } catch { } }
         }
     }
+
+    /// <summary>
+    /// A layer is clamped to 1.5× the canvas before it becomes an allocation. 4× (the old cap)
+    /// on a 2048² canvas is an 8192² buffer that Rotate then grows further, ~0.5-1 GB per layer.
+    /// </summary>
+    [Fact]
+    public void ImageLayerPixelSize_ClampsToOneAndAHalfCanvases()
+    {
+        var size = DocumentRenderer.ImageLayerPixelSize(new CoverLayer { Width = 4f, Height = 10f }, 200, 100);
+        Assert.Equal(300, size.Width);
+        Assert.Equal(150, size.Height);
+    }
+
+    [Fact]
+    public void ImageLayerPixelSize_NeverBelowOnePixel()
+    {
+        var size = DocumentRenderer.ImageLayerPixelSize(new CoverLayer { Width = 0f, Height = -2f }, 200, 100);
+        Assert.Equal(1, size.Width);
+        Assert.Equal(1, size.Height);
+    }
 }

@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using CustomCoverArt.Models;
 using SixLabors.Fonts;
 using SixLabors.ImageSharp;
@@ -78,24 +79,20 @@ public static class DocumentRenderer
             return;
         }
 
-        // Clamp the normalized size before it becomes an allocation: Width/Height are
-        // client-supplied, and an absurd fraction would drive a giant Resize buffer.
-        var normW = Math.Clamp(layer.Width, 0f, 4f);
-        var normH = Math.Clamp(layer.Height, 0f, 4f);
-        var w = Math.Max(1, (int)Math.Round(normW * canvas.Width));
-        var h = Math.Max(1, (int)Math.Round(normH * canvas.Height));
+        var size = ImageLayerPixelSize(layer, canvas.Width, canvas.Height);
+        var w = size.Width;
+        var h = size.Height;
 
         try
         {
-            // Decompression-bomb guard: inspect the header before a full decode.
-            var info = Image.Identify(layer.ImagePath);
-            const long maxSourcePixels = 8192L * 8192L;
-            if ((long)info.Width * info.Height > maxSourcePixels)
+            // Shared decompression-bomb guard; a logo is always drawn as a still, so only
+            // its first frame is ever decoded.
+            using var logo = SafeImageLoader.TryLoadRgba32(layer.ImagePath, maxFrames: 1);
+            if (logo is null)
             {
                 return;
             }
 
-            using var logo = Image.Load<Rgba32>(layer.ImagePath);
             logo.Mutate(x => x.Resize(w, h));
 
             // Rotation grows the bounding box, so the top-left must be derived from the
@@ -125,6 +122,23 @@ public static class DocumentRenderer
         {
             // Unreadable/undecodable logo: skip it, never break the whole render.
         }
+    }
+
+    /// <summary>Largest an image layer may be, as a multiple of the canvas on each axis.</summary>
+    internal const float MaxImageLayerScale = 1.5f;
+
+    /// <summary>
+    /// Pixel size an image layer is resized to. Width/Height are client-supplied fractions,
+    /// so they are clamped before they become an allocation: a layer bigger than 1.5× the
+    /// canvas is mostly off-canvas anyway, and Rotate grows the buffer further still.
+    /// </summary>
+    internal static Size ImageLayerPixelSize(CoverLayer layer, int canvasWidth, int canvasHeight)
+    {
+        var normW = Math.Clamp(layer.Width, 0f, MaxImageLayerScale);
+        var normH = Math.Clamp(layer.Height, 0f, MaxImageLayerScale);
+        return new Size(
+            Math.Max(1, (int)Math.Round(normW * canvasWidth)),
+            Math.Max(1, (int)Math.Round(normH * canvasHeight)));
     }
 
     // Parses a #rrggbb colour, falling back to a default instead of throwing so
@@ -377,9 +391,11 @@ public static class DocumentRenderer
     /// </summary>
     public static ColorStop[] BuildColorStops(GradientSettings gradient)
     {
-        if (gradient.Stops is { Count: >= 2 })
+        // Null entries are skipped even on paths that never ran Normalize.
+        var explicitStops = gradient.Stops?.Where(s => s is not null).ToList();
+        if (explicitStops is { Count: >= 2 })
         {
-            return gradient.Stops
+            return explicitStops
                 .OrderBy(s => s.Position)
                 .Select(s => new ColorStop(
                     Math.Clamp(s.Position, 0f, 1f),
@@ -529,7 +545,8 @@ public static class DocumentRenderer
     }
 
     /// <summary>
-    /// Renders a text layer with fallback mechanisms if the primary render throws.
+    /// Renders a text layer, retrying once without effects if the full render throws. If
+    /// that fails too the layer is skipped: one bad layer must never cost the rest of the cover.
     /// </summary>
     internal static void RenderTextLayerWithFallback(Image<Rgba32> canvas, CoverLayer layer, CoverDocument doc)
     {
@@ -542,8 +559,7 @@ public static class DocumentRenderer
             // Fallback: simple text overlay without advanced effects.
             try
             {
-                var fallbackFontPx = Math.Max(12, layer.Size * doc.Canvas.Height * 0.5f);
-                var font = BundledFamily(FontWeight.Normal).CreateFont(fallbackFontPx);
+                var font = BundledFamily(FontWeight.Normal).CreateFont(FallbackFontPixelSize(layer, doc));
                 var textColor = SafeColor(layer.Color, Color.White);
                 var position = new PointF(canvas.Width / 2f, canvas.Height / 2f);
 
@@ -551,12 +567,18 @@ public static class DocumentRenderer
             }
             catch
             {
-                // Ultimate fallback: Just fill with the dim/background color
-                var backgroundColor = SafeColor(doc.Background.DimColor, Color.Black);
-                canvas.Mutate(x => x.Fill(backgroundColor));
+                // Skip this layer. Filling the canvas here (as this once did) erased the
+                // background and every layer already drawn.
             }
         }
     }
+
+    /// <summary>
+    /// Font size for the effects-free fallback: half the layer's size, clamped to the same
+    /// [8, 1024]px range as the main render so a bad layer cannot drive huge rasterisation.
+    /// </summary>
+    internal static float FallbackFontPixelSize(CoverLayer layer, CoverDocument doc)
+        => Math.Clamp(layer.Size * doc.Canvas.Height * 0.5f, 8f, 1024f);
 
     private static HorizontalAlignment GetHorizontalAlignment(TextAlign textAlign)
     {
@@ -613,20 +635,47 @@ public static class DocumentRenderer
     internal static Font CreateFont(CoverLayer layer, float fontPixelSize)
     {
         // Custom uploaded font takes priority (its path is already sandboxed).
-        if (!string.IsNullOrEmpty(layer.FontPath) && File.Exists(layer.FontPath))
+        if (!string.IsNullOrEmpty(layer.FontPath) && File.Exists(layer.FontPath)
+            && TryGetCustomFamily(layer.FontPath, out var custom))
         {
-            try
-            {
-                var fontCollection = new FontCollection();
-                var fontFamily = fontCollection.Add(layer.FontPath);
-                return fontFamily.CreateFont(fontPixelSize);
-            }
-            catch
-            {
-                // Fall back to the bundled font if the custom one fails to load.
-            }
+            return custom.CreateFont(fontPixelSize);
         }
 
         return BundledFamily(layer.Weight).CreateFont(fontPixelSize);
     }
+
+    // Parsed custom fonts, keyed by path and invalidated by the file's write time, so a
+    // font is read once per version instead of once per layer per render (an animated GIF
+    // with three text layers parsed it 90 times).
+    private static readonly ConcurrentDictionary<string, (DateTime WriteTimeUtc, FontFamily Family)> CustomFamilies =
+        new(StringComparer.Ordinal);
+
+    /// <summary>Loads (or reuses) the family for a custom font file; false if it cannot be parsed.</summary>
+    internal static bool TryGetCustomFamily(string path, out FontFamily family)
+    {
+        family = default;
+        try
+        {
+            var writeTime = File.GetLastWriteTimeUtc(path);
+            if (CustomFamilies.TryGetValue(path, out var cached) && cached.WriteTimeUtc == writeTime)
+            {
+                family = cached.Family;
+                return true;
+            }
+
+            var loaded = new FontCollection().Add(path);
+            CustomFamilies[path] = (writeTime, loaded);
+            family = loaded;
+            return true;
+        }
+        catch
+        {
+            // Unparseable font: the caller falls back to the bundled face.
+            return false;
+        }
+    }
+
+    /// <summary>True when the current version of the file at <paramref name="path"/> is cached.</summary>
+    internal static bool IsCustomFontCached(string path)
+        => CustomFamilies.TryGetValue(path, out var cached) && cached.WriteTimeUtc == File.GetLastWriteTimeUtc(path);
 }
