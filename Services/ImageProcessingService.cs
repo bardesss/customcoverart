@@ -74,10 +74,10 @@ public class ImageProcessingService : IImageProcessingService
             return result;
         }
 
-        // Content-based validation. This is NOT antivirus — it verifies the
-        // bytes are actually a decodable image and rejects obvious executable
-        // content, which is what closes the "wrong file with an image extension"
-        // gap that an extension check alone leaves open.
+        // Content-based validation. This is NOT antivirus — it verifies the bytes are
+        // an identifiable image (a PNG identified only by its header must also decode
+        // its first frame) and rejects obvious executable content, which is what closes
+        // the "wrong file with an image extension" gap that an extension check alone leaves open.
         return await ScanContentAsync(file);
     }
 
@@ -111,12 +111,14 @@ public class ImageProcessingService : IImageProcessingService
             }
         }
 
-        // The real check: the bytes must decode as a supported image, and a single frame
-        // must fit the decode budget. Image.Identify reads headers and frame metadata only,
-        // never pixel data.
+        // The real check: the bytes must be a supported image, and a single frame must fit
+        // the decode budget. Image.Identify reads headers and frame metadata only, never
+        // pixel data. When Identify failed and only the PNG header fallback identified the
+        // file (it throws on some valid APNGs), a header proves nothing, so after the budget
+        // check one frame is decoded to prove the file is really an image.
         try
         {
-            var info = SafeImageLoader.TryIdentify(bytes);
+            var info = SafeImageLoader.TryIdentify(bytes, out var viaHeaderFallback);
             if (info is null || info.Width <= 0 || info.Height <= 0)
             {
                 result.IsValid = false;
@@ -129,6 +131,11 @@ public class ImageProcessingService : IImageProcessingService
                 // the renderer decodes as many of its frames as fit.
                 result.IsValid = false;
                 result.ErrorMessage = _localizationService.GetString("errors.image_too_large");
+            }
+            else if (viaHeaderFallback && !SafeImageLoader.CanDecodeFirstFrame(bytes))
+            {
+                result.IsValid = false;
+                result.ErrorMessage = _localizationService.GetString("errors.invalid_file_format");
             }
         }
         catch
