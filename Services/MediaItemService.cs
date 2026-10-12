@@ -35,8 +35,19 @@ public class MediaItemService : IMediaItemService
         _logger = logger;
     }
 
+    /// <summary>Most items one search page may return.</summary>
+    public const int MaxPageSize = 100;
+
+    /// <summary>Highest page number honoured; keeps (Page - 1) * PageSize far from int overflow.</summary>
+    public const int MaxPage = 100_000;
+
     public Task<ItemSearchResponse> SearchItemsAsync(ItemSearchRequest request)
     {
+        // A JSON "null" body binds to null; treat it as an empty query.
+        request ??= new ItemSearchRequest();
+        var pageSize = Math.Clamp(request.PageSize, 1, MaxPageSize);
+        var page = Math.Clamp(request.Page, 1, MaxPage);
+
         try
         {
             var query = new InternalItemsQuery
@@ -45,8 +56,8 @@ public class MediaItemService : IMediaItemService
                 IncludeItemTypes = ParseKinds(request.ItemTypes),
                 ImageTypes = new[] { ImageType.Primary },
                 Recursive = true,
-                Limit = request.PageSize,
-                StartIndex = (request.Page - 1) * request.PageSize
+                Limit = pageSize,
+                StartIndex = (page - 1) * pageSize
             };
 
             if (!string.IsNullOrEmpty(request.LibraryId) && Guid.TryParse(request.LibraryId, out var libId))
@@ -57,17 +68,14 @@ public class MediaItemService : IMediaItemService
             var result = _libraryManager.GetItemsResult(query);
             var totalCount = result.TotalRecordCount;
             var mediaItems = result.Items.Select(MapToMediaItemInfo).ToList();
-            var totalPages = request.PageSize > 0
-                ? (int)Math.Ceiling((double)totalCount / request.PageSize)
-                : 0;
 
             return Task.FromResult(new ItemSearchResponse
             {
                 Items = mediaItems,
                 TotalCount = totalCount,
-                Page = request.Page,
-                PageSize = request.PageSize,
-                TotalPages = totalPages
+                Page = page,
+                PageSize = pageSize,
+                TotalPages = (int)Math.Ceiling((double)totalCount / pageSize)
             });
         }
         catch (Exception ex)
@@ -77,8 +85,8 @@ public class MediaItemService : IMediaItemService
             {
                 Items = Enumerable.Empty<MediaItemInfo>(),
                 TotalCount = 0,
-                Page = request.Page,
-                PageSize = request.PageSize,
+                Page = page,
+                PageSize = pageSize,
                 TotalPages = 0
             });
         }
