@@ -7,10 +7,11 @@ namespace CustomCoverArt.Services;
 /// <summary>
 /// The one place the plugin decodes an image it did not create (uploads, posters, logos).
 /// It identifies the file first (header and frame metadata only, no pixel buffers) and
-/// refuses anything whose decoded size would exceed <see cref="MaxPixelBudget"/>, counting
-/// frames as well as width × height. A 2000-frame GIF passes a W×H-only check but would
-/// decode every frame. It then decodes with <see cref="DecoderOptions.MaxFrames"/>, so a
-/// still cover never pays for an animation's other frames.
+/// refuses an image whose single frame exceeds <see cref="MaxPixelBudget"/>, and clamps the
+/// number of decoded frames so frames × width × height stays within it. A 2000-frame GIF
+/// passes a W×H-only check but would decode every frame. It decodes with
+/// <see cref="DecoderOptions.MaxFrames"/>, so a still cover never pays for an animation's
+/// other frames, and a long animation is truncated rather than rejected.
 /// Total by design: a missing, corrupt or oversized file yields <c>null</c>, never an exception.
 /// </summary>
 public static class SafeImageLoader
@@ -25,25 +26,25 @@ public static class SafeImageLoader
     public static int FrameCount(ImageInfo info) => Math.Max(1, info.FrameMetadataCollection.Count);
 
     /// <summary>
-    /// Whether decoding at most <paramref name="maxFrames"/> frames stays within
-    /// <paramref name="pixelBudget"/>. The per-frame product is checked on its own first,
-    /// so the multiplication by the frame count can never overflow.
+    /// Whether the image can be decoded at all: it has a size and a single frame fits
+    /// <paramref name="pixelBudget"/>. Long animations are not refused; they are clamped
+    /// to fewer frames by <see cref="FramesToDecode"/>. <paramref name="maxFrames"/> is
+    /// accepted for call-site clarity and does not affect the result.
     /// </summary>
     public static bool IsWithinBudget(ImageInfo info, int maxFrames, long pixelBudget = MaxPixelBudget)
+        => info.Width > 0 && info.Height > 0 && (long)info.Width * info.Height <= pixelBudget;
+
+    /// <summary>
+    /// Frames to decode: min(requested, declared, budget / pixels-per-frame), at least 1.
+    /// Division keeps the arithmetic overflow-safe. Only meaningful when
+    /// <see cref="IsWithinBudget"/> holds.
+    /// </summary>
+    public static int FramesToDecode(ImageInfo info, int maxFrames, long pixelBudget = MaxPixelBudget)
     {
-        if (info.Width <= 0 || info.Height <= 0)
-        {
-            return false;
-        }
-
-        var perFrame = (long)info.Width * info.Height;
-        if (perFrame > pixelBudget)
-        {
-            return false;
-        }
-
-        var frames = Math.Min(FrameCount(info), Math.Max(1, maxFrames));
-        return perFrame * frames <= pixelBudget;
+        var perFrame = Math.Max(1L, (long)info.Width * info.Height);
+        var affordable = pixelBudget / perFrame;
+        var frames = Math.Min(Math.Min(FrameCount(info), Math.Max(1, maxFrames)), affordable);
+        return (int)Math.Max(1L, frames);
     }
 
     /// <summary>Header-only inspection; null when the file is missing or not a supported image.</summary>
@@ -70,7 +71,7 @@ public static class SafeImageLoader
 
         try
         {
-            return Image.Load(Options(maxFrames), path);
+            return Image.Load(Options(FramesToDecode(info, maxFrames, pixelBudget)), path);
         }
         catch
         {
@@ -89,7 +90,7 @@ public static class SafeImageLoader
 
         try
         {
-            return Image.Load<Rgba32>(Options(maxFrames), path);
+            return Image.Load<Rgba32>(Options(FramesToDecode(info, maxFrames, pixelBudget)), path);
         }
         catch
         {

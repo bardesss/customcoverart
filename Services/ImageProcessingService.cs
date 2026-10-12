@@ -107,7 +107,9 @@ public class ImageProcessingService : IImageProcessingService
             }
         }
 
-        // The real check: the bytes must decode as a supported image, and fit the decode budget. Image.Identify reads headers and frame metadata only, never pixel data.
+        // The real check: the bytes must decode as a supported image, and a single frame
+        // must fit the decode budget. Image.Identify reads headers and frame metadata only,
+        // never pixel data.
         try
         {
             var info = Image.Identify(bytes);
@@ -118,8 +120,9 @@ public class ImageProcessingService : IImageProcessingService
             }
             else if (!SafeImageLoader.IsWithinBudget(info, SafeImageLoader.MaxAnimatedFrames))
             {
-                // Same budget the renderer applies, at the most frames it would ever decode,
-                // so an upload is refused up front instead of being silently ignored later.
+                // Same budget the renderer applies. Only a single frame over budget is
+                // refused (it could never be decoded); a long animation is accepted and
+                // the renderer decodes as many of its frames as fit.
                 result.IsValid = false;
                 result.ErrorMessage = _localizationService.GetString("errors.image_too_large");
             }

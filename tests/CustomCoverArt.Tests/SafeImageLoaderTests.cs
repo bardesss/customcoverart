@@ -27,9 +27,9 @@ public class SafeImageLoaderTests
         finally { File.Delete(path); }
     }
 
-    /// <summary>Frames count against the budget: W×H alone let a long animation through.</summary>
+    /// <summary>Frames count against the budget: an over-budget animation is clamped, not refused.</summary>
     [Fact]
-    public void FramesCountAgainstTheBudget_UpToMaxFrames()
+    public void FramesCountAgainstTheBudget_AreClampedNotRefused()
     {
         var path = TestImages.TempPath(".gif");
         TestImages.SaveMultiFrameGif(path, 32, 32, frames: 10);
@@ -39,11 +39,46 @@ public class SafeImageLoaderTests
             Assert.Equal(10, SafeImageLoader.FrameCount(info));
 
             const long budget = 32 * 32 * 5; // room for five frames
-            Assert.False(SafeImageLoader.IsWithinBudget(info, maxFrames: 60, budget));
-            Assert.True(SafeImageLoader.IsWithinBudget(info, maxFrames: 1, budget));
-            Assert.Null(SafeImageLoader.TryLoad(path, maxFrames: 60, budget));
+            Assert.True(SafeImageLoader.IsWithinBudget(info, maxFrames: 60, budget));
+            Assert.Equal(5, SafeImageLoader.FramesToDecode(info, maxFrames: 60, budget));
+            Assert.Equal(1, SafeImageLoader.FramesToDecode(info, maxFrames: 1, budget));
+
+            using var loaded = SafeImageLoader.TryLoad(path, maxFrames: 60, budget);
+            Assert.NotNull(loaded);
+            Assert.Equal(5, loaded!.Frames.Count);
         }
         finally { File.Delete(path); }
+    }
+
+    /// <summary>A frame that alone exceeds the budget is still refused.</summary>
+    [Fact]
+    public void SingleFrameOverBudget_IsRefused()
+    {
+        var path = TestImages.TempPath(".gif");
+        TestImages.SaveMultiFrameGif(path, 32, 32, frames: 3);
+        try
+        {
+            var info = Image.Identify(path);
+            Assert.False(SafeImageLoader.IsWithinBudget(info, maxFrames: 60, pixelBudget: 32 * 32 - 1));
+            Assert.Null(SafeImageLoader.TryLoad(path, maxFrames: 60, pixelBudget: 32 * 32 - 1));
+        }
+        finally { File.Delete(path); }
+    }
+
+    /// <summary>A long animation whose frames fit individually is accepted at upload.</summary>
+    [Fact]
+    public async Task Upload_AcceptsLongAnimationWhoseFramesFit()
+    {
+        // Header-only: 4096x4096 screen x 5 frames = 84M pixels, over the 67M budget, but one frame fits.
+        var loc = Substitute.For<ILocalizationService>();
+        loc.GetString(Arg.Any<string>(), Arg.Any<object[]>()).Returns(ci => (string)ci[0]);
+        var bytes = TestImages.GifWithScreenFrames(4096, 4096, 5);
+        Assert.True(SafeImageLoader.FrameCount(Image.Identify(bytes)) >= 2, "test GIF must declare several frames");
+        var file = new FormFile(new MemoryStream(bytes), 0, bytes.Length, "file", "long.gif");
+
+        var result = await new ImageProcessingService(loc).ValidateFileAsync(file);
+
+        Assert.True(result.IsValid, result.ErrorMessage);
     }
 
     [Fact]
