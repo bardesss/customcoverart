@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using CustomCoverArt.Models;
 using SixLabors.Fonts;
 using SixLabors.ImageSharp;
@@ -632,20 +633,47 @@ public static class DocumentRenderer
     internal static Font CreateFont(CoverLayer layer, float fontPixelSize)
     {
         // Custom uploaded font takes priority (its path is already sandboxed).
-        if (!string.IsNullOrEmpty(layer.FontPath) && File.Exists(layer.FontPath))
+        if (!string.IsNullOrEmpty(layer.FontPath) && File.Exists(layer.FontPath)
+            && TryGetCustomFamily(layer.FontPath, out var custom))
         {
-            try
-            {
-                var fontCollection = new FontCollection();
-                var fontFamily = fontCollection.Add(layer.FontPath);
-                return fontFamily.CreateFont(fontPixelSize);
-            }
-            catch
-            {
-                // Fall back to the bundled font if the custom one fails to load.
-            }
+            return custom.CreateFont(fontPixelSize);
         }
 
         return BundledFamily(layer.Weight).CreateFont(fontPixelSize);
     }
+
+    // Parsed custom fonts, keyed by path and invalidated by the file's write time, so a
+    // font is read once per version instead of once per layer per render (an animated GIF
+    // with three text layers parsed it 90 times).
+    private static readonly ConcurrentDictionary<string, (DateTime WriteTimeUtc, FontFamily Family)> CustomFamilies =
+        new(StringComparer.Ordinal);
+
+    /// <summary>Loads (or reuses) the family for a custom font file; false if it cannot be parsed.</summary>
+    internal static bool TryGetCustomFamily(string path, out FontFamily family)
+    {
+        family = default;
+        try
+        {
+            var writeTime = File.GetLastWriteTimeUtc(path);
+            if (CustomFamilies.TryGetValue(path, out var cached) && cached.WriteTimeUtc == writeTime)
+            {
+                family = cached.Family;
+                return true;
+            }
+
+            var loaded = new FontCollection().Add(path);
+            CustomFamilies[path] = (writeTime, loaded);
+            family = loaded;
+            return true;
+        }
+        catch
+        {
+            // Unparseable font: the caller falls back to the bundled face.
+            return false;
+        }
+    }
+
+    /// <summary>True when the current version of the file at <paramref name="path"/> is cached.</summary>
+    internal static bool IsCustomFontCached(string path)
+        => CustomFamilies.TryGetValue(path, out var cached) && cached.WriteTimeUtc == File.GetLastWriteTimeUtc(path);
 }
