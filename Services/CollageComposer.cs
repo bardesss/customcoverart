@@ -52,15 +52,13 @@ public static class CollageComposer
                 tileIndex++;
                 try
                 {
-                    // Header-only check first, so a decompression-bomb poster can't
-                    // exhaust memory during the full decode below.
-                    var info = Image.Identify(path);
-                    if ((long)info.Width * info.Height > 8192L * 8192L)
+                    // Shared decompression-bomb guard; a tile is a still, so one frame.
+                    using var poster = SafeImageLoader.TryLoadRgba32(path, maxFrames: 1);
+                    if (poster is null)
                     {
                         continue;
                     }
 
-                    using var poster = Image.Load<Rgba32>(path);
                     poster.Mutate(x => x.Resize(new ResizeOptions
                     {
                         Size = new Size(tileW, tileH),

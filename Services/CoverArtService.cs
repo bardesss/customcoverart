@@ -150,31 +150,15 @@ public class CoverArtService : ICoverArtService
                 }
                 else if (!string.IsNullOrEmpty(document.Background.ImagePath))
                 {
-                    if (!File.Exists(document.Background.ImagePath))
+                    // Identify-then-decode through the shared guard: rejects decompression
+                    // bombs (frames × width × height over budget) and decodes only the frames
+                    // this render uses. A still cover takes ONE frame of an animated source,
+                    // so the resize/blur in ApplyBackgroundLayer no longer runs on frames that
+                    // are never drawn.
+                    backgroundImage = SafeImageLoader.TryLoad(document.Background.ImagePath, BackgroundMaxFrames(document));
+                    if (backgroundImage is null)
                     {
-                        _logger.LogWarning("Background file not found: {Path}", document.Background.ImagePath);
-                    }
-                    else
-                    {
-                        try
-                        {
-                            // Reject oversize source images before a full decode
-                            // (decompression-bomb guard).
-                            var info = Image.Identify(document.Background.ImagePath);
-                            const long maxSourcePixels = 8192L * 8192L;
-                            if ((long)info.Width * info.Height <= maxSourcePixels)
-                            {
-                                backgroundImage = await Image.LoadAsync(document.Background.ImagePath);
-                            }
-                            else
-                            {
-                                _logger.LogWarning("Background image ignored, too large: {Width}x{Height}", info.Width, info.Height);
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogWarning("Failed to decode background {Path}: {Error}", document.Background.ImagePath, ex.Message);
-                        }
+                        _logger.LogWarning("Background image ignored (missing, undecodable or too large): {Path}", document.Background.ImagePath);
                     }
                 }
 
@@ -217,6 +201,13 @@ public class CoverArtService : ICoverArtService
 
         return Path.Combine(_outputDirectory, "Libraries", id.ToString("N"));
     }
+
+    /// <summary>
+    /// Frames to decode from the background: all of them (up to the passthrough cap) only
+    /// when exporting an animated GIF, otherwise just the first.
+    /// </summary>
+    internal static int BackgroundMaxFrames(CoverDocument document)
+        => document.Background.Animation?.Enabled == true ? SafeImageLoader.MaxAnimatedFrames : 1;
 
     // Clones a document for a downscaled animated working canvas. Layer.Size is
     // already a fraction of Canvas.Height, so pointing Canvas.Width/Height at the
