@@ -167,11 +167,15 @@ public class CustomCoverArtController : ControllerBase
     private async Task<ApiResponse<bool>> ApplyRenderedAsync(string libraryId, Func<Task<string>> render)
     {
         // Validate the library id up front, before it is used anywhere.
-        if (!Guid.TryParse(libraryId, out _))
+        if (!Guid.TryParse(libraryId, out var libraryGuid))
         {
             return Fail<bool>("Invalid library id");
         }
 
+        // Serialise applies per target: an interleaved prune would otherwise delete
+        // the cover another apply has just made live.
+        var gate = ApplyLocks.GetOrAdd(libraryGuid, _ => new SemaphoreSlim(1, 1));
+        await gate.WaitAsync().ConfigureAwait(false);
         try
         {
             var userName = _userContextService.GetCurrentUserName() ?? "unknown";
@@ -196,7 +200,16 @@ public class CustomCoverArtController : ControllerBase
             }
 
             // Only now is the new cover live, so every older copy in the folder is garbage.
-            _coverArtService.PruneLibraryOutputs(libraryId, savedPath);
+            // Best effort: the cover is already live, so a cleanup failure is not an apply failure.
+            try
+            {
+                _coverArtService.PruneLibraryOutputs(libraryId, savedPath);
+            }
+            catch (Exception pruneEx)
+            {
+                _logger.LogWarning(pruneEx, "Failed to prune old covers for library {LibraryId}", libraryId);
+            }
+
             return Success(true);
         }
         catch (Exception ex)
@@ -204,7 +217,13 @@ public class CustomCoverArtController : ControllerBase
             _logger.LogError(ex, "Failed to apply cover art to library {LibraryId}", libraryId);
             return Fail<bool>("Failed to apply cover art.");
         }
+        finally
+        {
+            gate.Release();
+        }
     }
+
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, SemaphoreSlim> ApplyLocks = new();
 
     /// <summary>Whether a restore point (original cover backup) exists for a target.</summary>
     [HttpGet("targets/{id}/backup")]

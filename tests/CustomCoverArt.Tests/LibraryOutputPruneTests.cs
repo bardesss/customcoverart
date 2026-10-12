@@ -1,6 +1,5 @@
 using System;
 using System.IO;
-using System.Linq;
 using System.Threading.Tasks;
 using CustomCoverArt.Models;
 using CustomCoverArt.Services;
@@ -61,6 +60,61 @@ public class LibraryOutputPruneTests
         Assert.True(result.Success);
         await library.Received(1).BackupCurrentCoverArtAsync(LibraryId);
         coverArt.Received(1).PruneLibraryOutputs(LibraryId, "saved.png");
+    }
+
+    /// <summary>A prune failure must not turn a live cover into a reported failure.</summary>
+    [Fact]
+    public async Task ApplyDocument_PruneThrows_StillSucceeds()
+    {
+        var coverArt = Substitute.For<ICoverArtService>();
+        coverArt.GenerateFromDocumentAsync(Arg.Any<CoverDocument>()).Returns("gen.png");
+        coverArt.SaveCoverArtAsync(LibraryId, "gen.png").Returns("saved.png");
+        coverArt.When(c => c.PruneLibraryOutputs(Arg.Any<string>(), Arg.Any<string>()))
+            .Do(_ => throw new IOException("boom"));
+        var library = Substitute.For<ILibraryDetectionService>();
+        library.UpdateLibraryCoverArtAsync(LibraryId, "saved.png").Returns(true);
+
+        var result = await ControllerHost.New(coverArt, library)
+            .ApplyDocument(new ApplyDocumentRequest { LibraryId = LibraryId, Document = new CoverDocument() });
+
+        Assert.True(result.Success);
+    }
+
+    /// <summary>Two applies to one library must not interleave, or one prune deletes the other's live cover.</summary>
+    [Fact]
+    public async Task ApplyDocument_ConcurrentSameLibrary_IsSerialised()
+    {
+        const string lib = "22222222-2222-2222-2222-222222222222";
+        var coverArt = Substitute.For<ICoverArtService>();
+        coverArt.GenerateFromDocumentAsync(Arg.Any<CoverDocument>()).Returns("genA.png", "genB.png");
+        coverArt.SaveCoverArtAsync(lib, "genA.png").Returns("savedA.png");
+        coverArt.SaveCoverArtAsync(lib, "genB.png").Returns("savedB.png");
+
+        var aInUpdate = new TaskCompletionSource();
+        var releaseA = new TaskCompletionSource<bool>();
+        var library = Substitute.For<ILibraryDetectionService>();
+        library.UpdateLibraryCoverArtAsync(lib, "savedA.png").Returns(_ =>
+        {
+            aInUpdate.SetResult();
+            return releaseA.Task;
+        });
+        library.UpdateLibraryCoverArtAsync(lib, "savedB.png").Returns(true);
+
+        var request = new ApplyDocumentRequest { LibraryId = lib, Document = new CoverDocument() };
+        var taskA = ControllerHost.New(coverArt, library).ApplyDocument(request);
+        await aInUpdate.Task;
+
+        var taskB = ControllerHost.New(coverArt, library).ApplyDocument(request);
+
+        // Everything is synchronous apart from A's gate, so an unserialised B would be finished by now.
+        Assert.False(taskB.IsCompleted);
+        await coverArt.DidNotReceive().SaveCoverArtAsync(lib, "genB.png");
+
+        releaseA.SetResult(true);
+        Assert.True((await taskA).Success);
+        Assert.True((await taskB).Success);
+        coverArt.Received(1).PruneLibraryOutputs(lib, "savedA.png");
+        coverArt.Received(1).PruneLibraryOutputs(lib, "savedB.png");
     }
 
     [Fact]

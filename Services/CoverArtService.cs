@@ -374,13 +374,15 @@ public class CoverArtService : ICoverArtService
             {
                 File.Delete(file);
             }
-            catch (IOException)
+            catch (IOException ex)
             {
                 // In use: the next successful apply retries it.
+                _logger.LogDebug(ex, "Could not delete old cover {File}; will retry on next apply", file);
             }
-            catch (UnauthorizedAccessException)
+            catch (UnauthorizedAccessException ex)
             {
                 // Not ours to delete; leave it.
+                _logger.LogDebug(ex, "Not allowed to delete old cover {File}", file);
             }
         }
     }
