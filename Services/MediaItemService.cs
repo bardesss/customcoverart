@@ -5,6 +5,7 @@ using MediaBrowser.Controller.Entities.Movies;
 using MediaBrowser.Controller.Entities.TV;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Model.Entities;
+using Microsoft.Extensions.Logging;
 
 namespace CustomCoverArt.Services;
 
@@ -24,14 +25,14 @@ public class MediaItemService : IMediaItemService
     };
 
     private readonly ILibraryManager _libraryManager;
-    private readonly ILoggingService _loggingService;
+    private readonly ILogger<MediaItemService> _logger;
 
     public MediaItemService(
         ILibraryManager libraryManager,
-        ILoggingService loggingService)
+        ILogger<MediaItemService> logger)
     {
         _libraryManager = libraryManager;
-        _loggingService = loggingService;
+        _logger = logger;
     }
 
     public Task<ItemSearchResponse> SearchItemsAsync(ItemSearchRequest request)
@@ -71,7 +72,7 @@ public class MediaItemService : IMediaItemService
         }
         catch (Exception ex)
         {
-            _loggingService.LogError("Failed to search items", ex);
+            _logger.LogError(ex, "Failed to search items");
             return Task.FromResult(new ItemSearchResponse
             {
                 Items = Enumerable.Empty<MediaItemInfo>(),
@@ -117,7 +118,7 @@ public class MediaItemService : IMediaItemService
         }
         catch (Exception ex)
         {
-            _loggingService.LogError("Failed to get poster paths for {ParentId}", ex, parentId);
+            _logger.LogError(ex, "Failed to get poster paths for {ParentId}", parentId);
             return Task.FromResult<IReadOnlyList<string>>(Array.Empty<string>());
         }
     }

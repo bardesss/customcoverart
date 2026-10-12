@@ -19,7 +19,6 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddHttpContextAccessor();
 
         // Stateless / shared singletons.
-        serviceCollection.AddSingleton<ILoggingService, LoggingService>();
         serviceCollection.AddSingleton<ILocalizationService, LocalizationService>();
         serviceCollection.AddSingleton<IRateLimitingService, RateLimitingService>();
         serviceCollection.AddSingleton<IStartupValidationService, StartupValidationService>();

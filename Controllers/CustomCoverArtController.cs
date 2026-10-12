@@ -6,6 +6,7 @@ using MediaBrowser.Common.Configuration;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 
 namespace CustomCoverArt.Controllers;
 
@@ -24,7 +25,7 @@ public class CustomCoverArtController : ControllerBase
     private readonly IImageProcessingService _imageProcessingService;
     private readonly IMediaItemService _mediaItemService;
     private readonly IUserContextService _userContextService;
-    private readonly ILoggingService _loggingService;
+    private readonly ILogger<CustomCoverArtController> _logger;
     private readonly IRateLimitingService _rateLimitingService;
     private readonly IStartupValidationService _startupValidationService;
     private readonly ILocalizationService _localizationService;
@@ -36,7 +37,7 @@ public class CustomCoverArtController : ControllerBase
         IImageProcessingService imageProcessingService,
         IMediaItemService mediaItemService,
         IUserContextService userContextService,
-        ILoggingService loggingService,
+        ILogger<CustomCoverArtController> logger,
         IRateLimitingService rateLimitingService,
         IStartupValidationService startupValidationService,
         ILocalizationService localizationService,
@@ -47,7 +48,7 @@ public class CustomCoverArtController : ControllerBase
         _imageProcessingService = imageProcessingService;
         _mediaItemService = mediaItemService;
         _userContextService = userContextService;
-        _loggingService = loggingService;
+        _logger = logger;
         _rateLimitingService = rateLimitingService;
         _startupValidationService = startupValidationService;
         _localizationService = localizationService;
@@ -82,7 +83,7 @@ public class CustomCoverArtController : ControllerBase
         }
         catch (Exception ex)
         {
-            _loggingService.LogError("Failed to get targets", ex);
+            _logger.LogError(ex, "Failed to get targets");
             return Fail<IEnumerable<LibraryInfo>>("Failed to load targets.");
         }
     }
@@ -106,7 +107,7 @@ public class CustomCoverArtController : ControllerBase
         }
         catch (Exception ex)
         {
-            _loggingService.LogError("Failed to generate preview", ex);
+            _logger.LogError(ex, "Failed to generate preview");
             return BadRequest(new { error = "Failed to generate preview." });
         }
     }
@@ -130,7 +131,7 @@ public class CustomCoverArtController : ControllerBase
         }
         catch (Exception ex)
         {
-            _loggingService.LogError("Failed to generate document preview", ex);
+            _logger.LogError(ex, "Failed to generate document preview");
             return BadRequest(new { error = "Failed to generate preview." });
         }
     }
@@ -154,7 +155,7 @@ public class CustomCoverArtController : ControllerBase
         try
         {
             var userName = _userContextService.GetCurrentUserName() ?? "unknown";
-            _loggingService.LogInformation("User {UserName} applying document cover art to library {LibraryId}", userName, request.LibraryId);
+            _logger.LogInformation("User {UserName} applying document cover art to library {LibraryId}", userName, request.LibraryId);
 
             var coverArtPath = await _coverArtService.GenerateFromDocumentAsync(request.Document).ConfigureAwait(false);
 
@@ -178,7 +179,7 @@ public class CustomCoverArtController : ControllerBase
         }
         catch (Exception ex)
         {
-            _loggingService.LogError("Failed to apply document to {LibraryId}", ex, request.LibraryId);
+            _logger.LogError(ex, "Failed to apply document to {LibraryId}", request.LibraryId);
             return Fail<bool>("Failed to apply cover art.");
         }
     }
@@ -216,7 +217,7 @@ public class CustomCoverArtController : ControllerBase
         try
         {
             var userName = _userContextService.GetCurrentUserName() ?? "unknown";
-            _loggingService.LogInformation("User {UserName} applying cover art to library {LibraryId}", userName, libraryId);
+            _logger.LogInformation("User {UserName} applying cover art to library {LibraryId}", userName, libraryId);
 
             var coverArtPath = await render().ConfigureAwait(false);
 
@@ -240,7 +241,7 @@ public class CustomCoverArtController : ControllerBase
         }
         catch (Exception ex)
         {
-            _loggingService.LogError("Failed to apply cover art to library {LibraryId}", ex, libraryId);
+            _logger.LogError(ex, "Failed to apply cover art to library {LibraryId}", libraryId);
             return Fail<bool>("Failed to apply cover art.");
         }
     }
@@ -273,7 +274,7 @@ public class CustomCoverArtController : ControllerBase
         }
         catch (Exception ex)
         {
-            _loggingService.LogError("Failed to restore original cover for {Id}", ex, id);
+            _logger.LogError(ex, "Failed to restore original cover for {Id}", id);
             return Fail<bool>("Failed to restore original cover.");
         }
     }
@@ -368,7 +369,7 @@ public class CustomCoverArtController : ControllerBase
         {
             if (!_rateLimitingService.IsAllowed(clientId, rateLimitAction, maxRequests, window))
             {
-                _loggingService.LogWarning("Rate limit exceeded for {Action} by {UserName}", rateLimitAction, userName);
+                _logger.LogWarning("Rate limit exceeded for {Action} by {UserName}", rateLimitAction, userName);
                 return Fail<string>(_localizationService.GetString("errors.too_many_uploads"));
             }
 
@@ -395,12 +396,12 @@ public class CustomCoverArtController : ControllerBase
                 await file.CopyToAsync(stream).ConfigureAwait(false);
             }
 
-            _loggingService.LogInformation("User {UserName} uploaded {FileName}", userName, fileName);
+            _logger.LogInformation("User {UserName} uploaded {FileName}", userName, fileName);
             return Success(filePath);
         }
         catch (Exception ex)
         {
-            _loggingService.LogError("Upload failed for user {UserName}", ex, userName);
+            _logger.LogError(ex, "Upload failed for user {UserName}", userName);
             return Fail<string>("Could not save the uploaded file.");
         }
     }
@@ -416,7 +417,7 @@ public class CustomCoverArtController : ControllerBase
         }
         catch (Exception ex)
         {
-            _loggingService.LogError("Failed to search items", ex);
+            _logger.LogError(ex, "Failed to search items");
             return Fail<ItemSearchResponse>("Failed to search items.");
         }
     }
@@ -445,7 +446,7 @@ public class CustomCoverArtController : ControllerBase
         }
         catch (Exception ex)
         {
-            _loggingService.LogError("Health check failed", ex);
+            _logger.LogError(ex, "Health check failed");
             return Fail<object>("Health check failed.");
         }
     }
@@ -464,7 +465,7 @@ public class CustomCoverArtController : ControllerBase
         }
         catch (Exception ex)
         {
-            _loggingService.LogError("Failed to get language info", ex);
+            _logger.LogError(ex, "Failed to get language info");
             return Fail<object>("Failed to get language info.");
         }
     }

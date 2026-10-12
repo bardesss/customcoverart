@@ -1,5 +1,6 @@
 using CustomCoverArt.Services;
 using MediaBrowser.Common.Configuration;
+using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using SixLabors.ImageSharp;
 using Xunit;
@@ -15,7 +16,7 @@ internal static class AnimationTestHost
             System.IO.Path.GetTempPath(), "cca_anim_" + System.Guid.NewGuid().ToString("N"));
         paths.DataPath.Returns(dataDir);
         var svc = new CoverArtService(
-            paths, Substitute.For<ILoggingService>(), Substitute.For<IMediaItemService>());
+            paths, NullLogger<CoverArtService>.Instance, Substitute.For<IMediaItemService>());
         return (svc, dataDir);
     }
 

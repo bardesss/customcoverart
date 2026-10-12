@@ -3,6 +3,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using CustomCoverArt.Services;
+using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using Xunit;
 
@@ -78,7 +79,7 @@ public class LocalizationResourceTests
     [Fact]
     public void EveryKeyTheServerCodeUses_ResolvesToRealText()
     {
-        var service = new LocalizationService(Substitute.For<ILoggingService>());
+        var service = new LocalizationService(NullLogger<LocalizationService>.Instance);
 
         foreach (var key in KeysUsedByServerCode)
         {
@@ -98,7 +99,7 @@ public class LocalizationResourceTests
     [Fact]
     public void LoadedLanguages_MatchTheSupportedList()
     {
-        var service = new LocalizationService(Substitute.For<ILoggingService>());
+        var service = new LocalizationService(NullLogger<LocalizationService>.Instance);
 
         Assert.Equal(
             LocalizationService.SupportedLanguageCodes.OrderBy(c => c, System.StringComparer.Ordinal),

@@ -3,6 +3,7 @@ using System.IO;
 using System.Threading.Tasks;
 using CustomCoverArt.Services;
 using MediaBrowser.Common.Configuration;
+using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using Xunit;
 
@@ -24,7 +25,7 @@ public class BackupRestoreTests : IDisposable
     {
         var svc = new LibraryDetectionService(
             Substitute.For<MediaBrowser.Controller.Library.ILibraryManager>(),
-            Substitute.For<ILoggingService>(),
+            NullLogger<LibraryDetectionService>.Instance,
             Paths());
 
         Assert.False(svc.HasBackup(Guid.NewGuid().ToString()));
@@ -41,7 +42,7 @@ public class BackupRestoreTests : IDisposable
 
         var svc = new LibraryDetectionService(
             Substitute.For<MediaBrowser.Controller.Library.ILibraryManager>(),
-            Substitute.For<ILoggingService>(), paths);
+            NullLogger<LibraryDetectionService>.Instance, paths);
 
         Assert.True(svc.HasBackup(id));
     }
@@ -51,7 +52,7 @@ public class BackupRestoreTests : IDisposable
     {
         var svc = new LibraryDetectionService(
             Substitute.For<MediaBrowser.Controller.Library.ILibraryManager>(),
-            Substitute.For<ILoggingService>(), Paths());
+            NullLogger<LibraryDetectionService>.Instance, Paths());
 
         Assert.False(await svc.RestoreOriginalCoverArtAsync(Guid.NewGuid().ToString()));
     }

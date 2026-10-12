@@ -1,6 +1,7 @@
 using CustomCoverArt.Common;
 using CustomCoverArt.Models;
 using MediaBrowser.Common.Configuration;
+using Microsoft.Extensions.Logging;
 using SixLabors.ImageSharp.Processing;
 using SixLabors.ImageSharp.Drawing.Processing;
 
@@ -16,13 +17,13 @@ public interface IStartupValidationService
 
 public class StartupValidationService : IStartupValidationService
 {
-    private readonly ILoggingService _loggingService;
+    private readonly ILogger<StartupValidationService> _logger;
     private readonly IApplicationPaths _applicationPaths;
     private bool _isPluginReady = false;
 
-    public StartupValidationService(ILoggingService loggingService, IApplicationPaths applicationPaths)
+    public StartupValidationService(ILogger<StartupValidationService> logger, IApplicationPaths applicationPaths)
     {
-        _loggingService = loggingService;
+        _logger = logger;
         _applicationPaths = applicationPaths;
     }
 
@@ -47,13 +48,13 @@ public class StartupValidationService : IStartupValidationService
                 try
                 {
                     Directory.CreateDirectory(dir);
-                    _loggingService.LogDebug("Directory validation successful: {Directory}", dir);
+                    _logger.LogDebug("Directory validation successful: {Directory}", dir);
                 }
                 catch (Exception ex)
                 {
                     result.IsValid = false;
                     result.ErrorMessage = $"Cannot create directory {dir}: {ex.Message}";
-                    _loggingService.LogError("Directory validation failed: {Directory}, Error: {Error}", dir, ex.Message);
+                    _logger.LogError("Directory validation failed: {Directory}, Error: {Error}", dir, ex.Message);
                     return result;
                 }
             }
@@ -71,17 +72,17 @@ public class StartupValidationService : IStartupValidationService
                 {
                     result.IsValid = false;
                     result.ErrorMessage = $"Cannot write to directory {dir}: {ex.Message}";
-                    _loggingService.LogError("Write permission validation failed: {Directory}, Error: {Error}", dir, ex.Message);
+                    _logger.LogError("Write permission validation failed: {Directory}, Error: {Error}", dir, ex.Message);
                     return result;
                 }
             }
 
-            _loggingService.LogInformation("Configuration validation completed successfully");
+            _logger.LogInformation("Configuration validation completed successfully");
             return result;
         }
         catch (Exception ex)
         {
-            _loggingService.LogError("Configuration validation failed: {Error}", ex.Message);
+            _logger.LogError("Configuration validation failed: {Error}", ex.Message);
             return new ValidationResult
             {
                 IsValid = false,
@@ -116,7 +117,7 @@ public class StartupValidationService : IStartupValidationService
             {
                 result.IsValid = false;
                 result.ErrorMessage = $"ImageSharp validation failed: {ex.Message}";
-                _loggingService.LogError("ImageSharp validation failed: {Error}", ex.Message);
+                _logger.LogError("ImageSharp validation failed: {Error}", ex.Message);
                 return result;
             }
 
@@ -128,21 +129,21 @@ public class StartupValidationService : IStartupValidationService
                 {
                     result.IsValid = false;
                     result.ErrorMessage = "No system fonts available";
-                    _loggingService.LogWarning("No system fonts available");
+                    _logger.LogWarning("No system fonts available");
                 }
             }
             catch (Exception ex)
             {
                 result.WarningMessage = $"Font system validation warning: {ex.Message}";
-                _loggingService.LogWarning("Font system validation warning: {Error}", ex.Message);
+                _logger.LogWarning("Font system validation warning: {Error}", ex.Message);
             }
 
-            _loggingService.LogInformation("Dependencies validation completed successfully");
+            _logger.LogInformation("Dependencies validation completed successfully");
             return result;
         }
         catch (Exception ex)
         {
-            _loggingService.LogError("Dependencies validation failed: {Error}", ex.Message);
+            _logger.LogError("Dependencies validation failed: {Error}", ex.Message);
             return new ValidationResult
             {
                 IsValid = false,
@@ -188,16 +189,16 @@ public class StartupValidationService : IStartupValidationService
             {
                 result.IsValid = false;
                 result.ErrorMessage = $"File system permissions test failed: {ex.Message}";
-                _loggingService.LogError("File system permissions test failed: {Error}", ex.Message);
+                _logger.LogError("File system permissions test failed: {Error}", ex.Message);
                 return result;
             }
 
-            _loggingService.LogInformation("Permissions validation completed successfully");
+            _logger.LogInformation("Permissions validation completed successfully");
             return result;
         }
         catch (Exception ex)
         {
-            _loggingService.LogError("Permissions validation failed: {Error}", ex.Message);
+            _logger.LogError("Permissions validation failed: {Error}", ex.Message);
             return new ValidationResult
             {
                 IsValid = false,

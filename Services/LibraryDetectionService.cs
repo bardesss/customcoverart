@@ -6,6 +6,7 @@ using MediaBrowser.Common.Configuration;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Model.Entities;
+using Microsoft.Extensions.Logging;
 
 namespace CustomCoverArt.Services;
 
@@ -15,16 +16,16 @@ namespace CustomCoverArt.Services;
 public class LibraryDetectionService : ILibraryDetectionService
 {
     private readonly ILibraryManager _libraryManager;
-    private readonly ILoggingService _loggingService;
+    private readonly ILogger<LibraryDetectionService> _logger;
     private readonly IApplicationPaths _applicationPaths;
 
     public LibraryDetectionService(
         ILibraryManager libraryManager,
-        ILoggingService loggingService,
+        ILogger<LibraryDetectionService> logger,
         IApplicationPaths applicationPaths)
     {
         _libraryManager = libraryManager;
-        _loggingService = loggingService;
+        _logger = logger;
         _applicationPaths = applicationPaths;
     }
 
@@ -53,13 +54,13 @@ public class LibraryDetectionService : ILibraryDetectionService
                 }
                 catch (Exception ex)
                 {
-                    _loggingService.LogError("Error processing library {Name}: {Error}", vf.Name ?? "unknown", ex.Message);
+                    _logger.LogError("Error processing library {Name}: {Error}", vf.Name ?? "unknown", ex.Message);
                 }
             }
         }
         catch (Exception ex)
         {
-            _loggingService.LogError("Failed to get libraries: {Error}", ex.Message);
+            _logger.LogError("Failed to get libraries: {Error}", ex.Message);
         }
 
         return Task.FromResult<IEnumerable<LibraryInfo>>(libraries);
@@ -79,7 +80,7 @@ public class LibraryDetectionService : ILibraryDetectionService
         }
         catch (Exception ex)
         {
-            _loggingService.LogError("Failed to get targets ({Type}): {Error}", type ?? "?", ex.Message);
+            _logger.LogError("Failed to get targets ({Type}): {Error}", type ?? "?", ex.Message);
             return Task.FromResult(Enumerable.Empty<LibraryInfo>());
         }
     }
@@ -173,20 +174,20 @@ public class LibraryDetectionService : ILibraryDetectionService
         {
             if (!Guid.TryParse(libraryId, out var id))
             {
-                _loggingService.LogWarning("Invalid library ID format: {LibraryId}", libraryId);
+                _logger.LogWarning("Invalid library ID format: {LibraryId}", libraryId);
                 return false;
             }
 
             var item = _libraryManager.GetItemById<BaseItem>(id);
             if (item is null)
             {
-                _loggingService.LogWarning("Library not found with ID: {LibraryId}", libraryId);
+                _logger.LogWarning("Library not found with ID: {LibraryId}", libraryId);
                 return false;
             }
 
             if (!File.Exists(coverArtPath))
             {
-                _loggingService.LogWarning("Cover art file does not exist: {Path}", coverArtPath);
+                _logger.LogWarning("Cover art file does not exist: {Path}", coverArtPath);
                 return false;
             }
 
@@ -201,7 +202,7 @@ public class LibraryDetectionService : ILibraryDetectionService
             await item.UpdateToRepositoryAsync(ItemUpdateType.ImageUpdate, CancellationToken.None)
                 .ConfigureAwait(false);
 
-            _loggingService.LogInformation(
+            _logger.LogInformation(
                 "Successfully updated cover art for library: {LibraryName} (ID: {LibraryId})",
                 item.Name, libraryId);
 
@@ -209,7 +210,7 @@ public class LibraryDetectionService : ILibraryDetectionService
         }
         catch (Exception ex)
         {
-            _loggingService.LogError("Failed to update library cover art for ID: {LibraryId}", ex, libraryId);
+            _logger.LogError(ex, "Failed to update library cover art for ID: {LibraryId}", libraryId);
             return false;
         }
     }
@@ -276,7 +277,7 @@ public class LibraryDetectionService : ILibraryDetectionService
         }
         catch (Exception ex)
         {
-            _loggingService.LogError("Failed to back up cover art for {LibraryId}", ex, libraryId);
+            _logger.LogError(ex, "Failed to back up cover art for {LibraryId}", libraryId);
             return Task.FromResult<string?>(null);
         }
     }
