@@ -391,9 +391,11 @@ public static class DocumentRenderer
     /// </summary>
     public static ColorStop[] BuildColorStops(GradientSettings gradient)
     {
-        if (gradient.Stops is { Count: >= 2 })
+        // Null entries are skipped even on paths that never ran Normalize.
+        var explicitStops = gradient.Stops?.Where(s => s is not null).ToList();
+        if (explicitStops is { Count: >= 2 })
         {
-            return gradient.Stops
+            return explicitStops
                 .OrderBy(s => s.Position)
                 .Select(s => new ColorStop(
                     Math.Clamp(s.Position, 0f, 1f),
