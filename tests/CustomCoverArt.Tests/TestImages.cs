@@ -59,6 +59,19 @@ internal static class TestImages
         gif.SaveAsGif(path);
     }
 
+    /// <summary>Writes an animated PNG (APNG) whose frames alternate red / blue.</summary>
+    public static void SaveMultiFrameApng(string path, int width, int height, int frames)
+    {
+        using var png = new Image<Rgba32>(width, height, Color.Red);
+        for (int i = 1; i < frames; i++)
+        {
+            using var frame = new Image<Rgba32>(width, height, i % 2 == 0 ? Color.Red : Color.Blue);
+            png.Frames.AddFrame(frame.Frames.RootFrame);
+        }
+
+        png.SaveAsPng(path);
+    }
+
     public static string TempPath(string ext) =>
         Path.Combine(Path.GetTempPath(), $"cca_img_{Guid.NewGuid():N}{ext}");
 }

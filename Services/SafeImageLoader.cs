@@ -1,5 +1,6 @@
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats;
+using SixLabors.ImageSharp.Metadata;
 using SixLabors.ImageSharp.PixelFormats;
 
 namespace CustomCoverArt.Services;
@@ -36,6 +37,9 @@ public static class SafeImageLoader
 
     /// <summary>
     /// Frames to decode: min(requested, declared, budget / pixels-per-frame), at least 1.
+    /// When the file declares no frame count (ImageSharp's Identify reports 0 for APNG, which
+    /// still decodes every frame) the declared count is not used as a clamp; MaxFrames and the
+    /// budget still bound the decode, and a still image simply yields the one frame it has.
     /// Division keeps the arithmetic overflow-safe. Only meaningful when
     /// <see cref="IsWithinBudget"/> holds.
     /// </summary>
@@ -43,7 +47,9 @@ public static class SafeImageLoader
     {
         var perFrame = Math.Max(1L, (long)info.Width * info.Height);
         var affordable = pixelBudget / perFrame;
-        var frames = Math.Min(Math.Min(FrameCount(info), Math.Max(1, maxFrames)), affordable);
+        var requested = (long)Math.Max(1, maxFrames);
+        var declared = info.FrameMetadataCollection.Count;
+        var frames = Math.Min(declared > 0 ? Math.Min(declared, requested) : requested, affordable);
         return (int)Math.Max(1L, frames);
     }
 
@@ -52,7 +58,67 @@ public static class SafeImageLoader
     {
         try
         {
-            return File.Exists(path) ? Image.Identify(path) : null;
+            if (!File.Exists(path))
+            {
+                return null;
+            }
+
+            try
+            {
+                return Image.Identify(path);
+            }
+            catch
+            {
+                var head = new byte[24];
+                using var stream = File.OpenRead(path);
+                var read = stream.Read(head, 0, head.Length);
+                return TryIdentifyPngHeader(head.AsSpan(0, read));
+            }
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Header-only inspection of in-memory bytes (uploads); null when not a supported image.</summary>
+    public static ImageInfo? TryIdentify(byte[] bytes)
+    {
+        try
+        {
+            return Image.Identify(bytes);
+        }
+        catch
+        {
+            return TryIdentifyPngHeader(bytes.AsSpan(0, Math.Min(24, bytes.Length)));
+        }
+    }
+
+    /// <summary>
+    /// ImageSharp 3.1.12's Identify can throw on a valid APNG (it mis-walks the frame chunks)
+    /// although Load decodes it. For a PNG signature, read width/height from IHDR so the size
+    /// is still budget-checked; the frame count stays unknown (0), which
+    /// <see cref="FramesToDecode"/> bounds by maxFrames and the budget. A corrupt file still fails at Load.
+    /// </summary>
+    private static ImageInfo? TryIdentifyPngHeader(ReadOnlySpan<byte> head)
+    {
+        try
+        {
+            if (head.Length < 24
+                || !head[..8].SequenceEqual(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A })
+                || !head.Slice(12, 4).SequenceEqual("IHDR"u8))
+            {
+                return null;
+            }
+
+            var width = System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(head.Slice(16, 4));
+            var height = System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(head.Slice(20, 4));
+            if (width == 0 || height == 0 || width > int.MaxValue || height > int.MaxValue)
+            {
+                return null;
+            }
+
+            return new ImageInfo(new PixelTypeInfo(32), new Size((int)width, (int)height), new ImageMetadata());
         }
         catch
         {

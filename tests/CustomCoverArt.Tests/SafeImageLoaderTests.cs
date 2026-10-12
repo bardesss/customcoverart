@@ -50,6 +50,32 @@ public class SafeImageLoaderTests
         finally { File.Delete(path); }
     }
 
+    /// <summary>Identify reports no frame metadata for APNG, so an unknown count must not collapse to a still.</summary>
+    [Fact]
+    public void Apng_KeepsItsFrames_AndPlainPngStaysOneFrame()
+    {
+        var apng = TestImages.TempPath(".png");
+        var still = TestImages.TempPath(".png");
+        TestImages.SaveMultiFrameApng(apng, 16, 16, frames: 4);
+        TestImages.SaveMultiFrameApng(still, 16, 16, frames: 1);
+        try
+        {
+            using var animated = SafeImageLoader.TryLoad(apng, maxFrames: 60);
+            Assert.NotNull(animated);
+            Assert.True(animated!.Frames.Count > 1, $"APNG decoded {animated.Frames.Count} frame(s)");
+
+            using var plain = SafeImageLoader.TryLoad(still, maxFrames: 60);
+            Assert.NotNull(plain);
+            Assert.Equal(1, plain!.Frames.Count);
+
+            // Still bounded by the budget when the declared count is unknown.
+            using var clamped = SafeImageLoader.TryLoad(apng, maxFrames: 60, pixelBudget: 16 * 16 * 2);
+            Assert.NotNull(clamped);
+            Assert.True(clamped!.Frames.Count <= 2);
+        }
+        finally { File.Delete(apng); File.Delete(still); }
+    }
+
     /// <summary>A frame that alone exceeds the budget is still refused.</summary>
     [Fact]
     public void SingleFrameOverBudget_IsRefused()
@@ -136,6 +162,26 @@ public class SafeImageLoaderTests
 
         Assert.False(result.IsValid);
         Assert.Equal("errors.image_too_large", result.ErrorMessage);
+    }
+
+    /// <summary>Identify throws on ImageSharp 3.1.12's own APNG output; the upload check must still accept it.</summary>
+    [Fact]
+    public async Task Upload_AcceptsAnApng()
+    {
+        var loc = Substitute.For<ILocalizationService>();
+        loc.GetString(Arg.Any<string>(), Arg.Any<object[]>()).Returns(ci => (string)ci[0]);
+        var path = TestImages.TempPath(".png");
+        TestImages.SaveMultiFrameApng(path, 16, 16, frames: 3);
+        try
+        {
+            var bytes = File.ReadAllBytes(path);
+            var file = new FormFile(new MemoryStream(bytes), 0, bytes.Length, "file", "anim.png");
+
+            var result = await new ImageProcessingService(loc).ValidateFileAsync(file);
+
+            Assert.True(result.IsValid, result.ErrorMessage);
+        }
+        finally { File.Delete(path); }
     }
 
     /// <summary>A2: a still cover decodes one frame; only an animated export takes up to 60.</summary>
