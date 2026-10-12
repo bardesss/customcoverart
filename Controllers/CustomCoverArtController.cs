@@ -204,7 +204,7 @@ public class CustomCoverArtController : ControllerBase
             var backup = await _libraryService.BackupCurrentCoverArtAsync(libraryId).ConfigureAwait(false);
             if (backup == BackupOutcome.Failed)
             {
-                return Fail<bool>("Could not back up the current cover, so it was left unchanged.");
+                return Fail<bool>(_localizationService.GetString("errors.backup_failed"));
             }
 
             var updated = await _libraryService.UpdateLibraryCoverArtAsync(libraryId, savedPath).ConfigureAwait(false);
