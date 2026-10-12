@@ -25,6 +25,7 @@ public class BackupRestoreTests : IDisposable
     {
         var svc = new LibraryDetectionService(
             Substitute.For<MediaBrowser.Controller.Library.ILibraryManager>(),
+            Substitute.For<MediaBrowser.Controller.Providers.IProviderManager>(),
             NullLogger<LibraryDetectionService>.Instance,
             Paths());
 
@@ -42,7 +43,9 @@ public class BackupRestoreTests : IDisposable
 
         var svc = new LibraryDetectionService(
             Substitute.For<MediaBrowser.Controller.Library.ILibraryManager>(),
-            NullLogger<LibraryDetectionService>.Instance, paths);
+            Substitute.For<MediaBrowser.Controller.Providers.IProviderManager>(),
+            NullLogger<LibraryDetectionService>.Instance,
+            paths);
 
         Assert.True(svc.HasBackup(id));
     }
@@ -52,7 +55,9 @@ public class BackupRestoreTests : IDisposable
     {
         var svc = new LibraryDetectionService(
             Substitute.For<MediaBrowser.Controller.Library.ILibraryManager>(),
-            NullLogger<LibraryDetectionService>.Instance, Paths());
+            Substitute.For<MediaBrowser.Controller.Providers.IProviderManager>(),
+            NullLogger<LibraryDetectionService>.Instance,
+            Paths());
 
         Assert.False(await svc.RestoreOriginalCoverArtAsync(Guid.NewGuid().ToString()));
     }
