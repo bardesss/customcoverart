@@ -1,25 +1,24 @@
 using CustomCoverArt.Common;
-using CustomCoverArt.Models;
 using MediaBrowser.Common.Configuration;
 using Microsoft.Extensions.Logging;
-using SixLabors.ImageSharp.Processing;
-using SixLabors.ImageSharp.Drawing.Processing;
 
 namespace CustomCoverArt.Services;
 
 public interface IStartupValidationService
 {
-    Task<ValidationResult> ValidateConfigurationAsync();
-    Task<ValidationResult> ValidateDependenciesAsync();
-    Task<ValidationResult> ValidatePermissionsAsync();
-    bool IsPluginReady { get; }
+    /// <summary>
+    /// Whether the plugin can write to its data directory. A success is cached for the life
+    /// of the process. A failure is re-checked on the next call, so fixing permissions
+    /// recovers without a restart.
+    /// </summary>
+    Task<bool> IsPluginReadyAsync();
 }
 
 public class StartupValidationService : IStartupValidationService
 {
     private readonly ILogger<StartupValidationService> _logger;
     private readonly IApplicationPaths _applicationPaths;
-    private bool _isPluginReady = false;
+    private volatile bool _ready;
 
     public StartupValidationService(ILogger<StartupValidationService> logger, IApplicationPaths applicationPaths)
     {
@@ -27,184 +26,41 @@ public class StartupValidationService : IStartupValidationService
         _applicationPaths = applicationPaths;
     }
 
-    public bool IsPluginReady => _isPluginReady;
-
-    public async Task<ValidationResult> ValidateConfigurationAsync()
+    public async Task<bool> IsPluginReadyAsync()
     {
+        if (_ready)
+        {
+            return true;
+        }
+
+        // One probe of the one directory everything else lives under. Details go to the
+        // server log only, never into the HTTP response.
+        var dir = PluginPaths.Base(_applicationPaths);
+        var probe = Path.Combine(dir, $".write-check-{Guid.NewGuid():N}.tmp");
         try
         {
-            var result = new ValidationResult { IsValid = true };
-
-            // Check if required directories can be created
-            var testDirectories = new[]
-            {
-                PluginPaths.Generated(_applicationPaths),
-                PluginPaths.Uploads(_applicationPaths),
-                PluginPaths.Fonts(_applicationPaths)
-            };
-
-            foreach (var dir in testDirectories)
-            {
-                try
-                {
-                    Directory.CreateDirectory(dir);
-                    _logger.LogDebug("Directory validation successful: {Directory}", dir);
-                }
-                catch (Exception ex)
-                {
-                    result.IsValid = false;
-                    result.ErrorMessage = $"Cannot create directory {dir}: {ex.Message}";
-                    _logger.LogError("Directory validation failed: {Directory}, Error: {Error}", dir, ex.Message);
-                    return result;
-                }
-            }
-
-            // Check if we can write to directories
-            foreach (var dir in testDirectories)
-            {
-                try
-                {
-                    var testFile = Path.Combine(dir, $"test_{Guid.NewGuid():N}.tmp");
-                    await File.WriteAllTextAsync(testFile, "test");
-                    File.Delete(testFile);
-                }
-                catch (Exception ex)
-                {
-                    result.IsValid = false;
-                    result.ErrorMessage = $"Cannot write to directory {dir}: {ex.Message}";
-                    _logger.LogError("Write permission validation failed: {Directory}, Error: {Error}", dir, ex.Message);
-                    return result;
-                }
-            }
-
-            _logger.LogInformation("Configuration validation completed successfully");
-            return result;
+            Directory.CreateDirectory(dir);
+            await File.WriteAllTextAsync(probe, "ok").ConfigureAwait(false);
+            File.Delete(probe);
+            _ready = true;
+            return true;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            _logger.LogError("Configuration validation failed: {Error}", ex.Message);
-            return new ValidationResult
-            {
-                IsValid = false,
-                ErrorMessage = $"Configuration validation failed: {ex.Message}"
-            };
-        }
-    }
-
-    public async Task<ValidationResult> ValidateDependenciesAsync()
-    {
-        try
-        {
-            var result = new ValidationResult { IsValid = true };
-
-            // Test ImageSharp functionality
+            _logger.LogError(ex, "Plugin data directory is not writable: {Directory}", dir);
             try
             {
-                using var testImage = new SixLabors.ImageSharp.Image<SixLabors.ImageSharp.PixelFormats.Rgba32>(10, 10);
-                testImage.Mutate(x => x.Fill(SixLabors.ImageSharp.Color.Red));
-                
-                using var memoryStream = new MemoryStream();
-                await testImage.SaveAsync(memoryStream, new SixLabors.ImageSharp.Formats.Png.PngEncoder());
-                
-                if (memoryStream.Length == 0)
+                if (File.Exists(probe))
                 {
-                    result.IsValid = false;
-                    result.ErrorMessage = "ImageSharp PNG encoding test failed";
-                    return result;
+                    File.Delete(probe);
                 }
             }
-            catch (Exception ex)
+            catch (Exception cleanup) when (cleanup is IOException or UnauthorizedAccessException)
             {
-                result.IsValid = false;
-                result.ErrorMessage = $"ImageSharp validation failed: {ex.Message}";
-                _logger.LogError("ImageSharp validation failed: {Error}", ex.Message);
-                return result;
+                // Best effort; the probe name is unique, so a leftover never collides.
             }
 
-            // Test font availability
-            try
-            {
-                var testFont = SixLabors.Fonts.SystemFonts.CreateFont("Arial", 12);
-                if (testFont == null)
-                {
-                    result.IsValid = false;
-                    result.ErrorMessage = "No system fonts available";
-                    _logger.LogWarning("No system fonts available");
-                }
-            }
-            catch (Exception ex)
-            {
-                result.WarningMessage = $"Font system validation warning: {ex.Message}";
-                _logger.LogWarning("Font system validation warning: {Error}", ex.Message);
-            }
-
-            _logger.LogInformation("Dependencies validation completed successfully");
-            return result;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError("Dependencies validation failed: {Error}", ex.Message);
-            return new ValidationResult
-            {
-                IsValid = false,
-                ErrorMessage = $"Dependencies validation failed: {ex.Message}"
-            };
-        }
-    }
-
-    public async Task<ValidationResult> ValidatePermissionsAsync()
-    {
-        try
-        {
-            var result = new ValidationResult { IsValid = true };
-
-            // Test file system permissions
-            var testPath = Path.Combine(Path.GetTempPath(), $"CustomCoverArt_test_{Guid.NewGuid():N}");
-            
-            try
-            {
-                // Test create directory
-                Directory.CreateDirectory(testPath);
-                
-                // Test create file
-                var testFile = Path.Combine(testPath, "test.txt");
-                await File.WriteAllTextAsync(testFile, "test");
-                
-                // Test read file
-                var content = await File.ReadAllTextAsync(testFile);
-                if (content != "test")
-                {
-                    result.IsValid = false;
-                    result.ErrorMessage = "File read/write test failed";
-                    return result;
-                }
-                
-                // Test delete file
-                File.Delete(testFile);
-                
-                // Test delete directory
-                Directory.Delete(testPath);
-            }
-            catch (Exception ex)
-            {
-                result.IsValid = false;
-                result.ErrorMessage = $"File system permissions test failed: {ex.Message}";
-                _logger.LogError("File system permissions test failed: {Error}", ex.Message);
-                return result;
-            }
-
-            _logger.LogInformation("Permissions validation completed successfully");
-            return result;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError("Permissions validation failed: {Error}", ex.Message);
-            return new ValidationResult
-            {
-                IsValid = false,
-                ErrorMessage = $"Permissions validation failed: {ex.Message}"
-            };
+            return false;
         }
     }
 }
-
