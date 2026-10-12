@@ -683,8 +683,7 @@ public class CustomCoverArtController : ControllerBase
         CoverArtSettings? baseSettings = request.Settings;
         if (!string.IsNullOrWhiteSpace(request.TemplateName))
         {
-            var tpl = Plugin.Instance?.Configuration.Templates
-                .FirstOrDefault(t => string.Equals(t.Name, request.TemplateName, StringComparison.OrdinalIgnoreCase));
+            var tpl = Plugin.Instance is { } plugin ? TemplateStore.Find(plugin.Configuration, request.TemplateName) : null;
             if (tpl is null)
             {
                 return Fail<List<BatchApplyResult>>("Template not found: " + request.TemplateName);
@@ -729,8 +728,8 @@ public class CustomCoverArtController : ControllerBase
     [HttpGet("templates")]
     public ApiResponse<List<SavedTemplate>> GetTemplates()
     {
-        var list = Plugin.Instance?.Configuration.Templates ?? new List<SavedTemplate>();
-        return Success(list);
+        var cfg = Plugin.Instance?.Configuration;
+        return Success(cfg is null ? new List<SavedTemplate>() : TemplateStore.Snapshot(cfg));
     }
 
     /// <summary>Save (upsert by name) a design template.</summary>
@@ -749,9 +748,7 @@ public class CustomCoverArtController : ControllerBase
         }
 
         var normalized = NormalizeTemplate(template);
-        cfg.Templates.RemoveAll(t => string.Equals(t.Name, normalized.Name, StringComparison.OrdinalIgnoreCase));
-        cfg.Templates.Add(normalized);
-        Plugin.Instance!.SaveConfiguration();
+        TemplateStore.Upsert(cfg, normalized, () => Plugin.Instance!.SaveConfiguration());
         return Success(true);
     }
 
@@ -765,8 +762,7 @@ public class CustomCoverArtController : ControllerBase
             return Fail<bool>("Plugin not initialized.");
         }
 
-        cfg.Templates.RemoveAll(t => string.Equals(t.Name, name, StringComparison.OrdinalIgnoreCase));
-        Plugin.Instance!.SaveConfiguration();
+        TemplateStore.Remove(cfg, name, () => Plugin.Instance!.SaveConfiguration());
         return Success(true);
     }
 
