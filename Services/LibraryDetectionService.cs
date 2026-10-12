@@ -5,6 +5,7 @@ using Jellyfin.Data.Enums;
 using MediaBrowser.Common.Configuration;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Library;
+using MediaBrowser.Controller.Providers;
 using MediaBrowser.Model.Entities;
 using Microsoft.Extensions.Logging;
 
@@ -16,15 +17,18 @@ namespace CustomCoverArt.Services;
 public class LibraryDetectionService : ILibraryDetectionService
 {
     private readonly ILibraryManager _libraryManager;
+    private readonly IProviderManager _providerManager;
     private readonly ILogger<LibraryDetectionService> _logger;
     private readonly IApplicationPaths _applicationPaths;
 
     public LibraryDetectionService(
         ILibraryManager libraryManager,
+        IProviderManager providerManager,
         ILogger<LibraryDetectionService> logger,
         IApplicationPaths applicationPaths)
     {
         _libraryManager = libraryManager;
+        _providerManager = providerManager;
         _logger = logger;
         _applicationPaths = applicationPaths;
     }
@@ -191,16 +195,7 @@ public class LibraryDetectionService : ILibraryDetectionService
                 return false;
             }
 
-            // VERIFY: this is the primary Jellyfin-API integration point. Setting
-            // the primary image then persisting with ItemUpdateType.ImageUpdate is
-            // the 10.11 pattern; confirm against your running server. If the image
-            // does not appear, a metadata refresh may also be required.
-            item.SetImage(
-                new ItemImageInfo { Path = coverArtPath, Type = ImageType.Primary },
-                0);
-
-            await item.UpdateToRepositoryAsync(ItemUpdateType.ImageUpdate, CancellationToken.None)
-                .ConfigureAwait(false);
+            await SetPrimaryImageAsync(item, coverArtPath).ConfigureAwait(false);
 
             _logger.LogInformation(
                 "Successfully updated cover art for library: {LibraryName} (ID: {LibraryId})",
@@ -214,6 +209,43 @@ public class LibraryDetectionService : ILibraryDetectionService
             return false;
         }
     }
+
+    /// <summary>
+    /// Hands an image to Jellyfin's own image pipeline, the same call the dashboard's
+    /// "upload image" makes. Jellyfin copies it into its metadata store and records its
+    /// dimensions and blurhash, so the cover no longer depends on a file in the plugin's
+    /// data dir. The stream overload copies and never deletes <paramref name="sourcePath"/>.
+    /// </summary>
+    private async Task SetPrimaryImageAsync(BaseItem item, string sourcePath)
+    {
+        // Jellyfin deletes an item's previous local image file when it saves a new one to a
+        // different path. Covers applied (and restores made) before 4.0.2.0 pointed the item
+        // straight at files in OUR data dir, including the backup itself. Detach those first
+        // so Jellyfin can never delete a restore point. Images outside our dir (Jellyfin's
+        // own, or the user's) are left for Jellyfin to manage, after Backup has copied them.
+        var current = item.GetImageInfo(ImageType.Primary, 0);
+        if (current is not null && PluginPaths.IsInsideBase(_applicationPaths, current.Path))
+        {
+            item.RemoveImage(current);
+        }
+
+        await using var stream = new FileStream(sourcePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+        await _providerManager
+            .SaveImage(item, stream, MimeTypeFor(sourcePath), ImageType.Primary, null, CancellationToken.None)
+            .ConfigureAwait(false);
+        await item.UpdateToRepositoryAsync(ItemUpdateType.ImageUpdate, CancellationToken.None)
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>MIME type Jellyfin uses to pick the saved file's extension.</summary>
+    internal static string MimeTypeFor(string path) => Path.GetExtension(path).ToLowerInvariant() switch
+    {
+        ".gif" => "image/gif",
+        ".jpg" or ".jpeg" => "image/jpeg",
+        ".webp" => "image/webp",
+        ".bmp" => "image/bmp",
+        _ => "image/png",
+    };
 
     // A GUID subfolder is the only valid backup location; validating here means a
     // non-GUID targetId can never inject path segments even if a caller forgets to.
@@ -308,13 +340,14 @@ public class LibraryDetectionService : ILibraryDetectionService
                 return false;
             }
 
-            item.SetImage(new ItemImageInfo { Path = backupPath, Type = ImageType.Primary }, 0);
-            await item.UpdateToRepositoryAsync(ItemUpdateType.ImageUpdate, CancellationToken.None)
-                .ConfigureAwait(false);
+            // Copies the backup into Jellyfin's image store; the backup file itself stays,
+            // so restoring again later still works.
+            await SetPrimaryImageAsync(item, backupPath).ConfigureAwait(false);
             return true;
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.LogError(ex, "Failed to restore original cover for {LibraryId}", libraryId);
             return false;
         }
     }
