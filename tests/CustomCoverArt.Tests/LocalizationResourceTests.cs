@@ -3,6 +3,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using CustomCoverArt.Services;
+using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using Xunit;
 
@@ -28,6 +29,8 @@ public class LocalizationResourceTests
         "errors.invalid_file_format",
         "errors.too_many_uploads",
         "errors.suspicious_content",
+        "errors.image_too_large",
+        "errors.backup_failed",
     };
 
     private static Dictionary<string, string> Load(string code)
@@ -78,7 +81,7 @@ public class LocalizationResourceTests
     [Fact]
     public void EveryKeyTheServerCodeUses_ResolvesToRealText()
     {
-        var service = new LocalizationService(Substitute.For<ILoggingService>());
+        var service = new LocalizationService(NullLogger<LocalizationService>.Instance);
 
         foreach (var key in KeysUsedByServerCode)
         {
@@ -95,10 +98,19 @@ public class LocalizationResourceTests
         Assert.True(unused.Count == 0, "Resource keys defined but never requested: " + string.Join(", ", unused));
     }
 
+    [Theory]
+    [InlineData("en")]
+    [InlineData("nl")]
+    [InlineData("es")]
+    public void InvalidFormatMessage_DoesNotAdvertiseTiff(string code)
+    {
+        Assert.DoesNotContain("TIFF", Load(code)["errors.invalid_file_format"]);
+    }
+
     [Fact]
     public void LoadedLanguages_MatchTheSupportedList()
     {
-        var service = new LocalizationService(Substitute.For<ILoggingService>());
+        var service = new LocalizationService(NullLogger<LocalizationService>.Instance);
 
         Assert.Equal(
             LocalizationService.SupportedLanguageCodes.OrderBy(c => c, System.StringComparer.Ordinal),

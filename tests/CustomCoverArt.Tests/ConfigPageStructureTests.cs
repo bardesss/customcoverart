@@ -193,4 +193,15 @@ public class ConfigPageStructureTests
         // Unused since Phase 1 — the canvas renders synchronously, so nothing ever showed it.
         Assert.DoesNotContain("ccaPreviewSpinner", ConfigPage(), System.StringComparison.Ordinal);
     }
+
+    /// <summary>
+    /// TIFF is not offered: the server refuses it, and browsers cannot draw it on the canvas.
+    /// </summary>
+    [Fact]
+    public void BackgroundUpload_DoesNotOfferTiff()
+    {
+        var page = ConfigPage();
+        Assert.DoesNotContain(".tif", page, System.StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("TIFF", page);
+    }
 }

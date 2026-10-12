@@ -1,6 +1,7 @@
 using CustomCoverArt.Common;
 using CustomCoverArt.Models;
 using MediaBrowser.Common.Configuration;
+using Microsoft.Extensions.Logging;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats.Gif;
 using SixLabors.ImageSharp.PixelFormats;
@@ -16,17 +17,17 @@ namespace CustomCoverArt.Services;
 public class CoverArtService : ICoverArtService
 {
     private readonly IApplicationPaths _applicationPaths;
-    private readonly ILoggingService _loggingService;
+    private readonly ILogger<CoverArtService> _logger;
     private readonly IMediaItemService _mediaItemService;
     private readonly string _outputDirectory;
 
     public CoverArtService(
         IApplicationPaths applicationPaths,
-        ILoggingService loggingService,
+        ILogger<CoverArtService> logger,
         IMediaItemService mediaItemService)
     {
         _applicationPaths = applicationPaths;
-        _loggingService = loggingService;
+        _logger = logger;
         _mediaItemService = mediaItemService;
 
         // Data location comes from Jellyfin's application paths (via DI) — no
@@ -53,7 +54,7 @@ public class CoverArtService : ICoverArtService
             DocumentMigration.Normalize(document);
 
             if (document.Canvas.Width <= 0 || document.Canvas.Height <= 0)
-                throw new ArgumentException("Invalid dimensions");
+                throw new CoverValidationException("Invalid dimensions");
 
             // Housekeeping: drop stale preview/generated files.
             PruneOldGenerated();
@@ -65,7 +66,7 @@ public class CoverArtService : ICoverArtService
             {
                 if (!string.IsNullOrEmpty(document.Background.ImagePath))
                 {
-                    _loggingService.LogWarning("Background path rejected (outside plugin data dir): {Path}", document.Background.ImagePath);
+                    _logger.LogWarning("Background path rejected (outside plugin data dir): {Path}", document.Background.ImagePath);
                 }
                 document.Background.ImagePath = string.Empty;
             }
@@ -76,7 +77,7 @@ public class CoverArtService : ICoverArtService
             const int maxLayers = 40;
             if (document.Layers.Count > maxLayers)
             {
-                _loggingService.LogWarning("Dropping {Count} excess layers (max {Max})", document.Layers.Count - maxLayers, maxLayers);
+                _logger.LogWarning("Dropping {Count} excess layers (max {Max})", document.Layers.Count - maxLayers, maxLayers);
                 document.Layers = document.Layers.Take(maxLayers).ToList();
             }
 
@@ -94,7 +95,7 @@ public class CoverArtService : ICoverArtService
                 {
                     if (!string.IsNullOrEmpty(layer.ImagePath))
                     {
-                        _loggingService.LogWarning("Layer image rejected (outside plugin data dir): {Path}", layer.ImagePath);
+                        _logger.LogWarning("Layer image rejected (outside plugin data dir): {Path}", layer.ImagePath);
                     }
                     layer.ImagePath = string.Empty;
                 }
@@ -114,7 +115,7 @@ public class CoverArtService : ICoverArtService
 
             if (!dimensionValidation.IsValid)
             {
-                throw new ArgumentException(dimensionValidation.ErrorMessage);
+                throw new CoverValidationException(dimensionValidation.ErrorMessage);
             }
 
             // A large-file-size estimate (dimensionValidation.WarningMessage) is
@@ -122,9 +123,7 @@ public class CoverArtService : ICoverArtService
 
             // Whitelist the output format. The extension is NEVER derived from the
             // raw client string (which could contain path-traversal segments) —
-            // anything that is not "gif" becomes "png". (This subsumes the old
-            // "auto"-format optimizer: DetermineOptimalFormatAsync always resolved
-            // to "png" unconditionally, so this mapping is exactly equivalent.)
+            // anything that is not "gif" (including "auto") becomes "png".
             var outputFormat = document.Canvas.Format?.ToLowerInvariant() == "gif" ? "gif" : "png";
             document.Canvas.Format = outputFormat;
 
@@ -149,31 +148,15 @@ public class CoverArtService : ICoverArtService
                 }
                 else if (!string.IsNullOrEmpty(document.Background.ImagePath))
                 {
-                    if (!File.Exists(document.Background.ImagePath))
+                    // Identify-then-decode through the shared guard: rejects decompression
+                    // bombs (frames × width × height over budget) and decodes only the frames
+                    // this render uses. A still cover takes ONE frame of an animated source,
+                    // so the resize/blur in ApplyBackgroundLayer no longer runs on frames that
+                    // are never drawn.
+                    backgroundImage = SafeImageLoader.TryLoad(document.Background.ImagePath, BackgroundMaxFrames(document));
+                    if (backgroundImage is null)
                     {
-                        _loggingService.LogWarning("Background file not found: {Path}", document.Background.ImagePath);
-                    }
-                    else
-                    {
-                        try
-                        {
-                            // Reject oversize source images before a full decode
-                            // (decompression-bomb guard).
-                            var info = Image.Identify(document.Background.ImagePath);
-                            const long maxSourcePixels = 8192L * 8192L;
-                            if ((long)info.Width * info.Height <= maxSourcePixels)
-                            {
-                                backgroundImage = await Image.LoadAsync(document.Background.ImagePath);
-                            }
-                            else
-                            {
-                                _loggingService.LogWarning("Background image ignored, too large: {Width}x{Height}", info.Width, info.Height);
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            _loggingService.LogWarning("Failed to decode background {Path}: {Error}", document.Background.ImagePath, ex.Message);
-                        }
+                        _logger.LogWarning("Background image ignored (missing, undecodable or too large): {Path}", document.Background.ImagePath);
                     }
                 }
 
@@ -198,6 +181,11 @@ public class CoverArtService : ICoverArtService
                 backgroundImage?.Dispose();
             }
         }
+        catch (CoverValidationException)
+        {
+            // User-fixable: let the message through unwrapped so the controller can show it.
+            throw;
+        }
         catch (Exception ex)
         {
             throw new InvalidOperationException($"Failed to generate cover art: {ex.Message}", ex);
@@ -217,15 +205,22 @@ public class CoverArtService : ICoverArtService
         return Path.Combine(_outputDirectory, "Libraries", id.ToString("N"));
     }
 
+    /// <summary>
+    /// Frames to decode from the background: all of them (up to the passthrough cap) only
+    /// when exporting an animated GIF, otherwise just the first.
+    /// </summary>
+    internal static int BackgroundMaxFrames(CoverDocument document)
+        => document.Background.Animation?.Enabled == true ? SafeImageLoader.MaxAnimatedFrames : 1;
+
     // Clones a document for a downscaled animated working canvas. Layer.Size is
     // already a fraction of Canvas.Height, so pointing Canvas.Width/Height at the
     // actual (capped) working dimensions keeps text proportional automatically —
     // no separate text-size scaling needed (unlike the legacy flat TextSize,
     // which was an absolute pixel value tied to the ORIGINAL ExportHeight and
-    // required pre-shrinking to compensate). Shadow/outline pixel offsets are
-    // still absolute values on CoverLayer, so those are scaled explicitly to
+    // required pre-shrinking to compensate). Shadow/outline offsets, background blur and
+    // the border are absolute pixel values, so those are scaled explicitly to
     // preserve their visual proportions on the smaller canvas.
-    private static CoverDocument ScaleDocumentForCanvas(CoverDocument doc, int width, int height, float scale)
+    internal static CoverDocument ScaleDocumentForCanvas(CoverDocument doc, int width, int height, float scale)
     {
         var json = System.Text.Json.JsonSerializer.Serialize(doc);
         var c = System.Text.Json.JsonSerializer.Deserialize<CoverDocument>(json) ?? doc;
@@ -238,11 +233,31 @@ public class CoverArtService : ICoverArtService
             layer.Shadow.OffsetY = (int)System.Math.Round(layer.Shadow.OffsetY * scale);
             layer.Outline.Width = (int)System.Math.Round(layer.Outline.Width * scale);
         }
+        // Background blur and the border are absolute pixels too.
+        c.Background.Blur *= scale;
+        var border = c.Effects.Border;
+        border.Thickness = ScaleNonZero(border.Thickness, scale);
+        border.Radius = (int)System.Math.Round(border.Radius * scale);
+        border.Gap = ScaleNonZero(border.Gap, scale);
         return c;
     }
 
-    /// <summary>Source crop rectangle for a Ken Burns frame at progress t (0..1).</summary>
+    // A border the user switched on stays at least 1px instead of rounding away.
+    private static int ScaleNonZero(int value, float scale)
+        => value <= 0 ? value : System.Math.Max(1, (int)System.Math.Round(value * scale));
+
+    /// <summary>Source crop rectangle for a Ken Burns frame at progress t (0..1), at the source's own aspect.</summary>
     public static Rectangle KenBurnsCrop(int srcW, int srcH, float t, float zoomAmount, string direction)
+        => KenBurnsCrop(srcW, srcH, srcW, srcH, t, zoomAmount, direction);
+
+    /// <summary>
+    /// Source crop rectangle for a Ken Burns frame at progress t (0..1). The window has the
+    /// CANVAS aspect (<paramref name="dstW"/>:<paramref name="dstH"/>): the largest such window
+    /// that fits inside the source, shrunk by the zoom and kept centred. It is then resized to
+    /// the canvas without distortion. Cropping at the source aspect and resizing to the canvas
+    /// stretched any background whose shape differed from the cover.
+    /// </summary>
+    public static Rectangle KenBurnsCrop(int srcW, int srcH, int dstW, int dstH, float t, float zoomAmount, string direction)
     {
         var z = System.Math.Clamp(zoomAmount, 0f, 1f);
         // progress from wide (0) to tight (1)
@@ -251,8 +266,29 @@ public class CoverArtService : ICoverArtService
 
         // scale goes 1.0 (full) → 1/(1+z) (tight)
         var scale = 1f - p * (1f - 1f / (1f + z));
-        var w = (int)System.Math.Round(srcW * scale);
-        var h = (int)System.Math.Round(srcH * scale);
+
+        // Largest canvas-aspect window inside the source.
+        int baseW, baseH;
+        if (dstW <= 0 || dstH <= 0)
+        {
+            baseW = srcW;
+            baseH = srcH;
+        }
+        else if ((long)srcW * dstH > (long)srcH * dstW)
+        {
+            // Source is wider than the canvas: full height, trimmed width.
+            baseH = srcH;
+            baseW = (int)System.Math.Round(srcH * (double)dstW / dstH);
+        }
+        else
+        {
+            // Source is taller (or equal): full width, trimmed height.
+            baseW = srcW;
+            baseH = (int)System.Math.Round(srcW * (double)dstH / dstW);
+        }
+
+        var w = System.Math.Clamp((int)System.Math.Round(baseW * scale), 1, System.Math.Max(1, srcW));
+        var h = System.Math.Clamp((int)System.Math.Round(baseH * scale), 1, System.Math.Max(1, srcH));
         var x = (srcW - w) / 2;
         var y = (srcH - h) / 2;
         return new Rectangle(x, y, w, h);
@@ -260,7 +296,7 @@ public class CoverArtService : ICoverArtService
 
     // Best-effort cleanup of stale generated/preview files so the folder does
     // not grow without bound (preview fires on every UI tweak). Only prunes the
-    // flat generated root; the per-library copies under Libraries/ are kept.
+    // flat generated root; the per-library folders under Libraries/ are pruned by PruneLibraryOutputs after each successful apply.
     private void PruneOldGenerated()
     {
         try
@@ -312,6 +348,48 @@ public class CoverArtService : ICoverArtService
         }
     }
 
+    public void PruneLibraryOutputs(string libraryId, string keepPath)
+    {
+        string libraryDirectory;
+        try
+        {
+            libraryDirectory = LibraryDir(libraryId);
+        }
+        catch (ArgumentException)
+        {
+            return; // not a GUID: nothing of ours to prune
+        }
+
+        if (!Directory.Exists(libraryDirectory))
+        {
+            return;
+        }
+
+        var keep = Path.GetFullPath(keepPath);
+        foreach (var file in Directory.EnumerateFiles(libraryDirectory))
+        {
+            if (string.Equals(Path.GetFullPath(file), keep, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            try
+            {
+                File.Delete(file);
+            }
+            catch (IOException ex)
+            {
+                // In use: the next successful apply retries it.
+                _logger.LogDebug(ex, "Could not delete old cover {File}; will retry on next apply", file);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                // Not ours to delete; leave it.
+                _logger.LogDebug(ex, "Not allowed to delete old cover {File}", file);
+            }
+        }
+    }
+
     /// <summary>
     /// Composites one frame (background + layers) onto the supplied canvas. Shared
     /// by the single-image path and the animated-GIF path (which calls it per frame).
@@ -349,6 +427,7 @@ public class CoverArtService : ICoverArtService
 
         // Passthrough when the source background is itself animated.
         var animatedSource = background is not null && background.Frames.Count > 1;
+        var kenBurns = !animatedSource && background is not null && document.Background.Animation!.KenBurns;
 
         // An animated source drives its own frame count (so its motion isn't
         // truncated or padded); Ken Burns / static sources use the requested count.
@@ -357,61 +436,68 @@ public class CoverArtService : ICoverArtService
             : System.Math.Clamp(document.Background.Animation!.FrameCount, 2, 30);
         var delayCentis = System.Math.Max(2, document.Background.Animation!.DelayMs / 10); // GIF delay is 1/100s
 
+        // A still background without Ken Burns gives the same picture on every frame:
+        // compose it once and repeat it, instead of cloning the full-size source and
+        // re-running the whole compositor for each frame. ApplyBackgroundLayer mutates the
+        // background it is given, which is fine here because it is used exactly once.
+        Image<Rgba32>? staticFrame = null;
         Image<Rgba32>? output = null;
         try
         {
+            if (!animatedSource && !kenBurns)
+            {
+                staticFrame = new Image<Rgba32>(w, h);
+                ComposeFrame(staticFrame, background, composeDocument);
+            }
+
             for (int i = 0; i < frameCount; i++)
             {
                 var t = frameCount == 1 ? 0f : i / (float)(frameCount - 1);
                 var frameDelay = delayCentis;
 
-                using var frameCanvas = new Image<Rgba32>(w, h);
-                Image? frameBg = null;
-                Image<Rgba32>? tempBg = null;
-                try
+                using var frameCanvas = staticFrame is not null ? staticFrame.Clone() : new Image<Rgba32>(w, h);
+                if (staticFrame is null)
                 {
-                    if (animatedSource)
+                    Image? frameBg = null;
+                    try
                     {
-                        var srcIndex = i % background!.Frames.Count;
-                        tempBg = background.Frames.CloneFrame(srcIndex).CloneAs<Rgba32>();
-                        frameBg = tempBg;
-                        // Preserve the source GIF's own timing so playback speed matches.
-                        var srcDelay = background.Frames[srcIndex].Metadata.GetGifMetadata().FrameDelay;
-                        if (srcDelay > 0) { frameDelay = srcDelay; }
-                    }
-                    else if (document.Background.Animation!.KenBurns && background is not null)
-                    {
-                        var crop = KenBurnsCrop(background.Width, background.Height, t,
-                            document.Background.Animation.ZoomAmount, document.Background.Animation.Direction);
-                        tempBg = background.CloneAs<Rgba32>();
-                        tempBg.Mutate(x => x.Crop(crop).Resize(w, h));
-                        frameBg = tempBg;
-                    }
-                    else if (background is not null)
-                    {
-                        tempBg = background.CloneAs<Rgba32>();
-                        frameBg = tempBg;
-                    }
+                        if (animatedSource)
+                        {
+                            var srcIndex = i % background!.Frames.Count;
+                            // One clone of one frame, in the source's own pixel format.
+                            frameBg = background.Frames.CloneFrame(srcIndex);
+                            // Preserve the source GIF's own timing so playback speed matches.
+                            var srcDelay = background.Frames[srcIndex].Metadata.GetGifMetadata().FrameDelay;
+                            if (srcDelay > 0) { frameDelay = srcDelay; }
+                        }
+                        else
+                        {
+                            var crop = KenBurnsCrop(background!.Width, background.Height, w, h, t,
+                                document.Background.Animation.ZoomAmount, document.Background.Animation.Direction);
+                            // Crop first, then resize: the clone is the small window, never the full source.
+                            frameBg = background.Clone(x => x.Crop(crop).Resize(w, h));
+                        }
 
-                    ComposeFrame(frameCanvas, frameBg, composeDocument);
-
-                    if (output is null)
-                    {
-                        output = frameCanvas.Clone();
-                        var gm = output.Metadata.GetGifMetadata();
-                        gm.RepeatCount = (ushort)(document.Background.Animation!.Loop ? 0 : 1);
-                        output.Frames.RootFrame.Metadata.GetGifMetadata().FrameDelay = frameDelay;
+                        ComposeFrame(frameCanvas, frameBg, composeDocument);
                     }
-                    else
+                    finally
                     {
-                        var added = frameCanvas.Frames.RootFrame;
-                        added.Metadata.GetGifMetadata().FrameDelay = frameDelay;
-                        output.Frames.AddFrame(added);
+                        frameBg?.Dispose();
                     }
                 }
-                finally
+
+                if (output is null)
                 {
-                    tempBg?.Dispose();
+                    output = frameCanvas.Clone();
+                    var gm = output.Metadata.GetGifMetadata();
+                    gm.RepeatCount = (ushort)(document.Background.Animation!.Loop ? 0 : 1);
+                    output.Frames.RootFrame.Metadata.GetGifMetadata().FrameDelay = frameDelay;
+                }
+                else
+                {
+                    var added = frameCanvas.Frames.RootFrame;
+                    added.Metadata.GetGifMetadata().FrameDelay = frameDelay;
+                    output.Frames.AddFrame(added);
                 }
             }
 
@@ -421,6 +507,7 @@ public class CoverArtService : ICoverArtService
         }
         finally
         {
+            staticFrame?.Dispose();
             output?.Dispose();
         }
     }

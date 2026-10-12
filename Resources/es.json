@@ -2,7 +2,9 @@
   "errors.no_file_uploaded": "No se ha subido ningún archivo",
   "errors.file_too_large": "El archivo es demasiado grande. El tamaño máximo es {0}MB.",
   "errors.font_too_large": "El archivo de fuente es demasiado grande. El tamaño máximo es 5MB.",
-  "errors.invalid_file_format": "Formato de archivo no válido. Solo se permiten JPG, PNG, GIF, BMP, WebP y TIFF.",
+  "errors.invalid_file_format": "Formato de archivo no válido. Solo se permiten JPG, PNG, GIF, BMP y WebP.",
   "errors.too_many_uploads": "Demasiadas subidas. Inténtalo de nuevo dentro de un minuto.",
-  "errors.suspicious_content": "El archivo contiene contenido sospechoso y ha sido rechazado"
+  "errors.suspicious_content": "El archivo contiene contenido sospechoso y ha sido rechazado",
+  "errors.image_too_large": "La imagen es demasiado grande para procesarla. Usa una imagen más pequeña o una animación con menos fotogramas.",
+  "errors.backup_failed": "No se pudo hacer una copia de seguridad de la portada actual, así que se dejó sin cambios."
 }
