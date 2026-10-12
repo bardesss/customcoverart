@@ -402,21 +402,8 @@ public class CustomCoverArtController : ControllerBase
     {
         try
         {
-            if (_startupValidationService.IsPluginReady)
-            {
-                return Success<object>(new { PluginReady = true, Version = Plugin.Instance?.Version.ToString() });
-            }
-
-            var config = await _startupValidationService.ValidateConfigurationAsync().ConfigureAwait(false);
-            var deps = await _startupValidationService.ValidateDependenciesAsync().ConfigureAwait(false);
-            var perms = await _startupValidationService.ValidatePermissionsAsync().ConfigureAwait(false);
-
-            return Success<object>(new
-            {
-                PluginReady = config.IsValid && deps.IsValid && perms.IsValid,
-                Version = Plugin.Instance?.Version.ToString(),
-                ValidationResults = new { Configuration = config, Dependencies = deps, Permissions = perms }
-            });
+            var ready = await _startupValidationService.IsPluginReadyAsync().ConfigureAwait(false);
+            return Success<object>(new { PluginReady = ready, Version = Plugin.Instance?.Version.ToString() });
         }
         catch (Exception ex)
         {
