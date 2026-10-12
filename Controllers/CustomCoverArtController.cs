@@ -55,22 +55,15 @@ public class CustomCoverArtController : ControllerBase
         _applicationPaths = applicationPaths;
     }
 
-    // Returns true if the caller has exceeded the limit for this action.
-    // Records the attempt on every call (so failed attempts also count).
+    // Identifies the caller for rate limiting: the Jellyfin user, else the remote IP.
+    private string ClientId() => _userContextService.GetCurrentUserId()
+        ?? HttpContext.Connection.RemoteIpAddress?.ToString()
+        ?? "unknown";
+
+    // Returns true if the caller has exceeded the limit for this action. Check and record
+    // are one atomic step, so a concurrent burst cannot all slip past the check.
     private bool RateLimited(string action, int maxRequests, TimeSpan window)
-    {
-        var clientId = _userContextService.GetCurrentUserId()
-            ?? HttpContext.Connection.RemoteIpAddress?.ToString()
-            ?? "unknown";
-
-        if (!_rateLimitingService.IsAllowed(clientId, action, maxRequests, window))
-        {
-            return true;
-        }
-
-        _rateLimitingService.RecordRequest(clientId, action);
-        return false;
-    }
+        => !_rateLimitingService.TryAcquire(ClientId(), action, maxRequests, window);
 
     /// <summary>Get cover-art targets of a type: "library", "collection" or "playlist".</summary>
     [HttpGet("targets/{type}")]
@@ -328,13 +321,10 @@ public class CustomCoverArtController : ControllerBase
         Func<IFormFile, Task<ValidationResult>> validate)
     {
         var userName = _userContextService.GetCurrentUserName() ?? "unknown";
-        var clientId = _userContextService.GetCurrentUserId()
-            ?? HttpContext.Connection.RemoteIpAddress?.ToString()
-            ?? "unknown";
 
         try
         {
-            if (!_rateLimitingService.IsAllowed(clientId, rateLimitAction, maxRequests, window))
+            if (RateLimited(rateLimitAction, maxRequests, window))
             {
                 _logger.LogWarning("Rate limit exceeded for {Action} by {UserName}", rateLimitAction, userName);
                 return Fail<string>(_localizationService.GetString("errors.too_many_uploads"));
@@ -350,8 +340,6 @@ public class CustomCoverArtController : ControllerBase
             {
                 return Fail<string>(validation.ErrorMessage);
             }
-
-            _rateLimitingService.RecordRequest(clientId, rateLimitAction);
 
             Directory.CreateDirectory(directory);
             var sanitized = ImageProcessingService.SanitizeFileName(file.FileName);
