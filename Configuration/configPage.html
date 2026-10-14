@@ -2527,6 +2527,31 @@
             return Math.max(8, Math.min(1024, layer.Size * doc.Canvas.Height)) * textScale(H);
         }
 
+        // Paints ONLY the shadow of a text layer's glyphs. ctx is already translated and
+        // rotated to the layer anchor, with font, alignment and fill set. A plain shadowed
+        // fillText also paints the glyphs, which drawTextLayer's real fill then paints again.
+        // At Opacity < 1 that double coat came out denser than the server, which fills once.
+        // So the glyphs are pushed far off the bitmap in DEVICE space and the shadow is pulled
+        // back by the same distance. The HTML canvas spec says shadow offsets and blur "are
+        // not affected by the current transformation matrix", so the shadow lands exactly
+        // where a plain shadowed fill would have put it (screen-space offset, which the
+        // server now matches), and the glyphs land nowhere. Clamps match RenderTextLayer.
+        function drawTextShadowOnly(ctx, layer, fontPx, k) {
+            var content = layer.Content || '';
+            var m = ctx.getTransform();
+            // Far enough that no glyph, at any rotation, can still touch the bitmap: the
+            // anchor's device x plus the text's longest possible reach from it.
+            var shift = Math.ceil(Math.abs(m.e) + ctx.measureText(content).width + fontPx) + 64;
+            ctx.save();
+            ctx.setTransform(new DOMMatrix([1, 0, 0, 1, -shift, 0]).multiply(m));
+            ctx.shadowColor = layer.Shadow.Color;
+            ctx.shadowBlur = Math.max(0, Math.min(50, layer.Shadow.Blur)) * k;
+            ctx.shadowOffsetX = Math.max(-50, Math.min(50, layer.Shadow.OffsetX)) * k + shift;
+            ctx.shadowOffsetY = Math.max(-50, Math.min(50, layer.Shadow.OffsetY)) * k;
+            ctx.fillText(content, 0, 0);
+            ctx.restore();
+        }
+
         // One text layer: shadow, then outline, then fill, mirroring RenderTextLayer.
         // Pixel values are scaled for the target canvas (textScale).
         function drawTextLayer(ctx, layer, W, H) {
@@ -2549,13 +2574,7 @@
             // OVER the outline — the server has always drawn it underneath.
             ctx.fillStyle = layer.Color;
             if (layer.Shadow && layer.Shadow.Enabled) {
-                ctx.save();
-                ctx.shadowColor = layer.Shadow.Color;
-                ctx.shadowBlur = layer.Shadow.Blur * k;
-                ctx.shadowOffsetX = layer.Shadow.OffsetX * k;
-                ctx.shadowOffsetY = layer.Shadow.OffsetY * k;
-                ctx.fillText(layer.Content, 0, 0);
-                ctx.restore();
+                drawTextShadowOnly(ctx, layer, fontPx, k);
             }
             // Same [0, 10] clamp as the server. A zero lineWidth is ignored by canvas
             // (the previous width would be kept), hence the guard.
