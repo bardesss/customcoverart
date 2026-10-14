@@ -4,6 +4,9 @@ The text under each version heading is published to the plugin's manifest by the
 release workflow (and shown as the version's changelog inside Jellyfin). Add a
 new `## <version>` section when you bump `<Version>` in the csproj.
 
+## 4.0.4.0
+The live preview and the cover that actually gets applied now **agree on text effects**. A **shadow's softness** came out twice as wide on the applied cover as in the preview; it now matches, so a cover with a blurred text shadow looks slightly sharper than before once you apply it again. An **outline on semi-transparent text** used to stay fully solid on the cover however far you turned the opacity down; it now fades with the text, as the preview always showed, and outline corners are a little rounder. On **rotated text**, the cover turned the shadow along with the letters while the preview kept it falling the same way on screen; the cover now does what the preview shows. The preview itself had a few slips of its own: semi-transparent text with a shadow was drawn **slightly too dense**, the **in-context previews** (wide, square, poster) drew text, shadow and outline at full size so they spilled out of the little thumbnails, an **uploaded font** looked artificially bold when the weight was set to bold (the cover never was), and a **gradient from an old template** with fewer than two colour stops showed different colours in the editor, the preview and the cover. All three now show the same colours. Covers you have already applied are not changed until you apply them again. Fully opaque, unrotated text without a blurred shadow looks the same as before.
+
 ## 4.0.3.0
 A **fix-up release for backups and the live preview**.
 
