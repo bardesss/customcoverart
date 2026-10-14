@@ -46,6 +46,9 @@
                             <button is="emby-button" type="button" id="ccaRestoreBtn" class="raised" disabled>
                                 <span data-i18n="restore.button">Restore original cover</span>
                             </button>
+                            <button is="emby-button" type="button" id="ccaResetBackupBtn" class="raised" disabled>
+                                <span data-i18n="restore.reset">Reset backup</span>
+                            </button>
                             <span class="ccaFileName" id="ccaRestoreHint" data-i18n="restore.none">No backup yet</span>
                         </div>
                         <div class="ccaStepGroup">
@@ -928,6 +931,7 @@
                 'dyn.uploadFail': 'Upload failed: {0}', 'dyn.fontFail': 'Font upload failed: {0}',
                 'dyn.unknown': 'unknown error',
                 'restore.button': 'Restore original cover', 'restore.none': 'No backup yet', 'restore.available': 'A backup exists', 'restore.done': 'Original cover restored.', 'restore.fail': 'No backup found to restore.',
+                'restore.reset': 'Reset backup', 'restore.resetConfirm': 'Delete the current backup? The next apply then saves the cover this target shows at that moment as its new original, unless that is the cover this plugin applied last.', 'restore.resetDone': 'Backup deleted. The next apply saves the current cover as the new original.', 'restore.resetFail': 'Could not reset the backup: {0}',
                 'bg.source': 'Background source', 'bg.source.image': 'Image', 'bg.source.gradient': 'Gradient', 'bg.source.solid': 'Solid colour', 'bg.source.collage': 'Poster collage from this target', 'bg.collage.density': 'Collage density', 'bg.collage.sparse': 'Sparse', 'bg.collage.medium': 'Medium', 'bg.collage.dense': 'Dense', 'bg.collage.shuffle': 'Shuffle', 'bg.collage.livetv': 'Live TV has no posters to collage.',
                 'tpl.load': 'Load template', 'tpl.delete': 'Delete', 'tpl.save': 'Save current design', 'tpl.savebtn': 'Save', 'tpl.nameph': 'Template name', 'tpl.hint': 'Templates store the design but not the title — each target keeps its own name.', 'tpl.saved': 'Template saved.', 'tpl.named': 'Enter a template name first.',
                 'batch.hint': 'Apply the current design (or loaded template) to several targets at once. Each cover is titled with its target\'s name.', 'batch.apply': 'Apply to selected', 'batch.none': 'Select at least one target.', 'batch.running': 'Applying…', 'batch.done': 'Done: {0} ok, {1} failed.',
@@ -989,6 +993,7 @@
                 'dyn.uploadFail': 'Uploaden mislukt: {0}', 'dyn.fontFail': 'Lettertype uploaden mislukt: {0}',
                 'dyn.unknown': 'onbekende fout',
                 'restore.button': 'Originele cover herstellen', 'restore.none': 'Nog geen back-up', 'restore.available': 'Er is een back-up', 'restore.done': 'Originele cover hersteld.', 'restore.fail': 'Geen back-up gevonden om te herstellen.',
+                'restore.reset': 'Back-up resetten', 'restore.resetConfirm': 'De huidige back-up verwijderen? Bij de volgende keer toepassen wordt de cover die dit doel op dat moment toont bewaard als het nieuwe origineel, tenzij dat de cover is die deze plug-in het laatst heeft toegepast.', 'restore.resetDone': 'Back-up verwijderd. Bij de volgende keer toepassen wordt de huidige cover bewaard als het nieuwe origineel.', 'restore.resetFail': 'Kon de back-up niet resetten: {0}',
                 'bg.source': 'Achtergrondbron', 'bg.source.image': 'Afbeelding', 'bg.source.gradient': 'Verloop', 'bg.source.solid': 'Effen kleur', 'bg.source.collage': 'Postercollage van dit doel', 'bg.collage.density': 'Collagedichtheid', 'bg.collage.sparse': 'Dun', 'bg.collage.medium': 'Gemiddeld', 'bg.collage.dense': 'Dicht', 'bg.collage.shuffle': 'Schudden', 'bg.collage.livetv': 'Live TV heeft geen posters voor een collage.',
                 'tpl.load': 'Sjabloon laden', 'tpl.delete': 'Verwijderen', 'tpl.save': 'Huidig ontwerp opslaan', 'tpl.savebtn': 'Opslaan', 'tpl.nameph': 'Sjabloonnaam', 'tpl.hint': 'Sjablonen bewaren het ontwerp maar niet de titel — elk doel houdt zijn eigen naam.', 'tpl.saved': 'Sjabloon opgeslagen.', 'tpl.named': 'Voer eerst een sjabloonnaam in.',
                 'batch.hint': 'Pas het huidige ontwerp (of geladen sjabloon) in één keer toe op meerdere doelen. Elke cover krijgt de naam van zijn doel als titel.', 'batch.apply': 'Toepassen op selectie', 'batch.none': 'Selecteer minstens één doel.', 'batch.running': 'Bezig met toepassen…', 'batch.done': 'Klaar: {0} gelukt, {1} mislukt.',
@@ -1050,6 +1055,7 @@
                 'dyn.uploadFail': 'Error al subir: {0}', 'dyn.fontFail': 'Error al subir la fuente: {0}',
                 'dyn.unknown': 'error desconocido',
                 'restore.button': 'Restaurar la carátula original', 'restore.none': 'Aún no hay copia de seguridad', 'restore.available': 'Existe una copia de seguridad', 'restore.done': 'Carátula original restaurada.', 'restore.fail': 'No se ha encontrado ninguna copia de seguridad que restaurar.',
+                'restore.reset': 'Restablecer copia de seguridad', 'restore.resetConfirm': '¿Eliminar la copia de seguridad actual? La próxima vez que apliques, la carátula que muestre este destino en ese momento se guardará como el nuevo original, salvo que sea la última carátula aplicada por este complemento.', 'restore.resetDone': 'Copia de seguridad eliminada. La próxima vez que apliques, la carátula actual se guardará como el nuevo original.', 'restore.resetFail': 'No se pudo restablecer la copia de seguridad: {0}',
                 'bg.source': 'Origen del fondo', 'bg.source.image': 'Imagen', 'bg.source.gradient': 'Degradado', 'bg.source.solid': 'Color sólido', 'bg.source.collage': 'Collage de pósteres de este destino', 'bg.collage.density': 'Densidad del collage', 'bg.collage.sparse': 'Baja', 'bg.collage.medium': 'Media', 'bg.collage.dense': 'Alta', 'bg.collage.shuffle': 'Barajar', 'bg.collage.livetv': 'La TV en directo no tiene pósteres para hacer un collage.',
                 'tpl.load': 'Cargar plantilla', 'tpl.delete': 'Eliminar', 'tpl.save': 'Guardar el diseño actual', 'tpl.savebtn': 'Guardar', 'tpl.nameph': 'Nombre de la plantilla', 'tpl.hint': 'Las plantillas guardan el diseño pero no el título — cada destino conserva su propio nombre.', 'tpl.saved': 'Plantilla guardada.', 'tpl.named': 'Introduce primero un nombre de plantilla.',
                 'batch.hint': 'Aplica el diseño actual (o la plantilla cargada) a varios destinos a la vez. Cada carátula se titula con el nombre de su destino.', 'batch.apply': 'Aplicar a la selección', 'batch.none': 'Selecciona al menos un destino.', 'batch.running': 'Aplicando…', 'batch.done': 'Listo: {0} correctas, {1} fallidas.',
@@ -1156,6 +1162,18 @@
         }
 
         function el(id) { return page.querySelector('#' + id); }
+
+        // Promise<boolean>. Jellyfin's own themed confirm dialog when the dashboard exposes
+        // it (Dashboard.confirm(message, title, callback)), the browser's otherwise.
+        function confirmAction(message) {
+            return new Promise(function (resolve) {
+                if (window.Dashboard && typeof Dashboard.confirm === 'function') {
+                    try { Dashboard.confirm(message, '', function (ok) { resolve(!!ok); }); return; }
+                    catch (e) { /* fall through to the browser dialog */ }
+                }
+                resolve(window.confirm(message));
+            });
+        }
 
         // --- Step accordion -----------------------------------------------
         // Owns .ccaStepBody and NOTHING else. Every other visibility helper
@@ -3274,12 +3292,15 @@
         // Refreshes the Restore button state for the currently selected target.
         function refreshRestoreState() {
             var btn = el('ccaRestoreBtn');
+            var reset = el('ccaResetBackupBtn');
             var hint = el('ccaRestoreHint');
             if (!btn) { return; }
-            if (!state.libraryId) { btn.disabled = true; hint.textContent = t('restore.none'); return; }
+            if (!state.libraryId) { btn.disabled = true; reset.disabled = true; hint.textContent = t('restore.none'); return; }
             jsonFetch('CustomCoverArt/targets/' + encodeURIComponent(state.libraryId) + '/backup').then(function (res) {
                 var has = pick(res, 'Success') && pick(res, 'Data');
+                // Reset is only meaningful when there is a backup to throw away.
                 btn.disabled = !has;
+                reset.disabled = !has;
                 hint.textContent = has ? t('restore.available') : t('restore.none');
             });
         }
@@ -3599,6 +3620,9 @@
                 Dashboard.hideLoadingMsg();
                 if (pick(res, 'Success')) {
                     Dashboard.alert(t('dyn.applied'));
+                    // Applying backs the previous cover up, so Restore and Reset may have just
+                    // become available.
+                    refreshRestoreState();
                 } else {
                     Dashboard.alert(t('dyn.error', pick(res, 'ErrorMessage') || t('dyn.unknown')));
                 }
@@ -3658,6 +3682,22 @@
                     .then(function (res) {
                         Dashboard.alert(pick(res, 'Success') ? t('restore.done') : t('restore.fail'));
                     });
+            });
+
+            el('ccaResetBackupBtn').addEventListener('click', function () {
+                if (!state.libraryId) { return; }
+                var id = state.libraryId;
+                confirmAction(t('restore.resetConfirm')).then(function (ok) {
+                    if (!ok) { return; }
+                    return jsonFetch('CustomCoverArt/targets/' + encodeURIComponent(id) + '/backup', 'DELETE')
+                        .then(function (res) {
+                            Dashboard.alert(pick(res, 'Success')
+                                ? t('restore.resetDone')
+                                : t('restore.resetFail', pick(res, 'ErrorMessage') || t('dyn.unknown')));
+                        })
+                        .catch(function (e) { Dashboard.alert(t('restore.resetFail', e.message)); })
+                        .then(refreshRestoreState);
+                });
             });
             // --- Text card: drives the SELECTED text layer ----------------
             el('ccaTitle').addEventListener('input', function () {

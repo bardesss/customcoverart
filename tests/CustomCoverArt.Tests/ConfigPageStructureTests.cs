@@ -35,6 +35,27 @@ public class ConfigPageStructureTests
         return page.Substring(0, scriptAt);
     }
 
+    // Body of a top-level `function name(` in the page script (8-space indent), up to its
+    // closing brace.
+    private static string FunctionBody(string page, string name)
+    {
+        var start = page.IndexOf("function " + name + "(", System.StringComparison.Ordinal);
+        Assert.True(start > 0, $"function {name} not found.");
+        var end = page.IndexOf("\n        }", start, System.StringComparison.Ordinal);
+        Assert.True(end > start, $"Could not find the end of {name}.");
+        return page.Substring(start, end - start);
+    }
+
+    // Body of an event handler registered inside bindEvents (12-space indent).
+    private static string HandlerBody(string page, string anchor)
+    {
+        var start = page.IndexOf(anchor, System.StringComparison.Ordinal);
+        Assert.True(start > 0, $"{anchor} not found.");
+        var end = page.IndexOf("\n            });", start, System.StringComparison.Ordinal);
+        Assert.True(end > start, $"Could not find the end of {anchor}.");
+        return page.Substring(start, end - start);
+    }
+
     // Every cca* element id present at the start of the guided-editor restructure, minus
     // ccaPreviewSpinner (dead since Phase 1, removed here) and ccaGradient (replaced by the
     // background source dropdown). Add to this list when you add a control; never remove
@@ -69,7 +90,8 @@ public class ConfigPageStructureTests
         "ccaSettings", "ccaShadow", "ccaSwatches", "ccaTargetType", "ccaTemplateDelete",
         "ccaTemplateName", "ccaTemplateSave", "ccaTemplateSelect", "ccaTextAlign", "ccaTextColor",
         "ccaContexts", "ccaTextSize", "ccaTextSizeVal", "ccaTextWeight", "ccaTitle", "ccaUndo", "ccaRedo",
-        "ccaUploadControls", "ccaWidth"
+        "ccaUploadControls", "ccaWidth",
+        "ccaResetBackupBtn"
     };
 
     /// <summary>
@@ -203,5 +225,38 @@ public class ConfigPageStructureTests
         var page = ConfigPage();
         Assert.DoesNotContain(".tif", page, System.StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("TIFF", page);
+    }
+
+    /// <summary>
+    /// Reset backup deletes the target's restore point, so it must ask first, call the
+    /// server's DELETE route, and leave both buttons in step with what is left.
+    /// </summary>
+    [Fact]
+    public void ResetBackup_AsksFirst_DeletesTheBackup_AndRefreshesTheButtons()
+    {
+        var page = ConfigPage();
+        Assert.Contains("data-i18n=\"restore.reset\"", Markup(), System.StringComparison.Ordinal);
+
+        var handler = HandlerBody(page, "el('ccaResetBackupBtn').addEventListener('click'");
+        Assert.Contains("confirmAction(t('restore.resetConfirm'))", handler, System.StringComparison.Ordinal);
+        Assert.Contains("'/backup', 'DELETE')", handler, System.StringComparison.Ordinal);
+        Assert.Contains(".then(refreshRestoreState)", handler, System.StringComparison.Ordinal);
+
+        Assert.Contains("ccaResetBackupBtn", FunctionBody(page, "refreshRestoreState"), System.StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ConfirmAction_UsesJellyfinsDialog_WithTheBrowsersAsFallback()
+    {
+        var body = FunctionBody(ConfigPage(), "confirmAction");
+        Assert.Contains("Dashboard.confirm(", body, System.StringComparison.Ordinal);
+        Assert.Contains("window.confirm(", body, System.StringComparison.Ordinal);
+    }
+
+    /// <summary>The first apply creates the backup, so Restore and Reset come alive right away.</summary>
+    [Fact]
+    public void ApplyingRefreshesTheRestoreButtons()
+    {
+        Assert.Contains("refreshRestoreState();", FunctionBody(ConfigPage(), "applyCoverArt"), System.StringComparison.Ordinal);
     }
 }
