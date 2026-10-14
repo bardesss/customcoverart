@@ -442,10 +442,10 @@ public static class DocumentRenderer
         var fontPixelSize = Math.Clamp(layer.Size * doc.Canvas.Height, 8f, 1024f);
         var font = CreateFont(layer, fontPixelSize);
 
-        // Per-layer opacity folded into every colour this layer draws with. The client
-        // canvas sets ctx.globalAlpha once per layer and then strokes/fills separately,
-        // so alpha-per-element is the matching behaviour (outline and fill each fade
-        // independently rather than being flattened first).
+        // Per-layer opacity. The client sets ctx.globalAlpha once per layer and composites
+        // each canvas operation (shadow, stroke, fill) separately under it, so every element
+        // fades on its own rather than being flattened first. The shadow and the fill are
+        // single draws here too, so they carry the opacity in their colour.
         var opacity = Math.Clamp(layer.Opacity, 0f, 1f);
         var textColor = SafeColor(layer.Color, Color.White).WithAlpha(opacity);
 
@@ -462,8 +462,7 @@ public static class DocumentRenderer
 
         // Rotation pivots on the layer's own anchor, matching the client's
         // translate/rotate around (X*W, Y*H). Set on the drawing context (not the
-        // image) so it applies to this layer's passes only — which is also why every
-        // pass below shares ONE Mutate block.
+        // image) so it applies to this layer's passes only.
         var rotate = layer.Rotation != 0f
             ? System.Numerics.Matrix3x2.CreateRotation(
                 (float)(layer.Rotation * Math.PI / 180.0),
@@ -474,74 +473,120 @@ public static class DocumentRenderer
         // the legacy CoverArtSettings.TextShadowOffsetX/Y clamp.
         var shadowColor = SafeColor(layer.Shadow.Color, Color.Black).WithAlpha(opacity);
         var shadowBlur = Math.Clamp(layer.Shadow.Blur, 0, 50);
+        var shadowDx = Math.Clamp(layer.Shadow.OffsetX, -50, 50);
+        var shadowDy = Math.Clamp(layer.Shadow.OffsetY, -50, 50);
         var shadowOptions = new RichTextOptions(font)
         {
-            Origin = new PointF(
-                textPosition.X + Math.Clamp(layer.Shadow.OffsetX, -50, 50),
-                textPosition.Y + Math.Clamp(layer.Shadow.OffsetY, -50, 50)),
+            Origin = new PointF(textPosition.X + shadowDx, textPosition.Y + shadowDy),
             HorizontalAlignment = textOptions.HorizontalAlignment,
             VerticalAlignment = textOptions.VerticalAlignment
         };
+        var shadowTransform = ShadowTransform(rotate, shadowDx, shadowDy);
 
-        // A blurred shadow needs its own surface: blurring has to happen before the glyphs
-        // are drawn on top, and it must not blur whatever is already on the canvas. Done
-        // OUTSIDE the main Mutate block below because that block sets the rotation
-        // transform — the scratch surface already has the rotation baked in, and drawing
-        // it through the transform as well would rotate the shadow twice.
-        if (layer.Shadow.Enabled && shadowBlur > 0)
+        // The shadow is drawn first, in its own step, so it sits beneath the outline and the fill.
+        if (layer.Shadow.Enabled)
         {
-            using var shadowSurface = new Image<Rgba32>(canvas.Width, canvas.Height);
-            shadowSurface.Mutate(sc =>
+            if (shadowBlur > 0)
             {
-                if (!rotate.IsIdentity) { sc.SetDrawingTransform(rotate); }
-                sc.DrawText(shadowOptions, layer.Content, shadowColor);
-            });
-            shadowSurface.Mutate(sc => sc.GaussianBlur(shadowBlur));
-            canvas.Mutate(x => x.DrawImage(shadowSurface, Point.Empty, 1f));
+                // A blurred shadow needs its own surface: blurring has to happen before the
+                // glyphs are drawn on top, and it must not blur whatever is already on the canvas.
+                using var shadowSurface = new Image<Rgba32>(canvas.Width, canvas.Height);
+                shadowSurface.Mutate(sc =>
+                {
+                    if (!shadowTransform.IsIdentity) { sc.SetDrawingTransform(shadowTransform); }
+                    sc.DrawText(shadowOptions, layer.Content, shadowColor);
+                });
+                // Canvas shadowBlur is NOT a sigma: the HTML spec defines the shadow Gaussian's
+                // standard deviation as shadowBlur / 2, while ImageSharp's GaussianBlur takes the
+                // sigma itself. Passing Blur straight through made every server shadow twice as
+                // soft as the preview.
+                shadowSurface.Mutate(sc => sc.GaussianBlur(shadowBlur / 2f));
+                canvas.Mutate(x => x.DrawImage(shadowSurface, Point.Empty, 1f));
+            }
+            else
+            {
+                // An unblurred shadow is a plain offset copy.
+                canvas.Mutate(ctx =>
+                {
+                    if (!shadowTransform.IsIdentity) { ctx.SetDrawingTransform(shadowTransform); }
+                    ctx.DrawText(shadowOptions, layer.Content, shadowColor);
+                });
+            }
         }
 
-        canvas.Mutate(ctx =>
+        // Outline. The canvas strokes the glyph contours ONCE (lineWidth = 2 × Width, round
+        // joins) under globalAlpha. The server builds the same silhouette by dilation: the
+        // glyphs drawn at every integer offset inside a disc of radius Width, which is exactly
+        // the outer edge of a round-joined stroke that wide. Those are up to 316 separate
+        // draws, though, and drawing each at the layer opacity stacked them back up to opaque.
+        // So the passes go OPAQUE onto their own transparent Rgba32 surface, and that surface
+        // is composited once at the layer opacity.
+        //
+        // Why dilation rather than one stroked Pen: at the default opacity of 1 this keeps
+        // every existing outline exactly as it rendered before, except that its outer corners
+        // are now round (like the preview) instead of square. A Pen stroke would re-derive
+        // every outline from ImageSharp's stroker, a new geometry for every outlined cover.
+        // One known difference remains: under a semi-transparent fill, the canvas stroke covers
+        // only a Width-px band inside the glyph edge, while the dilation covers the whole
+        // interior. Punching the glyphs out of the surface would fix that, but at full
+        // opacity it leaves a background-coloured fringe along every antialiased edge.
+        var outlineWidth = layer.Outline.Enabled ? Math.Clamp(layer.Outline.Width, 0, 10) : 0;
+        if (outlineWidth > 0)
         {
-            if (!rotate.IsIdentity)
+            var outlineColor = SafeColor(layer.Outline.Color, Color.Black).WithAlpha(1f);
+            var reach = outlineWidth * outlineWidth;
+            using var outlineSurface = new Image<Rgba32>(canvas.Width, canvas.Height);
+            outlineSurface.Mutate(oc =>
             {
-                ctx.SetDrawingTransform(rotate);
-            }
+                if (!rotate.IsIdentity) { oc.SetDrawingTransform(rotate); }
 
-            // An unblurred shadow is a plain offset copy, drawn first so it sits beneath
-            // the outline and the fill.
-            if (layer.Shadow.Enabled && shadowBlur <= 0)
-            {
-                ctx.DrawText(shadowOptions, layer.Content, shadowColor);
-            }
-
-            if (layer.Outline.Enabled)
-            {
-                var outlineColor = SafeColor(layer.Outline.Color, Color.Black).WithAlpha(opacity);
-                var outlineWidth = Math.Clamp(layer.Outline.Width, 0, 10);
-
-                // Draw outline by drawing text multiple times with slight offsets
-                for (int x = -outlineWidth; x <= outlineWidth; x++)
+                for (var x = -outlineWidth; x <= outlineWidth; x++)
                 {
-                    for (int y = -outlineWidth; y <= outlineWidth; y++)
+                    for (var y = -outlineWidth; y <= outlineWidth; y++)
                     {
-                        if (x == 0 && y == 0) continue;
+                        if ((x == 0 && y == 0) || x * x + y * y > reach) { continue; }
 
-                        var outlinePosition = new PointF(textPosition.X + x, textPosition.Y + y);
                         var outlineOptions = new RichTextOptions(font)
                         {
-                            Origin = outlinePosition,
+                            Origin = new PointF(textPosition.X + x, textPosition.Y + y),
                             HorizontalAlignment = textOptions.HorizontalAlignment,
                             VerticalAlignment = textOptions.VerticalAlignment
                         };
-
-                        ctx.DrawText(outlineOptions, layer.Content, outlineColor);
+                        oc.DrawText(outlineOptions, layer.Content, outlineColor);
                     }
                 }
-            }
+            });
+            canvas.Mutate(c => c.DrawImage(outlineSurface, Point.Empty, opacity));
+        }
 
-            // Draw main text
+        // Main text, a single draw at the layer opacity.
+        canvas.Mutate(ctx =>
+        {
+            if (!rotate.IsIdentity) { ctx.SetDrawingTransform(rotate); }
             ctx.DrawText(textOptions, layer.Content, textColor);
         });
+    }
+
+    /// <summary>
+    /// Drawing transform for a text layer's shadow. The canvas preview offsets a shadow in
+    /// SCREEN space: per the HTML canvas spec, shadowOffsetX/Y "are not affected by the
+    /// current transformation matrix", so a rotated layer's shadow still falls the way the
+    /// offset says on screen. The shadow's RichTextOptions.Origin already carries the offset
+    /// (dx, dy) in the layer's frame, so this undoes it, rotates about the anchor, and
+    /// re-applies it after the rotation. System.Numerics uses row vectors, so
+    /// <c>A * B</c> applies A first: T(-d), then R, then T(+d). An unrotated layer gets
+    /// identity, which keeps the plain offset-origin draw byte-identical to before.
+    /// </summary>
+    public static System.Numerics.Matrix3x2 ShadowTransform(System.Numerics.Matrix3x2 rotate, float dx, float dy)
+    {
+        if (rotate.IsIdentity)
+        {
+            return System.Numerics.Matrix3x2.Identity;
+        }
+
+        return System.Numerics.Matrix3x2.CreateTranslation(-dx, -dy)
+            * rotate
+            * System.Numerics.Matrix3x2.CreateTranslation(dx, dy);
     }
 
     /// <summary>
