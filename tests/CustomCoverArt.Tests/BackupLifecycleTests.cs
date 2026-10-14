@@ -143,6 +143,79 @@ public class BackupLifecycleTests : IDisposable
         Assert.False(Directory.Exists(BackupDir(h, "N")));
     }
 
+    // --- E3: reset backup ---------------------------------------------------------------
+
+    [Fact]
+    public void IsInside_IsTrueOnlyBelowTheDirectory()
+    {
+        var dir = Path.Combine(_dataDir, "customcoverart", "backups", "abc");
+        Assert.True(PluginPaths.IsInside(dir, Path.Combine(dir, "original.png")));
+        Assert.False(PluginPaths.IsInside(dir, dir + "def" + Path.DirectorySeparatorChar + "original.png"));
+        Assert.False(PluginPaths.IsInside(dir, Path.Combine(dir, "..", "other", "original.png")));
+        Assert.False(PluginPaths.IsInside(dir, ""));
+    }
+
+    [Fact]
+    public void Reset_DeletesTheTargetsBackupInBothSpellings_AndNothingElse()
+    {
+        var h = NewHost();
+        WriteFile(Path.Combine(BackupDir(h, "N"), "original.png"), new byte[] { 1 });
+        WriteFile(Path.Combine(BackupDir(h, "D"), "original.png"), new byte[] { 2 });
+        var sibling = WriteFile(Path.Combine(PluginPaths.Backups(h.Paths), Guid.NewGuid().ToString("N"), "original.png"), new byte[] { 3 });
+        var stray = WriteFile(Path.Combine(PluginPaths.Backups(h.Paths), "readme.txt"), new byte[] { 4 });
+        var applied = WriteFile(Path.Combine(PluginPaths.Base(h.Paths), "applied", h.Item.Id.ToString("N") + ".sha256"), new byte[] { 5 });
+
+        Assert.Equal(BackupResetOutcome.Deleted, h.Svc.ResetBackup(h.Item.Id.ToString("D")));
+
+        Assert.False(Directory.Exists(BackupDir(h, "N")));
+        Assert.False(Directory.Exists(BackupDir(h, "D")));
+        Assert.True(File.Exists(sibling));
+        Assert.True(File.Exists(stray));
+        Assert.True(File.Exists(applied));
+        Assert.False(h.Svc.HasBackup(h.Item.Id.ToString()));
+    }
+
+    [Fact]
+    public void Reset_WithoutABackup_ReportsNoBackup()
+    {
+        var h = NewHost();
+        Assert.Equal(BackupResetOutcome.NoBackup, h.Svc.ResetBackup(h.Item.Id.ToString("N")));
+    }
+
+    /// <summary>
+    /// A restore made before 4.0.2.0 pointed the item straight at the backup file. Deleting
+    /// the folder then would delete the image the target is showing.
+    /// </summary>
+    [Fact]
+    public void Reset_RefusesWhileTheTargetShowsTheBackupFileItself()
+    {
+        var h = NewHost();
+        var backup = WriteFile(Path.Combine(BackupDir(h, "N"), "original.png"), new byte[] { 1 });
+        h.Item.SetImage(new ItemImageInfo { Path = backup, Type = ImageType.Primary }, 0);
+
+        Assert.Equal(BackupResetOutcome.InUse, h.Svc.ResetBackup(h.Item.Id.ToString("N")));
+        Assert.True(File.Exists(backup));
+    }
+
+    [Fact]
+    public async Task Reset_ThenApply_SavesTheThenCurrentCoverAsTheNewOriginal()
+    {
+        var h = NewHost();
+        WriteFile(Path.Combine(BackupDir(h, "N"), "original.png"), new byte[] { 1 }); // a wrong backup, e.g. an early test cover
+        ShowForeignImage(h, new byte[] { 8, 8 });                                     // the cover the user set in the dashboard
+
+        Assert.Equal(BackupResetOutcome.Deleted, h.Svc.ResetBackup(h.Item.Id.ToString("N")));
+        Assert.Equal(BackupOutcome.BackedUp, await h.Svc.BackupCurrentCoverArtAsync(h.Item.Id.ToString("N")));
+        Assert.Equal(new byte[] { 8, 8 }, File.ReadAllBytes(Path.Combine(BackupDir(h, "N"), "original.jpg")));
+    }
+
+    [Fact]
+    public void Reset_RejectsAMalformedId()
+    {
+        var h = NewHost();
+        Assert.Throws<ArgumentException>(() => h.Svc.ResetBackup("../x"));
+    }
+
     public void Dispose()
     {
         try { if (Directory.Exists(_dataDir)) Directory.Delete(_dataDir, true); } catch { }

@@ -31,6 +31,7 @@ public class LocalizationResourceTests
         "errors.suspicious_content",
         "errors.image_too_large",
         "errors.backup_failed",
+        "errors.backup_in_use",
     };
 
     private static Dictionary<string, string> Load(string code)
