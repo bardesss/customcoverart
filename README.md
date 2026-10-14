@@ -197,9 +197,10 @@ centre, text scales its font size) and a **knob above it to rotate**. Hold **Shi
 to keep a logo's proportions, or while rotating to snap to 15° steps. The **Opacity** and
 **Rotation** sliders apply to text and logos alike. Covers are capped at 40 layers.
 
-Text **shadow** and **outline** look the same in the preview and on the applied cover, including
-how soft the shadow is, semi-transparent text, and rotated layers (a shadow always falls the way
-its offset says on screen, however the text is turned). The in-context previews in step 5 scale
+Text **shadow** and **outline** in the preview closely match the applied cover, including how
+soft the shadow is, semi-transparent text, and rotated layers (a shadow always falls the way its
+offset says on screen, however the text is turned). A very thick outline on semi-transparent text
+can still look slightly different inside the letters. The in-context previews in step 5 scale
 text, shadow and outline down with the thumbnail. An uploaded font is drawn at its own weight;
 the weight control only applies to the bundled Noto Sans.
 
