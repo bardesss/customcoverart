@@ -94,4 +94,40 @@ public class TextEffectParityTests
         var expected = blur / 2.0;
         Assert.InRange(sigma, expected * 0.85, expected * 1.15);
     }
+
+    /// <summary>
+    /// Canvas shadow offsets "are not affected by the current transformation matrix" (HTML
+    /// spec), so in the preview a rotated layer's shadow still falls in screen space. The
+    /// server used to rotate the offset along with the text. Offsets here are perpendicular
+    /// to the line of text, so the shadow never slides under the glyphs and the centroid
+    /// shift is exactly the offset. Covers both the hard (Blur 0) and the blurred path.
+    /// </summary>
+    [Theory]
+    [InlineData(0f, 0, 40, 0)]
+    [InlineData(0f, 0, 40, 6)]
+    [InlineData(90f, 40, 0, 0)]
+    [InlineData(90f, 40, 0, 6)]
+    [InlineData(270f, 40, 0, 0)]
+    [InlineData(270f, 40, 0, 6)]
+    public void ShadowOffset_IsScreenSpace_OnRotatedLayers(float rotation, int dx, int dy, int blur)
+    {
+        using var img = Render(Doc(l =>
+        {
+            l.Rotation = rotation;
+            l.Shadow = new TextShadowSettings { Enabled = true, Color = "#ff0000", Blur = blur, OffsetX = dx, OffsetY = dy };
+        }));
+
+        var glyph = Moments(img, GlyphInk);
+        var shadow = Moments(img, ShadowInk);
+
+        Assert.InRange(shadow.Mx - glyph.Mx, dx - 2.0, dx + 2.0);
+        Assert.InRange(shadow.My - glyph.My, dy - 2.0, dy + 2.0);
+    }
+
+    /// <summary>Unrotated layers must keep the plain offset-origin path, byte for byte.</summary>
+    [Fact]
+    public void ShadowTransform_UnrotatedLayer_IsIdentity()
+    {
+        Assert.True(DocumentRenderer.ShadowTransform(System.Numerics.Matrix3x2.Identity, 7f, -3f).IsIdentity);
+    }
 }
