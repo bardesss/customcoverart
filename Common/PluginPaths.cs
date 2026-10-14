@@ -38,13 +38,20 @@ public static class PluginPaths
     /// paths that try to escape the sandbox (path-traversal / arbitrary read).
     /// </summary>
     public static bool IsInsideBase(IApplicationPaths paths, string candidatePath)
+        => IsInside(Base(paths), candidatePath);
+
+    /// <summary>
+    /// Returns true if <paramref name="candidatePath"/> resolves to a location strictly
+    /// inside <paramref name="directory"/> (".." segments are resolved first).
+    /// </summary>
+    public static bool IsInside(string directory, string candidatePath)
     {
         if (string.IsNullOrWhiteSpace(candidatePath))
         {
             return false;
         }
 
-        var baseFull = Path.GetFullPath(Base(paths))
+        var baseFull = Path.GetFullPath(directory)
             .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
             + Path.DirectorySeparatorChar;
 

@@ -303,6 +303,40 @@ public class LibraryDetectionService : ILibraryDetectionService
 
     public bool HasBackup(string libraryId) => ExistingBackupPath(libraryId) is not null;
 
+    public BackupResetOutcome ResetBackup(string targetId)
+    {
+        if (!Guid.TryParse(targetId, out var id))
+        {
+            throw new ArgumentException("Invalid target id", nameof(targetId));
+        }
+
+        var dirs = BackupDirs(id).Where(Directory.Exists).ToList();
+        if (dirs.Count == 0)
+        {
+            return BackupResetOutcome.NoBackup;
+        }
+
+        // A restore made before 4.0.2.0 pointed the item straight at the backup file: deleting
+        // the folder would delete the image the target is showing. Restoring once copies it
+        // into Jellyfin's store (SetPrimaryImageAsync detaches it first); then a reset works.
+        var current = _libraryManager.GetItemById<BaseItem>(id)?.GetImagePath(ImageType.Primary, 0);
+        if (current is { Length: > 0 } shown && dirs.Any(dir => PluginPaths.IsInside(dir, shown)))
+        {
+            _logger.LogWarning("Not resetting the cover backup of {TargetId}: the target is showing the backup file {Path}", targetId, shown);
+            return BackupResetOutcome.InUse;
+        }
+
+        // The applied-cover record is deliberately kept: without it, the next apply would back
+        // up the plugin's own cover as the "original" again.
+        foreach (var dir in dirs)
+        {
+            Directory.Delete(dir, recursive: true);
+            _logger.LogInformation("Deleted the cover backup of {TargetId} ({Folder})", targetId, dir);
+        }
+
+        return BackupResetOutcome.Deleted;
+    }
+
     public Task<BackupOutcome> BackupCurrentCoverArtAsync(string libraryId)
     {
         string? currentPath = null;

@@ -6,5 +6,6 @@
   "errors.too_many_uploads": "Demasiadas subidas. Inténtalo de nuevo dentro de un minuto.",
   "errors.suspicious_content": "El archivo contiene contenido sospechoso y ha sido rechazado",
   "errors.image_too_large": "La imagen es demasiado grande para procesarla. Usa una imagen más pequeña o una animación con menos fotogramas.",
-  "errors.backup_failed": "No se pudo hacer una copia de seguridad de la portada actual, así que se dejó sin cambios."
+  "errors.backup_failed": "No se pudo hacer una copia de seguridad de la portada actual, así que se dejó sin cambios.",
+  "errors.backup_in_use": "Esta copia de seguridad es la imagen que muestra ahora el destino. Restáurala primero y después restablece la copia de seguridad."
 }

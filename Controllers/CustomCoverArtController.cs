@@ -182,7 +182,7 @@ public class CustomCoverArtController : ControllerBase
 
         // Serialise applies per target: an interleaved prune would otherwise delete
         // the cover another apply has just made live.
-        var gate = ApplyLocks.GetOrAdd(libraryGuid, _ => new SemaphoreSlim(1, 1));
+        var gate = TargetLock(libraryGuid);
         await gate.WaitAsync().ConfigureAwait(false);
         try
         {
@@ -241,7 +241,12 @@ public class CustomCoverArtController : ControllerBase
         }
     }
 
-    private static readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, SemaphoreSlim> ApplyLocks = new();
+    // One lock per target, shared by apply, restore and backup reset: each reads and then
+    // replaces the target's cover or restore point, so two must never interleave (a reset
+    // landing between an apply's backup step and its save would lose the original).
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, SemaphoreSlim> TargetLocks = new();
+
+    private static SemaphoreSlim TargetLock(Guid id) => TargetLocks.GetOrAdd(id, _ => new SemaphoreSlim(1, 1));
 
     /// <summary>Whether a restore point (original cover backup) exists for a target.</summary>
     [HttpGet("targets/{id}/backup")]
@@ -262,11 +267,13 @@ public class CustomCoverArtController : ControllerBase
     [HttpPost("targets/{type}/{id}/restore")]
     public async Task<ApiResponse<bool>> RestoreOriginal(string id)
     {
-        if (!Guid.TryParse(id, out _))
+        if (!Guid.TryParse(id, out var targetGuid))
         {
             return Fail<bool>("Invalid target id");
         }
 
+        var gate = TargetLock(targetGuid);
+        await gate.WaitAsync().ConfigureAwait(false);
         try
         {
             var ok = await _libraryService.RestoreOriginalCoverArtAsync(id).ConfigureAwait(false);
@@ -276,6 +283,42 @@ public class CustomCoverArtController : ControllerBase
         {
             _logger.LogError(ex, "Failed to restore original cover for {Id}", id);
             return Fail<bool>("Failed to restore original cover.");
+        }
+        finally
+        {
+            gate.Release();
+        }
+    }
+
+    /// <summary>
+    /// Delete a target's restore point ("Reset backup"), so the next apply backs up whatever
+    /// the target shows then. Only ever touches <c>backups/&lt;that target&gt;</c>.
+    /// </summary>
+    [HttpDelete("targets/{id}/backup")]
+    public async Task<ApiResponse<bool>> ResetBackup(string id)
+    {
+        if (!Guid.TryParse(id, out var targetGuid))
+        {
+            return Fail<bool>("Invalid target id");
+        }
+
+        var gate = TargetLock(targetGuid);
+        await gate.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            var outcome = _libraryService.ResetBackup(id);
+            return outcome == BackupResetOutcome.InUse
+                ? Fail<bool>(_localizationService.GetString("errors.backup_in_use"))
+                : Success(true);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to reset the cover backup for {Id}", id);
+            return Fail<bool>("Failed to reset backup.");
+        }
+        finally
+        {
+            gate.Release();
         }
     }
 
