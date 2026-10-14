@@ -21,6 +21,13 @@ public interface ILibraryDetectionService
     /// <summary>Whether an original-cover restore point exists for a target.</summary>
     bool HasBackup(string libraryId);
 
+    /// <summary>
+    /// Deletes a target's restore point (in either id spelling) so the next apply backs up
+    /// whatever the target shows then. Touches nothing outside <c>backups/&lt;that target&gt;</c>.
+    /// Throws <see cref="ArgumentException"/> for a malformed id.
+    /// </summary>
+    BackupResetOutcome ResetBackup(string targetId);
+
     /// <summary>Restore a target's original (pre-plugin) primary image, if backed up.</summary>
     Task<bool> RestoreOriginalCoverArtAsync(string libraryId);
 }
@@ -38,6 +45,20 @@ public enum BackupOutcome
     /// <summary>The current image is not ours and could not be copied; replacing it
     /// could lose the original for good.</summary>
     Failed,
+}
+
+/// <summary>Result of <see cref="ILibraryDetectionService.ResetBackup"/>.</summary>
+public enum BackupResetOutcome
+{
+    /// <summary>The backup folder(s) were deleted.</summary>
+    Deleted,
+
+    /// <summary>There was no backup to delete.</summary>
+    NoBackup,
+
+    /// <summary>The target's current image IS the backup file (a pre-4.0.2.0 restore pointed
+    /// the item straight at it), so deleting it would blank the cover. Nothing was deleted.</summary>
+    InUse,
 }
 
 public interface ICoverArtService
