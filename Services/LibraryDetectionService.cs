@@ -259,30 +259,47 @@ public class LibraryDetectionService : ILibraryDetectionService
         _ => "image/png",
     };
 
-    // A GUID subfolder is the only valid backup location; validating here means a
-    // non-GUID targetId can never inject path segments even if a caller forgets to.
-    private string BackupPathFor(string targetId, string extension)
-        => Path.Combine(PluginPaths.Backups(_applicationPaths), NormalizeTargetId(targetId), "original" + extension);
+    // Backup folders are named after the target's GUID, and the id arrives in two spellings:
+    // libraries N-format (32 hex digits, from VirtualFolders' ItemId), collections, playlists
+    // and Live TV D-format (item.Id.ToString()). 4.0.2.0 wrote D-format folders but looked
+    // up the raw id, so a library's second apply found no backup, collided with the first
+    // one's file and was refused. Every backup path goes through here: new backups are
+    // written N-format (like CoverArtService.LibraryDir and the backups of earlier
+    // versions), and an existing backup is found in either spelling. Only ever built from a
+    // parsed GUID, so a target id can never inject path segments.
+    private IEnumerable<string> BackupDirs(Guid id)
+    {
+        var root = PluginPaths.Backups(_applicationPaths);
+        yield return Path.Combine(root, id.ToString("N"));
+        yield return Path.Combine(root, id.ToString("D"));
+    }
+
+    private string BackupPathFor(Guid id, string extension)
+        => Path.Combine(BackupDirs(id).First(), "original" + extension);
 
     private string? ExistingBackupPath(string targetId)
     {
-        if (!Guid.TryParse(targetId, out _))
+        if (!Guid.TryParse(targetId, out var id))
         {
             return null;
         }
 
-        var dir = Path.Combine(PluginPaths.Backups(_applicationPaths), targetId);
-        if (!Directory.Exists(dir))
+        foreach (var dir in BackupDirs(id))
         {
-            return null;
+            if (!Directory.Exists(dir))
+            {
+                continue;
+            }
+
+            var files = Directory.GetFiles(dir, "original.*");
+            if (files.Length > 0)
+            {
+                return files[0];
+            }
         }
 
-        var files = Directory.GetFiles(dir, "original.*");
-        return files.Length > 0 ? files[0] : null;
+        return null;
     }
-
-    private static string NormalizeTargetId(string targetId)
-        => Guid.TryParse(targetId, out var id) ? id.ToString() : throw new ArgumentException("Invalid target id", nameof(targetId));
 
     public bool HasBackup(string libraryId) => ExistingBackupPath(libraryId) is not null;
 
@@ -316,7 +333,7 @@ public class LibraryDetectionService : ILibraryDetectionService
                 return Task.FromResult(BackupOutcome.NotNeeded);
             }
 
-            var backupPath = BackupPathFor(libraryId, Path.GetExtension(currentPath));
+            var backupPath = BackupPathFor(id, Path.GetExtension(currentPath));
             Directory.CreateDirectory(Path.GetDirectoryName(backupPath)!);
             File.Copy(currentPath, backupPath, overwrite: false);
             return Task.FromResult(BackupOutcome.BackedUp);

@@ -18,8 +18,10 @@ namespace CustomCoverArt.Tests;
 /// <summary>
 /// Covers are handed to Jellyfin's own image pipeline (the dashboard's "upload image" path)
 /// instead of pointing the item at a file in the plugin's data dir. These tests set the
-/// static BaseItem.LibraryManager that UpdateToRepositoryAsync uses; no other test class does.
+/// static BaseItem.LibraryManager that UpdateToRepositoryAsync uses, as does
+/// BackupLifecycleTests; the shared collection keeps the two from running in parallel.
 /// </summary>
+[Collection("BaseItemStatics")]
 public class ProviderSaveImageTests : IDisposable
 {
     private readonly string _dataDir = Path.Combine(Path.GetTempPath(), "cca-provider-" + Guid.NewGuid().ToString("N"));
