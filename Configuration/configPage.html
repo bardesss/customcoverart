@@ -492,6 +492,7 @@
                             <canvas id="ccaCanvas" class="ccaCanvas" width="1400" height="1400" aria-label="Cover art canvas"></canvas>
                             <div id="ccaPreviewPlaceholder" class="ccaPreviewPlaceholder" data-i18n="preview.placeholder">The preview appears here automatically.</div>
                             <div id="ccaCollageSpinner" class="ccaSpinner" aria-hidden="true" hidden></div>
+                            <div id="ccaGifHolder" class="ccaGifHolder" aria-hidden="true"></div>
                         </div>
                         <div class="fieldDescription" id="ccaCollageHint" data-i18n="preview.collageFail" hidden>The collage preview could not be loaded. Use Show server render to see it.</div>
                         <div class="ccaActions ccaStickyApply">
@@ -842,6 +843,10 @@
         @media (prefers-reduced-motion: reduce) {
             #CustomCoverArtConfigPage .ccaSpinner { animation-duration: 2.4s; }
         }
+        /* Keeps an animated-GIF background in the document so the browser keeps advancing its
+           frames for the canvas to copy. 1px and nearly transparent: never actually seen. */
+        #CustomCoverArtConfigPage .ccaGifHolder { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: hidden; opacity: .01; pointer-events: none; }
+        #CustomCoverArtConfigPage .ccaGifHolder img { width: 1px; height: 1px; }
         #CustomCoverArtConfigPage .ccaActions { display: flex; flex-direction: column; gap: .6em; margin-top: 1em; }
         #CustomCoverArtConfigPage .ccaActions .emby-button { margin: 0; }
 
@@ -1489,6 +1494,82 @@
             showCollageHint(true);
         }
 
+        // --- Animated GIF background on the live canvas ----------------------------
+        // The canvas only repaints on edits, so an animated GIF background looked frozen.
+        // While the background bitmap is an animated GIF, repaint ~15 times a second, and
+        // only while the editor is on screen and the user has not asked for reduced motion.
+        // The flag lives on the <img> itself, so replacing or clearing bgImageEl anywhere
+        // ends the loop with no extra bookkeeping.
+        var GIF_FRAME_MS = 1000 / 15;
+        var _gifLoopId = 0;           // the ONE rAF handle; 0 = no loop running
+        var _gifLastPaint = 0;
+        var _reducedMotion = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
+
+        // Flags img once its bytes prove a multi-frame GIF (a still GIF never loops).
+        function watchForAnimatedGif(img, blob) {
+            if (!blob || !blob.arrayBuffer) { return; }
+            if (blob.type !== 'image/gif' && !/\.gif$/i.test(blob.name || '')) { return; }
+            blob.arrayBuffer().then(function (buf) {
+                if (isAnimatedGif(buf)) { img._ccaAnimatedGif = true; updateGifLoop(); }
+            }).catch(function () { /* detection is best-effort: the canvas just stays still */ });
+        }
+
+        // The canvas is laid out (its step and the page are shown) and the tab is visible.
+        function isEditorOnScreen() {
+            var cv = el('ccaCanvas');
+            return !document.hidden && !!cv && cv.offsetParent !== null;
+        }
+
+        function gifLoopWanted() {
+            return !!(bgImageEl && bgImageEl._ccaAnimatedGif)
+                && activeBgBitmap() === bgImageEl
+                && isEditorOnScreen()
+                && !(_reducedMotion && _reducedMotion.matches);
+        }
+
+        function gifTick(now) {
+            _gifLoopId = 0;
+            if (!gifLoopWanted()) { return; }
+            // Re-arm first: the render below calls updateGifLoop, which must see a live loop
+            // and not start a second one.
+            _gifLoopId = requestAnimationFrame(gifTick);
+            if (now - _gifLastPaint < GIF_FRAME_MS) { return; }
+            _gifLastPaint = now;
+            renderDocument(true);
+        }
+
+        function stopGifLoop() {
+            if (_gifLoopId) { cancelAnimationFrame(_gifLoopId); }
+            _gifLoopId = 0;
+        }
+
+        // Starts or stops the loop to match the current state; cheap, so it runs after every
+        // render and on every visibility or reduced-motion change.
+        function updateGifLoop() {
+            var gif = (bgImageEl && bgImageEl._ccaAnimatedGif) ? bgImageEl : null;
+            var holder = el('ccaGifHolder');
+            if (holder && holder.firstChild !== gif) {
+                holder.innerHTML = '';
+                if (gif) { holder.appendChild(gif); }
+            }
+            if (gifLoopWanted()) {
+                if (!_gifLoopId) { _gifLoopId = requestAnimationFrame(gifTick); }
+            } else {
+                stopGifLoop();
+            }
+        }
+
+        function bindGifLoopListeners() {
+            document.addEventListener('visibilitychange', updateGifLoop);
+            if (_reducedMotion) {
+                if (_reducedMotion.addEventListener) { _reducedMotion.addEventListener('change', updateGifLoop); }
+                else if (_reducedMotion.addListener) { _reducedMotion.addListener(updateGifLoop); }
+            }
+            // Leaving the page stops at once; pageshow's scheduleRender() restarts it.
+            page.addEventListener('pagehide', stopGifLoop);
+            page.addEventListener('viewhide', stopGifLoop);
+        }
+
         // Background pan/zoom mode (Task 9): when true, canvas drag/wheel/pinch
         // mutate doc.Background.Transform instead of selecting/dragging a text
         // layer. Toggled by the #ccaBgAdjust checkbox.
@@ -1717,7 +1798,8 @@
             if (typeof commit === 'function') { commit(); }
         }
 
-        function renderDocument() {
+        // animFrame: true when called by the animated-GIF loop (a repaint, not an edit).
+        function renderDocument(animFrame) {
             var cv = el('ccaCanvas');
             if (!cv) { return; }
             if (cv.width !== doc.Canvas.Width || cv.height !== doc.Canvas.Height) {
@@ -1754,15 +1836,23 @@
             // downloadPreview() clears the selection before exporting so it never bakes in.
             drawSelectionHandles(ctx, W, H);
 
-            // Keep the swatches and the in-context thumbnails in step with the design.
-            refreshPalette();
-            renderPreviewContexts();
+            // An animation frame only repaints. The swatches, thumbnails and buttons were
+            // brought up to date by the edit-driven render, and both refreshers are 300 ms
+            // debounces that 15 calls a second would starve.
+            if (!animFrame) {
+                // Keep the swatches and the in-context thumbnails in step with the design.
+                refreshPalette();
+                renderPreviewContexts();
 
-            var ph = el('ccaPreviewPlaceholder');
-            if (ph) { ph.style.display = 'none'; }
-            // The canvas always renders, so the export target is always available.
-            var dl = el('ccaDownloadBtn');
-            if (dl) { dl.disabled = false; }
+                var ph = el('ccaPreviewPlaceholder');
+                if (ph) { ph.style.display = 'none'; }
+                // The canvas always renders, so the export target is always available.
+                var dl = el('ccaDownloadBtn');
+                if (dl) { dl.disabled = false; }
+            }
+
+            // Starts or stops the animated-GIF repaint loop to match what is now on the canvas.
+            updateGifLoop();
         }
 
         // Background only — no layers, no effects, no selection chrome. Split out of
@@ -3790,6 +3880,8 @@
         }
 
         function bindEvents() {
+            // Document and media-query listeners for the GIF repaint loop (bindEvents runs once).
+            bindGifLoopListeners();
             el('ccaLibrarySelect').addEventListener('change', function () {
                 state.libraryId = this.value;
                 updateUI();
@@ -4114,6 +4206,7 @@
                         var img = new Image();
                         img.onload = function () { bgImageEl = img; scheduleRender(); };
                         img.src = URL.createObjectURL(file);
+                        watchForAnimatedGif(img, file);
                         maybeSwitchToAnimated(file);
                         scheduleRender();
                     } else {
@@ -4393,6 +4486,7 @@
                         var img = new Image();
                         img.onload = function () { bgImageEl = img; scheduleRender(); };
                         img.src = URL.createObjectURL(posterBlob);
+                        watchForAnimatedGif(img, posterBlob);
                         el('ccaSelectedBgName').textContent = name;
                         el('ccaSelectedBg').style.display = '';
                         scheduleRender();
