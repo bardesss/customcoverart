@@ -268,17 +268,19 @@ original. A cover you set in the dashboard after an earlier apply is replaced by
 as with Jellyfin's own upload.
 
 **Reset backup**, next to Restore, deletes the target's backup. It saves nothing itself: the next
-apply stores whatever cover the target shows at that moment as its new original. Use it when the
+apply stores the cover the target shows at that moment as its new original, unless it is a cover the plugin applied. Use it when the
 backup holds the wrong image, for example a test cover from before the first backup was made (your
 true original was overwritten by then, so Restore brings the test cover back). Do it in this order:
 first put the cover you want to keep back on the library, either by uploading it in the dashboard
-(**Edit images**) or by deleting the poster and refreshing metadata with *replace images*; then
+(**Edit images**) or by deleting the poster and refreshing metadata with *Replace existing images*; then
 press **Reset backup**; then apply. If the target still shows a cover the plugin made, the next
 apply does not save it, so no wrong original is stored. Covers applied by 4.0.2.0 are not
 recognised as plugin covers until one apply with 4.0.3.0 has happened.
 
-The backups live in the plugin's data folder under `customcoverart/backups`; in a Docker
-container with its config volume at `/config`, that is `/config/data/data/customcoverart/backups`.
+The backups live in `<Jellyfin data path>/customcoverart/backups`. For example, on the
+linuxserver.io Docker image (config volume `/config`) that is
+`/config/data/data/customcoverart/backups`, and on the official image it is
+`/config/data/customcoverart/backups`.
 Restores, backups and skipped backups are written to the Jellyfin log. Applies, restores and
 resets of the same target run one at a time.
 
