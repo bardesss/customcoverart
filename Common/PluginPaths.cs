@@ -32,6 +32,10 @@ public static class PluginPaths
     public static string Backups(IApplicationPaths paths) =>
         Path.Combine(Base(paths), "backups");
 
+    /// <summary>Per-target records (SHA-256) of the cover the plugin applied last.</summary>
+    public static string Applied(IApplicationPaths paths) =>
+        Path.Combine(Base(paths), "applied");
+
     /// <summary>
     /// Returns true if <paramref name="candidatePath"/> resolves to a location
     /// inside the plugin's base data directory. Used to reject client-supplied

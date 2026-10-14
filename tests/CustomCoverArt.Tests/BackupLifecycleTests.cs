@@ -216,6 +216,130 @@ public class BackupLifecycleTests : IDisposable
         Assert.Throws<ArgumentException>(() => h.Svc.ResetBackup("../x"));
     }
 
+    // --- E2: plugin covers are never the original; E4: say what happened -------------------
+
+    private static string AppliedRecord(Host h)
+        => Path.Combine(PluginPaths.Base(h.Paths), "applied", h.Item.Id.ToString("N") + ".sha256");
+
+    /// <summary>
+    /// After 4.0.2.0 an applied cover lives in Jellyfin's own store, outside our data dir, so
+    /// only the applied-cover record can tell it apart from the user's original.
+    /// </summary>
+    [Fact]
+    public async Task Backup_SkipsTheCoverThisPluginApplied()
+    {
+        var h = NewHost();
+        var id = h.Item.Id.ToString("N");
+        Assert.True(await h.Svc.UpdateLibraryCoverArtAsync(id, RenderedCover(h, new byte[] { 1, 2, 3 })));
+
+        Assert.Equal(BackupOutcome.NotNeeded, await h.Svc.BackupCurrentCoverArtAsync(id));
+        Assert.False(h.Svc.HasBackup(id));
+    }
+
+    /// <summary>
+    /// Jellyfin may re-encode what it is given (seen live: a restored poster.png differed from
+    /// its backup), so the record must hash the stored file, not our rendered source.
+    /// </summary>
+    [Fact]
+    public async Task TheAppliedRecord_HashesTheFileJellyfinStored_NotTheRenderedSource()
+    {
+        var h = NewHost(reencode: b => b.Concat(new byte[] { 0xFF }).ToArray());
+        var id = h.Item.Id.ToString("N");
+        var source = new byte[] { 1, 2, 3 };
+        Assert.True(await h.Svc.UpdateLibraryCoverArtAsync(id, RenderedCover(h, source)));
+
+        var record = File.ReadAllText(AppliedRecord(h)).Trim();
+        Assert.Equal(Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(h.StorePoster))), record);
+        Assert.NotEqual(Convert.ToHexString(SHA256.HashData(source)), record);
+        Assert.Equal(BackupOutcome.NotNeeded, await h.Svc.BackupCurrentCoverArtAsync(id));
+    }
+
+    [Fact]
+    public async Task Backup_SkipsAnImageInsideThePluginDataFolder()
+    {
+        var h = NewHost();
+        var ours = WriteFile(Path.Combine(PluginPaths.Generated(h.Paths), "Libraries", h.Item.Id.ToString("N"), "old.png"), new byte[] { 4 });
+        h.Item.SetImage(new ItemImageInfo { Path = ours, Type = ImageType.Primary }, 0);
+
+        Assert.Equal(BackupOutcome.NotNeeded, await h.Svc.BackupCurrentCoverArtAsync(h.Item.Id.ToString()));
+        Assert.False(h.Svc.HasBackup(h.Item.Id.ToString()));
+    }
+
+    /// <summary>
+    /// After a restore the target shows its original. If the record still claimed it, a
+    /// Reset backup followed by an apply would replace the original without a copy.
+    /// </summary>
+    [Fact]
+    public async Task Restore_ClearsTheAppliedRecord_SoTheRestoredOriginalCountsAsForeignAgain()
+    {
+        var h = NewHost();
+        var id = h.Item.Id.ToString("N");
+        ShowForeignImage(h, new byte[] { 5, 5 });
+        Assert.Equal(BackupOutcome.BackedUp, await h.Svc.BackupCurrentCoverArtAsync(id));
+        Assert.True(await h.Svc.UpdateLibraryCoverArtAsync(id, RenderedCover(h, new byte[] { 1 })));
+        Assert.True(File.Exists(AppliedRecord(h)));
+
+        Assert.True(await h.Svc.RestoreOriginalCoverArtAsync(id));
+
+        Assert.False(File.Exists(AppliedRecord(h)));
+        Assert.Equal(BackupResetOutcome.Deleted, h.Svc.ResetBackup(id));
+        Assert.Equal(BackupOutcome.BackedUp, await h.Svc.BackupCurrentCoverArtAsync(id));
+        Assert.Equal(new byte[] { 5, 5 }, File.ReadAllBytes(Directory.GetFiles(BackupDir(h, "N"), "original.*").Single()));
+    }
+
+    /// <summary>Reset must not undo E2: the cover the plugin applied last is still not an original.</summary>
+    [Fact]
+    public async Task Reset_KeepsTheAppliedRecord_SoAPluginCoverIsStillNotSavedAsTheOriginal()
+    {
+        var h = NewHost();
+        var id = h.Item.Id.ToString("N");
+        ShowForeignImage(h, new byte[] { 5 });
+        Assert.Equal(BackupOutcome.BackedUp, await h.Svc.BackupCurrentCoverArtAsync(id));
+        Assert.True(await h.Svc.UpdateLibraryCoverArtAsync(id, RenderedCover(h, new byte[] { 1 })));
+
+        Assert.Equal(BackupResetOutcome.Deleted, h.Svc.ResetBackup(id));
+
+        Assert.Equal(BackupOutcome.NotNeeded, await h.Svc.BackupCurrentCoverArtAsync(id));
+        Assert.False(h.Svc.HasBackup(id));
+    }
+
+    [Fact]
+    public async Task BackupAndRestore_SayWhatTheyDid()
+    {
+        var log = new CapturingLogger<LibraryDetectionService>();
+        var h = NewHost(log);
+        var id = h.Item.Id.ToString("N");
+        var foreign = ShowForeignImage(h, new byte[] { 5 });
+        var backup = Path.Combine(BackupDir(h, "N"), "original.jpg");
+
+        await h.Svc.BackupCurrentCoverArtAsync(id);
+        Assert.Contains(log.Entries, e => e.Level == LogLevel.Information
+            && e.Message.Contains("Backed up", StringComparison.Ordinal)
+            && e.Message.Contains(foreign, StringComparison.Ordinal)
+            && e.Message.Contains(backup, StringComparison.Ordinal));
+
+        Assert.True(await h.Svc.RestoreOriginalCoverArtAsync(id));
+        Assert.Contains(log.Entries, e => e.Level == LogLevel.Information
+            && e.Message.Contains("Restored", StringComparison.Ordinal)
+            && e.Message.Contains(id, StringComparison.Ordinal)
+            && e.Message.Contains(backup, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Backup_SaysWhyItSkippedAPluginCover()
+    {
+        var log = new CapturingLogger<LibraryDetectionService>();
+        var h = NewHost(log);
+        var id = h.Item.Id.ToString("N");
+        Assert.True(await h.Svc.UpdateLibraryCoverArtAsync(id, RenderedCover(h, new byte[] { 1 })));
+
+        await h.Svc.BackupCurrentCoverArtAsync(id);
+
+        Assert.Contains(log.Entries, e => e.Level == LogLevel.Information
+            && e.Message.Contains("Not backing up", StringComparison.Ordinal)
+            && e.Message.Contains("applied last", StringComparison.Ordinal));
+    }
+
     public void Dispose()
     {
         try { if (Directory.Exists(_dataDir)) Directory.Delete(_dataDir, true); } catch { }
