@@ -35,6 +35,27 @@ public class ConfigPageStructureTests
         return page.Substring(0, scriptAt);
     }
 
+    // Body of a top-level `function name(` in the page script (8-space indent), up to its
+    // closing brace.
+    private static string FunctionBody(string page, string name)
+    {
+        var start = page.IndexOf("function " + name + "(", System.StringComparison.Ordinal);
+        Assert.True(start > 0, $"function {name} not found.");
+        var end = page.IndexOf("\n        }", start, System.StringComparison.Ordinal);
+        Assert.True(end > start, $"Could not find the end of {name}.");
+        return page.Substring(start, end - start);
+    }
+
+    // Body of an event handler registered inside bindEvents (12-space indent).
+    private static string HandlerBody(string page, string anchor)
+    {
+        var start = page.IndexOf(anchor, System.StringComparison.Ordinal);
+        Assert.True(start > 0, $"{anchor} not found.");
+        var end = page.IndexOf("\n            });", start, System.StringComparison.Ordinal);
+        Assert.True(end > start, $"Could not find the end of {anchor}.");
+        return page.Substring(start, end - start);
+    }
+
     // Every cca* element id present at the start of the guided-editor restructure, minus
     // ccaPreviewSpinner (dead since Phase 1, removed here) and ccaGradient (replaced by the
     // background source dropdown). Add to this list when you add a control; never remove
@@ -69,7 +90,8 @@ public class ConfigPageStructureTests
         "ccaSettings", "ccaShadow", "ccaSwatches", "ccaTargetType", "ccaTemplateDelete",
         "ccaTemplateName", "ccaTemplateSave", "ccaTemplateSelect", "ccaTextAlign", "ccaTextColor",
         "ccaContexts", "ccaTextSize", "ccaTextSizeVal", "ccaTextWeight", "ccaTitle", "ccaUndo", "ccaRedo",
-        "ccaUploadControls", "ccaWidth"
+        "ccaUploadControls", "ccaWidth",
+        "ccaResetBackupBtn", "ccaCollageSpinner", "ccaCollageHint", "ccaGifHolder"
     };
 
     /// <summary>
@@ -203,5 +225,177 @@ public class ConfigPageStructureTests
         var page = ConfigPage();
         Assert.DoesNotContain(".tif", page, System.StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("TIFF", page);
+    }
+
+    /// <summary>
+    /// Reset backup deletes the target's restore point, so it must ask first, call the
+    /// server's DELETE route, and leave both buttons in step with what is left.
+    /// </summary>
+    [Fact]
+    public void ResetBackup_AsksFirst_DeletesTheBackup_AndRefreshesTheButtons()
+    {
+        var page = ConfigPage();
+        Assert.Contains("data-i18n=\"restore.reset\"", Markup(), System.StringComparison.Ordinal);
+
+        var handler = HandlerBody(page, "el('ccaResetBackupBtn').addEventListener('click'");
+        Assert.Contains("confirmAction(t('restore.resetConfirm'))", handler, System.StringComparison.Ordinal);
+        Assert.Contains("'/backup', 'DELETE')", handler, System.StringComparison.Ordinal);
+        Assert.Contains(".then(refreshRestoreState)", handler, System.StringComparison.Ordinal);
+
+        Assert.Contains("ccaResetBackupBtn", FunctionBody(page, "refreshRestoreState"), System.StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ConfirmAction_UsesJellyfinsDialog_WithTheBrowsersAsFallback()
+    {
+        var body = FunctionBody(ConfigPage(), "confirmAction");
+        Assert.Contains("Dashboard.confirm(", body, System.StringComparison.Ordinal);
+        Assert.Contains("window.confirm(", body, System.StringComparison.Ordinal);
+    }
+
+    /// <summary>The first apply creates the backup, so Restore and Reset come alive right away.</summary>
+    [Fact]
+    public void ApplyingRefreshesTheRestoreButtons()
+    {
+        Assert.Contains("refreshRestoreState();", FunctionBody(ConfigPage(), "applyCoverArt"), System.StringComparison.Ordinal);
+    }
+
+    /// <summary>A slow answer for a previous target must not enable the buttons of the current one.</summary>
+    [Fact]
+    public void RefreshRestoreState_IgnoresAnAnswerForAnotherTarget()
+    {
+        var body = FunctionBody(ConfigPage(), "refreshRestoreState");
+        Assert.Contains("var requestedId = state.libraryId;", body, System.StringComparison.Ordinal);
+        Assert.Contains("if (requestedId !== state.libraryId) { return; }", body, System.StringComparison.Ordinal);
+    }
+
+    /// <summary>Switching the collage's target drops the old target's posters at once.</summary>
+    [Fact]
+    public void CollageSourceChange_ReleasesTheCurrentMosaic()
+    {
+        var body = FunctionBody(ConfigPage(), "syncCollageBitmap");
+        Assert.Contains("_collageSourceId", body, System.StringComparison.Ordinal);
+        Assert.Contains("releaseCollageBitmap();", body, System.StringComparison.Ordinal);
+        Assert.Contains("var _collageSourceId", ConfigPage(), System.StringComparison.Ordinal);
+    }
+
+    /// <summary>A batch can include the selected target, so its buttons need a refresh afterwards.</summary>
+    [Fact]
+    public void BatchApply_RefreshesTheRestoreButtons()
+    {
+        var handler = HandlerBody(ConfigPage(), "el('ccaBatchApply').addEventListener('click'");
+        Assert.Contains("refreshRestoreState();", handler, System.StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The canvas draws dim, blur, pan/zoom, overlay, effects and layers itself. The server
+    /// must therefore return the bare mosaic only, or each would be applied twice.
+    /// </summary>
+    [Fact]
+    public void CollagePreview_AsksTheServerForTheBareMosaicOnly()
+    {
+        var body = FunctionBody(ConfigPage(), "collageRequestDocument");
+        foreach (var expected in new[]
+        {
+            "Layers: []", "Effects: defaultEffects()", "Overlay: null", "Gradient: null",
+            "Blur: 0, Dim: 0", "OffsetX: 0, OffsetY: 0, Scale: 1", "Format: 'png'",
+            "Collage: buildCollageFromControls()",
+        })
+        {
+            Assert.Contains(expected, body, System.StringComparison.Ordinal);
+        }
+    }
+
+    /// <summary>Each request is a full server-side collage, so only collage inputs may trigger one.</summary>
+    [Fact]
+    public void CollagePreview_IsKeyedOnTheCollageInputsAlone()
+    {
+        var page = ConfigPage();
+        var key = FunctionBody(page, "collageKey");
+        foreach (var input in new[] { "c.SourceId", "c.Density", "c.Seed", "doc.Canvas.Width", "doc.Canvas.Height" })
+        {
+            Assert.Contains(input, key, System.StringComparison.Ordinal);
+        }
+        foreach (var unrelated in new[] { "Layers", "Effects", "Transform", "Dim", "Blur" })
+        {
+            Assert.DoesNotContain(unrelated, key, System.StringComparison.Ordinal);
+        }
+
+        Assert.Contains("syncCollageBitmap();", FunctionBody(page, "renderDocument"), System.StringComparison.Ordinal);
+        Assert.Contains("debounce(fetchCollageBitmap, 400)", page, System.StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CollagePreview_DropsStaleAnswers_AndRevokesItsUrls()
+    {
+        var page = ConfigPage();
+        var fetch = FunctionBody(page, "fetchCollageBitmap");
+        Assert.Contains("token !== _collageToken", fetch, System.StringComparison.Ordinal);
+        Assert.Contains("URL.revokeObjectURL(url)", fetch, System.StringComparison.Ordinal);
+        Assert.Contains("URL.revokeObjectURL(_collageUrl)", FunctionBody(page, "releaseCollageBitmap"), System.StringComparison.Ordinal);
+        Assert.Contains("_collageToken++", FunctionBody(page, "syncCollageBitmap"), System.StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TheCanvasPaintsTheBitmapOfTheChosenSource()
+    {
+        var page = ConfigPage();
+        Assert.Contains("collageBgEl", FunctionBody(page, "activeBgBitmap"), System.StringComparison.Ordinal);
+        var paint = FunctionBody(page, "paintBackgroundOnly");
+        Assert.Contains("activeBgBitmap()", paint, System.StringComparison.Ordinal);
+        Assert.DoesNotContain("bgImageEl", paint, System.StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// One rAF loop at ~15 fps, only while an animated GIF is the visible background and the
+    /// user has not asked for reduced motion; every way of leaving stops it.
+    /// </summary>
+    [Fact]
+    public void GifPreview_RunsOneThrottledLoop_OnlyWhileItCanBeSeen()
+    {
+        var page = ConfigPage();
+        var wanted = FunctionBody(page, "gifLoopWanted");
+        Assert.Contains("_ccaAnimatedGif", wanted, System.StringComparison.Ordinal);
+        Assert.Contains("activeBgBitmap() === bgImageEl", wanted, System.StringComparison.Ordinal);
+        Assert.Contains("isEditorOnScreen()", wanted, System.StringComparison.Ordinal);
+        Assert.Contains("_reducedMotion", wanted, System.StringComparison.Ordinal);
+        Assert.Contains("matchMedia('(prefers-reduced-motion: reduce)')", page, System.StringComparison.Ordinal);
+        Assert.Contains("document.hidden", FunctionBody(page, "isEditorOnScreen"), System.StringComparison.Ordinal);
+
+        var update = FunctionBody(page, "updateGifLoop");
+        Assert.Contains("if (!_gifLoopId)", update, System.StringComparison.Ordinal);
+        Assert.Contains("stopGifLoop()", update, System.StringComparison.Ordinal);
+
+        var tick = FunctionBody(page, "gifTick");
+        Assert.Contains("GIF_FRAME_MS", tick, System.StringComparison.Ordinal);
+        Assert.Contains("renderDocument(true)", tick, System.StringComparison.Ordinal);
+        Assert.Contains("var GIF_FRAME_MS = 1000 / 15;", page, System.StringComparison.Ordinal);
+
+        var listeners = FunctionBody(page, "bindGifLoopListeners");
+        Assert.Contains("'visibilitychange'", listeners, System.StringComparison.Ordinal);
+        Assert.Contains("'pagehide'", listeners, System.StringComparison.Ordinal);
+        Assert.Contains("bindGifLoopListeners();", FunctionBody(page, "bindEvents"), System.StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The palette and in-context refreshers are 300 ms debounces: called 15 times a second
+    /// they would never fire, so animation frames must skip them.
+    /// </summary>
+    [Fact]
+    public void GifPreview_AnimationFramesSkipTheDebouncedExtras()
+    {
+        var render = FunctionBody(ConfigPage(), "renderDocument");
+        Assert.Contains("function renderDocument(animFrame)", render, System.StringComparison.Ordinal);
+        Assert.Contains("if (!animFrame)", render, System.StringComparison.Ordinal);
+        Assert.Contains("updateGifLoop();", render, System.StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void GifPreview_BothBackgroundPathsWatchForAnimation()
+    {
+        var page = ConfigPage();
+        Assert.Contains("watchForAnimatedGif(img, file);", page, System.StringComparison.Ordinal);
+        Assert.Contains("watchForAnimatedGif(img, posterBlob);", page, System.StringComparison.Ordinal);
+        Assert.Contains("isAnimatedGif(buf)", FunctionBody(page, "watchForAnimatedGif"), System.StringComparison.Ordinal);
     }
 }

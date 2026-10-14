@@ -32,19 +32,30 @@ public static class PluginPaths
     public static string Backups(IApplicationPaths paths) =>
         Path.Combine(Base(paths), "backups");
 
+    /// <summary>Per-target records (SHA-256) of the cover the plugin applied last.</summary>
+    public static string Applied(IApplicationPaths paths) =>
+        Path.Combine(Base(paths), "applied");
+
     /// <summary>
     /// Returns true if <paramref name="candidatePath"/> resolves to a location
     /// inside the plugin's base data directory. Used to reject client-supplied
     /// paths that try to escape the sandbox (path-traversal / arbitrary read).
     /// </summary>
     public static bool IsInsideBase(IApplicationPaths paths, string candidatePath)
+        => IsInside(Base(paths), candidatePath);
+
+    /// <summary>
+    /// Returns true if <paramref name="candidatePath"/> resolves to a location strictly
+    /// inside <paramref name="directory"/> (".." segments are resolved first).
+    /// </summary>
+    public static bool IsInside(string directory, string candidatePath)
     {
         if (string.IsNullOrWhiteSpace(candidatePath))
         {
             return false;
         }
 
-        var baseFull = Path.GetFullPath(Base(paths))
+        var baseFull = Path.GetFullPath(directory)
             .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
             + Path.DirectorySeparatorChar;
 

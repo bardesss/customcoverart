@@ -46,6 +46,9 @@
                             <button is="emby-button" type="button" id="ccaRestoreBtn" class="raised" disabled>
                                 <span data-i18n="restore.button">Restore original cover</span>
                             </button>
+                            <button is="emby-button" type="button" id="ccaResetBackupBtn" class="raised" disabled>
+                                <span data-i18n="restore.reset">Reset backup</span>
+                            </button>
                             <span class="ccaFileName" id="ccaRestoreHint" data-i18n="restore.none">No backup yet</span>
                         </div>
                         <div class="ccaStepGroup">
@@ -488,7 +491,10 @@
                         <div class="ccaPreviewWrap">
                             <canvas id="ccaCanvas" class="ccaCanvas" width="1400" height="1400" aria-label="Cover art canvas"></canvas>
                             <div id="ccaPreviewPlaceholder" class="ccaPreviewPlaceholder" data-i18n="preview.placeholder">The preview appears here automatically.</div>
+                            <div id="ccaCollageSpinner" class="ccaSpinner" aria-hidden="true" hidden></div>
+                            <div id="ccaGifHolder" class="ccaGifHolder" aria-hidden="true"></div>
                         </div>
+                        <div class="fieldDescription" id="ccaCollageHint" data-i18n="preview.collageFail" hidden>The collage preview could not be loaded. Use Show server render to see it.</div>
                         <div class="ccaActions ccaStickyApply">
                             <button is="emby-button" type="button" id="ccaApplyBtn" class="raised block button-submit" disabled><span data-i18n="action.apply">Apply to library</span></button>
                             <button is="emby-button" type="button" id="ccaServerRender" class="raised block"><span data-i18n="action.serverRender">Show server render</span></button>
@@ -837,6 +843,10 @@
         @media (prefers-reduced-motion: reduce) {
             #CustomCoverArtConfigPage .ccaSpinner { animation-duration: 2.4s; }
         }
+        /* Keeps an animated-GIF background in the document so the browser keeps advancing its
+           frames for the canvas to copy. 1px and nearly transparent: never actually seen. */
+        #CustomCoverArtConfigPage .ccaGifHolder { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: hidden; opacity: .01; pointer-events: none; }
+        #CustomCoverArtConfigPage .ccaGifHolder img { width: 1px; height: 1px; }
         #CustomCoverArtConfigPage .ccaActions { display: flex; flex-direction: column; gap: .6em; margin-top: 1em; }
         #CustomCoverArtConfigPage .ccaActions .emby-button { margin: 0; }
 
@@ -920,7 +930,7 @@
                 'hint.font': 'TTF, OTF, TTC, WOFF or WOFF2 · up to 5 MB. Leave empty to use the bundled Noto Sans.',
                 'card.preview': 'Preview', 'preview.placeholder': 'The preview appears here automatically.',
                 'bg.adjust': 'Reposition background (drag to pan, scroll or pinch to zoom)',
-                'action.apply': 'Apply to library', 'action.applying': 'Applying…', 'action.download': 'Download image', 'action.serverRender': 'Show server render', 'serverrender.label': 'Authoritative render (server)', 'preview.hint': 'The preview updates automatically as you adjust settings.',
+                'action.apply': 'Apply to library', 'action.applying': 'Applying…', 'action.download': 'Download image', 'action.serverRender': 'Show server render', 'serverrender.label': 'Authoritative render (server)', 'preview.hint': 'The preview updates automatically as you adjust settings.', 'preview.collageFail': 'The collage preview could not be loaded. Use Show server render to see it.',
                 'modal.title': 'Select a poster', 'modal.search': 'Search…', 'modal.alltypes': 'All types',
                 'ty.movies': 'Movies', 'ty.series': 'Series', 'ty.seasons': 'Seasons', 'ty.albums': 'Albums', 'ty.artists': 'Artists', 'ty.books': 'Books', 'ty.musicvideos': 'Music videos', 'ty.photos': 'Photos', 'modal.prev': 'Previous', 'modal.next': 'Next',
                 'dyn.loading': 'Loading…', 'dyn.errorItems': 'Error loading items', 'dyn.noItems': 'No items found', 'dyn.page': 'Page {0} of {1}',
@@ -928,6 +938,7 @@
                 'dyn.uploadFail': 'Upload failed: {0}', 'dyn.fontFail': 'Font upload failed: {0}',
                 'dyn.unknown': 'unknown error',
                 'restore.button': 'Restore original cover', 'restore.none': 'No backup yet', 'restore.available': 'A backup exists', 'restore.done': 'Original cover restored.', 'restore.fail': 'No backup found to restore.',
+                'restore.reset': 'Reset backup', 'restore.resetConfirm': 'Delete the current backup? Reset saves nothing by itself. The next apply stores the cover this target shows at that moment as the new original, unless it is a cover this plugin applied. So first put the cover you want to keep back on this target (Edit images, then upload it; or delete the poster and refresh metadata with "Replace existing images"), then reset, then apply.', 'restore.resetDone': 'Backup deleted. The next apply saves the current cover as the new original.', 'restore.resetFail': 'Could not reset the backup: {0}',
                 'bg.source': 'Background source', 'bg.source.image': 'Image', 'bg.source.gradient': 'Gradient', 'bg.source.solid': 'Solid colour', 'bg.source.collage': 'Poster collage from this target', 'bg.collage.density': 'Collage density', 'bg.collage.sparse': 'Sparse', 'bg.collage.medium': 'Medium', 'bg.collage.dense': 'Dense', 'bg.collage.shuffle': 'Shuffle', 'bg.collage.livetv': 'Live TV has no posters to collage.',
                 'tpl.load': 'Load template', 'tpl.delete': 'Delete', 'tpl.save': 'Save current design', 'tpl.savebtn': 'Save', 'tpl.nameph': 'Template name', 'tpl.hint': 'Templates store the design but not the title — each target keeps its own name.', 'tpl.saved': 'Template saved.', 'tpl.named': 'Enter a template name first.',
                 'batch.hint': 'Apply the current design (or loaded template) to several targets at once. Each cover is titled with its target\'s name.', 'batch.apply': 'Apply to selected', 'batch.none': 'Select at least one target.', 'batch.running': 'Applying…', 'batch.done': 'Done: {0} ok, {1} failed.',
@@ -981,7 +992,7 @@
                 'hint.font': 'TTF, OTF, TTC, WOFF of WOFF2 · max. 5 MB. Laat leeg voor de meegeleverde Noto Sans.',
                 'card.preview': 'Voorbeeld', 'preview.placeholder': 'Het voorbeeld verschijnt hier automatisch.',
                 'bg.adjust': 'Achtergrond verplaatsen (sleep om te verschuiven, scroll of knijp om te zoomen)',
-                'action.apply': 'Toepassen op bibliotheek', 'action.applying': 'Bezig met toepassen…', 'action.download': 'Afbeelding downloaden', 'action.serverRender': 'Serverweergave tonen', 'serverrender.label': 'Gezaghebbende weergave (server)', 'preview.hint': 'Het voorbeeld wordt automatisch bijgewerkt terwijl je instellingen aanpast.',
+                'action.apply': 'Toepassen op bibliotheek', 'action.applying': 'Bezig met toepassen…', 'action.download': 'Afbeelding downloaden', 'action.serverRender': 'Serverweergave tonen', 'serverrender.label': 'Gezaghebbende weergave (server)', 'preview.hint': 'Het voorbeeld wordt automatisch bijgewerkt terwijl je instellingen aanpast.', 'preview.collageFail': 'Het collagevoorbeeld kon niet worden geladen. Gebruik Serverweergave tonen om het te zien.',
                 'modal.title': 'Selecteer een poster', 'modal.search': 'Zoeken…', 'modal.alltypes': 'Alle types',
                 'ty.movies': 'Films', 'ty.series': 'Series', 'ty.seasons': 'Seizoenen', 'ty.albums': 'Albums', 'ty.artists': 'Artiesten', 'ty.books': 'Boeken', 'ty.musicvideos': 'Videoclips', 'ty.photos': 'Foto\'s', 'modal.prev': 'Vorige', 'modal.next': 'Volgende',
                 'dyn.loading': 'Laden…', 'dyn.errorItems': 'Fout bij laden van items', 'dyn.noItems': 'Geen items gevonden', 'dyn.page': 'Pagina {0} van {1}',
@@ -989,6 +1000,7 @@
                 'dyn.uploadFail': 'Uploaden mislukt: {0}', 'dyn.fontFail': 'Lettertype uploaden mislukt: {0}',
                 'dyn.unknown': 'onbekende fout',
                 'restore.button': 'Originele cover herstellen', 'restore.none': 'Nog geen back-up', 'restore.available': 'Er is een back-up', 'restore.done': 'Originele cover hersteld.', 'restore.fail': 'Geen back-up gevonden om te herstellen.',
+                'restore.reset': 'Back-up resetten', 'restore.resetConfirm': 'De huidige back-up verwijderen? Resetten bewaart zelf niets. Bij de volgende keer toepassen wordt de cover die dit doel op dat moment toont bewaard als het nieuwe origineel, tenzij het een cover is die deze plug-in heeft toegepast. Zet dus eerst de cover die je wilt houden terug op dit doel (Afbeeldingen bewerken en uploaden; of verwijder de poster en ververs de metadata met "bestaande afbeeldingen vervangen"), reset daarna en pas dan toe.', 'restore.resetDone': 'Back-up verwijderd. Bij de volgende keer toepassen wordt de huidige cover bewaard als het nieuwe origineel.', 'restore.resetFail': 'Kon de back-up niet resetten: {0}',
                 'bg.source': 'Achtergrondbron', 'bg.source.image': 'Afbeelding', 'bg.source.gradient': 'Verloop', 'bg.source.solid': 'Effen kleur', 'bg.source.collage': 'Postercollage van dit doel', 'bg.collage.density': 'Collagedichtheid', 'bg.collage.sparse': 'Dun', 'bg.collage.medium': 'Gemiddeld', 'bg.collage.dense': 'Dicht', 'bg.collage.shuffle': 'Schudden', 'bg.collage.livetv': 'Live TV heeft geen posters voor een collage.',
                 'tpl.load': 'Sjabloon laden', 'tpl.delete': 'Verwijderen', 'tpl.save': 'Huidig ontwerp opslaan', 'tpl.savebtn': 'Opslaan', 'tpl.nameph': 'Sjabloonnaam', 'tpl.hint': 'Sjablonen bewaren het ontwerp maar niet de titel — elk doel houdt zijn eigen naam.', 'tpl.saved': 'Sjabloon opgeslagen.', 'tpl.named': 'Voer eerst een sjabloonnaam in.',
                 'batch.hint': 'Pas het huidige ontwerp (of geladen sjabloon) in één keer toe op meerdere doelen. Elke cover krijgt de naam van zijn doel als titel.', 'batch.apply': 'Toepassen op selectie', 'batch.none': 'Selecteer minstens één doel.', 'batch.running': 'Bezig met toepassen…', 'batch.done': 'Klaar: {0} gelukt, {1} mislukt.',
@@ -1042,7 +1054,7 @@
                 'hint.font': 'TTF, OTF, TTC, WOFF o WOFF2 · hasta 5 MB. Déjalo vacío para usar la Noto Sans incluida.',
                 'card.preview': 'Vista previa', 'preview.placeholder': 'La vista previa aparecerá aquí automáticamente.',
                 'bg.adjust': 'Reposicionar el fondo (arrastra para desplazar, usa la rueda o pellizca para acercar)',
-                'action.apply': 'Aplicar a la biblioteca', 'action.applying': 'Aplicando…', 'action.download': 'Descargar imagen', 'action.serverRender': 'Mostrar el render del servidor', 'serverrender.label': 'Render de referencia (servidor)', 'preview.hint': 'La vista previa se actualiza automáticamente mientras ajustas los valores.',
+                'action.apply': 'Aplicar a la biblioteca', 'action.applying': 'Aplicando…', 'action.download': 'Descargar imagen', 'action.serverRender': 'Mostrar el render del servidor', 'serverrender.label': 'Render de referencia (servidor)', 'preview.hint': 'La vista previa se actualiza automáticamente mientras ajustas los valores.', 'preview.collageFail': 'No se pudo cargar la vista previa del collage. Usa «Mostrar el render del servidor» para verlo.',
                 'modal.title': 'Selecciona un póster', 'modal.search': 'Buscar…', 'modal.alltypes': 'Todos los tipos',
                 'ty.movies': 'Películas', 'ty.series': 'Series', 'ty.seasons': 'Temporadas', 'ty.albums': 'Álbumes', 'ty.artists': 'Artistas', 'ty.books': 'Libros', 'ty.musicvideos': 'Videoclips', 'ty.photos': 'Fotos', 'modal.prev': 'Anterior', 'modal.next': 'Siguiente',
                 'dyn.loading': 'Cargando…', 'dyn.errorItems': 'Error al cargar los elementos', 'dyn.noItems': 'No se han encontrado elementos', 'dyn.page': 'Página {0} de {1}',
@@ -1050,6 +1062,7 @@
                 'dyn.uploadFail': 'Error al subir: {0}', 'dyn.fontFail': 'Error al subir la fuente: {0}',
                 'dyn.unknown': 'error desconocido',
                 'restore.button': 'Restaurar la carátula original', 'restore.none': 'Aún no hay copia de seguridad', 'restore.available': 'Existe una copia de seguridad', 'restore.done': 'Carátula original restaurada.', 'restore.fail': 'No se ha encontrado ninguna copia de seguridad que restaurar.',
+                'restore.reset': 'Restablecer copia de seguridad', 'restore.resetConfirm': '¿Eliminar la copia de seguridad actual? Restablecer no guarda nada por sí solo. La próxima vez que apliques, la carátula que muestre este destino en ese momento se guardará como el nuevo original, salvo que sea una carátula aplicada por este complemento. Por eso, primero vuelve a poner en este destino la que quieres conservar (Editar imágenes y súbela; o elimina el póster y actualiza los metadatos con "Reemplazar imágenes existentes"), después restablece y luego aplica.', 'restore.resetDone': 'Copia de seguridad eliminada. La próxima vez que apliques, la carátula actual se guardará como el nuevo original.', 'restore.resetFail': 'No se pudo restablecer la copia de seguridad: {0}',
                 'bg.source': 'Origen del fondo', 'bg.source.image': 'Imagen', 'bg.source.gradient': 'Degradado', 'bg.source.solid': 'Color sólido', 'bg.source.collage': 'Collage de pósteres de este destino', 'bg.collage.density': 'Densidad del collage', 'bg.collage.sparse': 'Baja', 'bg.collage.medium': 'Media', 'bg.collage.dense': 'Alta', 'bg.collage.shuffle': 'Barajar', 'bg.collage.livetv': 'La TV en directo no tiene pósteres para hacer un collage.',
                 'tpl.load': 'Cargar plantilla', 'tpl.delete': 'Eliminar', 'tpl.save': 'Guardar el diseño actual', 'tpl.savebtn': 'Guardar', 'tpl.nameph': 'Nombre de la plantilla', 'tpl.hint': 'Las plantillas guardan el diseño pero no el título — cada destino conserva su propio nombre.', 'tpl.saved': 'Plantilla guardada.', 'tpl.named': 'Introduce primero un nombre de plantilla.',
                 'batch.hint': 'Aplica el diseño actual (o la plantilla cargada) a varios destinos a la vez. Cada carátula se titula con el nombre de su destino.', 'batch.apply': 'Aplicar a la selección', 'batch.none': 'Selecciona al menos un destino.', 'batch.running': 'Aplicando…', 'batch.done': 'Listo: {0} correctas, {1} fallidas.',
@@ -1156,6 +1169,18 @@
         }
 
         function el(id) { return page.querySelector('#' + id); }
+
+        // Promise<boolean>. Jellyfin's own themed confirm dialog when the dashboard exposes
+        // it (Dashboard.confirm(message, title, callback)), the browser's otherwise.
+        function confirmAction(message) {
+            return new Promise(function (resolve) {
+                if (window.Dashboard && typeof Dashboard.confirm === 'function') {
+                    try { Dashboard.confirm(message, '', function (ok) { resolve(!!ok); }); return; }
+                    catch (e) { /* fall through to the browser dialog */ }
+                }
+                resolve(window.confirm(message));
+            });
+        }
 
         // --- Step accordion -----------------------------------------------
         // Owns .ccaStepBody and NOTHING else. Every other visibility helper
@@ -1344,14 +1369,214 @@
         }
         var doc = defaultDocument();
 
-        // CRITICAL canvas-source invariant: bgImageEl must ONLY ever be assigned an
-        // <img> loaded from a blob: object-URL (URL.createObjectURL of a client File
-        // or a fetched Blob). A blob: URL adopts the document origin so the canvas is
+        // CRITICAL canvas-source invariant: bgImageEl AND collageBgEl must ONLY ever be
+        // assigned an <img> loaded from a blob: object-URL (URL.createObjectURL of a client
+        // File or a fetched Blob). A blob: URL adopts the document origin so the canvas is
         // never tainted (Phase 3's getImageData/palette + client grain depend on it).
-        // NEVER point it at ApiClient.getImageUrl(...) or a server /upload path.
-        // Wiring the upload/poster Blob happens in Task 8; here it stays null and the
-        // gradient default renders.
+        // NEVER point either at ApiClient.getImageUrl(...) or a server /upload path.
+        // bgImageEl is the user's image (upload or poster pick); collageBgEl the server-built
+        // mosaic. Which one is painted is decided by activeBgBitmap(), so switching between
+        // image and collage neither loses the uploaded bitmap nor paints a stale one.
         var bgImageEl = null;
+
+        // The bitmap the canvas paints as the background right now, or null when nothing
+        // drawable is loaded (the gradient or flat colour renders instead).
+        function activeBgBitmap() {
+            var img = doc.Background.Source === 'collage' ? collageBgEl : bgImageEl;
+            return (img && img.complete && img.naturalWidth) ? img : null;
+        }
+
+        // --- Collage background on the live canvas ------------------------------
+        // The canvas cannot build a poster collage (the posters are server files), so it
+        // asks the server for the bare mosaic and then treats it exactly like an uploaded
+        // image: drawBackgroundImage applies Fit, Transform and Blur, paintBackgroundOnly
+        // the dim, and the overlay, effects and layers are drawn on top as usual. That is
+        // the server's own order (CollageComposer output -> ApplyBackgroundLayer), so the
+        // request strips everything the canvas adds itself, or it would be applied twice.
+        var collageBgEl = null;      // <img> from a blob: URL of the server's PNG (invariant above)
+        var _collageUrl = null;      // collageBgEl's object URL, revoked when replaced
+        var _collageWanted = '';     // collageKey() the canvas should be showing ('' = none)
+        var _collageSourceId = '';   // the target the current mosaic belongs to
+        var _collageToken = 0;      // bumped per request and per change: older answers are dropped
+
+        // Everything the server's mosaic depends on, and nothing else: text, effect and
+        // background-adjustment edits leave it alone, so they never trigger a request.
+        function collageKey() {
+            var c = buildCollageFromControls();
+            return [c.SourceId, c.SourceType, c.Density, c.Seed, doc.Canvas.Width, doc.Canvas.Height].join('|');
+        }
+
+        // The background-only document for the mosaic: the same collage at the same size,
+        // drawn untransformed with no blur, dim, gradient, overlay, effects or layers.
+        function collageRequestDocument() {
+            return {
+                Version: doc.Version,
+                Canvas: { Width: doc.Canvas.Width, Height: doc.Canvas.Height, Format: 'png', DimensionPreset: doc.Canvas.DimensionPreset },
+                Background: {
+                    Source: 'collage', ImagePath: '', Fit: 'cover',
+                    Transform: { OffsetX: 0, OffsetY: 0, Scale: 1 },
+                    Blur: 0, Dim: 0, DimColor: '#000000',
+                    Gradient: null, Overlay: null, Animation: null,
+                    Collage: buildCollageFromControls()
+                },
+                Effects: defaultEffects(),
+                Layers: []
+            };
+        }
+
+        function setCollageBusy(on) {
+            var spinner = el('ccaCollageSpinner');
+            if (spinner) { spinner.hidden = !on; }
+        }
+
+        function showCollageHint(on) {
+            var hint = el('ccaCollageHint');
+            if (hint) { hint.hidden = !on; }
+        }
+
+        function releaseCollageBitmap() {
+            if (_collageUrl) { URL.revokeObjectURL(_collageUrl); }
+            _collageUrl = null;
+            collageBgEl = null;
+            showCollageHint(false);
+        }
+
+        // Called on every render; does nothing unless the collage inputs changed.
+        function syncCollageBitmap() {
+            var wanted = (doc.Background.Source === 'collage' && state.libraryId) ? collageKey() : '';
+            if (wanted === _collageWanted) { return; }
+            _collageWanted = wanted;
+            // A different target must not keep showing the previous target's posters: drop
+            // them now (flat colour + spinner). Same-target re-rolls keep the old bitmap.
+            var sourceId = wanted ? state.libraryId : '';
+            if (sourceId !== _collageSourceId) {
+                _collageSourceId = sourceId;
+                releaseCollageBitmap();
+            }
+            _collageToken++;                 // whatever is in flight now answers an old question
+            if (!wanted) {
+                releaseCollageBitmap();
+                setCollageBusy(false);
+                return;
+            }
+            setCollageBusy(true);
+            requestCollageBitmap();
+        }
+
+        function fetchCollageBitmap() {
+            if (!_collageWanted) { return; }
+            var token = ++_collageToken;
+            authFetch('CustomCoverArt/document/preview', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(collageRequestDocument())
+            }).then(function (r) {
+                if (!r.ok) { throw new Error('collage render returned ' + r.status); }
+                return r.blob();
+            }).then(function (blob) {
+                if (token !== _collageToken) { return; }
+                var url = URL.createObjectURL(blob);
+                var img = new Image();
+                img.onload = function () {
+                    if (token !== _collageToken) { URL.revokeObjectURL(url); return; }
+                    releaseCollageBitmap();
+                    collageBgEl = img;
+                    _collageUrl = url;
+                    setCollageBusy(false);
+                    scheduleRender();
+                };
+                img.onerror = function () {
+                    URL.revokeObjectURL(url);
+                    collageFailed(token);
+                };
+                img.src = url;
+            }).catch(function () { collageFailed(token); });
+        }
+        var requestCollageBitmap = debounce(fetchCollageBitmap, 400);
+
+        // Keeps whatever was showing (an older mosaic, or the flat base colour) and says why
+        // the collage is missing. The same inputs are not retried; changing one is.
+        function collageFailed(token) {
+            if (token !== _collageToken) { return; }
+            setCollageBusy(false);
+            showCollageHint(true);
+        }
+
+        // --- Animated GIF background on the live canvas ----------------------------
+        // The canvas only repaints on edits, so an animated GIF background looked frozen.
+        // While the background bitmap is an animated GIF, repaint ~15 times a second, and
+        // only while the editor is on screen and the user has not asked for reduced motion.
+        // The flag lives on the <img> itself, so replacing or clearing bgImageEl anywhere
+        // ends the loop with no extra bookkeeping.
+        var GIF_FRAME_MS = 1000 / 15;
+        var _gifLoopId = 0;           // the ONE rAF handle; 0 = no loop running
+        var _gifLastPaint = 0;
+        var _reducedMotion = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
+
+        // Flags img once its bytes prove a multi-frame GIF (a still GIF never loops).
+        function watchForAnimatedGif(img, blob) {
+            if (!blob || !blob.arrayBuffer) { return; }
+            if (blob.type !== 'image/gif' && !/\.gif$/i.test(blob.name || '')) { return; }
+            blob.arrayBuffer().then(function (buf) {
+                if (isAnimatedGif(buf)) { img._ccaAnimatedGif = true; updateGifLoop(); }
+            }).catch(function () { /* detection is best-effort: the canvas just stays still */ });
+        }
+
+        // The canvas is laid out (its step and the page are shown) and the tab is visible.
+        function isEditorOnScreen() {
+            var cv = el('ccaCanvas');
+            return !document.hidden && !!cv && cv.offsetParent !== null;
+        }
+
+        function gifLoopWanted() {
+            return !!(bgImageEl && bgImageEl._ccaAnimatedGif)
+                && activeBgBitmap() === bgImageEl
+                && isEditorOnScreen()
+                && !(_reducedMotion && _reducedMotion.matches);
+        }
+
+        function gifTick(now) {
+            _gifLoopId = 0;
+            if (!gifLoopWanted()) { return; }
+            // Re-arm first: the render below calls updateGifLoop, which must see a live loop
+            // and not start a second one.
+            _gifLoopId = requestAnimationFrame(gifTick);
+            if (now - _gifLastPaint < GIF_FRAME_MS) { return; }
+            _gifLastPaint = now;
+            renderDocument(true);
+        }
+
+        function stopGifLoop() {
+            if (_gifLoopId) { cancelAnimationFrame(_gifLoopId); }
+            _gifLoopId = 0;
+        }
+
+        // Starts or stops the loop to match the current state; cheap, so it runs after every
+        // render and on every visibility or reduced-motion change.
+        function updateGifLoop() {
+            var gif = (bgImageEl && bgImageEl._ccaAnimatedGif) ? bgImageEl : null;
+            var holder = el('ccaGifHolder');
+            if (holder && holder.firstChild !== gif) {
+                holder.innerHTML = '';
+                if (gif) { holder.appendChild(gif); }
+            }
+            if (gifLoopWanted()) {
+                if (!_gifLoopId) { _gifLoopId = requestAnimationFrame(gifTick); }
+            } else {
+                stopGifLoop();
+            }
+        }
+
+        function bindGifLoopListeners() {
+            document.addEventListener('visibilitychange', updateGifLoop);
+            if (_reducedMotion) {
+                if (_reducedMotion.addEventListener) { _reducedMotion.addEventListener('change', updateGifLoop); }
+                else if (_reducedMotion.addListener) { _reducedMotion.addListener(updateGifLoop); }
+            }
+            // Leaving the page stops at once; pageshow's scheduleRender() restarts it.
+            page.addEventListener('pagehide', stopGifLoop);
+            page.addEventListener('viewhide', stopGifLoop);
+        }
 
         // Background pan/zoom mode (Task 9): when true, canvas drag/wheel/pinch
         // mutate doc.Background.Transform instead of selecting/dragging a text
@@ -1581,7 +1806,8 @@
             if (typeof commit === 'function') { commit(); }
         }
 
-        function renderDocument() {
+        // animFrame: true when called by the animated-GIF loop (a repaint, not an edit).
+        function renderDocument(animFrame) {
             var cv = el('ccaCanvas');
             if (!cv) { return; }
             if (cv.width !== doc.Canvas.Width || cv.height !== doc.Canvas.Height) {
@@ -1592,6 +1818,8 @@
             var W = cv.width, H = cv.height;
             ctx.clearRect(0, 0, W, H);
 
+            // Fetches a new server mosaic only when a collage input changed.
+            syncCollageBitmap();
             paintBackgroundOnly(ctx, W, H);
 
             // Effects order is a contract shared with the server (EffectsComposer):
@@ -1616,15 +1844,23 @@
             // downloadPreview() clears the selection before exporting so it never bakes in.
             drawSelectionHandles(ctx, W, H);
 
-            // Keep the swatches and the in-context thumbnails in step with the design.
-            refreshPalette();
-            renderPreviewContexts();
+            // An animation frame only repaints. The swatches, thumbnails and buttons were
+            // brought up to date by the edit-driven render, and both refreshers are 300 ms
+            // debounces that 15 calls a second would starve.
+            if (!animFrame) {
+                // Keep the swatches and the in-context thumbnails in step with the design.
+                refreshPalette();
+                renderPreviewContexts();
 
-            var ph = el('ccaPreviewPlaceholder');
-            if (ph) { ph.style.display = 'none'; }
-            // The canvas always renders, so the export target is always available.
-            var dl = el('ccaDownloadBtn');
-            if (dl) { dl.disabled = false; }
+                var ph = el('ccaPreviewPlaceholder');
+                if (ph) { ph.style.display = 'none'; }
+                // The canvas always renders, so the export target is always available.
+                var dl = el('ccaDownloadBtn');
+                if (dl) { dl.disabled = false; }
+            }
+
+            // Starts or stops the animated-GIF repaint loop to match what is now on the canvas.
+            updateGifLoop();
         }
 
         // Background only — no layers, no effects, no selection chrome. Split out of
@@ -1635,8 +1871,9 @@
         // blob-loaded image if one is ready, else the gradient, else a flat fill.
         function paintBackgroundOnly(ctx, W, H) {
             var drewImage = false;
-            if (bgImageEl && bgImageEl.complete && bgImageEl.naturalWidth) {
-                drawBackgroundImage(ctx, bgImageEl, W, H);
+            var bitmap = activeBgBitmap();
+            if (bitmap) {
+                drawBackgroundImage(ctx, bitmap, W, H);
                 drewImage = true;
             } else if (doc.Background.Gradient && doc.Background.Gradient.IsEnabled) {
                 drawGradient(ctx, doc.Background.Gradient, W, H);
@@ -2540,7 +2777,7 @@
             _pointers[ev.pointerId] = { x: ev.clientX, y: ev.clientY };
 
             if (bgAdjustMode) {
-                if (!bgImageEl) { return; } // nothing to reposition without a loaded image
+                if (!activeBgBitmap()) { return; } // nothing to reposition without a loaded image
                 if (Object.keys(_pointers).length >= 2) {
                     // Second finger down: switch to pinch-zoom, cancel any pan in flight.
                     _bgDrag = null;
@@ -2597,7 +2834,7 @@
             if (_pointers[ev.pointerId]) { _pointers[ev.pointerId] = { x: ev.clientX, y: ev.clientY }; }
 
             if (bgAdjustMode) {
-                if (!bgImageEl) { return; }
+                if (!activeBgBitmap()) { return; }
                 if (Object.keys(_pointers).length >= 2 && _pinchStartDist > 0) {
                     var dist = pointerDistance();
                     var scale = _pinchStartScale * (dist / _pinchStartDist);
@@ -2618,7 +2855,7 @@
                 // Natural "grab and slide" direction: dragging right/down should make
                 // the image follow the cursor, which means the sampled source rect
                 // shifts the OTHER way — the offset moves opposite the drag delta.
-                var g = backgroundGeometry(bgImageEl, cv.width, cv.height);
+                var g = backgroundGeometry(activeBgBitmap(), cv.width, cv.height);
                 if (g.gainX > 0) {
                     doc.Background.Transform.OffsetX = Math.max(-1, Math.min(1,
                         _bgDrag.origOffsetX - (bgPt.x - _bgDrag.startX) / g.gainX));
@@ -3274,12 +3511,18 @@
         // Refreshes the Restore button state for the currently selected target.
         function refreshRestoreState() {
             var btn = el('ccaRestoreBtn');
+            var reset = el('ccaResetBackupBtn');
             var hint = el('ccaRestoreHint');
             if (!btn) { return; }
-            if (!state.libraryId) { btn.disabled = true; hint.textContent = t('restore.none'); return; }
-            jsonFetch('CustomCoverArt/targets/' + encodeURIComponent(state.libraryId) + '/backup').then(function (res) {
+            if (!state.libraryId) { btn.disabled = true; reset.disabled = true; hint.textContent = t('restore.none'); return; }
+            var requestedId = state.libraryId;
+            jsonFetch('CustomCoverArt/targets/' + encodeURIComponent(requestedId) + '/backup').then(function (res) {
+                // The target may have changed while this was in flight.
+                if (requestedId !== state.libraryId) { return; }
                 var has = pick(res, 'Success') && pick(res, 'Data');
+                // Reset is only meaningful when there is a backup to throw away.
                 btn.disabled = !has;
+                reset.disabled = !has;
                 hint.textContent = has ? t('restore.available') : t('restore.none');
             });
         }
@@ -3599,6 +3842,9 @@
                 Dashboard.hideLoadingMsg();
                 if (pick(res, 'Success')) {
                     Dashboard.alert(t('dyn.applied'));
+                    // Applying backs the previous cover up, so Restore and Reset may have just
+                    // become available.
+                    refreshRestoreState();
                 } else {
                     Dashboard.alert(t('dyn.error', pick(res, 'ErrorMessage') || t('dyn.unknown')));
                 }
@@ -3645,10 +3891,13 @@
         }
 
         function bindEvents() {
+            // Document and media-query listeners for the GIF repaint loop (bindEvents runs once).
+            bindGifLoopListeners();
             el('ccaLibrarySelect').addEventListener('change', function () {
                 state.libraryId = this.value;
                 updateUI();
                 refreshRestoreState();
+                scheduleRender(); // a collage background follows the target
             });
 
             el('ccaRestoreBtn').addEventListener('click', function () {
@@ -3658,6 +3907,22 @@
                     .then(function (res) {
                         Dashboard.alert(pick(res, 'Success') ? t('restore.done') : t('restore.fail'));
                     });
+            });
+
+            el('ccaResetBackupBtn').addEventListener('click', function () {
+                if (!state.libraryId) { return; }
+                var id = state.libraryId;
+                confirmAction(t('restore.resetConfirm')).then(function (ok) {
+                    if (!ok) { return; }
+                    return jsonFetch('CustomCoverArt/targets/' + encodeURIComponent(id) + '/backup', 'DELETE')
+                        .then(function (res) {
+                            Dashboard.alert(pick(res, 'Success')
+                                ? t('restore.resetDone')
+                                : t('restore.resetFail', pick(res, 'ErrorMessage') || t('dyn.unknown')));
+                        })
+                        .catch(function (e) { Dashboard.alert(t('restore.resetFail', e.message)); })
+                        .then(refreshRestoreState);
+                });
             });
             // --- Text card: drives the SELECTED text layer ----------------
             el('ccaTitle').addEventListener('input', function () {
@@ -3927,7 +4192,7 @@
             el('ccaTargetType').addEventListener('change', function () {
                 Dashboard.showLoadingMsg();
                 loadLibraries()
-                    .then(function () { updateUI(); updateBackgroundVisibility(); refreshRestoreState(); loadBatchList(); Dashboard.hideLoadingMsg(); })
+                    .then(function () { updateUI(); updateBackgroundVisibility(); refreshRestoreState(); loadBatchList(); Dashboard.hideLoadingMsg(); scheduleRender(); })
                     .catch(function () { Dashboard.hideLoadingMsg(); });
             });
 
@@ -3952,6 +4217,7 @@
                         var img = new Image();
                         img.onload = function () { bgImageEl = img; scheduleRender(); };
                         img.src = URL.createObjectURL(file);
+                        watchForAnimatedGif(img, file);
                         maybeSwitchToAnimated(file);
                         scheduleRender();
                     } else {
@@ -4009,10 +4275,10 @@
             cv.addEventListener('pointercancel', onCanvasPointerUp);
 
             // Mouse-wheel zoom of the background, only while repositioning it and
-            // only when an image is actually loaded (bgImageEl) — otherwise a no-op
+            // only when an image is actually loaded (activeBgBitmap) — otherwise a no-op
             // so the page can still scroll normally.
             cv.addEventListener('wheel', function (ev) {
-                if (!bgAdjustMode || !bgImageEl) { return; }
+                if (!bgAdjustMode || !activeBgBitmap()) { return; }
                 ev.preventDefault();
                 var s = doc.Background.Transform.Scale * (ev.deltaY < 0 ? 1.05 : 0.95);
                 doc.Background.Transform.Scale = Math.min(4, Math.max(1, s));
@@ -4094,6 +4360,8 @@
                         var ok = data.filter(function (r) { return pick(r, 'Success'); }).length;
                         var fail = data.length - ok;
                         el('ccaBatchStatus').textContent = t('batch.done').replace('{0}', ok).replace('{1}', fail);
+                        // The selected target may have been part of the batch.
+                        refreshRestoreState();
                     });
             });
 
@@ -4231,6 +4499,7 @@
                         var img = new Image();
                         img.onload = function () { bgImageEl = img; scheduleRender(); };
                         img.src = URL.createObjectURL(posterBlob);
+                        watchForAnimatedGif(img, posterBlob);
                         el('ccaSelectedBgName').textContent = name;
                         el('ccaSelectedBg').style.display = '';
                         scheduleRender();

@@ -6,5 +6,6 @@
   "errors.too_many_uploads": "Te veel uploads. Probeer het over een minuut opnieuw.",
   "errors.suspicious_content": "Bestand bevat verdachte inhoud en wordt geweigerd",
   "errors.image_too_large": "Afbeelding is te groot om te verwerken. Gebruik een kleinere afbeelding of een animatie met minder frames.",
-  "errors.backup_failed": "De huidige cover kon niet worden geback-upt en is daarom ongewijzigd gelaten."
+  "errors.backup_failed": "De huidige cover kon niet worden geback-upt en is daarom ongewijzigd gelaten.",
+  "errors.backup_in_use": "Deze back-up is de afbeelding die het doel nu toont. Herstel hem eerst en reset daarna de back-up."
 }
