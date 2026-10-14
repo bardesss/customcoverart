@@ -130,4 +130,88 @@ public class TextEffectParityTests
     {
         Assert.True(DocumentRenderer.ShadowTransform(System.Numerics.Matrix3x2.Identity, 7f, -3f).IsIdentity);
     }
+
+    // 60px "HELLO" with a red outline, centred on black.
+    private static CoverDocument OutlineDoc(float opacity, bool outline, int width = 4, float rotation = 0f) => Doc(l =>
+    {
+        l.Size = 0.2f;
+        l.Opacity = opacity;
+        l.Rotation = rotation;
+        l.Outline = new TextOutlineSettings { Enabled = outline, Color = "#ff0000", Width = width };
+    });
+
+    // A pixel that is outline and nothing else: fully red, no white fill mixed in.
+    private static bool IsPureOutline(Rgba32 p) => p.R >= 250 && p.G <= 5 && p.B <= 5;
+
+    // Horizontal extent of anything bright (white fill or red outline).
+    private static int InkWidth(Image<Rgba32> img)
+    {
+        int min = int.MaxValue, max = int.MinValue;
+        for (var y = 0; y < img.Height; y++)
+            for (var x = 0; x < img.Width; x++)
+                if (img[x, y].R > 128) { if (x < min) { min = x; } if (x > max) { max = x; } }
+        return max < min ? 0 : max - min + 1;
+    }
+
+    /// <summary>
+    /// The canvas strokes the outline ONCE under globalAlpha, so at 50% opacity an outline
+    /// pixel is half strength (≈128 of 255 over black). The server used to draw up to 440
+    /// offset copies, each at the layer opacity, and they stacked back up to fully opaque.
+    /// </summary>
+    [Fact]
+    public void Outline_AtHalfOpacity_IsHalfStrength()
+    {
+        using var opaque = Render(OutlineDoc(1f, true));
+        using var half = Render(OutlineDoc(0.5f, true));
+
+        double sumR = 0, sumG = 0;
+        var n = 0;
+        for (var y = 0; y < Px; y++)
+            for (var x = 0; x < Px; x++)
+            {
+                if (!IsPureOutline(opaque[x, y])) { continue; }
+                sumR += half[x, y].R;
+                sumG += half[x, y].G;
+                n++;
+            }
+
+        Assert.True(n > 200, $"Expected a solid outline band at full opacity, found {n} pixels.");
+        Assert.InRange(sumR / n, 112.0, 143.0);
+        Assert.True(sumG / n < 10, $"Outline pixels should stay pure red, mean G was {sumG / n:F1}.");
+    }
+
+    /// <summary>
+    /// Width parity: the canvas strokes with lineWidth = 2 × Width centred on the glyph
+    /// contour, so the outline reaches Width px beyond the glyphs on each side.
+    /// </summary>
+    [Fact]
+    public void Outline_ReachesWidthPixelsBeyondTheGlyphs()
+    {
+        using var plain = Render(OutlineDoc(1f, false));
+        using var outlined = Render(OutlineDoc(1f, true, width: 6));
+
+        var grow = InkWidth(outlined) - InkWidth(plain);
+        Assert.InRange(grow, 2 * 6 - 2, 2 * 6 + 2);
+    }
+
+    /// <summary>The outline surface must be drawn through the layer rotation like the fill.</summary>
+    [Fact]
+    public void Outline_FollowsTheLayerRotation()
+    {
+        using var img = Render(OutlineDoc(1f, true, rotation: 90f));
+
+        int minX = int.MaxValue, maxX = int.MinValue, minY = int.MaxValue, maxY = int.MinValue;
+        for (var y = 0; y < Px; y++)
+            for (var x = 0; x < Px; x++)
+            {
+                if (!IsPureOutline(img[x, y])) { continue; }
+                minX = Math.Min(minX, x); maxX = Math.Max(maxX, x);
+                minY = Math.Min(minY, y); maxY = Math.Max(maxY, y);
+            }
+
+        Assert.True(maxX >= minX, "The rotated outline drew nothing.");
+        var w = maxX - minX + 1;
+        var h = maxY - minY + 1;
+        Assert.True(h > 2 * w, $"Rotated 90°, the outline should be tall, not wide (w={w}, h={h}).");
+    }
 }

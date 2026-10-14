@@ -514,39 +514,55 @@ public static class DocumentRenderer
             }
         }
 
-        canvas.Mutate(ctx =>
+        // Outline. The canvas strokes the glyph contours ONCE (lineWidth = 2 × Width, round
+        // joins) under globalAlpha. The server builds the same silhouette by dilation: the
+        // glyphs drawn at every integer offset inside a disc of radius Width, which is exactly
+        // the outer edge of a round-joined stroke that wide. Those are up to 316 separate
+        // draws, though, and drawing each at the layer opacity stacked them back up to opaque.
+        // So the passes go OPAQUE onto their own transparent Rgba32 surface, and that surface
+        // is composited once at the layer opacity.
+        //
+        // Why dilation rather than one stroked Pen: at the default opacity of 1 this keeps
+        // every existing outline exactly as it rendered before, except that its outer corners
+        // are now round (like the preview) instead of square. A Pen stroke would re-derive
+        // every outline from ImageSharp's stroker, a new geometry for every outlined cover.
+        // One known difference remains: under a semi-transparent fill, the canvas stroke covers
+        // only a Width-px band inside the glyph edge, while the dilation covers the whole
+        // interior. Punching the glyphs out of the surface would fix that, but at full
+        // opacity it leaves a background-coloured fringe along every antialiased edge.
+        var outlineWidth = layer.Outline.Enabled ? Math.Clamp(layer.Outline.Width, 0, 10) : 0;
+        if (outlineWidth > 0)
         {
-            if (!rotate.IsIdentity)
+            var outlineColor = SafeColor(layer.Outline.Color, Color.Black).WithAlpha(1f);
+            var reach = outlineWidth * outlineWidth;
+            using var outlineSurface = new Image<Rgba32>(canvas.Width, canvas.Height);
+            outlineSurface.Mutate(oc =>
             {
-                ctx.SetDrawingTransform(rotate);
-            }
+                if (!rotate.IsIdentity) { oc.SetDrawingTransform(rotate); }
 
-            if (layer.Outline.Enabled)
-            {
-                var outlineColor = SafeColor(layer.Outline.Color, Color.Black).WithAlpha(opacity);
-                var outlineWidth = Math.Clamp(layer.Outline.Width, 0, 10);
-
-                // Draw outline by drawing text multiple times with slight offsets
-                for (int x = -outlineWidth; x <= outlineWidth; x++)
+                for (var x = -outlineWidth; x <= outlineWidth; x++)
                 {
-                    for (int y = -outlineWidth; y <= outlineWidth; y++)
+                    for (var y = -outlineWidth; y <= outlineWidth; y++)
                     {
-                        if (x == 0 && y == 0) continue;
+                        if ((x == 0 && y == 0) || x * x + y * y > reach) { continue; }
 
-                        var outlinePosition = new PointF(textPosition.X + x, textPosition.Y + y);
                         var outlineOptions = new RichTextOptions(font)
                         {
-                            Origin = outlinePosition,
+                            Origin = new PointF(textPosition.X + x, textPosition.Y + y),
                             HorizontalAlignment = textOptions.HorizontalAlignment,
                             VerticalAlignment = textOptions.VerticalAlignment
                         };
-
-                        ctx.DrawText(outlineOptions, layer.Content, outlineColor);
+                        oc.DrawText(outlineOptions, layer.Content, outlineColor);
                     }
                 }
-            }
+            });
+            canvas.Mutate(c => c.DrawImage(outlineSurface, Point.Empty, opacity));
+        }
 
-            // Draw main text
+        // Main text, a single draw at the layer opacity.
+        canvas.Mutate(ctx =>
+        {
+            if (!rotate.IsIdentity) { ctx.SetDrawingTransform(rotate); }
             ctx.DrawText(textOptions, layer.Content, textColor);
         });
     }
