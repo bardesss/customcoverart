@@ -57,7 +57,7 @@ Layered text and logos, backgrounds, composition effects — designed on a live 
 | 🧩 | **Poster collage** | Auto-build a grid-mosaic background from a target's own item posters |
 | 💾 | **Design templates** | Save a look and reuse it; each target keeps its own name as the title |
 | 📚 | **Batch apply** | Apply one design to many libraries/collections/playlists at once |
-| 🕗 | **Restore original** | One-click revert to a target's pre-plugin cover |
+| 🕗 | **Restore original** | One-click revert to a target's original cover, and Reset backup to choose a new original |
 | 🎞️ | **Animated GIF** | Export animated covers (animated-source passthrough or Ken Burns pan/zoom) |
 | 🌍 | **Localisation** | English, Dutch and Spanish included; easy to add more |
 | 🪶 | **Lightweight** | Small footprint — the plugin DLL is ~1.8 MB (fonts are subset-embedded), so it stays easy on the server |
@@ -162,7 +162,7 @@ Nothing is locked — open any step at any time, and only one stays open so the 
 a wall of controls. Each step shows what most people need, with the rest under **Advanced**.
 
 1. **Target & start** — pick a library, collection, playlist or Live TV. Optionally start from a
-   saved template, or restore the target's original cover.
+   saved template, or restore (or reset) the target's original cover.
 2. **Background** — choose one source: an **image** (upload one or browse your library's posters),
    a **poster collage** built from the target's own items, a **gradient**, or a **solid colour**.
    Only the chosen source's controls are shown.
@@ -236,7 +236,9 @@ entirely in your browser — nothing is uploaded — and stays off until you ena
 
 In step 2, set **Background source** to *Poster collage from this target* to build a
 dimmed grid of that library's own posters. Use **Shuffle** to re-roll the arrangement. (Live TV
-has no posters, so collage is unavailable there.)
+has no posters, so collage is unavailable there.) The live preview shows the collage too: the
+server builds the mosaic and the canvas draws your dim, blur, overlay, effects and text on top, so
+a new mosaic is only fetched when you change the target, density, shuffle or size.
 
 ### Templates and batch apply
 
@@ -249,7 +251,9 @@ they're migrated to the new design format automatically the first time you pick 
 
 Set the output format to **Animated GIF** to export a moving cover — either passing through an
 animated-GIF background, or applying a gentle **Ken Burns** pan/zoom. GIFs are larger and only
-animate in the Jellyfin views that render GIFs.
+animate in the Jellyfin views that render GIFs. An animated-GIF background also moves in the live
+preview (about 15 frames a second while the editor is on screen); with *reduce motion* switched
+on in your system it stays still.
 
 ### Restoring the original
 
@@ -258,10 +262,25 @@ cover** in step 1 to revert — you can restore, apply and restore again as ofte
 Applied covers are handed to Jellyfin's own image store (the same as uploading an image in the
 dashboard), so covers applied or restored from version 4.0.2.0 on keep working even if the
 plugin's data folder is cleared (covers applied by 4.0.1.0 and never re-applied still live in
-that folder). The first backup keeps the cover you had before you first used the plugin, so it
-can always be restored; a cover you set in the dashboard after an earlier apply is replaced by
-the next apply, as with Jellyfin's own upload. The backups live in the data folder under
-`customcoverart/backups`. Applies to the same target run one at a time.
+that folder). A cover made by the plugin is never backed up as the original: the plugin remembers
+the cover it applied last and skips it (and anything in its own data folder) when it saves an
+original. A cover you set in the dashboard after an earlier apply is replaced by the next apply,
+as with Jellyfin's own upload.
+
+**Reset backup**, next to Restore, deletes the target's backup. It saves nothing itself: the next
+apply stores whatever cover the target shows at that moment as its new original. Use it when the
+backup holds the wrong image, for example a test cover from before the first backup was made (your
+true original was overwritten by then, so Restore brings the test cover back). Do it in this order:
+first put the cover you want to keep back on the library, either by uploading it in the dashboard
+(**Edit images**) or by deleting the poster and refreshing metadata with *replace images*; then
+press **Reset backup**; then apply. If the target still shows a cover the plugin made, the next
+apply does not save it, so no wrong original is stored. Covers applied by 4.0.2.0 are not
+recognised as plugin covers until one apply with 4.0.3.0 has happened.
+
+The backups live in the plugin's data folder under `customcoverart/backups`; in a Docker
+container with its config volume at `/config`, that is `/config/data/data/customcoverart/backups`.
+Restores, backups and skipped backups are written to the Jellyfin log. Applies, restores and
+resets of the same target run one at a time.
 
 ## 🔒 Security & privacy
 
