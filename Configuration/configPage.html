@@ -1338,6 +1338,45 @@
             return d;
         }
 
+        // Client mirror of DocumentRenderer.BuildColorStops' fallback. A background gradient
+        // with fewer than two Stops renders on the server as StartColor -> EndColor (Jellyfin
+        // purple -> blue by default, GradientSettings in CoverArtModels.cs). The canvas used
+        // to draw black -> white instead, and the stop editor showed the brand colours without
+        // writing them back. Legacy templates are exactly that shape. Folding Start/End into
+        // Stops makes the document say what the server draws, and the server renders the
+        // migrated document identically: two stops at 0 and 1 ARE its own fallback.
+        // Runs on LOAD only, like the normalizers above.
+        var GRADIENT_FALLBACK_START = '#aa5cc3';
+        var GRADIENT_FALLBACK_END = '#00a4dc';
+
+        // A colour the server's SafeColor would accept (Color.ParseHex: #rgb, #rgba, #rrggbb,
+        // #rrggbbaa, '#' optional), normalised with a '#'; anything else gets `fallback`,
+        // which is what SafeColor does.
+        function serverHexOr(hex, fallback) {
+            var s = String(hex == null ? '' : hex).trim();
+            if (!/^#?([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(s)) { return fallback; }
+            return s.charAt(0) === '#' ? s : '#' + s;
+        }
+
+        // The two stops the server falls back to: a MISSING Start/End takes the C# default,
+        // and an unparseable one takes SafeColor's black/white.
+        function gradientFallbackStops(g) {
+            var start = pick(g, 'StartColor'), end = pick(g, 'EndColor');
+            return [
+                { Color: serverHexOr(start === undefined ? GRADIENT_FALLBACK_START : start, '#000000'), Position: 0, Alpha: 1 },
+                { Color: serverHexOr(end === undefined ? GRADIENT_FALLBACK_END : end, '#ffffff'), Position: 1, Alpha: 1 }
+            ];
+        }
+
+        function normalizeGradientStops(d) {
+            var g = d.Background && d.Background.Gradient;
+            if (!g) { return d; }
+            // Null entries are dropped first, as DocumentMigration/BuildColorStops do.
+            g.Stops = (g.Stops || []).filter(Boolean);
+            if (g.Stops.length < 2) { g.Stops = gradientFallbackStops(g); }
+            return d;
+        }
+
         function defaultDocument() {
             return {
                 Version: 2,
@@ -2131,6 +2170,7 @@
             normalizeEffects(doc);
             normalizeBackgroundSource(doc);
             normalizeOverlay(doc);
+            normalizeGradientStops(doc);
             doc._selectedId = selected;
             // It carries server paths but no decoded bitmaps.
             bgImageEl = null;
@@ -2277,16 +2317,15 @@
         // ------------------------------------------------------------------
 
         // Builds the canvas colour-stop list from gradient settings — the explicit
-        // Stops (sorted, clamped) when there are 2+, else a black→white fallback,
-        // mirroring DocumentRenderer.BuildColorStops.
+        // Stops (sorted, clamped) when there are 2+, else the server's StartColor/EndColor
+        // fallback, mirroring DocumentRenderer.BuildColorStops. normalizeGradientStops
+        // already folds those into Stops at load; this covers a document that skipped it.
         function gradientStops(g) {
-            var stops = (g.Stops || []).slice().sort(function (a, b) { return a.Position - b.Position; });
-            if (stops.length >= 2) {
-                return stops.map(function (s) {
-                    return { pos: Math.max(0, Math.min(1, s.Position)), color: s.Color || '#808080' };
-                });
-            }
-            return [{ pos: 0, color: '#000000' }, { pos: 1, color: '#ffffff' }];
+            var stops = (g.Stops || []).filter(Boolean).sort(function (a, b) { return a.Position - b.Position; });
+            if (stops.length < 2) { stops = gradientFallbackStops(g); }
+            return stops.map(function (s) {
+                return { pos: Math.max(0, Math.min(1, s.Position)), color: s.Color || '#808080' };
+            });
         }
 
         // How many sub-segments each adjacent pair of overlay stops is split into. 8 is
@@ -2483,8 +2522,17 @@
             return '"Noto Sans", sans-serif';
         }
 
+        // An uploaded font is registered (ensureLayerFont) as one FontFace with no weight
+        // descriptor, i.e. a single 400 face, and the server renders custom fonts at their own
+        // weight: DocumentRenderer.CreateFont ignores Weight for them. Asking the canvas for
+        // 700 of a 400-only family makes the browser fake a bold the cover will never have,
+        // so a ready custom font is requested at 400. While it is loading or failed,
+        // fontFamilyFor draws Noto Sans instead, which the server's fallback also renders at
+        // layer.Weight, so the weight is kept then (same 'ready' test as fontFamilyFor).
         function canvasFont(layer, fontPx) {
-            return layer.Weight + ' ' + fontPx + 'px ' + fontFamilyFor(layer);
+            var entry = layer.FontPath && _customFonts[layer.FontPath];
+            var weight = entry && entry.state === 'ready' ? 400 : layer.Weight;
+            return weight + ' ' + fontPx + 'px ' + fontFamilyFor(layer);
         }
 
         // Fetches an uploaded font through the authenticated endpoint and registers it with
@@ -2511,12 +2559,61 @@
                 .catch(function () { _customFonts[path].state = 'failed'; });
         }
 
-        // One text layer: outline (multi-pass strokeText), shadow (ctx.shadow*),
-        // then fill — mirroring RenderTextLayer. Font px keys off doc.Canvas.Height
-        // (the design's reference resolution), matching the server's font sizing.
+        // Every text value authored in pixels (font size, shadow blur and offset, outline
+        // width) is relative to the design's reference resolution, doc.Canvas.Height. The
+        // main canvas IS that size (factor 1). The in-context thumbnails are not, and they
+        // used to draw full-size text into a 180px-tall box. This is the server's own rule
+        // (CoverArtService.ScaleDocumentForCanvas): positions are already normalized, and pixel
+        // values scale by targetHeight / referenceHeight.
+        function textScale(H) {
+            return doc.Canvas.Height > 0 ? H / doc.Canvas.Height : 1;
+        }
+
+        // Font px for a text layer drawn into a canvas H pixels tall. The server points
+        // Canvas.Height at the scaled size and then clamps Size * Height to [8, 1024], so the
+        // clamp comes AFTER scaling (identical on the main canvas, where H is the reference).
+        function textFontPx(layer, H) {
+            return Math.max(8, Math.min(1024, layer.Size * H));
+        }
+
+        // Paints ONLY the shadow of a text layer's glyphs. ctx is already translated and
+        // rotated to the layer anchor, with font, alignment and fill set. A plain shadowed
+        // fillText also paints the glyphs, which drawTextLayer's real fill then paints again.
+        // At Opacity < 1 that double coat came out denser than the server, which fills once.
+        // So the glyphs are pushed far off the bitmap in DEVICE space and the shadow is pulled
+        // back by the same distance. The HTML canvas spec says shadow offsets and blur "are
+        // not affected by the current transformation matrix", so the shadow lands exactly
+        // where a plain shadowed fill would have put it (screen-space offset, which the
+        // server now matches), and the glyphs land nowhere. Clamps match RenderTextLayer.
+        //
+        // The device matrix is built directly from the anchor (px, py) and the rotation:
+        // both callers (renderDocument, drawDocInto) reach drawTextLayer with an identity
+        // CTM, so the layer's matrix is exactly translate(px, py) * rotate. Reading the
+        // current matrix back needs a matrix API older engines (Chromium < 68, Firefox < 70)
+        // lack, and a throw here aborted the whole render with this layer's save() still on
+        // the stack.
+        function drawTextShadowOnly(ctx, layer, fontPx, k, px, py) {
+            var content = layer.Content || '';
+            var r = (layer.Rotation || 0) * Math.PI / 180, c = Math.cos(r), s = Math.sin(r);
+            // Far enough that no glyph, at any rotation, can still touch the bitmap: the
+            // anchor's device x plus the text's longest possible reach from it.
+            var shift = Math.ceil(Math.abs(px) + ctx.measureText(content).width + fontPx) + 64;
+            ctx.save();
+            ctx.setTransform(c, s, -s, c, px - shift, py);
+            ctx.shadowColor = layer.Shadow.Color;
+            ctx.shadowBlur = Math.max(0, Math.min(50, layer.Shadow.Blur)) * k;
+            ctx.shadowOffsetX = Math.max(-50, Math.min(50, layer.Shadow.OffsetX)) * k + shift;
+            ctx.shadowOffsetY = Math.max(-50, Math.min(50, layer.Shadow.OffsetY)) * k;
+            ctx.fillText(content, 0, 0);
+            ctx.restore();
+        }
+
+        // One text layer: shadow, then outline, then fill, mirroring RenderTextLayer.
+        // Pixel values are scaled for the target canvas (textScale).
         function drawTextLayer(ctx, layer, W, H) {
             var px = normToPx(layer.X, W), py = normToPx(layer.Y, H);
-            var fontPx = Math.max(8, Math.min(1024, layer.Size * doc.Canvas.Height));
+            var k = textScale(H);
+            var fontPx = textFontPx(layer, H);
             ctx.save();
             ctx.globalAlpha = layer.Opacity;
             // Rotate about the layer's own anchor and draw at the local origin —
@@ -2533,16 +2630,14 @@
             // OVER the outline — the server has always drawn it underneath.
             ctx.fillStyle = layer.Color;
             if (layer.Shadow && layer.Shadow.Enabled) {
-                ctx.save();
-                ctx.shadowColor = layer.Shadow.Color;
-                ctx.shadowBlur = layer.Shadow.Blur;
-                ctx.shadowOffsetX = layer.Shadow.OffsetX;
-                ctx.shadowOffsetY = layer.Shadow.OffsetY;
-                ctx.fillText(layer.Content, 0, 0);
-                ctx.restore();
+                drawTextShadowOnly(ctx, layer, fontPx, k, px, py);
             }
-            if (layer.Outline && layer.Outline.Enabled) {
-                ctx.lineWidth = layer.Outline.Width * 2;
+            // Server order: ScaleDocumentForCanvas rounds the scaled width to an int, then
+            // RenderTextLayer clamps it to [0, 10]. A zero lineWidth is ignored by canvas
+            // (the previous width would be kept), hence the guard.
+            var outlineWidth = Math.min(10, Math.max(0, Math.round(((layer.Outline && layer.Outline.Width) || 0) * k)));
+            if (layer.Outline && layer.Outline.Enabled && outlineWidth > 0) {
+                ctx.lineWidth = outlineWidth * 2;
                 ctx.strokeStyle = layer.Outline.Color;
                 ctx.lineJoin = 'round';
                 ctx.strokeText(layer.Content, 0, 0);
@@ -2572,7 +2667,7 @@
         // the middle baseline used by drawTextLayer. Used for hit-testing and the
         // selection outline so the box tracks the rendered glyphs.
         function textLayerBounds(ctx, layer, W, H) {
-            var fontPx = Math.max(8, Math.min(1024, layer.Size * doc.Canvas.Height));
+            var fontPx = textFontPx(layer, H);
             ctx.save();
             ctx.font = canvasFont(layer, fontPx);
             var m = ctx.measureText(layer.Content || '');
@@ -4314,6 +4409,7 @@
                 normalizeEffects(doc);
                 normalizeBackgroundSource(doc);
                 normalizeOverlay(doc);
+                normalizeGradientStops(doc);
                 var titleLayer = null;
                 for (var i = 0; i < doc.Layers.length; i++) {
                     if (doc.Layers[i].Id === 'title') { titleLayer = doc.Layers[i]; break; }
@@ -4528,6 +4624,7 @@
             // Seed every control (incl. the brand gradient stops) from the default
             // document, so the UI and the live canvas start in agreement.
             normalizeOverlay(doc);
+            normalizeGradientStops(doc);
             renderLayersPanel();
             syncControlsFromDocument();
             resetOverlayEditorState();
