@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Threading;
 using CustomCoverArt.Common;
 using CustomCoverArt.Models;
@@ -196,6 +197,7 @@ public class LibraryDetectionService : ILibraryDetectionService
             }
 
             await SetPrimaryImageAsync(item, coverArtPath).ConfigureAwait(false);
+            RecordAppliedCover(item);
 
             _logger.LogInformation(
                 "Successfully updated cover art for library: {LibraryName} (ID: {LibraryId})",
@@ -301,6 +303,64 @@ public class LibraryDetectionService : ILibraryDetectionService
         return null;
     }
 
+    // The record of the cover the plugin last put on a target: the SHA-256 of the file
+    // Jellyfin actually stored. Hashing our rendered source would miss, because Jellyfin may
+    // re-encode on save (seen live: a restored poster.png differed from its backup).
+    private string AppliedRecordPath(Guid id)
+        => Path.Combine(PluginPaths.Applied(_applicationPaths), id.ToString("N") + ".sha256");
+
+    private static string Sha256Of(string path)
+    {
+        using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+        return Convert.ToHexString(SHA256.HashData(stream));
+    }
+
+    // Call after SaveImage: the item's Primary path is then the file Jellyfin wrote.
+    private void RecordAppliedCover(BaseItem item)
+    {
+        try
+        {
+            var stored = item.GetImagePath(ImageType.Primary, 0);
+            if (string.IsNullOrEmpty(stored) || !File.Exists(stored))
+            {
+                return;
+            }
+
+            var record = AppliedRecordPath(item.Id);
+            Directory.CreateDirectory(Path.GetDirectoryName(record)!);
+            File.WriteAllText(record, Sha256Of(stored));
+        }
+        catch (Exception ex)
+        {
+            // Best effort: without a record the next backup treats this cover as foreign and
+            // copies it, which is the pre-4.0.3.0 behaviour.
+            _logger.LogWarning(ex, "Could not record the cover applied to {TargetId}", item.Id);
+        }
+    }
+
+    private bool IsLastAppliedCover(Guid id, string currentPath)
+    {
+        var record = AppliedRecordPath(id);
+        return File.Exists(record)
+            && string.Equals(File.ReadAllText(record).Trim(), Sha256Of(currentPath), StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void ForgetAppliedCover(Guid id)
+    {
+        try
+        {
+            var record = AppliedRecordPath(id);
+            if (File.Exists(record))
+            {
+                File.Delete(record);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not clear the applied-cover record of {TargetId}", id);
+        }
+    }
+
     public bool HasBackup(string libraryId) => ExistingBackupPath(libraryId) is not null;
 
     public BackupResetOutcome ResetBackup(string targetId)
@@ -367,9 +427,27 @@ public class LibraryDetectionService : ILibraryDetectionService
                 return Task.FromResult(BackupOutcome.NotNeeded);
             }
 
+            // A plugin cover is never anyone's original: saving one as original.* is how early
+            // test covers became the "original" Restore brings back. Replacing it without a
+            // copy loses nothing: one in our data dir is detached before saving
+            // (SetPrimaryImageAsync), and the cover we applied last is ours anyway.
+            var pluginCover = PluginPaths.IsInsideBase(_applicationPaths, currentPath) ? "a file in the plugin's data folder"
+                : IsLastAppliedCover(id, currentPath) ? "the cover this plugin applied last"
+                : null;
+            if (pluginCover is not null)
+            {
+                _logger.LogInformation(
+                    "Not backing up the current cover of {TargetId} ({SourcePath}): it is {Reason}",
+                    libraryId, currentPath, pluginCover);
+                return Task.FromResult(BackupOutcome.NotNeeded);
+            }
+
             var backupPath = BackupPathFor(id, Path.GetExtension(currentPath));
             Directory.CreateDirectory(Path.GetDirectoryName(backupPath)!);
             File.Copy(currentPath, backupPath, overwrite: false);
+            _logger.LogInformation(
+                "Backed up the current cover of {TargetId} ({SourcePath}) to {BackupPath}",
+                libraryId, currentPath, backupPath);
             return Task.FromResult(BackupOutcome.BackedUp);
         }
         catch (Exception ex)
@@ -412,6 +490,12 @@ public class LibraryDetectionService : ILibraryDetectionService
             // Copies the backup into Jellyfin's image store; the backup file itself stays,
             // so restoring again later still works.
             await SetPrimaryImageAsync(item, backupPath).ConfigureAwait(false);
+
+            // The target shows its original again, so the record of "our" cover no longer
+            // describes what it shows. Keeping it could only mislabel the original as a plugin
+            // cover, and a Reset backup + apply would then replace it without a copy.
+            ForgetAppliedCover(id);
+            _logger.LogInformation("Restored the original cover of {TargetId} from {BackupPath}", libraryId, backupPath);
             return true;
         }
         catch (Exception ex)
