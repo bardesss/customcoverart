@@ -2483,8 +2483,14 @@
             return '"Noto Sans", sans-serif';
         }
 
+        // An uploaded font is registered (ensureLayerFont) as one FontFace with no weight
+        // descriptor, i.e. a single 400 face, and the server renders custom fonts at their own
+        // weight: DocumentRenderer.CreateFont ignores Weight for them. Asking the canvas for
+        // 700 of a 400-only family makes the browser fake a bold the cover will never have,
+        // so a custom font is always requested at 400. Bundled Noto Sans keeps the weight.
         function canvasFont(layer, fontPx) {
-            return layer.Weight + ' ' + fontPx + 'px ' + fontFamilyFor(layer);
+            var weight = layer.FontPath ? 400 : layer.Weight;
+            return weight + ' ' + fontPx + 'px ' + fontFamilyFor(layer);
         }
 
         // Fetches an uploaded font through the authenticated endpoint and registers it with

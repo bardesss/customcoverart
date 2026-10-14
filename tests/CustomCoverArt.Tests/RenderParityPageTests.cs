@@ -83,4 +83,18 @@ public class RenderParityPageTests
         Assert.Contains("ctx.shadowOffsetY = Math.max(-50, Math.min(50, layer.Shadow.OffsetY)) * k;", shadow, StringComparison.Ordinal);
         Assert.Contains("ctx.shadowBlur = Math.max(0, Math.min(50, layer.Shadow.Blur)) * k;", shadow, StringComparison.Ordinal);
     }
+
+    /// <summary>
+    /// An uploaded font is registered as a single weight-400 FontFace, and the server
+    /// renders custom fonts at their own weight (CreateFont ignores Weight for them).
+    /// Requesting e.g. 700 from the canvas made the browser synthesise a bold that the
+    /// applied cover never has.
+    /// </summary>
+    [Fact]
+    public void CustomFontsAreRequestedAtTheirOwnWeight()
+    {
+        var body = FunctionBody("canvasFont");
+        Assert.Contains("var weight = layer.FontPath ? 400 : layer.Weight;", body, StringComparison.Ordinal);
+        Assert.Contains("return weight + ' ' + fontPx + 'px ' + fontFamilyFor(layer);", body, StringComparison.Ordinal);
+    }
 }
