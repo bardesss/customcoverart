@@ -91,7 +91,7 @@ public class ConfigPageStructureTests
         "ccaTemplateName", "ccaTemplateSave", "ccaTemplateSelect", "ccaTextAlign", "ccaTextColor",
         "ccaContexts", "ccaTextSize", "ccaTextSizeVal", "ccaTextWeight", "ccaTitle", "ccaUndo", "ccaRedo",
         "ccaUploadControls", "ccaWidth",
-        "ccaResetBackupBtn"
+        "ccaResetBackupBtn", "ccaCollageSpinner", "ccaCollageHint"
     };
 
     /// <summary>
@@ -258,5 +258,64 @@ public class ConfigPageStructureTests
     public void ApplyingRefreshesTheRestoreButtons()
     {
         Assert.Contains("refreshRestoreState();", FunctionBody(ConfigPage(), "applyCoverArt"), System.StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The canvas draws dim, blur, pan/zoom, overlay, effects and layers itself. The server
+    /// must therefore return the bare mosaic only, or each would be applied twice.
+    /// </summary>
+    [Fact]
+    public void CollagePreview_AsksTheServerForTheBareMosaicOnly()
+    {
+        var body = FunctionBody(ConfigPage(), "collageRequestDocument");
+        foreach (var expected in new[]
+        {
+            "Layers: []", "Effects: defaultEffects()", "Overlay: null", "Gradient: null",
+            "Blur: 0, Dim: 0", "OffsetX: 0, OffsetY: 0, Scale: 1", "Format: 'png'",
+            "Collage: buildCollageFromControls()",
+        })
+        {
+            Assert.Contains(expected, body, System.StringComparison.Ordinal);
+        }
+    }
+
+    /// <summary>Each request is a full server-side collage, so only collage inputs may trigger one.</summary>
+    [Fact]
+    public void CollagePreview_IsKeyedOnTheCollageInputsAlone()
+    {
+        var page = ConfigPage();
+        var key = FunctionBody(page, "collageKey");
+        foreach (var input in new[] { "c.SourceId", "c.Density", "c.Seed", "doc.Canvas.Width", "doc.Canvas.Height" })
+        {
+            Assert.Contains(input, key, System.StringComparison.Ordinal);
+        }
+        foreach (var unrelated in new[] { "Layers", "Effects", "Transform", "Dim", "Blur" })
+        {
+            Assert.DoesNotContain(unrelated, key, System.StringComparison.Ordinal);
+        }
+
+        Assert.Contains("syncCollageBitmap();", FunctionBody(page, "renderDocument"), System.StringComparison.Ordinal);
+        Assert.Contains("debounce(fetchCollageBitmap, 400)", page, System.StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CollagePreview_DropsStaleAnswers_AndRevokesItsUrls()
+    {
+        var page = ConfigPage();
+        var fetch = FunctionBody(page, "fetchCollageBitmap");
+        Assert.Contains("token !== _collageToken", fetch, System.StringComparison.Ordinal);
+        Assert.Contains("URL.revokeObjectURL(url)", fetch, System.StringComparison.Ordinal);
+        Assert.Contains("URL.revokeObjectURL(_collageUrl)", FunctionBody(page, "releaseCollageBitmap"), System.StringComparison.Ordinal);
+        Assert.Contains("_collageToken++", FunctionBody(page, "syncCollageBitmap"), System.StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TheCanvasPaintsTheBitmapOfTheChosenSource()
+    {
+        var page = ConfigPage();
+        Assert.Contains("collageBgEl", FunctionBody(page, "activeBgBitmap"), System.StringComparison.Ordinal);
+        var paint = FunctionBody(page, "paintBackgroundOnly");
+        Assert.Contains("activeBgBitmap()", paint, System.StringComparison.Ordinal);
+        Assert.DoesNotContain("bgImageEl", paint, System.StringComparison.Ordinal);
     }
 }

@@ -491,7 +491,9 @@
                         <div class="ccaPreviewWrap">
                             <canvas id="ccaCanvas" class="ccaCanvas" width="1400" height="1400" aria-label="Cover art canvas"></canvas>
                             <div id="ccaPreviewPlaceholder" class="ccaPreviewPlaceholder" data-i18n="preview.placeholder">The preview appears here automatically.</div>
+                            <div id="ccaCollageSpinner" class="ccaSpinner" aria-hidden="true" hidden></div>
                         </div>
+                        <div class="fieldDescription" id="ccaCollageHint" data-i18n="preview.collageFail" hidden>The collage preview could not be loaded. Use Show server render to see it.</div>
                         <div class="ccaActions ccaStickyApply">
                             <button is="emby-button" type="button" id="ccaApplyBtn" class="raised block button-submit" disabled><span data-i18n="action.apply">Apply to library</span></button>
                             <button is="emby-button" type="button" id="ccaServerRender" class="raised block"><span data-i18n="action.serverRender">Show server render</span></button>
@@ -923,7 +925,7 @@
                 'hint.font': 'TTF, OTF, TTC, WOFF or WOFF2 · up to 5 MB. Leave empty to use the bundled Noto Sans.',
                 'card.preview': 'Preview', 'preview.placeholder': 'The preview appears here automatically.',
                 'bg.adjust': 'Reposition background (drag to pan, scroll or pinch to zoom)',
-                'action.apply': 'Apply to library', 'action.applying': 'Applying…', 'action.download': 'Download image', 'action.serverRender': 'Show server render', 'serverrender.label': 'Authoritative render (server)', 'preview.hint': 'The preview updates automatically as you adjust settings.',
+                'action.apply': 'Apply to library', 'action.applying': 'Applying…', 'action.download': 'Download image', 'action.serverRender': 'Show server render', 'serverrender.label': 'Authoritative render (server)', 'preview.hint': 'The preview updates automatically as you adjust settings.', 'preview.collageFail': 'The collage preview could not be loaded. Use Show server render to see it.',
                 'modal.title': 'Select a poster', 'modal.search': 'Search…', 'modal.alltypes': 'All types',
                 'ty.movies': 'Movies', 'ty.series': 'Series', 'ty.seasons': 'Seasons', 'ty.albums': 'Albums', 'ty.artists': 'Artists', 'ty.books': 'Books', 'ty.musicvideos': 'Music videos', 'ty.photos': 'Photos', 'modal.prev': 'Previous', 'modal.next': 'Next',
                 'dyn.loading': 'Loading…', 'dyn.errorItems': 'Error loading items', 'dyn.noItems': 'No items found', 'dyn.page': 'Page {0} of {1}',
@@ -985,7 +987,7 @@
                 'hint.font': 'TTF, OTF, TTC, WOFF of WOFF2 · max. 5 MB. Laat leeg voor de meegeleverde Noto Sans.',
                 'card.preview': 'Voorbeeld', 'preview.placeholder': 'Het voorbeeld verschijnt hier automatisch.',
                 'bg.adjust': 'Achtergrond verplaatsen (sleep om te verschuiven, scroll of knijp om te zoomen)',
-                'action.apply': 'Toepassen op bibliotheek', 'action.applying': 'Bezig met toepassen…', 'action.download': 'Afbeelding downloaden', 'action.serverRender': 'Serverweergave tonen', 'serverrender.label': 'Gezaghebbende weergave (server)', 'preview.hint': 'Het voorbeeld wordt automatisch bijgewerkt terwijl je instellingen aanpast.',
+                'action.apply': 'Toepassen op bibliotheek', 'action.applying': 'Bezig met toepassen…', 'action.download': 'Afbeelding downloaden', 'action.serverRender': 'Serverweergave tonen', 'serverrender.label': 'Gezaghebbende weergave (server)', 'preview.hint': 'Het voorbeeld wordt automatisch bijgewerkt terwijl je instellingen aanpast.', 'preview.collageFail': 'Het collagevoorbeeld kon niet worden geladen. Gebruik Serverweergave tonen om het te zien.',
                 'modal.title': 'Selecteer een poster', 'modal.search': 'Zoeken…', 'modal.alltypes': 'Alle types',
                 'ty.movies': 'Films', 'ty.series': 'Series', 'ty.seasons': 'Seizoenen', 'ty.albums': 'Albums', 'ty.artists': 'Artiesten', 'ty.books': 'Boeken', 'ty.musicvideos': 'Videoclips', 'ty.photos': 'Foto\'s', 'modal.prev': 'Vorige', 'modal.next': 'Volgende',
                 'dyn.loading': 'Laden…', 'dyn.errorItems': 'Fout bij laden van items', 'dyn.noItems': 'Geen items gevonden', 'dyn.page': 'Pagina {0} van {1}',
@@ -1047,7 +1049,7 @@
                 'hint.font': 'TTF, OTF, TTC, WOFF o WOFF2 · hasta 5 MB. Déjalo vacío para usar la Noto Sans incluida.',
                 'card.preview': 'Vista previa', 'preview.placeholder': 'La vista previa aparecerá aquí automáticamente.',
                 'bg.adjust': 'Reposicionar el fondo (arrastra para desplazar, usa la rueda o pellizca para acercar)',
-                'action.apply': 'Aplicar a la biblioteca', 'action.applying': 'Aplicando…', 'action.download': 'Descargar imagen', 'action.serverRender': 'Mostrar el render del servidor', 'serverrender.label': 'Render de referencia (servidor)', 'preview.hint': 'La vista previa se actualiza automáticamente mientras ajustas los valores.',
+                'action.apply': 'Aplicar a la biblioteca', 'action.applying': 'Aplicando…', 'action.download': 'Descargar imagen', 'action.serverRender': 'Mostrar el render del servidor', 'serverrender.label': 'Render de referencia (servidor)', 'preview.hint': 'La vista previa se actualiza automáticamente mientras ajustas los valores.', 'preview.collageFail': 'No se pudo cargar la vista previa del collage. Usa «Mostrar el render del servidor» para verlo.',
                 'modal.title': 'Selecciona un póster', 'modal.search': 'Buscar…', 'modal.alltypes': 'Todos los tipos',
                 'ty.movies': 'Películas', 'ty.series': 'Series', 'ty.seasons': 'Temporadas', 'ty.albums': 'Álbumes', 'ty.artists': 'Artistas', 'ty.books': 'Libros', 'ty.musicvideos': 'Videoclips', 'ty.photos': 'Fotos', 'modal.prev': 'Anterior', 'modal.next': 'Siguiente',
                 'dyn.loading': 'Cargando…', 'dyn.errorItems': 'Error al cargar los elementos', 'dyn.noItems': 'No se han encontrado elementos', 'dyn.page': 'Página {0} de {1}',
@@ -1362,14 +1364,130 @@
         }
         var doc = defaultDocument();
 
-        // CRITICAL canvas-source invariant: bgImageEl must ONLY ever be assigned an
-        // <img> loaded from a blob: object-URL (URL.createObjectURL of a client File
-        // or a fetched Blob). A blob: URL adopts the document origin so the canvas is
+        // CRITICAL canvas-source invariant: bgImageEl AND collageBgEl must ONLY ever be
+        // assigned an <img> loaded from a blob: object-URL (URL.createObjectURL of a client
+        // File or a fetched Blob). A blob: URL adopts the document origin so the canvas is
         // never tainted (Phase 3's getImageData/palette + client grain depend on it).
-        // NEVER point it at ApiClient.getImageUrl(...) or a server /upload path.
-        // Wiring the upload/poster Blob happens in Task 8; here it stays null and the
-        // gradient default renders.
+        // NEVER point either at ApiClient.getImageUrl(...) or a server /upload path.
+        // bgImageEl is the user's image (upload or poster pick); collageBgEl the server-built
+        // mosaic. Which one is painted is decided by activeBgBitmap(), so switching between
+        // image and collage neither loses the uploaded bitmap nor paints a stale one.
         var bgImageEl = null;
+
+        // The bitmap the canvas paints as the background right now, or null when nothing
+        // drawable is loaded (the gradient or flat colour renders instead).
+        function activeBgBitmap() {
+            var img = doc.Background.Source === 'collage' ? collageBgEl : bgImageEl;
+            return (img && img.complete && img.naturalWidth) ? img : null;
+        }
+
+        // --- Collage background on the live canvas ------------------------------
+        // The canvas cannot build a poster collage (the posters are server files), so it
+        // asks the server for the bare mosaic and then treats it exactly like an uploaded
+        // image: drawBackgroundImage applies Fit, Transform and Blur, paintBackgroundOnly
+        // the dim, and the overlay, effects and layers are drawn on top as usual. That is
+        // the server's own order (CollageComposer output -> ApplyBackgroundLayer), so the
+        // request strips everything the canvas adds itself, or it would be applied twice.
+        var collageBgEl = null;      // <img> from a blob: URL of the server's PNG (invariant above)
+        var _collageUrl = null;      // collageBgEl's object URL, revoked when replaced
+        var _collageWanted = '';     // collageKey() the canvas should be showing ('' = none)
+        var _collageToken = 0;       // bumped per request and per change: older answers are dropped
+
+        // Everything the server's mosaic depends on, and nothing else: text, effect and
+        // background-adjustment edits leave it alone, so they never trigger a request.
+        function collageKey() {
+            var c = buildCollageFromControls();
+            return [c.SourceId, c.SourceType, c.Density, c.Seed, doc.Canvas.Width, doc.Canvas.Height].join('|');
+        }
+
+        // The background-only document for the mosaic: the same collage at the same size,
+        // drawn untransformed with no blur, dim, gradient, overlay, effects or layers.
+        function collageRequestDocument() {
+            return {
+                Version: doc.Version,
+                Canvas: { Width: doc.Canvas.Width, Height: doc.Canvas.Height, Format: 'png', DimensionPreset: doc.Canvas.DimensionPreset },
+                Background: {
+                    Source: 'collage', ImagePath: '', Fit: 'cover',
+                    Transform: { OffsetX: 0, OffsetY: 0, Scale: 1 },
+                    Blur: 0, Dim: 0, DimColor: '#000000',
+                    Gradient: null, Overlay: null, Animation: null,
+                    Collage: buildCollageFromControls()
+                },
+                Effects: defaultEffects(),
+                Layers: []
+            };
+        }
+
+        function setCollageBusy(on) {
+            var spinner = el('ccaCollageSpinner');
+            if (spinner) { spinner.hidden = !on; }
+        }
+
+        function showCollageHint(on) {
+            var hint = el('ccaCollageHint');
+            if (hint) { hint.hidden = !on; }
+        }
+
+        function releaseCollageBitmap() {
+            if (_collageUrl) { URL.revokeObjectURL(_collageUrl); }
+            _collageUrl = null;
+            collageBgEl = null;
+            showCollageHint(false);
+        }
+
+        // Called on every render; does nothing unless the collage inputs changed.
+        function syncCollageBitmap() {
+            var wanted = (doc.Background.Source === 'collage' && state.libraryId) ? collageKey() : '';
+            if (wanted === _collageWanted) { return; }
+            _collageWanted = wanted;
+            _collageToken++;                 // whatever is in flight now answers an old question
+            if (!wanted) {
+                releaseCollageBitmap();
+                setCollageBusy(false);
+                return;
+            }
+            setCollageBusy(true);
+            requestCollageBitmap();
+        }
+
+        function fetchCollageBitmap() {
+            if (!_collageWanted) { return; }
+            var token = ++_collageToken;
+            authFetch('CustomCoverArt/document/preview', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(collageRequestDocument())
+            }).then(function (r) {
+                if (!r.ok) { throw new Error('collage render returned ' + r.status); }
+                return r.blob();
+            }).then(function (blob) {
+                if (token !== _collageToken) { return; }
+                var url = URL.createObjectURL(blob);
+                var img = new Image();
+                img.onload = function () {
+                    if (token !== _collageToken) { URL.revokeObjectURL(url); return; }
+                    releaseCollageBitmap();
+                    collageBgEl = img;
+                    _collageUrl = url;
+                    setCollageBusy(false);
+                    scheduleRender();
+                };
+                img.onerror = function () {
+                    URL.revokeObjectURL(url);
+                    collageFailed(token);
+                };
+                img.src = url;
+            }).catch(function () { collageFailed(token); });
+        }
+        var requestCollageBitmap = debounce(fetchCollageBitmap, 400);
+
+        // Keeps whatever was showing (an older mosaic, or the flat base colour) and says why
+        // the collage is missing. The same inputs are not retried; changing one is.
+        function collageFailed(token) {
+            if (token !== _collageToken) { return; }
+            setCollageBusy(false);
+            showCollageHint(true);
+        }
 
         // Background pan/zoom mode (Task 9): when true, canvas drag/wheel/pinch
         // mutate doc.Background.Transform instead of selecting/dragging a text
@@ -1610,6 +1728,8 @@
             var W = cv.width, H = cv.height;
             ctx.clearRect(0, 0, W, H);
 
+            // Fetches a new server mosaic only when a collage input changed.
+            syncCollageBitmap();
             paintBackgroundOnly(ctx, W, H);
 
             // Effects order is a contract shared with the server (EffectsComposer):
@@ -1653,8 +1773,9 @@
         // blob-loaded image if one is ready, else the gradient, else a flat fill.
         function paintBackgroundOnly(ctx, W, H) {
             var drewImage = false;
-            if (bgImageEl && bgImageEl.complete && bgImageEl.naturalWidth) {
-                drawBackgroundImage(ctx, bgImageEl, W, H);
+            var bitmap = activeBgBitmap();
+            if (bitmap) {
+                drawBackgroundImage(ctx, bitmap, W, H);
                 drewImage = true;
             } else if (doc.Background.Gradient && doc.Background.Gradient.IsEnabled) {
                 drawGradient(ctx, doc.Background.Gradient, W, H);
@@ -2558,7 +2679,7 @@
             _pointers[ev.pointerId] = { x: ev.clientX, y: ev.clientY };
 
             if (bgAdjustMode) {
-                if (!bgImageEl) { return; } // nothing to reposition without a loaded image
+                if (!activeBgBitmap()) { return; } // nothing to reposition without a loaded image
                 if (Object.keys(_pointers).length >= 2) {
                     // Second finger down: switch to pinch-zoom, cancel any pan in flight.
                     _bgDrag = null;
@@ -2615,7 +2736,7 @@
             if (_pointers[ev.pointerId]) { _pointers[ev.pointerId] = { x: ev.clientX, y: ev.clientY }; }
 
             if (bgAdjustMode) {
-                if (!bgImageEl) { return; }
+                if (!activeBgBitmap()) { return; }
                 if (Object.keys(_pointers).length >= 2 && _pinchStartDist > 0) {
                     var dist = pointerDistance();
                     var scale = _pinchStartScale * (dist / _pinchStartDist);
@@ -2636,7 +2757,7 @@
                 // Natural "grab and slide" direction: dragging right/down should make
                 // the image follow the cursor, which means the sampled source rect
                 // shifts the OTHER way — the offset moves opposite the drag delta.
-                var g = backgroundGeometry(bgImageEl, cv.width, cv.height);
+                var g = backgroundGeometry(activeBgBitmap(), cv.width, cv.height);
                 if (g.gainX > 0) {
                     doc.Background.Transform.OffsetX = Math.max(-1, Math.min(1,
                         _bgDrag.origOffsetX - (bgPt.x - _bgDrag.startX) / g.gainX));
@@ -3673,6 +3794,7 @@
                 state.libraryId = this.value;
                 updateUI();
                 refreshRestoreState();
+                scheduleRender(); // a collage background follows the target
             });
 
             el('ccaRestoreBtn').addEventListener('click', function () {
@@ -3967,7 +4089,7 @@
             el('ccaTargetType').addEventListener('change', function () {
                 Dashboard.showLoadingMsg();
                 loadLibraries()
-                    .then(function () { updateUI(); updateBackgroundVisibility(); refreshRestoreState(); loadBatchList(); Dashboard.hideLoadingMsg(); })
+                    .then(function () { updateUI(); updateBackgroundVisibility(); refreshRestoreState(); loadBatchList(); Dashboard.hideLoadingMsg(); scheduleRender(); })
                     .catch(function () { Dashboard.hideLoadingMsg(); });
             });
 
@@ -4049,10 +4171,10 @@
             cv.addEventListener('pointercancel', onCanvasPointerUp);
 
             // Mouse-wheel zoom of the background, only while repositioning it and
-            // only when an image is actually loaded (bgImageEl) — otherwise a no-op
+            // only when an image is actually loaded (activeBgBitmap) — otherwise a no-op
             // so the page can still scroll normally.
             cv.addEventListener('wheel', function (ev) {
-                if (!bgAdjustMode || !bgImageEl) { return; }
+                if (!bgAdjustMode || !activeBgBitmap()) { return; }
                 ev.preventDefault();
                 var s = doc.Background.Transform.Scale * (ev.deltaY < 0 ? 1.05 : 0.95);
                 doc.Background.Transform.Scale = Math.min(4, Math.max(1, s));
