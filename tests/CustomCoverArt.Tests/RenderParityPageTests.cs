@@ -97,4 +97,41 @@ public class RenderParityPageTests
         Assert.Contains("var weight = layer.FontPath ? 400 : layer.Weight;", body, StringComparison.Ordinal);
         Assert.Contains("return weight + ' ' + fontPx + 'px ' + fontFamilyFor(layer);", body, StringComparison.Ordinal);
     }
+
+    /// <summary>
+    /// With fewer than two Stops the server draws StartColor to EndColor (BuildColorStops),
+    /// but the canvas drew black to white and the stop editor showed the brand colours without
+    /// writing them back: three different gradients for one legacy template. The client
+    /// fallback must be the server's, including its defaults.
+    /// </summary>
+    [Fact]
+    public void GradientFallbackMatchesTheServer()
+    {
+        var page = ConfigPage();
+        var start = Regex.Match(page, @"var GRADIENT_FALLBACK_START = '(#[0-9a-fA-F]{6})';");
+        var end = Regex.Match(page, @"var GRADIENT_FALLBACK_END = '(#[0-9a-fA-F]{6})';");
+        Assert.True(start.Success && end.Success, "Gradient fallback constants not found.");
+
+        var defaults = new GradientSettings();
+        Assert.Equal(defaults.StartColor, start.Groups[1].Value, ignoreCase: true);
+        Assert.Equal(defaults.EndColor, end.Groups[1].Value, ignoreCase: true);
+
+        var stops = FunctionBody("gradientStops");
+        Assert.Contains("gradientFallbackStops(g)", stops, StringComparison.Ordinal);
+        Assert.DoesNotContain("'#ffffff'", stops, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Migration runs on every load path (init, template load, undo/redo snapshot), the
+    /// same three places as the other client normalizers, so the document, the stop editor
+    /// and the canvas all hold the two colours the server will draw.
+    /// </summary>
+    [Fact]
+    public void GradientStopsAreMigratedOnEveryLoadPath()
+    {
+        var calls = Regex.Matches(ConfigPage(), @"normalizeGradientStops\(doc\);").Count;
+        Assert.True(calls == 3, $"Expected normalizeGradientStops(doc) at init, template load and restoreSnapshot; found {calls}.");
+        Assert.Contains("normalizeGradientStops(doc);", FunctionBody("restoreSnapshot"), StringComparison.Ordinal);
+        Assert.Contains("g.Stops = gradientFallbackStops(g);", FunctionBody("normalizeGradientStops"), StringComparison.Ordinal);
+    }
 }

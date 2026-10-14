@@ -1338,6 +1338,42 @@
             return d;
         }
 
+        // Client mirror of DocumentRenderer.BuildColorStops' fallback. A background gradient
+        // with fewer than two Stops renders on the server as StartColor -> EndColor (Jellyfin
+        // purple -> blue by default, GradientSettings in CoverArtModels.cs). The canvas used
+        // to draw black -> white instead, and the stop editor showed the brand colours without
+        // writing them back. Legacy templates are exactly that shape. Folding Start/End into
+        // Stops makes the document say what the server draws, and the server renders the
+        // migrated document identically: two stops at 0 and 1 ARE its own fallback.
+        // Runs on LOAD only, like the normalizers above.
+        var GRADIENT_FALLBACK_START = '#aa5cc3';
+        var GRADIENT_FALLBACK_END = '#00a4dc';
+
+        // A colour the server's SafeColor would accept (Color.ParseHex: #rgb, #rgba, #rrggbb,
+        // #rrggbbaa, '#' optional), normalised with a '#'; anything else gets `fallback`,
+        // which is what SafeColor does.
+        function serverHexOr(hex, fallback) {
+            var s = String(hex == null ? '' : hex).trim();
+            if (!/^#?([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(s)) { return fallback; }
+            return s.charAt(0) === '#' ? s : '#' + s;
+        }
+
+        // The two stops the server falls back to: a MISSING Start/End takes the C# default,
+        // and an unparseable one takes SafeColor's black/white.
+        function gradientFallbackStops(g) {
+            var start = pick(g, 'StartColor'), end = pick(g, 'EndColor');
+            return [
+                { Color: serverHexOr(start === undefined ? GRADIENT_FALLBACK_START : start, '#000000'), Position: 0, Alpha: 1 },
+                { Color: serverHexOr(end === undefined ? GRADIENT_FALLBACK_END : end, '#ffffff'), Position: 1, Alpha: 1 }
+            ];
+        }
+
+        function normalizeGradientStops(d) {
+            var g = d.Background && d.Background.Gradient;
+            if (g && (!g.Stops || g.Stops.length < 2)) { g.Stops = gradientFallbackStops(g); }
+            return d;
+        }
+
         function defaultDocument() {
             return {
                 Version: 2,
@@ -2131,6 +2167,7 @@
             normalizeEffects(doc);
             normalizeBackgroundSource(doc);
             normalizeOverlay(doc);
+            normalizeGradientStops(doc);
             doc._selectedId = selected;
             // It carries server paths but no decoded bitmaps.
             bgImageEl = null;
@@ -2277,16 +2314,15 @@
         // ------------------------------------------------------------------
 
         // Builds the canvas colour-stop list from gradient settings — the explicit
-        // Stops (sorted, clamped) when there are 2+, else a black→white fallback,
-        // mirroring DocumentRenderer.BuildColorStops.
+        // Stops (sorted, clamped) when there are 2+, else the server's StartColor/EndColor
+        // fallback, mirroring DocumentRenderer.BuildColorStops. normalizeGradientStops
+        // already folds those into Stops at load; this covers a document that skipped it.
         function gradientStops(g) {
             var stops = (g.Stops || []).slice().sort(function (a, b) { return a.Position - b.Position; });
-            if (stops.length >= 2) {
-                return stops.map(function (s) {
-                    return { pos: Math.max(0, Math.min(1, s.Position)), color: s.Color || '#808080' };
-                });
-            }
-            return [{ pos: 0, color: '#000000' }, { pos: 1, color: '#ffffff' }];
+            if (stops.length < 2) { stops = gradientFallbackStops(g); }
+            return stops.map(function (s) {
+                return { pos: Math.max(0, Math.min(1, s.Position)), color: s.Color || '#808080' };
+            });
         }
 
         // How many sub-segments each adjacent pair of overlay stops is split into. 8 is
@@ -4360,6 +4396,7 @@
                 normalizeEffects(doc);
                 normalizeBackgroundSource(doc);
                 normalizeOverlay(doc);
+                normalizeGradientStops(doc);
                 var titleLayer = null;
                 for (var i = 0; i < doc.Layers.length; i++) {
                     if (doc.Layers[i].Id === 'title') { titleLayer = doc.Layers[i]; break; }
@@ -4574,6 +4611,7 @@
             // Seed every control (incl. the brand gradient stops) from the default
             // document, so the UI and the live canvas start in agreement.
             normalizeOverlay(doc);
+            normalizeGradientStops(doc);
             renderLayersPanel();
             syncControlsFromDocument();
             resetOverlayEditorState();
