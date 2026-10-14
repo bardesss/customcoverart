@@ -496,7 +496,11 @@ public static class DocumentRenderer
                 if (!rotate.IsIdentity) { sc.SetDrawingTransform(rotate); }
                 sc.DrawText(shadowOptions, layer.Content, shadowColor);
             });
-            shadowSurface.Mutate(sc => sc.GaussianBlur(shadowBlur));
+            // Canvas shadowBlur is NOT a sigma: the HTML spec defines the shadow Gaussian's
+            // standard deviation as shadowBlur / 2, while ImageSharp's GaussianBlur takes the
+            // sigma itself. Passing Blur straight through made every server shadow twice as
+            // soft as the preview.
+            shadowSurface.Mutate(sc => sc.GaussianBlur(shadowBlur / 2f));
             canvas.Mutate(x => x.DrawImage(shadowSurface, Point.Empty, 1f));
         }
 
