@@ -2521,10 +2521,11 @@
             return doc.Canvas.Height > 0 ? H / doc.Canvas.Height : 1;
         }
 
-        // Font px for a text layer drawn into a canvas H pixels tall. The [8, 1024] clamp is
-        // the server's, applied at the reference resolution BEFORE scaling.
+        // Font px for a text layer drawn into a canvas H pixels tall. The server points
+        // Canvas.Height at the scaled size and then clamps Size * Height to [8, 1024], so the
+        // clamp comes AFTER scaling (identical on the main canvas, where H is the reference).
         function textFontPx(layer, H) {
-            return Math.max(8, Math.min(1024, layer.Size * doc.Canvas.Height)) * textScale(H);
+            return Math.max(8, Math.min(1024, layer.Size * H));
         }
 
         // Paints ONLY the shadow of a text layer's glyphs. ctx is already translated and
@@ -2576,11 +2577,12 @@
             if (layer.Shadow && layer.Shadow.Enabled) {
                 drawTextShadowOnly(ctx, layer, fontPx, k);
             }
-            // Same [0, 10] clamp as the server. A zero lineWidth is ignored by canvas
+            // Server order: ScaleDocumentForCanvas rounds the scaled width to an int, then
+            // RenderTextLayer clamps it to [0, 10]. A zero lineWidth is ignored by canvas
             // (the previous width would be kept), hence the guard.
-            var outlineWidth = Math.max(0, Math.min(10, (layer.Outline && layer.Outline.Width) || 0));
+            var outlineWidth = Math.min(10, Math.max(0, Math.round(((layer.Outline && layer.Outline.Width) || 0) * k)));
             if (layer.Outline && layer.Outline.Enabled && outlineWidth > 0) {
-                ctx.lineWidth = outlineWidth * 2 * k;
+                ctx.lineWidth = outlineWidth * 2;
                 ctx.strokeStyle = layer.Outline.Color;
                 ctx.lineJoin = 'round';
                 ctx.strokeText(layer.Content, 0, 0);

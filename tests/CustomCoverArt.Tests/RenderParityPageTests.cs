@@ -45,18 +45,21 @@ public class RenderParityPageTests
     public void TextPixelValuesAreScaledToTheTargetCanvas()
     {
         Assert.Contains("H / doc.Canvas.Height", FunctionBody("textScale"), StringComparison.Ordinal);
-        Assert.Contains("* textScale(H)", FunctionBody("textFontPx"), StringComparison.Ordinal);
+        // The server clamps AFTER scaling: Clamp(Size * scaledCanvasHeight, 8, 1024).
+        Assert.Contains("Math.max(8, Math.min(1024, layer.Size * H))", FunctionBody("textFontPx"), StringComparison.Ordinal);
 
         var draw = FunctionBody("drawTextLayer");
         Assert.Contains("var k = textScale(H);", draw, StringComparison.Ordinal);
         Assert.Contains("var fontPx = textFontPx(layer, H);", draw, StringComparison.Ordinal);
-        Assert.Contains("ctx.lineWidth = outlineWidth * 2 * k;", draw, StringComparison.Ordinal);
+        // Server order: round the scaled width, then clamp to [0, 10].
+        Assert.Contains("Math.min(10, Math.max(0, Math.round(", draw, StringComparison.Ordinal);
+        Assert.Contains("ctx.lineWidth = outlineWidth * 2;", draw, StringComparison.Ordinal);
 
         Assert.Contains("var fontPx = textFontPx(layer, H);", FunctionBody("textLayerBounds"), StringComparison.Ordinal);
 
         // The unscaled expression lives in exactly one place now: textFontPx.
-        var raw = Regex.Matches(ConfigPage(), @"layer\.Size \* doc\.Canvas\.Height").Count;
-        Assert.True(raw == 1, $"Expected 'layer.Size * doc.Canvas.Height' only inside textFontPx; found {raw}.");
+        var raw = Regex.Matches(ConfigPage(), @"layer\.Size \* (doc\.Canvas\.Height|H)\)").Count;
+        Assert.True(raw == 1, $"Expected the font-size expression only inside textFontPx; found {raw}.");
     }
 
     /// <summary>
