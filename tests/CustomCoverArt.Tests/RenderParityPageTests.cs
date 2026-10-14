@@ -58,4 +58,26 @@ public class RenderParityPageTests
         var raw = Regex.Matches(ConfigPage(), @"layer\.Size \* doc\.Canvas\.Height").Count;
         Assert.True(raw == 1, $"Expected 'layer.Size * doc.Canvas.Height' only inside textFontPx; found {raw}.");
     }
+
+    /// <summary>
+    /// A shadowed fillText paints the glyphs too, and drawTextLayer's real fill then paints
+    /// them again, so at Opacity &lt; 1 the preview's text came out denser than the server's
+    /// single fill. The shadow pass now moves the glyphs off the bitmap in device space and
+    /// pulls the shadow back by the same amount. Canvas shadow offsets ignore the transform,
+    /// so only the shadow lands.
+    /// </summary>
+    [Fact]
+    public void ShadowPassPaintsNoGlyphs()
+    {
+        var draw = FunctionBody("drawTextLayer");
+        Assert.Contains("drawTextShadowOnly(ctx, layer, fontPx, k);", draw, StringComparison.Ordinal);
+        Assert.Single(Regex.Matches(draw, @"fillText\("));
+        Assert.DoesNotContain("shadowColor", draw, StringComparison.Ordinal);
+
+        var shadow = FunctionBody("drawTextShadowOnly");
+        Assert.Contains("ctx.setTransform(new DOMMatrix([1, 0, 0, 1, -shift, 0]).multiply(m));", shadow, StringComparison.Ordinal);
+        Assert.Contains("ctx.shadowOffsetX = Math.max(-50, Math.min(50, layer.Shadow.OffsetX)) * k + shift;", shadow, StringComparison.Ordinal);
+        Assert.Contains("ctx.shadowOffsetY = Math.max(-50, Math.min(50, layer.Shadow.OffsetY)) * k;", shadow, StringComparison.Ordinal);
+        Assert.Contains("ctx.shadowBlur = Math.max(0, Math.min(50, layer.Shadow.Blur)) * k;", shadow, StringComparison.Ordinal);
+    }
 }
