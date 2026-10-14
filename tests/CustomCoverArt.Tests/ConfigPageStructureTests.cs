@@ -91,7 +91,7 @@ public class ConfigPageStructureTests
         "ccaTemplateName", "ccaTemplateSave", "ccaTemplateSelect", "ccaTextAlign", "ccaTextColor",
         "ccaContexts", "ccaTextSize", "ccaTextSizeVal", "ccaTextWeight", "ccaTitle", "ccaUndo", "ccaRedo",
         "ccaUploadControls", "ccaWidth",
-        "ccaResetBackupBtn", "ccaCollageSpinner", "ccaCollageHint"
+        "ccaResetBackupBtn", "ccaCollageSpinner", "ccaCollageHint", "ccaGifHolder"
     };
 
     /// <summary>
@@ -317,5 +317,58 @@ public class ConfigPageStructureTests
         var paint = FunctionBody(page, "paintBackgroundOnly");
         Assert.Contains("activeBgBitmap()", paint, System.StringComparison.Ordinal);
         Assert.DoesNotContain("bgImageEl", paint, System.StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// One rAF loop at ~15 fps, only while an animated GIF is the visible background and the
+    /// user has not asked for reduced motion; every way of leaving stops it.
+    /// </summary>
+    [Fact]
+    public void GifPreview_RunsOneThrottledLoop_OnlyWhileItCanBeSeen()
+    {
+        var page = ConfigPage();
+        var wanted = FunctionBody(page, "gifLoopWanted");
+        Assert.Contains("_ccaAnimatedGif", wanted, System.StringComparison.Ordinal);
+        Assert.Contains("activeBgBitmap() === bgImageEl", wanted, System.StringComparison.Ordinal);
+        Assert.Contains("isEditorOnScreen()", wanted, System.StringComparison.Ordinal);
+        Assert.Contains("_reducedMotion", wanted, System.StringComparison.Ordinal);
+        Assert.Contains("matchMedia('(prefers-reduced-motion: reduce)')", page, System.StringComparison.Ordinal);
+        Assert.Contains("document.hidden", FunctionBody(page, "isEditorOnScreen"), System.StringComparison.Ordinal);
+
+        var update = FunctionBody(page, "updateGifLoop");
+        Assert.Contains("if (!_gifLoopId)", update, System.StringComparison.Ordinal);
+        Assert.Contains("stopGifLoop()", update, System.StringComparison.Ordinal);
+
+        var tick = FunctionBody(page, "gifTick");
+        Assert.Contains("GIF_FRAME_MS", tick, System.StringComparison.Ordinal);
+        Assert.Contains("renderDocument(true)", tick, System.StringComparison.Ordinal);
+        Assert.Contains("var GIF_FRAME_MS = 1000 / 15;", page, System.StringComparison.Ordinal);
+
+        var listeners = FunctionBody(page, "bindGifLoopListeners");
+        Assert.Contains("'visibilitychange'", listeners, System.StringComparison.Ordinal);
+        Assert.Contains("'pagehide'", listeners, System.StringComparison.Ordinal);
+        Assert.Contains("bindGifLoopListeners();", FunctionBody(page, "bindEvents"), System.StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The palette and in-context refreshers are 300 ms debounces: called 15 times a second
+    /// they would never fire, so animation frames must skip them.
+    /// </summary>
+    [Fact]
+    public void GifPreview_AnimationFramesSkipTheDebouncedExtras()
+    {
+        var render = FunctionBody(ConfigPage(), "renderDocument");
+        Assert.Contains("function renderDocument(animFrame)", render, System.StringComparison.Ordinal);
+        Assert.Contains("if (!animFrame)", render, System.StringComparison.Ordinal);
+        Assert.Contains("updateGifLoop();", render, System.StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void GifPreview_BothBackgroundPathsWatchForAnimation()
+    {
+        var page = ConfigPage();
+        Assert.Contains("watchForAnimatedGif(img, file);", page, System.StringComparison.Ordinal);
+        Assert.Contains("watchForAnimatedGif(img, posterBlob);", page, System.StringComparison.Ordinal);
+        Assert.Contains("isAnimatedGif(buf)", FunctionBody(page, "watchForAnimatedGif"), System.StringComparison.Ordinal);
     }
 }
