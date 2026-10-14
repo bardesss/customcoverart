@@ -260,6 +260,33 @@ public class ConfigPageStructureTests
         Assert.Contains("refreshRestoreState();", FunctionBody(ConfigPage(), "applyCoverArt"), System.StringComparison.Ordinal);
     }
 
+    /// <summary>A slow answer for a previous target must not enable the buttons of the current one.</summary>
+    [Fact]
+    public void RefreshRestoreState_IgnoresAnAnswerForAnotherTarget()
+    {
+        var body = FunctionBody(ConfigPage(), "refreshRestoreState");
+        Assert.Contains("var requestedId = state.libraryId;", body, System.StringComparison.Ordinal);
+        Assert.Contains("if (requestedId !== state.libraryId) { return; }", body, System.StringComparison.Ordinal);
+    }
+
+    /// <summary>Switching the collage's target drops the old target's posters at once.</summary>
+    [Fact]
+    public void CollageSourceChange_ReleasesTheCurrentMosaic()
+    {
+        var body = FunctionBody(ConfigPage(), "syncCollageBitmap");
+        Assert.Contains("_collageSourceId", body, System.StringComparison.Ordinal);
+        Assert.Contains("releaseCollageBitmap();", body, System.StringComparison.Ordinal);
+        Assert.Contains("var _collageSourceId", ConfigPage(), System.StringComparison.Ordinal);
+    }
+
+    /// <summary>A batch can include the selected target, so its buttons need a refresh afterwards.</summary>
+    [Fact]
+    public void BatchApply_RefreshesTheRestoreButtons()
+    {
+        var handler = HandlerBody(ConfigPage(), "el('ccaBatchApply').addEventListener('click'");
+        Assert.Contains("refreshRestoreState();", handler, System.StringComparison.Ordinal);
+    }
+
     /// <summary>
     /// The canvas draws dim, blur, pan/zoom, overlay, effects and layers itself. The server
     /// must therefore return the bare mosaic only, or each would be applied twice.
