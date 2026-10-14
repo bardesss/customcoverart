@@ -67,18 +67,25 @@ public class RenderParityPageTests
     /// them again, so at Opacity &lt; 1 the preview's text came out denser than the server's
     /// single fill. The shadow pass now moves the glyphs off the bitmap in device space and
     /// pulls the shadow back by the same amount. Canvas shadow offsets ignore the transform,
-    /// so only the shadow lands.
+    /// so only the shadow lands. The device matrix is built from px, py and the rotation
+    /// directly (both callers enter with an identity CTM): getTransform/DOMMatrix do not
+    /// exist on older engines, and a throw there aborted the whole render mid-save.
     /// </summary>
     [Fact]
     public void ShadowPassPaintsNoGlyphs()
     {
         var draw = FunctionBody("drawTextLayer");
-        Assert.Contains("drawTextShadowOnly(ctx, layer, fontPx, k);", draw, StringComparison.Ordinal);
+        Assert.Contains("drawTextShadowOnly(ctx, layer, fontPx, k, px, py);", draw, StringComparison.Ordinal);
         Assert.Single(Regex.Matches(draw, @"fillText\("));
         Assert.DoesNotContain("shadowColor", draw, StringComparison.Ordinal);
 
         var shadow = FunctionBody("drawTextShadowOnly");
-        Assert.Contains("ctx.setTransform(new DOMMatrix([1, 0, 0, 1, -shift, 0]).multiply(m));", shadow, StringComparison.Ordinal);
+        Assert.Contains("var r = (layer.Rotation || 0) * Math.PI / 180, c = Math.cos(r), s = Math.sin(r);", shadow, StringComparison.Ordinal);
+        Assert.Contains("ctx.setTransform(c, s, -s, c, px - shift, py);", shadow, StringComparison.Ordinal);
+        Assert.Contains("Math.abs(px)", shadow, StringComparison.Ordinal);
+        var page = ConfigPage();
+        Assert.DoesNotContain("DOMMatrix", page, StringComparison.Ordinal);
+        Assert.DoesNotContain("getTransform", page, StringComparison.Ordinal);
         Assert.Contains("ctx.shadowOffsetX = Math.max(-50, Math.min(50, layer.Shadow.OffsetX)) * k + shift;", shadow, StringComparison.Ordinal);
         Assert.Contains("ctx.shadowOffsetY = Math.max(-50, Math.min(50, layer.Shadow.OffsetY)) * k;", shadow, StringComparison.Ordinal);
         Assert.Contains("ctx.shadowBlur = Math.max(0, Math.min(50, layer.Shadow.Blur)) * k;", shadow, StringComparison.Ordinal);
@@ -88,13 +95,17 @@ public class RenderParityPageTests
     /// An uploaded font is registered as a single weight-400 FontFace, and the server
     /// renders custom fonts at their own weight (CreateFont ignores Weight for them).
     /// Requesting e.g. 700 from the canvas made the browser synthesise a bold that the
-    /// applied cover never has.
+    /// applied cover never has. Only while the custom face is actually ready, though: while
+    /// it is loading or failed, fontFamilyFor falls back to Noto Sans, and the server's own
+    /// fallback (CreateFont) renders Noto at layer.Weight.
     /// </summary>
     [Fact]
     public void CustomFontsAreRequestedAtTheirOwnWeight()
     {
         var body = FunctionBody("canvasFont");
-        Assert.Contains("var weight = layer.FontPath ? 400 : layer.Weight;", body, StringComparison.Ordinal);
+        Assert.Contains("var entry = layer.FontPath && _customFonts[layer.FontPath];", body, StringComparison.Ordinal);
+        Assert.Contains("var weight = entry && entry.state === 'ready' ? 400 : layer.Weight;", body, StringComparison.Ordinal);
+        Assert.Contains("entry.state === 'ready'", FunctionBody("fontFamilyFor"), StringComparison.Ordinal);
         Assert.Contains("return weight + ' ' + fontPx + 'px ' + fontFamilyFor(layer);", body, StringComparison.Ordinal);
     }
 
@@ -133,5 +144,22 @@ public class RenderParityPageTests
         Assert.True(calls == 3, $"Expected normalizeGradientStops(doc) at init, template load and restoreSnapshot; found {calls}.");
         Assert.Contains("normalizeGradientStops(doc);", FunctionBody("restoreSnapshot"), StringComparison.Ordinal);
         Assert.Contains("g.Stops = gradientFallbackStops(g);", FunctionBody("normalizeGradientStops"), StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// A null entry in Stops is skipped by the server (BuildColorStops, DocumentMigration)
+    /// before the two-stop check. The client sorted it (a.Position on null throws) or counted
+    /// it as a real stop. Both client paths now drop nulls first.
+    /// </summary>
+    [Fact]
+    public void NullGradientStopsAreDroppedBeforeTheTwoStopCheck()
+    {
+        var normalize = FunctionBody("normalizeGradientStops");
+        Assert.Contains("g.Stops = (g.Stops || []).filter(Boolean);", normalize, StringComparison.Ordinal);
+        Assert.True(normalize.IndexOf(".filter(Boolean)", StringComparison.Ordinal) < normalize.IndexOf("< 2", StringComparison.Ordinal),
+            "normalizeGradientStops must drop null stops before the two-stop check.");
+
+        var stops = FunctionBody("gradientStops");
+        Assert.Contains("var stops = (g.Stops || []).filter(Boolean).sort(", stops, StringComparison.Ordinal);
     }
 }

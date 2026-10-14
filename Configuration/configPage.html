@@ -1370,7 +1370,10 @@
 
         function normalizeGradientStops(d) {
             var g = d.Background && d.Background.Gradient;
-            if (g && (!g.Stops || g.Stops.length < 2)) { g.Stops = gradientFallbackStops(g); }
+            if (!g) { return d; }
+            // Null entries are dropped first, as DocumentMigration/BuildColorStops do.
+            g.Stops = (g.Stops || []).filter(Boolean);
+            if (g.Stops.length < 2) { g.Stops = gradientFallbackStops(g); }
             return d;
         }
 
@@ -2318,7 +2321,7 @@
         // fallback, mirroring DocumentRenderer.BuildColorStops. normalizeGradientStops
         // already folds those into Stops at load; this covers a document that skipped it.
         function gradientStops(g) {
-            var stops = (g.Stops || []).slice().sort(function (a, b) { return a.Position - b.Position; });
+            var stops = (g.Stops || []).filter(Boolean).sort(function (a, b) { return a.Position - b.Position; });
             if (stops.length < 2) { stops = gradientFallbackStops(g); }
             return stops.map(function (s) {
                 return { pos: Math.max(0, Math.min(1, s.Position)), color: s.Color || '#808080' };
@@ -2523,9 +2526,12 @@
         // descriptor, i.e. a single 400 face, and the server renders custom fonts at their own
         // weight: DocumentRenderer.CreateFont ignores Weight for them. Asking the canvas for
         // 700 of a 400-only family makes the browser fake a bold the cover will never have,
-        // so a custom font is always requested at 400. Bundled Noto Sans keeps the weight.
+        // so a ready custom font is requested at 400. While it is loading or failed,
+        // fontFamilyFor draws Noto Sans instead, which the server's fallback also renders at
+        // layer.Weight, so the weight is kept then (same 'ready' test as fontFamilyFor).
         function canvasFont(layer, fontPx) {
-            var weight = layer.FontPath ? 400 : layer.Weight;
+            var entry = layer.FontPath && _customFonts[layer.FontPath];
+            var weight = entry && entry.state === 'ready' ? 400 : layer.Weight;
             return weight + ' ' + fontPx + 'px ' + fontFamilyFor(layer);
         }
 
@@ -2579,14 +2585,21 @@
         // not affected by the current transformation matrix", so the shadow lands exactly
         // where a plain shadowed fill would have put it (screen-space offset, which the
         // server now matches), and the glyphs land nowhere. Clamps match RenderTextLayer.
-        function drawTextShadowOnly(ctx, layer, fontPx, k) {
+        //
+        // The device matrix is built directly from the anchor (px, py) and the rotation:
+        // both callers (renderDocument, drawDocInto) reach drawTextLayer with an identity
+        // CTM, so the layer's matrix is exactly translate(px, py) * rotate. Reading the
+        // current matrix back needs a matrix API older engines (Chromium < 68, Firefox < 70)
+        // lack, and a throw here aborted the whole render with this layer's save() still on
+        // the stack.
+        function drawTextShadowOnly(ctx, layer, fontPx, k, px, py) {
             var content = layer.Content || '';
-            var m = ctx.getTransform();
+            var r = (layer.Rotation || 0) * Math.PI / 180, c = Math.cos(r), s = Math.sin(r);
             // Far enough that no glyph, at any rotation, can still touch the bitmap: the
             // anchor's device x plus the text's longest possible reach from it.
-            var shift = Math.ceil(Math.abs(m.e) + ctx.measureText(content).width + fontPx) + 64;
+            var shift = Math.ceil(Math.abs(px) + ctx.measureText(content).width + fontPx) + 64;
             ctx.save();
-            ctx.setTransform(new DOMMatrix([1, 0, 0, 1, -shift, 0]).multiply(m));
+            ctx.setTransform(c, s, -s, c, px - shift, py);
             ctx.shadowColor = layer.Shadow.Color;
             ctx.shadowBlur = Math.max(0, Math.min(50, layer.Shadow.Blur)) * k;
             ctx.shadowOffsetX = Math.max(-50, Math.min(50, layer.Shadow.OffsetX)) * k + shift;
@@ -2617,7 +2630,7 @@
             // OVER the outline — the server has always drawn it underneath.
             ctx.fillStyle = layer.Color;
             if (layer.Shadow && layer.Shadow.Enabled) {
-                drawTextShadowOnly(ctx, layer, fontPx, k);
+                drawTextShadowOnly(ctx, layer, fontPx, k, px, py);
             }
             // Server order: ScaleDocumentForCanvas rounds the scaled width to an int, then
             // RenderTextLayer clamps it to [0, 10]. A zero lineWidth is ignored by canvas
