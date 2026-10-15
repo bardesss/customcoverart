@@ -269,8 +269,10 @@ twice while it runs. Deleting a template asks first too.
 Set the output format to **Animated GIF** to export a moving cover — either passing through an
 animated-GIF background, or applying a gentle **Ken Burns** pan/zoom. GIFs are larger and only
 animate in the Jellyfin views that render GIFs. An animated-GIF background also moves in the live
-preview (about 15 frames a second while the editor is on screen); with *reduce motion* switched
-on in your system it stays still.
+preview while the editor is on screen, at the GIF's own speed (up to about 15 frames a second), in
+Chrome, Edge and Firefox; with *reduce motion* switched on in your system it stays still. Browsers
+that cannot decode an image frame by frame (such as Safari) show a still preview, but the applied
+cover still animates.
 
 ### Restoring the original
 
