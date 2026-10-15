@@ -507,14 +507,14 @@
             </div>
 
             <div id="ccaBrowserModal" class="ccaModal" style="display:none;">
-                <div class="ccaModalBox">
+                <div class="ccaModalBox" role="dialog" aria-modal="true" aria-labelledby="ccaBrowserTitle">
                     <div class="ccaModalHead">
-                        <h3 data-i18n="modal.title">Select a poster</h3>
-                        <button is="emby-button" type="button" id="ccaBrowserClose" class="ccaModalClose"><span>✕</span></button>
+                        <h3 id="ccaBrowserTitle" data-i18n="modal.title">Select a poster</h3>
+                        <button is="emby-button" type="button" id="ccaBrowserClose" class="ccaModalClose" aria-label="Close" data-i18n-aria="modal.close"><span aria-hidden="true">✕</span></button>
                     </div>
                     <div class="ccaModalFilters">
-                        <input is="emby-input" type="text" id="ccaBrowserSearch" placeholder="Search…" data-i18n-ph="modal.search" />
-                        <select is="emby-select" id="ccaBrowserType" class="emby-select">
+                        <input is="emby-input" type="text" id="ccaBrowserSearch" placeholder="Search…" data-i18n-ph="modal.search" aria-label="Search…" data-i18n-aria="modal.search" />
+                        <select is="emby-select" id="ccaBrowserType" class="emby-select" aria-label="Type" data-i18n-aria="target.type">
                             <option value="" data-i18n="modal.alltypes">All types</option>
                             <option value="Movie" data-i18n="ty.movies">Movies</option>
                             <option value="Series" data-i18n="ty.series">Series</option>
@@ -708,7 +708,7 @@
             #CustomCoverArtConfigPage .ccaLayout { display: flex; flex-direction: column; }
             #CustomCoverArtConfigPage .ccaPreviewCol {
                 order: -1; position: sticky; top: 0; z-index: 5;
-                background: var(--theme-body-background-color, #101010);
+                background: var(--cca-surface, var(--theme-body-background-color, #101010));
                 padding-bottom: .5em;
             }
             #CustomCoverArtConfigPage .ccaCanvas { max-height: 34vh; }
@@ -729,7 +729,7 @@
             #CustomCoverArtConfigPage .ccaStickyApply {
                 position: sticky; bottom: 0; z-index: 6;
                 padding: .6em 0;
-                background: var(--theme-body-background-color, #101010);
+                background: var(--cca-surface, var(--theme-body-background-color, #101010));
                 border-top: 1px solid rgba(127,127,127,.2);
             }
 
@@ -750,7 +750,7 @@
             }
             #CustomCoverArtConfigPage .ccaModalHead {
                 position: sticky; top: 0; z-index: 2;
-                background: var(--theme-body-background-color, #101010);
+                background: var(--cca-surface, var(--theme-body-background-color, #101010));
             }
             #CustomCoverArtConfigPage .ccaModalFilters { flex-wrap: wrap; gap: .5em; }
             #CustomCoverArtConfigPage .ccaModalClose { min-width: 44px; min-height: 44px; }
@@ -874,14 +874,18 @@
 
         /* Poster picker modal */
         #CustomCoverArtConfigPage .ccaModal { position: fixed; inset: 0; background: rgba(0, 0, 0, .65); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 1em; }
-        #CustomCoverArtConfigPage .ccaModalBox { background: #1b1b1b; width: 100%; max-width: 960px; max-height: 85vh; border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; border: 1px solid rgba(127, 127, 127, .25); }
+        /* --cca-surface/--cca-text are read off the live Jellyfin theme by
+           applyThemeSurface(); the literals are only the dark-theme fallback. */
+        #CustomCoverArtConfigPage .ccaModalBox { background: var(--cca-surface, #1b1b1b); color: var(--cca-text, #f2f2f2); width: 100%; max-width: 960px; max-height: 85vh; border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; border: 1px solid rgba(127, 127, 127, .25); }
         #CustomCoverArtConfigPage .ccaModalHead { display: flex; justify-content: space-between; align-items: center; padding: .75em 1em; border-bottom: 1px solid rgba(127, 127, 127, .2); }
         #CustomCoverArtConfigPage .ccaModalHead h3 { margin: 0; }
         #CustomCoverArtConfigPage .ccaModalFilters { display: flex; gap: .75em; padding: .85em 1em; border-bottom: 1px solid rgba(127, 127, 127, .2); flex-wrap: wrap; }
         #CustomCoverArtConfigPage .ccaModalFilters input { flex: 1; min-width: 180px; }
         #CustomCoverArtConfigPage .ccaPosterGrid { padding: 1em; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px; }
-        #CustomCoverArtConfigPage .ccaGridItem { cursor: pointer; border: 2px solid transparent; border-radius: 8px; overflow: hidden; background: rgba(127, 127, 127, .1); transition: border-color .15s; }
-        #CustomCoverArtConfigPage .ccaGridItem:hover { border-color: var(--theme-primary-color, #00a4dc); }
+        /* A <button> per tile (keyboard-selectable), reset to look like the old card. */
+        #CustomCoverArtConfigPage .ccaGridItem { display: block; width: 100%; margin: 0; padding: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; border: 2px solid transparent; border-radius: 8px; overflow: hidden; background: rgba(127, 127, 127, .1); transition: border-color .15s; }
+        #CustomCoverArtConfigPage .ccaGridItem:hover,
+        #CustomCoverArtConfigPage .ccaGridItem:focus-visible { border-color: var(--theme-primary-color, #00a4dc); outline: none; }
         #CustomCoverArtConfigPage .ccaGridItem img { width: 100%; height: 190px; object-fit: cover; display: block; background: #000; }
         #CustomCoverArtConfigPage .ccaGridItem .cap { padding: 7px 8px; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         #CustomCoverArtConfigPage .ccaModalPager { display: flex; gap: 1em; align-items: center; justify-content: center; padding: .85em; border-top: 1px solid rgba(127, 127, 127, .2); }
@@ -948,7 +952,7 @@
                 'card.preview': 'Preview', 'preview.placeholder': 'The preview appears here automatically.',
                 'bg.adjust': 'Reposition background (drag to pan, scroll or pinch to zoom)',
                 'action.apply': 'Apply to library', 'action.applying': 'Applying…', 'action.download': 'Download image', 'action.serverRender': 'Show server render', 'serverrender.label': 'Authoritative render (server)', 'preview.hint': 'The preview updates automatically as you adjust settings.', 'preview.collageFail': 'The collage preview could not be loaded. Use Show server render to see it.',
-                'modal.title': 'Select a poster', 'modal.search': 'Search…', 'modal.alltypes': 'All types',
+                'modal.title': 'Select a poster', 'modal.search': 'Search…', 'modal.alltypes': 'All types', 'modal.close': 'Close',
                 'ty.movies': 'Movies', 'ty.series': 'Series', 'ty.seasons': 'Seasons', 'ty.albums': 'Albums', 'ty.artists': 'Artists', 'ty.books': 'Books', 'ty.musicvideos': 'Music videos', 'ty.photos': 'Photos', 'modal.prev': 'Previous', 'modal.next': 'Next',
                 'dyn.loading': 'Loading…', 'dyn.errorItems': 'Error loading items', 'dyn.noItems': 'No items found', 'dyn.page': 'Page {0} of {1}',
                 'dyn.applied': 'Cover art applied successfully.', 'dyn.error': 'Error: {0}', 'dyn.applyFail': 'Could not apply cover art: {0}',
@@ -1019,7 +1023,7 @@
                 'card.preview': 'Voorbeeld', 'preview.placeholder': 'Het voorbeeld verschijnt hier automatisch.',
                 'bg.adjust': 'Achtergrond verplaatsen (sleep om te verschuiven, scroll of knijp om te zoomen)',
                 'action.apply': 'Toepassen op bibliotheek', 'action.applying': 'Bezig met toepassen…', 'action.download': 'Afbeelding downloaden', 'action.serverRender': 'Serverweergave tonen', 'serverrender.label': 'Gezaghebbende weergave (server)', 'preview.hint': 'Het voorbeeld wordt automatisch bijgewerkt terwijl je instellingen aanpast.', 'preview.collageFail': 'Het collagevoorbeeld kon niet worden geladen. Gebruik Serverweergave tonen om het te zien.',
-                'modal.title': 'Selecteer een poster', 'modal.search': 'Zoeken…', 'modal.alltypes': 'Alle types',
+                'modal.title': 'Selecteer een poster', 'modal.search': 'Zoeken…', 'modal.alltypes': 'Alle types', 'modal.close': 'Sluiten',
                 'ty.movies': 'Films', 'ty.series': 'Series', 'ty.seasons': 'Seizoenen', 'ty.albums': 'Albums', 'ty.artists': 'Artiesten', 'ty.books': 'Boeken', 'ty.musicvideos': 'Videoclips', 'ty.photos': 'Foto\'s', 'modal.prev': 'Vorige', 'modal.next': 'Volgende',
                 'dyn.loading': 'Laden…', 'dyn.errorItems': 'Fout bij laden van items', 'dyn.noItems': 'Geen items gevonden', 'dyn.page': 'Pagina {0} van {1}',
                 'dyn.applied': 'Cover art succesvol toegepast.', 'dyn.error': 'Fout: {0}', 'dyn.applyFail': 'Kon cover art niet toepassen: {0}',
@@ -1090,7 +1094,7 @@
                 'card.preview': 'Vista previa', 'preview.placeholder': 'La vista previa aparecerá aquí automáticamente.',
                 'bg.adjust': 'Reposicionar el fondo (arrastra para desplazar, usa la rueda o pellizca para acercar)',
                 'action.apply': 'Aplicar a la biblioteca', 'action.applying': 'Aplicando…', 'action.download': 'Descargar imagen', 'action.serverRender': 'Mostrar el render del servidor', 'serverrender.label': 'Render de referencia (servidor)', 'preview.hint': 'La vista previa se actualiza automáticamente mientras ajustas los valores.', 'preview.collageFail': 'No se pudo cargar la vista previa del collage. Usa «Mostrar el render del servidor» para verlo.',
-                'modal.title': 'Selecciona un póster', 'modal.search': 'Buscar…', 'modal.alltypes': 'Todos los tipos',
+                'modal.title': 'Selecciona un póster', 'modal.search': 'Buscar…', 'modal.alltypes': 'Todos los tipos', 'modal.close': 'Cerrar',
                 'ty.movies': 'Películas', 'ty.series': 'Series', 'ty.seasons': 'Temporadas', 'ty.albums': 'Álbumes', 'ty.artists': 'Artistas', 'ty.books': 'Libros', 'ty.musicvideos': 'Videoclips', 'ty.photos': 'Fotos', 'modal.prev': 'Anterior', 'modal.next': 'Siguiente',
                 'dyn.loading': 'Cargando…', 'dyn.errorItems': 'Error al cargar los elementos', 'dyn.noItems': 'No se han encontrado elementos', 'dyn.page': 'Página {0} de {1}',
                 'dyn.applied': 'Carátula aplicada correctamente.', 'dyn.error': 'Error: {0}', 'dyn.applyFail': 'No se ha podido aplicar la carátula: {0}',
@@ -4792,6 +4796,7 @@
 
             el('ccaBrowseBtn').addEventListener('click', openBrowser);
             el('ccaBrowserClose').addEventListener('click', closeBrowser);
+            el('ccaBrowserModal').addEventListener('keydown', onBrowserKeydown);
             el('ccaBrowserModal').addEventListener('click', function (e) {
                 if (e.target === this) { closeBrowser(); }
             });
@@ -4809,14 +4814,53 @@
             });
         }
 
+        // The modal and the mobile sticky bars need an OPAQUE surface in the current
+        // Jellyfin theme, which not every Jellyfin version exposes as a CSS variable. Read
+        // it off the nearest ancestor that actually paints a background, and the text
+        // colour off the page; fall back to the dark theme's pair.
+        function applyThemeSurface() {
+            var bg = '';
+            for (var n = page; n && n.nodeType === 1; n = n.parentElement) {
+                var c = getComputedStyle(n).backgroundColor;
+                if (c && c !== 'transparent' && !/^rgba\(.*,\s*0\)$/.test(c)) { bg = c; break; }
+            }
+            page.style.setProperty('--cca-surface', bg || '#1b1b1b');
+            page.style.setProperty('--cca-text', bg ? getComputedStyle(page).color : '#f2f2f2');
+        }
+
+        var _browserReturnFocus = null;
+
         function openBrowser() {
+            _browserReturnFocus = document.activeElement;
             el('ccaBrowserModal').style.display = 'flex';
             browser.page = 1;
             loadBrowserItems();
+            el('ccaBrowserSearch').focus();
         }
 
+        // Safe to call when already closed (pagehide calls it unconditionally).
         function closeBrowser() {
-            el('ccaBrowserModal').style.display = 'none';
+            var modal = el('ccaBrowserModal');
+            if (!modal || modal.style.display === 'none') { return; }
+            modal.style.display = 'none';
+            var back = _browserReturnFocus || el('ccaBrowseBtn');
+            _browserReturnFocus = null;
+            if (back && back.focus) { back.focus(); }
+        }
+
+        // Esc closes; Tab and Shift+Tab cycle inside the dialog instead of walking out
+        // into the page behind it (aria-modal informs assistive tech, not the browser).
+        function onBrowserKeydown(ev) {
+            if (ev.key === 'Escape') { ev.preventDefault(); closeBrowser(); return; }
+            if (ev.key !== 'Tab') { return; }
+            var box = el('ccaBrowserModal').querySelector('.ccaModalBox');
+            var focusable = Array.prototype.filter.call(
+                box.querySelectorAll('button, input, select, [tabindex]:not([tabindex="-1"])'),
+                function (n) { return !n.disabled && n.getClientRects().length > 0; });
+            if (!focusable.length) { return; }
+            var first = focusable[0], last = focusable[focusable.length - 1];
+            if (ev.shiftKey && document.activeElement === first) { ev.preventDefault(); last.focus(); }
+            else if (!ev.shiftKey && document.activeElement === last) { ev.preventDefault(); first.focus(); }
         }
 
         function gridMessage(grid, text) {
@@ -4867,11 +4911,13 @@
                 var name = pick(item, 'Name') || '';
                 var year = pick(item, 'Year');
 
-                var div = document.createElement('div');
-                div.className = 'ccaGridItem';
+                var tile = document.createElement('button');
+                tile.type = 'button';
+                tile.className = 'ccaGridItem';
 
                 var img = document.createElement('img');
-                img.alt = name;
+                // Decorative: the caption below already names the tile.
+                img.alt = '';
                 // Use Jellyfin's own image endpoint (token in query string) so the
                 // <img> loads without needing a custom auth header.
                 try { img.src = ApiClient.getImageUrl(id, { type: 'Primary', fillHeight: 220 }); } catch (e) { /* ignore */ }
@@ -4881,10 +4927,10 @@
                 cap.className = 'cap';
                 cap.textContent = name + (year ? ' (' + year + ')' : '');
 
-                div.appendChild(img);
-                div.appendChild(cap);
-                div.addEventListener('click', function () { selectBrowserItem(id, name); });
-                grid.appendChild(div);
+                tile.appendChild(img);
+                tile.appendChild(cap);
+                tile.addEventListener('click', function () { selectBrowserItem(id, name); });
+                grid.appendChild(tile);
             });
         }
 
@@ -4937,6 +4983,7 @@
             page = this;
             LANG = detectLang();
             applyI18n(page);
+            applyThemeSurface(); // every show: the user may have switched theme meanwhile
             if (!page.dataset.ccaInit) {
                 bindEvents();
                 initSteps();
