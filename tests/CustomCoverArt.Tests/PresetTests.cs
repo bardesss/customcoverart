@@ -108,7 +108,7 @@ public class PresetTests
     {
         var page = ConfigPage();
 
-        var used = Regex.Matches(page, @"data-i18n(?:-ph)?=""([^""]+)""")
+        var used = Regex.Matches(page, @"data-i18n(?:-ph|-aria|-alt)?=""([^""]+)""")
             .Select(m => m.Groups[1].Value)
             .Distinct()
             .ToList();
@@ -150,9 +150,9 @@ public class PresetTests
     }
 
     /// <summary>
-    /// applyI18n returns early for English, so the text sitting in the markup is exactly
-    /// what an English user reads — the en block is never applied over it. When the two
-    /// drift, English and every translation quietly say different things.
+    /// The markup is what shows before the script runs, and applyI18n re-applies the en
+    /// block over it for English users — so the two must say the same thing, or English
+    /// flickers between two texts and every translation is based on the wrong one.
     /// </summary>
     [Fact]
     public void MarkupDefaultText_MatchesTheEnglishDictionary()
@@ -188,7 +188,7 @@ public class PresetTests
     {
         var page = ConfigPage();
 
-        var used = new HashSet<string>(Regex.Matches(page, @"data-i18n(?:-ph)?=""([^""]+)""").Select(m => m.Groups[1].Value));
+        var used = new HashSet<string>(Regex.Matches(page, @"data-i18n(?:-ph|-aria|-alt)?=""([^""]+)""").Select(m => m.Groups[1].Value));
         foreach (Match m in Regex.Matches(page, @"[^A-Za-z0-9_]t\(\s*'([^']+)'"))
         {
             used.Add(m.Groups[1].Value);

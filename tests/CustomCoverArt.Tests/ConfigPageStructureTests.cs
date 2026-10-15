@@ -56,6 +56,17 @@ public class ConfigPageStructureTests
         return page.Substring(start, end - start);
     }
 
+    /// <summary>The page's one &lt;style&gt; block.</summary>
+    private static string Styles()
+    {
+        var page = ConfigPage();
+        var start = page.IndexOf("<style>", System.StringComparison.Ordinal);
+        Assert.True(start > 0, "Could not find the style block.");
+        var end = page.IndexOf("</style>", start, System.StringComparison.Ordinal);
+        Assert.True(end > start, "Could not find the end of the style block.");
+        return page.Substring(start, end - start);
+    }
+
     // Every cca* element id present at the start of the guided-editor restructure, minus
     // ccaPreviewSpinner (dead since Phase 1, removed here) and ccaGradient (replaced by the
     // background source dropdown). Add to this list when you add a control; never remove
@@ -67,7 +78,7 @@ public class ConfigPageStructureTests
         "ccaAutoPalette", "ccaBatchApply", "ccaBatchList", "ccaBatchStatus", "ccaBgAdjust",
         "ccaBgFit", "ccaBgImage", "ccaBgImageBtn", "ccaBgImageName", "ccaBgSource", "ccaBlur",
         "ccaBlurVal", "ccaBrowseBtn", "ccaBrowserClose", "ccaBrowserGrid", "ccaBrowserModal",
-        "ccaBrowserNext", "ccaBrowserPage", "ccaBrowserPrev", "ccaBrowserSearch", "ccaBrowserType",
+        "ccaBrowserNext", "ccaBrowserPage", "ccaBrowserPrev", "ccaBrowserSearch", "ccaBrowserTitle", "ccaBrowserType",
         "ccaCanvas", "ccaCollageDensity", "ccaCollageLiveTvHint", "ccaCollageRow", "ccaCollageShuffle",
         "ccaCustomDims",
         "ccaDim", "ccaDimColor", "ccaDimVal", "ccaDownloadBtn", "ccaFont", "ccaFontBtn",
@@ -287,6 +298,40 @@ public class ConfigPageStructureTests
         Assert.Contains("refreshRestoreState();", handler, System.StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void DestructiveActionsAskFirst()
+    {
+        var page = ConfigPage();
+        Assert.Contains("confirmAction(t('restore.confirm'))", page, System.StringComparison.Ordinal);
+        Assert.Contains("confirmAction(t('restore.resetConfirm'))", page, System.StringComparison.Ordinal);
+        Assert.Contains("confirmAction(t('tpl.confirmDelete', name))", page, System.StringComparison.Ordinal);
+        Assert.Contains("confirmAction(t('batch.confirm', targets.length))", page, System.StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Batch apply used to have no guard and no error path: a second click started a
+    /// second batch, and a failure left "Applying…" on screen forever.
+    /// </summary>
+    [Fact]
+    public void BatchApplyCannotRunTwiceAndAlwaysFinishes()
+    {
+        var handler = HandlerBody(ConfigPage(), "el('ccaBatchApply').addEventListener('click'");
+        Assert.Contains("state.batchRunning", handler, System.StringComparison.Ordinal);
+        Assert.Contains("btn.disabled = true", handler, System.StringComparison.Ordinal);
+        Assert.Contains(".catch(", handler, System.StringComparison.Ordinal);
+        Assert.Contains("t('batch.fail'", handler, System.StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RestoreRefreshesItsHint_AndStatusLinesAreAnnounced()
+    {
+        var restore = HandlerBody(ConfigPage(), "el('ccaRestoreBtn').addEventListener('click'");
+        Assert.Contains(".then(refreshRestoreState)", restore, System.StringComparison.Ordinal);
+        var markup = Markup();
+        Assert.Matches(@"id=""ccaRestoreHint""[^>]*aria-live=""polite""", markup);
+        Assert.Matches(@"id=""ccaBatchStatus""[^>]*aria-live=""polite""", markup);
+    }
+
     /// <summary>
     /// The canvas draws dim, blur, pan/zoom, overlay, effects and layers itself. The server
     /// must therefore return the bare mosaic only, or each would be applied twice.
@@ -323,6 +368,25 @@ public class ConfigPageStructureTests
 
         Assert.Contains("syncCollageBitmap();", FunctionBody(page, "renderDocument"), System.StringComparison.Ordinal);
         Assert.Contains("debounce(fetchCollageBitmap, 400)", page, System.StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// A slow, stale response must never overwrite a newer one: fast typing in the poster
+    /// search rendered whichever page arrived last, and a quick Type switch could fill the
+    /// target and batch lists with the previous type's targets. (The backup check and the
+    /// collage preview have their own guards: requestedId and _collageToken.)
+    /// </summary>
+    [Fact]
+    public void ListRequestsAreLatestWins()
+    {
+        var page = ConfigPage();
+        Assert.Contains("_requestSeq[channel] === n", FunctionBody(page, "requestGuard"), System.StringComparison.Ordinal);
+        foreach (var fn in new[] { "loadLibraries", "loadBatchList", "loadBrowserItems" })
+        {
+            var body = FunctionBody(page, fn);
+            Assert.Contains("requestGuard(", body, System.StringComparison.Ordinal);
+            Assert.Contains("if (!isCurrent()) { return; }", body, System.StringComparison.Ordinal);
+        }
     }
 
     [Fact]
@@ -371,10 +435,12 @@ public class ConfigPageStructureTests
         Assert.Contains("renderDocument(true)", tick, System.StringComparison.Ordinal);
         Assert.Contains("var GIF_FRAME_MS = 1000 / 15;", page, System.StringComparison.Ordinal);
 
-        var listeners = FunctionBody(page, "bindGifLoopListeners");
-        Assert.Contains("'visibilitychange'", listeners, System.StringComparison.Ordinal);
-        Assert.Contains("'pagehide'", listeners, System.StringComparison.Ordinal);
-        Assert.Contains("bindGifLoopListeners();", FunctionBody(page, "bindEvents"), System.StringComparison.Ordinal);
+        // Its watchers are page-scoped (bound on pageshow, removed on pagehide/viewhide),
+        // and leaving the page stops the loop at once.
+        var bindPage = FunctionBody(page, "bindPageListeners");
+        Assert.Contains("document.addEventListener('visibilitychange', updateGifLoop)", bindPage, System.StringComparison.Ordinal);
+        Assert.Contains("watchReducedMotion(true)", bindPage, System.StringComparison.Ordinal);
+        Assert.Contains("stopGifLoop()", FunctionBody(page, "onPageHide"), System.StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -393,9 +459,458 @@ public class ConfigPageStructureTests
     [Fact]
     public void GifPreview_BothBackgroundPathsWatchForAnimation()
     {
+        // Every background bitmap goes through setBackgroundBitmap, which flags a GIF: the
+        // upload, the poster pick, and the undo/template re-hydration alike.
         var page = ConfigPage();
-        Assert.Contains("watchForAnimatedGif(img, file);", page, System.StringComparison.Ordinal);
-        Assert.Contains("watchForAnimatedGif(img, posterBlob);", page, System.StringComparison.Ordinal);
+        Assert.Contains("watchForAnimatedGif(img, blob);", FunctionBody(page, "setBackgroundBitmap"), System.StringComparison.Ordinal);
+        Assert.Contains("setBackgroundBitmap(file, isCurrent);", page, System.StringComparison.Ordinal);
+        Assert.Contains("setBackgroundBitmap(posterBlob, isCurrent);", page, System.StringComparison.Ordinal);
         Assert.Contains("isAnimatedGif(buf)", FunctionBody(page, "watchForAnimatedGif"), System.StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The steps stopped being .ccaCard in the guided-editor redesign, which silently
+    /// orphaned every .ccaCard-scoped field rule: controls after a grid sat flush, and the
+    /// rest fell back to Jellyfin's 1.8em .inputContainer margin.
+    /// </summary>
+    [Fact]
+    public void StepSpacingIsScopedToStepBodies_NotTheRetiredCardClass()
+    {
+        var css = Styles();
+        Assert.DoesNotContain(".ccaCard .inputContainer", css, System.StringComparison.Ordinal);
+        Assert.DoesNotContain(".ccaCard > .inputContainer", css, System.StringComparison.Ordinal);
+        Assert.DoesNotContain(".ccaCard > .ccaFileRow", css, System.StringComparison.Ordinal);
+        Assert.Contains(".ccaStepBody .inputContainer", css, System.StringComparison.Ordinal);
+        Assert.Contains(".ccaStepBody .ccaGrid", css, System.StringComparison.Ordinal);
+        Assert.Contains(".ccaStepBody > :last-child", css, System.StringComparison.Ordinal);
+        // A dropdown and the button beside it share one height.
+        Assert.Contains(".ccaFileRow .ccaGrow ~ .emby-button", css, System.StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void NoInputContainerIsNestedDirectlyInAnother()
+    {
+        Assert.DoesNotMatch(@"class=""inputContainer[^""]*"">\s*<div class=""inputContainer""", Markup());
+    }
+
+    /// <summary>
+    /// Jellyfin reuses the page: switching the display language from Dutch back to
+    /// English used to leave every Dutch label in place because English was skipped.
+    /// </summary>
+    [Fact]
+    public void ApplyI18n_RunsForEnglishToo_AndTranslatesAttributes()
+    {
+        var page = ConfigPage();
+        Assert.DoesNotContain("LANG === 'en'", FunctionBody(page, "applyI18n"), System.StringComparison.Ordinal);
+        Assert.Contains("['data-i18n-aria', 'aria-label']", page, System.StringComparison.Ordinal);
+        Assert.Contains("['data-i18n-alt', 'alt']", page, System.StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void NoHardCodedEnglishIsLeftInTheMarkupOrDefaults()
+    {
+        var markup = Markup();
+        Assert.DoesNotContain("value=\"Movies\"", markup, System.StringComparison.Ordinal);
+        Assert.DoesNotContain("alt=\"Server render\"", markup, System.StringComparison.Ordinal);
+        Assert.DoesNotContain(">Page 1<", markup, System.StringComparison.Ordinal);
+        var page = ConfigPage();
+        Assert.DoesNotContain("Content: 'Movies'", page, System.StringComparison.Ordinal);
+        Assert.DoesNotContain("Layers card above", page, System.StringComparison.Ordinal);
+        Assert.DoesNotContain("kaart Lagen", page, System.StringComparison.Ordinal);
+        Assert.DoesNotContain("tarjeta Capas", page, System.StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ApplyButtonNamesTheTargetType()
+    {
+        var page = ConfigPage();
+        var body = FunctionBody(page, "applyLabelFor");
+        foreach (var key in new[] { "action.applyCollection", "action.applyPlaylist", "action.applyLivetv", "action.apply" })
+        {
+            Assert.Contains("t('" + key + "')", body, System.StringComparison.Ordinal);
+        }
+        Assert.Contains("applyLabelFor(", FunctionBody(page, "updateUI"), System.StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// A 401/413/429 has an empty or HTML body; parsing it first produced "Unexpected end
+    /// of JSON input", which names neither the status nor the cause. A 400 from the render
+    /// endpoints carries the server's own validation message, which must reach the user.
+    /// </summary>
+    [Fact]
+    public void JsonRequestsCheckTheStatusBeforeParsing()
+    {
+        var page = ConfigPage();
+        var readJson = FunctionBody(page, "readJson");
+        Assert.Contains("r.ok", readJson, System.StringComparison.Ordinal);
+        Assert.Contains("responseError(r)", readJson, System.StringComparison.Ordinal);
+        var responseError = FunctionBody(page, "responseError");
+        Assert.Contains("requestError(r.status)", responseError, System.StringComparison.Ordinal);
+        Assert.Contains("r.status === 400", responseError, System.StringComparison.Ordinal);
+        Assert.Contains("then(readJson", FunctionBody(page, "jsonFetch"), System.StringComparison.Ordinal);
+        Assert.Contains("then(readJson", FunctionBody(page, "uploadFile"), System.StringComparison.Ordinal);
+        Assert.Contains("responseError(r)", FunctionBody(page, "showServerRender"), System.StringComparison.Ordinal);
+        Assert.DoesNotContain("r.json()", page, System.StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void NoUntranslatedErrorTextReachesTheUser()
+    {
+        var page = ConfigPage();
+        foreach (var raw in new[]
+        {
+            // Quoted: the collage fetch's internal 'collage render returned ' is never shown.
+            "'render returned ", "image fetch returned", "Upload rejected", "Poster background failed",
+            "No image URL", "the downloaded image was empty",
+        })
+        {
+            Assert.DoesNotContain(raw, page, System.StringComparison.Ordinal);
+        }
+
+        // A raw exception message is English (or a browser's "Failed to fetch"); the one
+        // place allowed to read it is errorText, which every catch goes through.
+        var reads = Regex.Matches(page, @"\be\.message\b").Count;
+        Assert.True(reads == 1, $"Expected e.message only inside errorText; found {reads}.");
+        Assert.Contains("e.message", FunctionBody(page, "errorText"), System.StringComparison.Ordinal);
+    }
+
+    /// <summary>Each of these used to drop a failure on the floor or report success regardless.</summary>
+    [Fact]
+    public void ListLoadsAndTemplateCallsHandleFailure()
+    {
+        var page = ConfigPage();
+        Assert.Contains(".catch(", FunctionBody(page, "refreshRestoreState"), System.StringComparison.Ordinal);
+        Assert.Contains(".catch(", FunctionBody(page, "loadTemplates"), System.StringComparison.Ordinal);
+        Assert.Contains(".catch(", FunctionBody(page, "loadBatchList"), System.StringComparison.Ordinal);
+        Assert.Matches(@"'CustomCoverArt/templates', 'POST'[\s\S]{0,300}?dataOrThrow\(res\)[\s\S]{0,300}?\.catch\(", page);
+        Assert.Matches(@"'CustomCoverArt/templates/' \+ encodeURIComponent\(name\), 'DELETE'\)[\s\S]{0,300}?dataOrThrow\(res\)[\s\S]{0,300}?\.catch\(", page);
+        Assert.Matches(@"'/restore', 'POST'\)[\s\S]{0,400}?\.catch\(", page);
+    }
+
+    /// <summary>
+    /// Undo and template load replaced the document and nulled the background bitmap, so
+    /// the canvas showed the gradient/flat fallback while the server still rendered the
+    /// image (and an animated GIF background stopped moving).
+    /// </summary>
+    [Fact]
+    public void UndoAndTemplateLoadKeepOrRefetchTheBackground()
+    {
+        var page = ConfigPage();
+        var restore = FunctionBody(page, "restoreSnapshot");
+        Assert.Contains("hydrateBackgroundImage(previousImagePath)", restore, System.StringComparison.Ordinal);
+        Assert.DoesNotContain("bgImageEl = null", restore, System.StringComparison.Ordinal);
+        Assert.True(Regex.Matches(page, @"hydrateBackgroundImage\(previousImagePath\)").Count >= 2,
+            "The template load must re-hydrate the background too.");
+        var hydrate = FunctionBody(page, "hydrateBackgroundImage");
+        Assert.Contains("CustomCoverArt/layerImage?path=", hydrate, System.StringComparison.Ordinal);
+        Assert.Contains("setBackgroundBitmap(blob, isCurrent)", hydrate, System.StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void BackgroundObjectUrlsAreRevokedAndRacesDropped()
+    {
+        var page = ConfigPage();
+        var setter = FunctionBody(page, "setBackgroundBitmap");
+        Assert.Contains("if (!isCurrent()) { URL.revokeObjectURL(url); return; }", setter, System.StringComparison.Ordinal);
+        Assert.Contains("clearBackgroundBitmap();", setter, System.StringComparison.Ordinal);
+        Assert.Contains("URL.revokeObjectURL(_bgImageUrl)", FunctionBody(page, "clearBackgroundBitmap"), System.StringComparison.Ordinal);
+        // The leaky inline pattern (an object URL assigned straight to an <img>, never revoked).
+        Assert.DoesNotContain("img.src = URL.createObjectURL(file)", page, System.StringComparison.Ordinal);
+        Assert.DoesNotContain("img.src = URL.createObjectURL(posterBlob)", page, System.StringComparison.Ordinal);
+        Assert.Contains("requestGuard('bg')", FunctionBody(page, "selectBrowserItem"), System.StringComparison.Ordinal);
+        // bgImageEl has exactly two writers besides its declaration.
+        Assert.Equal(3, Regex.Matches(page, @"bgImageEl = ").Count);
+    }
+
+    [Fact]
+    public void FileNameLabelsFollowTheDocument()
+    {
+        var page = ConfigPage();
+        Assert.Contains("syncFileNames()", FunctionBody(page, "syncControlsFromDocument"), System.StringComparison.Ordinal);
+        var sync = FunctionBody(page, "syncFileNames");
+        Assert.Contains("ccaFontName", sync, System.StringComparison.Ordinal);
+        Assert.Contains("ccaBgImageName", sync, System.StringComparison.Ordinal);
+        Assert.Contains("ccaSelectedBg", sync, System.StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PosterBrowserIsARealDialog()
+    {
+        var markup = Markup();
+        Assert.Matches(@"class=""ccaModalBox""[^>]*role=""dialog""", markup);
+        Assert.Matches(@"class=""ccaModalBox""[^>]*aria-modal=""true""", markup);
+        Assert.Matches(@"class=""ccaModalBox""[^>]*aria-labelledby=""ccaBrowserTitle""", markup);
+        Assert.Matches(@"id=""ccaBrowserClose""[^>]*data-i18n-aria=""modal.close""", markup);
+
+        var page = ConfigPage();
+        Assert.Contains("createElement('button')", FunctionBody(page, "renderBrowserItems"), System.StringComparison.Ordinal);
+        Assert.Contains("'Escape'", FunctionBody(page, "onBrowserKeydown"), System.StringComparison.Ordinal);
+        Assert.Contains(".focus()", FunctionBody(page, "closeBrowser"), System.StringComparison.Ordinal);
+        Assert.Contains(".focus()", FunctionBody(page, "openBrowser"), System.StringComparison.Ordinal);
+    }
+
+    /// <summary>A pager button that disables itself while focused drops focus to body, killing Esc/Tab.</summary>
+    [Fact]
+    public void PosterBrowserKeepsFocusInsideAfterPaging()
+    {
+        var page = ConfigPage();
+        var keep = FunctionBody(page, "keepFocusInBrowser");
+        Assert.Contains("activeElement", keep, System.StringComparison.Ordinal);
+        Assert.Contains("ccaBrowserSearch", keep, System.StringComparison.Ordinal);
+        // A just-disabled focused button still reports as activeElement/contained.
+        Assert.Contains("!ae.disabled", keep, System.StringComparison.Ordinal);
+        Assert.Contains("document.body", keep, System.StringComparison.Ordinal);
+        Assert.Contains("_browserLastPager", keep, System.StringComparison.Ordinal);
+        Assert.Contains("_browserLastPager = ", FunctionBody(page, "bindEvents"), System.StringComparison.Ordinal);
+        Assert.Contains("keepFocusInBrowser();", FunctionBody(page, "loadBrowserItems"), System.StringComparison.Ordinal);
+
+        var render = FunctionBody(page, "renderBrowserItems");
+        Assert.Contains("createElement('span')", render, System.StringComparison.Ordinal);
+        Assert.DoesNotContain("createElement('div')", render, System.StringComparison.Ordinal);
+
+        var theme = FunctionBody(page, "applyThemeSurface");
+        Assert.Contains("--theme-body-background-color", theme, System.StringComparison.Ordinal);
+        Assert.Contains("isOpaqueColor", theme, System.StringComparison.Ordinal);
+        Assert.Contains("isOpaqueColor", page.Substring(page.IndexOf("function isOpaqueColor", System.StringComparison.Ordinal)), System.StringComparison.Ordinal);
+    }
+
+    /// <summary>A hard-coded dark box with inherited text colour is unreadable on the light theme.</summary>
+    [Fact]
+    public void ModalAndStickyBarsFollowTheTheme()
+    {
+        var css = Styles();
+        Assert.DoesNotMatch(@"background:\s*#1b1b1b", css);
+        Assert.Matches(@"\.ccaModalBox \{[^}]*background: var\(--cca-surface", css);
+        Assert.Matches(@"\.ccaModalBox \{[^}]*color: var\(--cca-text", css);
+        Assert.DoesNotContain("background: var(--theme-body-background-color, #101010);", css, System.StringComparison.Ordinal);
+        Assert.Contains("--cca-surface", FunctionBody(ConfigPage(), "applyThemeSurface"), System.StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void LayersPanelIsKeyboardUsableAndLabelled()
+    {
+        var page = ConfigPage();
+        var panel = FunctionBody(page, "renderLayersPanel");
+        Assert.Contains("name.setAttribute('data-act', 'pick')", panel, System.StringComparison.Ordinal);
+        Assert.Contains("var name = document.createElement('button')", panel, System.StringComparison.Ordinal);
+        Assert.Contains("vis.setAttribute('aria-pressed'", panel, System.StringComparison.Ordinal);
+        Assert.Contains("b.setAttribute('aria-label', t('layer.' + act))", panel, System.StringComparison.Ordinal);
+        Assert.Contains("more.setAttribute('aria-expanded'", panel, System.StringComparison.Ordinal);
+        Assert.Contains("restoreLayerFocus(box, prevFocus)", panel, System.StringComparison.Ordinal);
+        Assert.Matches(@"id=""ccaLayerList""[^>]*role=""list""", Markup());
+    }
+
+    [Fact]
+    public void CanvasIsFocusableAndArrowKeysNudgeTheSelectedLayer()
+    {
+        Assert.Matches(@"id=""ccaCanvas""[^>]*tabindex=""0""", Markup());
+        Assert.Matches(@"id=""ccaCanvas""[^>]*data-i18n-aria=""canvas.label""", Markup());
+        var page = ConfigPage();
+        var keys = FunctionBody(page, "onCanvasKeydown");
+        Assert.Contains("ArrowLeft", keys, System.StringComparison.Ordinal);
+        Assert.Contains("ev.shiftKey ? 10 : 1", keys, System.StringComparison.Ordinal);
+        Assert.Contains("cv.addEventListener('keydown', onCanvasKeydown)", page, System.StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void StopRowsAndSwatchesAreLabelled()
+    {
+        var page = ConfigPage();
+        var row = FunctionBody(page, "addStopRow");
+        Assert.Contains("t('stop.color')", row, System.StringComparison.Ordinal);
+        Assert.Contains("t('stop.position')", row, System.StringComparison.Ordinal);
+        Assert.Contains("t('stop.remove')", row, System.StringComparison.Ordinal);
+        Assert.Contains("updateStopRemoveButtons(container)", row, System.StringComparison.Ordinal);
+        Assert.Contains("rows.length <= 2", FunctionBody(page, "updateStopRemoveButtons"), System.StringComparison.Ordinal);
+        Assert.Contains("t('fx.swatch', hex)", FunctionBody(page, "renderSwatches"), System.StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The narrow-screen rules that show ⋯ and collapse the layer actions have the same
+    /// specificity as the base rules, so the base rules must come first or they win at
+    /// every width.
+    /// </summary>
+    [Fact]
+    public void LayerOverflowBaseRulesPrecedeTheNarrowScreenBlock()
+    {
+        var css = Styles();
+        var media = css.IndexOf("@media (max-width: 700px)", System.StringComparison.Ordinal);
+        Assert.True(media > 0, "max-width: 700px block not found.");
+        var baseMore = css.IndexOf("\n        #CustomCoverArtConfigPage .ccaLayerMore { display: none; }", System.StringComparison.Ordinal);
+        var baseActions = css.IndexOf("\n        #CustomCoverArtConfigPage .ccaLayerActions { display: flex;", System.StringComparison.Ordinal);
+        Assert.True(baseMore > 0 && baseMore < media, "Base .ccaLayerMore rule must precede the 700px block.");
+        Assert.True(baseActions > 0 && baseActions < media, "Base .ccaLayerActions rule must precede the 700px block.");
+    }
+
+    [Fact]
+    public void CanvasNudgeLeavesModifiedArrowKeysToTheBrowser()
+    {
+        var keys = FunctionBody(ConfigPage(), "onCanvasKeydown");
+        Assert.Contains("if (ev.altKey || ev.ctrlKey || ev.metaKey) { return; }", keys, System.StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// bindEvents runs once, but the page stays in the DOM while you browse the rest of
+    /// the dashboard: a document-level Ctrl+Z handler bound there hijacked undo on every
+    /// other settings page, and the GIF loop's visibility/reduced-motion watchers leaked
+    /// the same way.
+    /// </summary>
+    [Fact]
+    public void GlobalListenersArePageScoped()
+    {
+        var page = ConfigPage();
+        var bind = FunctionBody(page, "bindEvents");
+        Assert.DoesNotContain("window.addEventListener('resize'", bind, System.StringComparison.Ordinal);
+        Assert.DoesNotContain("document.addEventListener('keydown'", bind, System.StringComparison.Ordinal);
+        Assert.DoesNotContain("function bindGifLoopListeners(", page, System.StringComparison.Ordinal);
+
+        var unbind = FunctionBody(page, "unbindPageListeners");
+        Assert.Contains("window.removeEventListener('resize', onWindowResize)", unbind, System.StringComparison.Ordinal);
+        Assert.Contains("document.removeEventListener('keydown', onDocumentKeydown)", unbind, System.StringComparison.Ordinal);
+        Assert.Contains("document.removeEventListener('visibilitychange', updateGifLoop)", unbind, System.StringComparison.Ordinal);
+        Assert.Contains("watchReducedMotion(false)", unbind, System.StringComparison.Ordinal);
+
+        Assert.Contains("addEventListener('pagehide', onPageHide)", page, System.StringComparison.Ordinal);
+        Assert.Contains("addEventListener('viewhide', onPageHide)", page, System.StringComparison.Ordinal);
+        Assert.Contains("isPageVisible()", FunctionBody(page, "onDocumentKeydown"), System.StringComparison.Ordinal);
+    }
+
+    /// <summary>Only text-like fields keep the browser's own undo; sliders and pickers undo the design.</summary>
+    [Fact]
+    public void UndoShortcutBailsOnlyForTextFields()
+    {
+        var page = ConfigPage();
+        Assert.Contains("TEXT_INPUT_TYPES", FunctionBody(page, "isTextEditingTarget"), System.StringComparison.Ordinal);
+        Assert.Contains("isTextEditingTarget(ev.target)", FunctionBody(page, "onDocumentKeydown"), System.StringComparison.Ordinal);
+        Assert.DoesNotContain("target.tagName === 'INPUT' || target.tagName === 'TEXTAREA'", page, System.StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void BundledFontsAreRegisteredOncePerLoad()
+    {
+        var page = ConfigPage();
+        Assert.Contains("_canvasFontsLoaded = loadCanvasFonts()", page, System.StringComparison.Ordinal);
+        Assert.DoesNotContain("loadCanvasFonts().then(", page, System.StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void UnsavedWorkIsProtected()
+    {
+        var page = ConfigPage();
+        Assert.Contains("window.addEventListener('beforeunload', onBeforeUnload)", FunctionBody(page, "bindPageListeners"), System.StringComparison.Ordinal);
+        Assert.Contains("window.removeEventListener('beforeunload', onBeforeUnload)", FunctionBody(page, "unbindPageListeners"), System.StringComparison.Ordinal);
+        Assert.Contains("isDirty()", FunctionBody(page, "onBeforeUnload"), System.StringComparison.Ordinal);
+
+        var select = HandlerBody(page, "el('ccaTemplateSelect').addEventListener('change'");
+        Assert.Contains("confirmAction(t('tpl.confirmReplace'))", select, System.StringComparison.Ordinal);
+        Assert.Contains("loadTemplateOption(opt)", select, System.StringComparison.Ordinal);
+
+        Assert.Contains("markClean()", FunctionBody(page, "loadTemplateOption"), System.StringComparison.Ordinal);
+        Assert.Contains("markClean(appliedJson)", FunctionBody(page, "applyCoverArt"), System.StringComparison.Ordinal);
+        Assert.Matches(@"'CustomCoverArt/templates', 'POST'[\s\S]{0,300}?markClean\(savedJson\)", page);
+    }
+
+    [Fact]
+    public void CleanStateIsTakenAfterCollectDocumentMutatesTheDesign()
+    {
+        var page = ConfigPage();
+        var apply = FunctionBody(page, "applyCoverArt");
+        Assert.Contains("var sent = collectDocument();", apply, System.StringComparison.Ordinal);
+        Assert.Contains("var appliedJson = JSON.stringify(sent);", apply, System.StringComparison.Ordinal);
+        Assert.DoesNotContain("Document: collectDocument()", apply, System.StringComparison.Ordinal);
+
+        Assert.Matches(@"var sentDoc = collectDocument\(\);\s*var savedJson = JSON\.stringify\(sentDoc\);", page);
+
+        var batch = HandlerBody(page, "el('ccaBatchApply').addEventListener('click'");
+        Assert.Contains("collectDocumentKeepingCleanState()", batch, System.StringComparison.Ordinal);
+        Assert.DoesNotContain("var wasClean", batch, System.StringComparison.Ordinal);
+
+        var load = FunctionBody(page, "loadTemplates");
+        Assert.Equal(2, System.Text.RegularExpressions.Regex.Matches(load, @"state\.templateValue = '';").Count);
+    }
+
+    /// <summary>
+    /// Show server render and batch apply both run collectDocument(), which normalizes
+    /// doc; a clean design must stay clean across it or the unapplied-changes prompt lies.
+    /// </summary>
+    [Fact]
+    public void ServerRenderAndBatchKeepACleanDesignClean()
+    {
+        var page = ConfigPage();
+        var helper = FunctionBody(page, "collectDocumentKeepingCleanState");
+        Assert.Matches(@"var wasClean = _cleanJson !== null && !isDirty\(\);[\s\S]*?collectDocument\(\)[\s\S]*?if \(wasClean\) \{ markClean\(\); \}", helper);
+        var render = FunctionBody(page, "showServerRender");
+        Assert.Contains("collectDocumentKeepingCleanState()", render, System.StringComparison.Ordinal);
+        Assert.DoesNotContain("JSON.stringify(collectDocument())", render, System.StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// collectDocument()/collectSettings() ran synchronously before the request's catch,
+    /// so a throw left the batch button disabled and the status on "Applying…".
+    /// </summary>
+    [Fact]
+    public void BatchCollectionIsInsideTheErrorPath()
+    {
+        var handler = HandlerBody(ConfigPage(), "el('ccaBatchApply').addEventListener('click'");
+        Assert.Matches(@"Promise\.resolve\(\)\.then\(function \(\) \{[\s\S]*?collectDocumentKeepingCleanState\(\)[\s\S]*?collectSettings\(\)[\s\S]*?\.catch\(", handler);
+    }
+
+    [Fact]
+    public void RestoreShowsTheServerErrorMessage()
+    {
+        var handler = HandlerBody(ConfigPage(), "el('ccaRestoreBtn').addEventListener('click'");
+        Assert.Contains("pick(res, 'ErrorMessage')", handler, System.StringComparison.Ordinal);
+        Assert.Contains("pick(res, 'ErrorMessage') || t('restore.fail')", handler, System.StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PosterBrowserEscapeDoesNotBubbleToJellyfinWeb()
+    {
+        var body = FunctionBody(ConfigPage(), "onBrowserKeydown");
+        Assert.Contains("ev.stopPropagation()", body, System.StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void BatchConfirmIsCountNeutralInEveryLanguage()
+    {
+        var page = ConfigPage();
+        var matches = System.Text.RegularExpressions.Regex.Matches(page, @"'batch\.confirm': '([^']*)'");
+        Assert.Equal(3, matches.Count);
+        foreach (System.Text.RegularExpressions.Match m in matches)
+        {
+            Assert.Contains("({0})", m.Groups[1].Value, System.StringComparison.Ordinal);
+            Assert.DoesNotMatch(@"\{0\} (targets|doelen|destinos)", m.Groups[1].Value);
+        }
+    }
+
+    /// <summary>
+    /// Custom size and Animated GIF revealed their controls inside a CLOSED Advanced
+    /// disclosure (so choosing them appeared to do nothing), and the template and batch
+    /// groups were hidden there too.
+    /// </summary>
+    [Fact]
+    public void OutputStepHasNothingHiddenBehindAdvanced()
+    {
+        var markup = Markup();
+        var start = markup.IndexOf("data-step=\"5\"", System.StringComparison.Ordinal);
+        Assert.True(start > 0, "Step 5 not found.");
+        var end = markup.IndexOf("</section>", start, System.StringComparison.Ordinal);
+        var step5 = markup.Substring(start, end - start);
+        Assert.DoesNotContain("ccaAdv", step5, System.StringComparison.Ordinal);
+        foreach (var id in new[] { "ccaCustomDims", "ccaAnimRow", "ccaTemplateName", "ccaBatchApply" })
+        {
+            Assert.Contains($"id=\"{id}\"", step5, System.StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void CustomSizeIsClampedToWhatTheServerAccepts()
+    {
+        var page = ConfigPage();
+        Assert.Contains("var MIN_DIM = 100, MAX_DIM = 2048;", page, System.StringComparison.Ordinal);
+        var clamp = FunctionBody(page, "clampDim");
+        Assert.Contains("Math.max(MIN_DIM, Math.min(MAX_DIM", clamp, System.StringComparison.Ordinal);
+        Assert.Contains("bindCustomDim('ccaWidth', 'Width')", page, System.StringComparison.Ordinal);
+        Assert.DoesNotContain("parseInt(this.value, 10) || doc.Canvas.Width", page, System.StringComparison.Ordinal);
     }
 }
