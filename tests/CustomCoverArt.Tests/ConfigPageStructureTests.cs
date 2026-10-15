@@ -370,6 +370,25 @@ public class ConfigPageStructureTests
         Assert.Contains("debounce(fetchCollageBitmap, 400)", page, System.StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// A slow, stale response must never overwrite a newer one: fast typing in the poster
+    /// search rendered whichever page arrived last, and a quick Type switch could fill the
+    /// target and batch lists with the previous type's targets. (The backup check and the
+    /// collage preview have their own guards: requestedId and _collageToken.)
+    /// </summary>
+    [Fact]
+    public void ListRequestsAreLatestWins()
+    {
+        var page = ConfigPage();
+        Assert.Contains("_requestSeq[channel] === n", FunctionBody(page, "requestGuard"), System.StringComparison.Ordinal);
+        foreach (var fn in new[] { "loadLibraries", "loadBatchList", "loadBrowserItems" })
+        {
+            var body = FunctionBody(page, fn);
+            Assert.Contains("requestGuard(", body, System.StringComparison.Ordinal);
+            Assert.Contains("if (!isCurrent()) { return; }", body, System.StringComparison.Ordinal);
+        }
+    }
+
     [Fact]
     public void CollagePreview_DropsStaleAnswers_AndRevokesItsUrls()
     {
