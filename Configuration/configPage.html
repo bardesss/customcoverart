@@ -1723,21 +1723,25 @@
         }
 
         // Gives THIS img a frame decoder: { decoder, canvas, index, nextAt, pending, drawn,
-        // frameCount }. Only the current frame is kept, painted into canvas (the GIF's own
-        // size). The frames come from the uploaded Blob's bytes, so the canvas stays clean.
+        // frameCount, delays, lastDelay, resync }. Only the current frame is kept, painted
+        // into canvas (the GIF's own size); delays holds just the frame delays seen so far
+        // (numbers). The frames come from the uploaded Blob's bytes, so the canvas stays clean.
         function attachGifDecoder(img, buf) {
             var decoder;
             try {
                 decoder = new ImageDecoder({ data: buf, type: 'image/gif' });
             } catch (e) { return; }
-            decoder.tracks.ready.then(function () {
+            // frameCount may still grow until every byte is parsed (Firefox reports it
+            // late), so it is read only once decoder.completed has resolved too.
+            Promise.all([decoder.tracks.ready, decoder.completed]).then(function () {
                 var track = decoder.tracks.selectedTrack;
                 var count = track ? track.frameCount : 0;
                 // Replaced or dropped while the decoder was starting, or nothing to animate.
                 if (img._ccaGifClosed || !(count > 1)) { decoder.close(); return; }
                 img._ccaGifDecoder = {
                     decoder: decoder, canvas: document.createElement('canvas'),
-                    index: 0, nextAt: 0, pending: false, drawn: false, frameCount: count
+                    index: 0, nextAt: 0, pending: false, drawn: false, frameCount: count,
+                    delays: [], lastDelay: 100, resync: true
                 };
             }).catch(function () {
                 try { decoder.close(); } catch (e) { /* already closed */ }
@@ -1764,18 +1768,52 @@
             return ms <= 10 ? 100 : ms;
         }
 
-        // Called by gifTick (the one loop) for the background's decoder: decodes the frame
-        // that is due, paints it into the decoder's canvas, closes it and renders. Never
-        // re-arms itself: once the loop stops, decoding stops; a restart resumes at index.
+        // A frame's delay once it has been decoded; until then the last delay seen.
+        function gifDelayAt(gif, i) {
+            return gif.delays[i] || gif.lastDelay;
+        }
+
+        // One full pass through the GIF, with the same estimate for frames not yet seen.
+        function gifLoopLength(gif) {
+            var total = 0;
+            for (var i = 0; i < gif.frameCount; i++) { total += gifDelayAt(gif, i); }
+            return total;
+        }
+
+        // Called by gifTick (the one loop) for the background's decoder. Playback keeps a
+        // schedule: gif.nextAt is when frame gif.index is due. Frames whose time is already
+        // over are skipped (decode() returns a fully composited frame, so any index can be
+        // decoded directly), which keeps fast GIFs in real time under the 15 fps render
+        // cap. Decodes the due frame, paints it into the decoder's canvas, closes it and
+        // renders. Never re-arms itself: once the loop stops, decoding stops.
         function stepGifDecoder(img, gif, now) {
-            if (gif.pending || now < gif.nextAt) { return; }
+            if (gif.pending) { return; }
+            var track = gif.decoder.tracks.selectedTrack;
+            if (track && track.frameCount > gif.frameCount) { gif.frameCount = track.frameCount; }
+            // (Re)starting, or more than a whole loop behind: restart the clock here rather
+            // than fast-forwarding through everything that was missed.
+            if (gif.resync || now - gif.nextAt > gifLoopLength(gif)) {
+                gif.resync = false;
+                gif.nextAt = now;
+            }
+            while (now >= gif.nextAt + gifDelayAt(gif, gif.index)) {
+                gif.nextAt += gifDelayAt(gif, gif.index);
+                gif.index = (gif.index + 1) % gif.frameCount;
+            }
+            if (now < gif.nextAt) { return; }
+            var index = gif.index;
             gif.pending = true;
-            gif.decoder.decode({ frameIndex: gif.index }).then(function (result) {
+            gif.decoder.decode({ frameIndex: index }).then(function (result) {
                 gif.pending = false;
                 var frame = result.image;
                 // The background was replaced or cleared, or the loop stopped (page hidden,
-                // reduced motion) while decoding: drop the frame, keep the index.
-                if (gif.closed || img !== bgImageEl || !_gifLoopId) { frame.close(); return; }
+                // reduced motion) while decoding: drop the frame, keep the index, and
+                // restart the clock when it plays again.
+                if (gif.closed || img !== bgImageEl || !_gifLoopId) {
+                    frame.close();
+                    gif.resync = true;
+                    return;
+                }
                 var cv = gif.canvas;
                 var w = img.naturalWidth || frame.displayWidth, h = img.naturalHeight || frame.displayHeight;
                 var delay = gifFrameDelay(frame);
@@ -1787,15 +1825,21 @@
                 } finally {
                     frame.close();
                 }
+                gif.delays[index] = delay;
+                gif.lastDelay = delay;
                 gif.drawn = true;
-                gif.nextAt = now + delay;
-                gif.index = (gif.index + 1) % gif.frameCount;
+                // Due one delay after this frame was due, not after the (late) tick.
+                if (gif.index === index) {
+                    gif.nextAt += delay;
+                    gif.index = (index + 1) % gif.frameCount;
+                }
                 _gifLastPaint = now;
                 renderDocument(true);
-            }).catch(function () {
+            }).catch(function (err) {
                 gif.pending = false;
                 // The decoder failed (not just closed by us): fall back to the <img> path.
                 if (!gif.closed && img._ccaGifDecoder === gif) {
+                    if (window.console && console.debug) { console.debug('CustomCoverArt: GIF frame decoding failed, falling back to the <img>', err); }
                     gif.closed = true;
                     img._ccaGifDecoder = null;
                     try { gif.decoder.close(); } catch (e) { /* already closed */ }
@@ -1846,7 +1890,11 @@
                 if (gif) { holder.appendChild(gif); }
             }
             if (gifLoopWanted()) {
-                if (!_gifLoopId) { _gifLoopId = requestAnimationFrame(gifTick); }
+                if (!_gifLoopId) {
+                    // Starting or resuming: decoded playback restarts its clock (no catch-up).
+                    if (gif._ccaGifDecoder) { gif._ccaGifDecoder.resync = true; }
+                    _gifLoopId = requestAnimationFrame(gifTick);
+                }
             } else {
                 stopGifLoop();
             }
@@ -2901,7 +2949,7 @@
         function drawBackgroundImage(ctx, img, W, H) {
             var g = backgroundGeometry(img, W, H);
             var gif = img._ccaGifDecoder;
-            var source = gif ? (gif.drawn ? gif.canvas : img) : img;
+            var source = (gif && gif.drawn) ? gif.canvas : img;
             if (g.fit === 'contain') {
                 // Letterbox the remainder with the base colour, like the server.
                 ctx.fillStyle = doc.Background.DimColor || '#000';

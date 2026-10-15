@@ -489,7 +489,11 @@ public class ConfigPageStructureTests
         var attach = FunctionBody(page, "attachGifDecoder");
         Assert.Contains("new ImageDecoder({ data: buf, type: 'image/gif' })", attach, System.StringComparison.Ordinal);
         Assert.Contains("decoder.tracks.ready", attach, System.StringComparison.Ordinal);
+        // frameCount can still grow until all data is in (Firefox reports it late): read it
+        // only after decoder.completed, or a real animation looks like one frame.
+        Assert.Contains("Promise.all([decoder.tracks.ready, decoder.completed])", attach, System.StringComparison.Ordinal);
         Assert.Contains("decoder.tracks.selectedTrack", attach, System.StringComparison.Ordinal);
+        Assert.Contains("delays: []", attach, System.StringComparison.Ordinal);
         Assert.Contains("frameCount", attach, System.StringComparison.Ordinal);
         Assert.Contains("img._ccaGifDecoder = {", attach, System.StringComparison.Ordinal);
         Assert.Contains("decoder.close()", attach, System.StringComparison.Ordinal);
@@ -505,7 +509,22 @@ public class ConfigPageStructureTests
     {
         var page = ConfigPage();
         var step = FunctionBody(page, "stepGifDecoder");
-        Assert.Contains("decode({ frameIndex: gif.index })", step, System.StringComparison.Ordinal);
+        Assert.Contains("decode({ frameIndex: index })", step, System.StringComparison.Ordinal);
+        // Playback keeps a schedule: the next frame is due one delay after this one was due
+        // (not after the late tick that drew it), frames that are already over are skipped,
+        // and a pause (hidden page, more than a loop behind) restarts the clock instead of
+        // fast-forwarding.
+        Assert.Contains("gif.nextAt += delay;", step, System.StringComparison.Ordinal);
+        Assert.DoesNotContain("now + delay", step, System.StringComparison.Ordinal);
+        Assert.Contains("while (now >= gif.nextAt + gifDelayAt(gif, gif.index))", step, System.StringComparison.Ordinal);
+        Assert.Contains("gif.delays[index] = delay;", step, System.StringComparison.Ordinal);
+        Assert.Contains("gif.resync", step, System.StringComparison.Ordinal);
+        Assert.Contains("gifLoopLength(gif)", step, System.StringComparison.Ordinal);
+        Assert.Contains("gif._ccaGifDecoder.resync = true;", FunctionBody(page, "updateGifLoop"), System.StringComparison.Ordinal);
+        // frameCount may grow after attach; the modulo follows it.
+        Assert.Contains("selectedTrack", step, System.StringComparison.Ordinal);
+        // A real decode failure is logged before falling back to the <img>.
+        Assert.Contains("console.debug(", step, System.StringComparison.Ordinal);
         Assert.Contains("frame.close();", step, System.StringComparison.Ordinal);
         Assert.Contains("drawImage(frame,", step, System.StringComparison.Ordinal);
         Assert.Contains("img !== bgImageEl", step, System.StringComparison.Ordinal);
@@ -545,7 +564,7 @@ public class ConfigPageStructureTests
         var page = ConfigPage();
         var draw = FunctionBody(page, "drawBackgroundImage");
         Assert.Contains("img._ccaGifDecoder", draw, System.StringComparison.Ordinal);
-        Assert.Contains("gif.drawn ? gif.canvas : img", draw, System.StringComparison.Ordinal);
+        Assert.Contains("var source = (gif && gif.drawn) ? gif.canvas : img;", draw, System.StringComparison.Ordinal);
         // Geometry still comes from the <img>: the decoded canvas has the same size.
         Assert.Contains("backgroundGeometry(img, W, H)", draw, System.StringComparison.Ordinal);
 
