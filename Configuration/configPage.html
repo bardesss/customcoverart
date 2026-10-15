@@ -954,6 +954,11 @@
                 'dyn.applied': 'Cover art applied successfully.', 'dyn.error': 'Error: {0}', 'dyn.applyFail': 'Could not apply cover art: {0}',
                 'dyn.uploadFail': 'Upload failed: {0}', 'dyn.fontFail': 'Font upload failed: {0}',
                 'dyn.unknown': 'unknown error',
+                'err.network': 'Could not reach the server.', 'err.auth': 'The server refused the request (status {0}). Your session may have expired — reload the page and sign in again.',
+                'err.tooLarge': 'The file is too large for the server to accept.', 'err.rateLimited': 'Too many requests — wait a minute and try again.',
+                'err.status': 'The server answered with status {0}.', 'err.badResponse': 'The server sent a response the page could not read.',
+                'poster.noUrl': 'That item has no poster image.', 'poster.empty': 'The poster image came back empty.', 'poster.fail': 'Could not use that poster: {0}',
+                'restore.unknown': 'Could not check for a backup',
                 'text.defaultTitle': 'My library', 'serverrender.alt': 'Cover as rendered by the server',
                 'action.applyCollection': 'Apply to collection', 'action.applyPlaylist': 'Apply to playlist', 'action.applyLivetv': 'Apply to Live TV',
                 'restore.button': 'Restore original cover', 'restore.none': 'No backup yet', 'restore.available': 'A backup exists', 'restore.done': 'Original cover restored.', 'restore.fail': 'No backup found to restore.',
@@ -1018,6 +1023,11 @@
                 'dyn.applied': 'Cover art succesvol toegepast.', 'dyn.error': 'Fout: {0}', 'dyn.applyFail': 'Kon cover art niet toepassen: {0}',
                 'dyn.uploadFail': 'Uploaden mislukt: {0}', 'dyn.fontFail': 'Lettertype uploaden mislukt: {0}',
                 'dyn.unknown': 'onbekende fout',
+                'err.network': 'Kan de server niet bereiken.', 'err.auth': 'De server weigerde het verzoek (status {0}). Je sessie is mogelijk verlopen — laad de pagina opnieuw en meld je opnieuw aan.',
+                'err.tooLarge': 'Het bestand is te groot voor de server.', 'err.rateLimited': 'Te veel verzoeken — wacht een minuut en probeer het opnieuw.',
+                'err.status': 'De server antwoordde met status {0}.', 'err.badResponse': 'De server stuurde een antwoord dat de pagina niet kon lezen.',
+                'poster.noUrl': 'Dit item heeft geen posterafbeelding.', 'poster.empty': 'De posterafbeelding was leeg.', 'poster.fail': 'Kon die poster niet gebruiken: {0}',
+                'restore.unknown': 'Kon niet controleren of er een back-up is',
                 'text.defaultTitle': 'Mijn bibliotheek', 'serverrender.alt': 'Cover zoals de server die maakt',
                 'action.applyCollection': 'Toepassen op verzameling', 'action.applyPlaylist': 'Toepassen op afspeellijst', 'action.applyLivetv': 'Toepassen op live-tv',
                 'restore.button': 'Originele cover herstellen', 'restore.none': 'Nog geen back-up', 'restore.available': 'Er is een back-up', 'restore.done': 'Originele cover hersteld.', 'restore.fail': 'Geen back-up gevonden om te herstellen.',
@@ -1082,6 +1092,11 @@
                 'dyn.applied': 'Carátula aplicada correctamente.', 'dyn.error': 'Error: {0}', 'dyn.applyFail': 'No se ha podido aplicar la carátula: {0}',
                 'dyn.uploadFail': 'Error al subir: {0}', 'dyn.fontFail': 'Error al subir la fuente: {0}',
                 'dyn.unknown': 'error desconocido',
+                'err.network': 'No se puede conectar con el servidor.', 'err.auth': 'El servidor rechazó la solicitud (estado {0}). Puede que tu sesión haya caducado: recarga la página e inicia sesión de nuevo.',
+                'err.tooLarge': 'El archivo es demasiado grande para el servidor.', 'err.rateLimited': 'Demasiadas solicitudes: espera un minuto y vuelve a intentarlo.',
+                'err.status': 'El servidor respondió con el estado {0}.', 'err.badResponse': 'El servidor envió una respuesta que la página no pudo leer.',
+                'poster.noUrl': 'Ese elemento no tiene imagen de póster.', 'poster.empty': 'La imagen del póster llegó vacía.', 'poster.fail': 'No se ha podido usar ese póster: {0}',
+                'restore.unknown': 'No se pudo comprobar si hay copia de seguridad',
                 'text.defaultTitle': 'Mi biblioteca', 'serverrender.alt': 'Carátula tal como la genera el servidor',
                 'action.applyCollection': 'Aplicar a la colección', 'action.applyPlaylist': 'Aplicar a la lista de reproducción', 'action.applyLivetv': 'Aplicar a TV en directo',
                 'restore.button': 'Restaurar la carátula original', 'restore.none': 'Aún no hay copia de seguridad', 'restore.available': 'Existe una copia de seguridad', 'restore.done': 'Carátula original restaurada.', 'restore.fail': 'No se ha encontrado ninguna copia de seguridad que restaurar.',
@@ -1192,12 +1207,67 @@
             return fetch(apiUrl(path), options);
         }
 
+        // --- Requests & errors --------------------------------------------
+        // Every plugin call goes through readJson, so a non-2xx status or an unreadable
+        // body becomes an Error whose message is ALREADY translated and can be shown as
+        // is. Before this, a 401/413/429 (whose bodies are empty or HTML) reached .json()
+        // and surfaced as "Unexpected end of JSON input", naming neither status nor cause.
+        function requestError(status) {
+            if (status === 401 || status === 403) { return new Error(t('err.auth', status)); }
+            if (status === 413) { return new Error(t('err.tooLarge')); }
+            if (status === 429) { return new Error(t('err.rateLimited')); }
+            return new Error(t('err.status', status));
+        }
+
+        // fetch() itself rejects only when the server could not be reached at all.
+        function networkError() { return new Error(t('err.network')); }
+
+        // A failed response, as a rejected promise. The render endpoints answer a
+        // validation failure (CoverValidationException) with 400 { error: <message> }, and
+        // that message is already localized by the server, so it is shown as is; every
+        // other failure is described by its status.
+        function responseError(r) {
+            return r.text().then(function (text) {
+                var msg = '';
+                if (r.status === 400) {
+                    try { msg = pick(JSON.parse(text), 'Error') || ''; } catch (err) { msg = ''; }
+                }
+                throw msg ? new Error(msg) : requestError(r.status);
+            }, function () { throw requestError(r.status); });
+        }
+
+        function readJson(r) {
+            if (!r.ok) { return responseError(r); }
+            return r.text().then(function (text) {
+                try { return JSON.parse(text); }
+                catch (err) { throw new Error(t('err.badResponse')); }
+            });
+        }
+
         function jsonFetch(path, method, body) {
             return authFetch(path, {
                 method: method || 'GET',
                 headers: { 'Content-Type': 'application/json' },
                 body: body ? JSON.stringify(body) : undefined
-            }).then(function (r) { return r.json(); });
+            }).then(readJson, function () { throw networkError(); });
+        }
+
+        // An ApiResponse envelope: its Data on Success, otherwise an Error carrying the
+        // server's own (already localized) ErrorMessage.
+        function dataOrThrow(res) {
+            if (!pick(res, 'Success')) { throw new Error(pick(res, 'ErrorMessage') || t('dyn.unknown')); }
+            return pick(res, 'Data');
+        }
+
+        // The ONE place a caught Error's message is read (pinned by a test).
+        function errorText(e) { return (e && e.message) || t('dyn.unknown'); }
+
+        // The one way a failed action is reported. Takes a finished message so every
+        // translation key stays a literal t('…') call the reachability test can see:
+        //   showError(t('dyn.uploadFail', errorText(e)))
+        function showError(message) {
+            Dashboard.hideLoadingMsg();
+            Dashboard.alert(message);
         }
 
         function el(id) { return page.querySelector('#' + id); }
@@ -3689,6 +3759,11 @@
                 btn.disabled = !has;
                 reset.disabled = !has;
                 hint.textContent = has ? t('restore.available') : t('restore.none');
+            }).catch(function () {
+                if (requestedId !== state.libraryId) { return; }
+                btn.disabled = true;
+                reset.disabled = true;
+                hint.textContent = t('restore.unknown');
             });
         }
 
@@ -3703,14 +3778,12 @@
                 placeholder.value = '';
                 placeholder.textContent = t('lib.selectOption');
                 select.appendChild(placeholder);
-                if (pick(res, 'Success')) {
-                    (pick(res, 'Data') || []).forEach(function (lib) {
-                        var opt = document.createElement('option');
-                        opt.value = pick(lib, 'Id');
-                        opt.textContent = pick(lib, 'Name');
-                        select.appendChild(opt);
-                    });
-                }
+                (dataOrThrow(res) || []).forEach(function (lib) {
+                    var opt = document.createElement('option');
+                    opt.value = pick(lib, 'Id');
+                    opt.textContent = pick(lib, 'Name');
+                    select.appendChild(opt);
+                });
                 updateUI();
             });
         }
@@ -3793,10 +3866,11 @@
 
         function loadTemplates() {
             return jsonFetch('CustomCoverArt/templates').then(function (res) {
+                var templates = dataOrThrow(res) || [];
                 var sel = el('ccaTemplateSelect');
                 sel.innerHTML = '';
                 var none = document.createElement('option'); none.value = ''; none.textContent = '—'; sel.appendChild(none);
-                (pick(res, 'Data') || []).forEach(function (tpl) {
+                templates.forEach(function (tpl) {
                     var o = document.createElement('option');
                     o.value = pick(tpl, 'Name'); o.textContent = pick(tpl, 'Name');
                     o._document = pick(tpl, 'Document');
@@ -3806,6 +3880,12 @@
                     o._settings = pick(tpl, 'Settings');
                     sel.appendChild(o);
                 });
+            }).catch(function (e) {
+                // Shown in the dropdown itself: this runs on every page show, next to the
+                // target list, and a dead server should not stack three alerts.
+                var sel = el('ccaTemplateSelect');
+                sel.innerHTML = '';
+                var none = document.createElement('option'); none.value = ''; none.textContent = t('dyn.error', errorText(e)); sel.appendChild(none);
             });
         }
 
@@ -3813,8 +3893,9 @@
         function loadBatchList() {
             var type = el('ccaTargetType') ? el('ccaTargetType').value : 'library';
             return jsonFetch('CustomCoverArt/targets/' + type).then(function (res) {
+                var targets = dataOrThrow(res) || [];
                 var box = el('ccaBatchList'); box.innerHTML = '';
-                (pick(res, 'Data') || []).forEach(function (lib) {
+                targets.forEach(function (lib) {
                     var id = pick(lib, 'Id'), name = pick(lib, 'Name');
                     var row = document.createElement('label'); row.className = 'ccaCheck ccaCheckBlock';
                     var cb = document.createElement('input'); cb.type = 'checkbox'; cb.setAttribute('is', 'emby-checkbox');
@@ -3822,6 +3903,9 @@
                     var span = document.createElement('span'); span.textContent = name;
                     row.appendChild(cb); row.appendChild(span); box.appendChild(row);
                 });
+            }).catch(function (e) {
+                el('ccaBatchList').innerHTML = '';
+                el('ccaBatchStatus').textContent = t('dyn.error', errorText(e));
             });
         }
 
@@ -3922,7 +4006,7 @@
             var fd = new FormData();
             fd.append('file', file);
             return authFetch('CustomCoverArt/' + endpoint, { method: 'POST', body: fd })
-                .then(function (r) { return r.json(); });
+                .then(readJson, function () { throw networkError(); });
         }
 
         // Heuristic animated-GIF detection: an animated GIF has more than one
@@ -4013,8 +4097,7 @@
                     Dashboard.alert(t('dyn.error', pick(res, 'ErrorMessage') || t('dyn.unknown')));
                 }
             }).catch(function (e) {
-                Dashboard.hideLoadingMsg();
-                Dashboard.alert(t('dyn.applyFail', e.message));
+                showError(t('dyn.applyFail', errorText(e)));
             }).then(function () {
                 state.applying = false;
                 updateUI(); // restores the per-target label and the enabled state
@@ -4036,8 +4119,11 @@
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(collectDocument())
+            }).catch(function () {
+                throw networkError();
             }).then(function (r) {
-                if (!r.ok) { throw new Error('render returned ' + r.status); }
+                // A 400 here carries the server's validation message (e.g. a size it refuses).
+                if (!r.ok) { return responseError(r); }
                 return r.blob();
             }).then(function (blob) {
                 if (_serverRenderUrl) { URL.revokeObjectURL(_serverRenderUrl); }
@@ -4046,8 +4132,7 @@
                 el('ccaServerRenderWrap').style.display = '';
                 Dashboard.hideLoadingMsg();
             }).catch(function (e) {
-                Dashboard.hideLoadingMsg();
-                Dashboard.alert(t('dyn.error', e.message));
+                showError(t('dyn.error', errorText(e)));
             }).then(function () {
                 btn.disabled = false;
                 if (label) { label.textContent = original; }
@@ -4072,7 +4157,8 @@
                 jsonFetch('CustomCoverArt/targets/' + type + '/' + encodeURIComponent(state.libraryId) + '/restore', 'POST')
                     .then(function (res) {
                         Dashboard.alert(pick(res, 'Success') ? t('restore.done') : t('restore.fail'));
-                    });
+                    })
+                    .catch(function (e) { showError(t('dyn.error', errorText(e))); });
             });
 
             el('ccaResetBackupBtn').addEventListener('click', function () {
@@ -4086,7 +4172,7 @@
                                 ? t('restore.resetDone')
                                 : t('restore.resetFail', pick(res, 'ErrorMessage') || t('dyn.unknown')));
                         })
-                        .catch(function (e) { Dashboard.alert(t('restore.resetFail', e.message)); })
+                        .catch(function (e) { showError(t('restore.resetFail', errorText(e))); })
                         .then(refreshRestoreState);
                 });
             });
@@ -4144,9 +4230,8 @@
                     // a blob: URL, never from the server path we just received.
                     img.src = url;
                 }).catch(function (e) {
-                    Dashboard.hideLoadingMsg();
                     input.value = '';
-                    Dashboard.alert(e.message);
+                    showError(t('dyn.uploadFail', errorText(e)));
                 });
             });
 
@@ -4360,7 +4445,7 @@
                 Dashboard.showLoadingMsg();
                 loadLibraries()
                     .then(function () { prefillTitle(''); updateUI(); updateBackgroundVisibility(); refreshRestoreState(); loadBatchList(); Dashboard.hideLoadingMsg(); scheduleRender(); })
-                    .catch(function () { Dashboard.hideLoadingMsg(); });
+                    .catch(function (e) { showError(t('dyn.error', errorText(e))); });
             });
 
             el('ccaBgImageBtn').addEventListener('click', function () { el('ccaBgImage').click(); });
@@ -4390,7 +4475,7 @@
                     } else {
                         Dashboard.alert(t('dyn.uploadFail', pick(res, 'ErrorMessage') || t('dyn.unknown')));
                     }
-                }).catch(function (e) { Dashboard.hideLoadingMsg(); Dashboard.alert(e.message); });
+                }).catch(function (e) { showError(t('dyn.uploadFail', errorText(e))); });
             });
 
             el('ccaFont').addEventListener('change', function () {
@@ -4407,7 +4492,7 @@
                     } else {
                         Dashboard.alert(t('dyn.fontFail', pick(res, 'ErrorMessage') || t('dyn.unknown')));
                     }
-                }).catch(function (e) { Dashboard.hideLoadingMsg(); Dashboard.alert(e.message); });
+                }).catch(function (e) { showError(t('dyn.fontFail', errorText(e))); });
             });
 
             // Handle sizes and hit tolerances are derived from the canvas's CSS display
@@ -4506,12 +4591,15 @@
                 var name = el('ccaTemplateName').value.trim();
                 if (!name) { Dashboard.alert(t('tpl.named')); return; }
                 jsonFetch('CustomCoverArt/templates', 'POST', { Name: name, Document: collectDocument() })
-                    .then(function () { Dashboard.alert(t('tpl.saved')); loadTemplates(); });
+                    .then(function (res) { dataOrThrow(res); Dashboard.alert(t('tpl.saved')); return loadTemplates(); })
+                    .catch(function (e) { showError(t('dyn.error', errorText(e))); });
             });
             el('ccaTemplateDelete').addEventListener('click', function () {
                 var name = el('ccaTemplateSelect').value;
                 if (!name) { return; }
-                jsonFetch('CustomCoverArt/templates/' + encodeURIComponent(name), 'DELETE').then(loadTemplates);
+                jsonFetch('CustomCoverArt/templates/' + encodeURIComponent(name), 'DELETE')
+                    .then(function (res) { dataOrThrow(res); return loadTemplates(); })
+                    .catch(function (e) { showError(t('dyn.error', errorText(e))); });
             });
 
             el('ccaBatchApply').addEventListener('click', function () {
@@ -4597,7 +4685,7 @@
                 el('ccaBrowserPrev').disabled = browser.page <= 1;
                 el('ccaBrowserNext').disabled = browser.page >= browser.totalPages;
             }).catch(function (e) {
-                gridMessage(grid, e.message);
+                gridMessage(grid, t('dyn.error', errorText(e)));
             });
         }
 
@@ -4636,8 +4724,8 @@
 
         function selectBrowserItem(itemId, name) {
             var imgUrl;
-            try { imgUrl = ApiClient.getImageUrl(itemId, { type: 'Primary', maxHeight: 2000 }); } catch (e) { imgUrl = null; }
-            if (!imgUrl) { Dashboard.alert('No image URL for that item.'); return; }
+            try { imgUrl = ApiClient.getImageUrl(itemId, { type: 'Primary', maxHeight: 2000 }); } catch (err) { imgUrl = null; }
+            if (!imgUrl) { Dashboard.alert(t('poster.noUrl')); return; }
 
             Dashboard.showLoadingMsg();
             // Fetch the poster through Jellyfin's own image endpoint (authenticated,
@@ -4646,39 +4734,37 @@
             // File constructor, which isn't reliable in every webview.
             var posterBlob = null;
             fetch(imgUrl, { headers: { 'Authorization': authHeader() }, credentials: 'include' })
-                .then(function (r) { if (!r.ok) { throw new Error('image fetch returned ' + r.status); } return r.blob(); })
+                .catch(function () { throw networkError(); })
+                .then(function (r) { if (!r.ok) { throw requestError(r.status); } return r.blob(); })
                 .then(function (blob) {
-                    if (!blob || blob.size === 0) { throw new Error('the downloaded image was empty'); }
+                    if (!blob || blob.size === 0) { throw new Error(t('poster.empty')); }
                     posterBlob = blob;
                     var ext = blob.type === 'image/png' ? 'png' : (blob.type === 'image/webp' ? 'webp' : 'jpg');
                     var fd = new FormData();
                     fd.append('file', blob, 'poster.' + ext);
-                    return authFetch('CustomCoverArt/upload', { method: 'POST', body: fd }).then(function (r) { return r.json(); });
+                    return authFetch('CustomCoverArt/upload', { method: 'POST', body: fd })
+                        .then(readJson, function () { throw networkError(); });
                 })
                 .then(function (res) {
                     Dashboard.hideLoadingMsg();
-                    var path = pick(res, 'Data');
-                    if (pick(res, 'Success') && path) {
-                        // Server path for render/apply; canvas bitmap from the fetched
-                        // Blob via a blob: URL (canvas-source invariant — never the
-                        // server path / ApiClient.getImageUrl).
-                        doc.Background.ImagePath = path;
-                        state.backgroundImagePath = path;
-                        var img = new Image();
-                        img.onload = function () { bgImageEl = img; scheduleRender(); };
-                        img.src = URL.createObjectURL(posterBlob);
-                        watchForAnimatedGif(img, posterBlob);
-                        el('ccaSelectedBgName').textContent = name;
-                        el('ccaSelectedBg').style.display = '';
-                        scheduleRender();
-                        closeBrowser();
-                    } else {
-                        Dashboard.alert('Upload rejected: ' + (pick(res, 'ErrorMessage') || 'unknown reason'));
-                    }
+                    var path = dataOrThrow(res);
+                    if (!path) { throw new Error(t('dyn.unknown')); }
+                    // Server path for render/apply; canvas bitmap from the fetched
+                    // Blob via a blob: URL (canvas-source invariant — never the
+                    // server path / ApiClient.getImageUrl).
+                    doc.Background.ImagePath = path;
+                    state.backgroundImagePath = path;
+                    var img = new Image();
+                    img.onload = function () { bgImageEl = img; scheduleRender(); };
+                    img.src = URL.createObjectURL(posterBlob);
+                    watchForAnimatedGif(img, posterBlob);
+                    el('ccaSelectedBgName').textContent = name;
+                    el('ccaSelectedBg').style.display = '';
+                    scheduleRender();
+                    closeBrowser();
                 })
                 .catch(function (e) {
-                    Dashboard.hideLoadingMsg();
-                    Dashboard.alert('Poster background failed: ' + e.message);
+                    showError(t('poster.fail', errorText(e)));
                 });
         }
 
@@ -4714,7 +4800,7 @@
                 refreshRestoreState();
                 Dashboard.hideLoadingMsg();
                 scheduleRender();
-            }).catch(function () { Dashboard.hideLoadingMsg(); });
+            }).catch(function (e) { showError(t('dyn.error', errorText(e))); });
         });
     })();
     </script>

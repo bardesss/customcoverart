@@ -473,4 +473,59 @@ public class ConfigPageStructureTests
         }
         Assert.Contains("applyLabelFor(", FunctionBody(page, "updateUI"), System.StringComparison.Ordinal);
     }
+
+    /// <summary>
+    /// A 401/413/429 has an empty or HTML body; parsing it first produced "Unexpected end
+    /// of JSON input", which names neither the status nor the cause. A 400 from the render
+    /// endpoints carries the server's own validation message, which must reach the user.
+    /// </summary>
+    [Fact]
+    public void JsonRequestsCheckTheStatusBeforeParsing()
+    {
+        var page = ConfigPage();
+        var readJson = FunctionBody(page, "readJson");
+        Assert.Contains("r.ok", readJson, System.StringComparison.Ordinal);
+        Assert.Contains("responseError(r)", readJson, System.StringComparison.Ordinal);
+        var responseError = FunctionBody(page, "responseError");
+        Assert.Contains("requestError(r.status)", responseError, System.StringComparison.Ordinal);
+        Assert.Contains("r.status === 400", responseError, System.StringComparison.Ordinal);
+        Assert.Contains("then(readJson", FunctionBody(page, "jsonFetch"), System.StringComparison.Ordinal);
+        Assert.Contains("then(readJson", FunctionBody(page, "uploadFile"), System.StringComparison.Ordinal);
+        Assert.Contains("responseError(r)", FunctionBody(page, "showServerRender"), System.StringComparison.Ordinal);
+        Assert.DoesNotContain("r.json()", page, System.StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void NoUntranslatedErrorTextReachesTheUser()
+    {
+        var page = ConfigPage();
+        foreach (var raw in new[]
+        {
+            // Quoted: the collage fetch's internal 'collage render returned ' is never shown.
+            "'render returned ", "image fetch returned", "Upload rejected", "Poster background failed",
+            "No image URL", "the downloaded image was empty",
+        })
+        {
+            Assert.DoesNotContain(raw, page, System.StringComparison.Ordinal);
+        }
+
+        // A raw exception message is English (or a browser's "Failed to fetch"); the one
+        // place allowed to read it is errorText, which every catch goes through.
+        var reads = Regex.Matches(page, @"\be\.message\b").Count;
+        Assert.True(reads == 1, $"Expected e.message only inside errorText; found {reads}.");
+        Assert.Contains("e.message", FunctionBody(page, "errorText"), System.StringComparison.Ordinal);
+    }
+
+    /// <summary>Each of these used to drop a failure on the floor or report success regardless.</summary>
+    [Fact]
+    public void ListLoadsAndTemplateCallsHandleFailure()
+    {
+        var page = ConfigPage();
+        Assert.Contains(".catch(", FunctionBody(page, "refreshRestoreState"), System.StringComparison.Ordinal);
+        Assert.Contains(".catch(", FunctionBody(page, "loadTemplates"), System.StringComparison.Ordinal);
+        Assert.Contains(".catch(", FunctionBody(page, "loadBatchList"), System.StringComparison.Ordinal);
+        Assert.Matches(@"'CustomCoverArt/templates', 'POST'[\s\S]{0,300}?dataOrThrow\(res\)[\s\S]{0,300}?\.catch\(", page);
+        Assert.Matches(@"'CustomCoverArt/templates/' \+ encodeURIComponent\(name\), 'DELETE'\)[\s\S]{0,300}?dataOrThrow\(res\)[\s\S]{0,300}?\.catch\(", page);
+        Assert.Matches(@"'/restore', 'POST'\)[\s\S]{0,400}?\.catch\(", page);
+    }
 }
