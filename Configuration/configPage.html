@@ -1751,15 +1751,18 @@
             }
         }
 
-        function bindGifLoopListeners() {
-            document.addEventListener('visibilitychange', updateGifLoop);
-            if (_reducedMotion) {
-                if (_reducedMotion.addEventListener) { _reducedMotion.addEventListener('change', updateGifLoop); }
-                else if (_reducedMotion.addListener) { _reducedMotion.addListener(updateGifLoop); }
+        // Re-evaluates the loop when the reduced-motion preference changes. Switched on
+        // and off with the page (bindPageListeners / unbindPageListeners); older engines
+        // only have addListener/removeListener on a MediaQueryList.
+        function watchReducedMotion(on) {
+            if (!_reducedMotion) { return; }
+            if (_reducedMotion.addEventListener) {
+                if (on) { _reducedMotion.addEventListener('change', updateGifLoop); }
+                else { _reducedMotion.removeEventListener('change', updateGifLoop); }
+            } else if (_reducedMotion.addListener) {
+                if (on) { _reducedMotion.addListener(updateGifLoop); }
+                else { _reducedMotion.removeListener(updateGifLoop); }
             }
-            // Leaving the page stops at once; pageshow's scheduleRender() restarts it.
-            page.addEventListener('pagehide', stopGifLoop);
-            page.addEventListener('viewhide', stopGifLoop);
         }
 
         // Background pan/zoom mode (Task 9): when true, canvas drag/wheel/pinch
@@ -4385,8 +4388,8 @@
         }
 
         function bindEvents() {
-            // Document and media-query listeners for the GIF repaint loop (bindEvents runs once).
-            bindGifLoopListeners();
+            // Global listeners (resize, Ctrl+Z/Y, the GIF loop's visibility and reduced-
+            // motion watchers) are page-scoped instead: see bindPageListeners.
             el('ccaLibrarySelect').addEventListener('change', function () {
                 state.libraryId = this.value;
                 var opt = this.options[this.selectedIndex];
@@ -4754,24 +4757,8 @@
                 });
             });
 
-            // Handle sizes and hit tolerances are derived from the canvas's CSS display
-            // size, so a viewport change (rotating a phone, resizing a window) must redraw
-            // or the handles keep the size they had at the old width.
-            window.addEventListener('resize', debounce(function () { scheduleRender(); }, 150));
-
             el('ccaUndo').addEventListener('click', undo);
             el('ccaRedo').addEventListener('click', redo);
-
-            document.addEventListener('keydown', function (ev) {
-                if (!(ev.ctrlKey || ev.metaKey)) { return; }
-                // Never hijack text editing: inside a field the browser's own undo is the
-                // one the user means.
-                var target = ev.target;
-                if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) { return; }
-                var k = String(ev.key || '').toLowerCase();
-                if (k === 'z' && !ev.shiftKey) { ev.preventDefault(); undo(); }
-                else if (k === 'y' || (k === 'z' && ev.shiftKey)) { ev.preventDefault(); redo(); }
-            });
 
             el('ccaApplyBtn').addEventListener('click', applyCoverArt);
             el('ccaServerRender').addEventListener('click', showServerRender);
@@ -5131,6 +5118,79 @@
                 });
         }
 
+        // --- Page-level listeners -----------------------------------------
+        // window/document listeners outlive this page: Jellyfin keeps it in the DOM while
+        // you browse the rest of the dashboard, and a leftover Ctrl+Z handler would
+        // preventDefault the undo of every other settings page. They are added on pageshow
+        // and removed on pagehide/viewhide, and the keyboard and resize handlers also check
+        // that the page is on screen in case a hide event is ever missed.
+        var TEXT_INPUT_TYPES = { text: 1, search: 1, number: 1, email: 1, url: 1, tel: 1, password: 1 };
+
+        function isTextEditingTarget(n) {
+            if (!n) { return false; }
+            if (n.isContentEditable || n.tagName === 'TEXTAREA') { return true; }
+            if (n.tagName === 'INPUT') { return !!TEXT_INPUT_TYPES[String(n.type || 'text').toLowerCase()]; }
+            return false;
+        }
+
+        // The page is attached and displayed. Unlike isEditorOnScreen (the GIF loop's
+        // test) this ignores document.hidden: closing a background tab must still be able
+        // to ask about unapplied work.
+        function isPageVisible() {
+            return !!(page && page.isConnected && page.getClientRects().length > 0);
+        }
+
+        // Handle sizes and hit tolerances are derived from the canvas's CSS display size,
+        // so a viewport change (rotating a phone, resizing a window) must redraw or the
+        // handles keep the size they had at the old width.
+        var onWindowResize = debounce(function () {
+            if (isPageVisible()) { scheduleRender(); }
+        }, 150);
+
+        function onDocumentKeydown(ev) {
+            if (!(ev.ctrlKey || ev.metaKey) || !isPageVisible()) { return; }
+            // Never hijack text editing: in a text field the browser's own undo is the one
+            // the user means. Sliders, colour pickers and checkboxes are not text, so
+            // Ctrl+Z there undoes the design like anywhere else on the page.
+            if (isTextEditingTarget(ev.target)) { return; }
+            // Do not change the design underneath the open poster browser.
+            if (el('ccaBrowserModal').style.display !== 'none') { return; }
+            var k = String(ev.key || '').toLowerCase();
+            if (k === 'z' && !ev.shiftKey) { ev.preventDefault(); undo(); }
+            else if (k === 'y' || (k === 'z' && ev.shiftKey)) { ev.preventDefault(); redo(); }
+        }
+
+        function bindPageListeners() {
+            unbindPageListeners(); // pageshow can fire again without a hide in between
+            window.addEventListener('resize', onWindowResize);
+            document.addEventListener('keydown', onDocumentKeydown);
+            // The GIF loop re-evaluates when the tab hides/shows or reduced motion changes.
+            document.addEventListener('visibilitychange', updateGifLoop);
+            watchReducedMotion(true);
+        }
+
+        function unbindPageListeners() {
+            window.removeEventListener('resize', onWindowResize);
+            document.removeEventListener('keydown', onDocumentKeydown);
+            document.removeEventListener('visibilitychange', updateGifLoop);
+            watchReducedMotion(false);
+        }
+
+        // Leaving the page: drop the global listeners, stop the GIF loop at once (pageshow's
+        // scheduleRender() restarts it) and close the poster browser.
+        function onPageHide() {
+            unbindPageListeners();
+            stopGifLoop();
+            if (page) { closeBrowser(); }
+        }
+
+        // The bundled Noto faces are document-wide: register them once per page load, not
+        // once per visit (every pageshow used to add six more FontFace objects).
+        var _canvasFontsLoaded = null;
+
+        document.querySelector('#CustomCoverArtConfigPage').addEventListener('pagehide', onPageHide);
+        document.querySelector('#CustomCoverArtConfigPage').addEventListener('viewhide', onPageHide);
+
         document.querySelector('#CustomCoverArtConfigPage').addEventListener('pageshow', function () {
             page = this;
             LANG = detectLang();
@@ -5142,6 +5202,7 @@
                 initAdvanced();
                 page.dataset.ccaInit = 'true';
             }
+            bindPageListeners();
             Dashboard.showLoadingMsg();
             // Seed every control (incl. the brand gradient stops) from the default
             // document, so the UI and the live canvas start in agreement.
@@ -5155,7 +5216,8 @@
             // Render immediately with a sane fallback, then re-render once the
             // bundled Noto weights register so canvas text metrics match the server.
             scheduleRender();
-            loadCanvasFonts().then(scheduleRender);
+            if (!_canvasFontsLoaded) { _canvasFontsLoaded = loadCanvasFonts(); }
+            _canvasFontsLoaded.then(scheduleRender);
             loadTemplates();
             loadBatchList();
             loadLibraries().then(function () {
