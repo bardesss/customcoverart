@@ -647,6 +647,26 @@ public class ConfigPageStructureTests
         Assert.Contains(".focus()", FunctionBody(page, "openBrowser"), System.StringComparison.Ordinal);
     }
 
+    /// <summary>A pager button that disables itself while focused drops focus to body, killing Esc/Tab.</summary>
+    [Fact]
+    public void PosterBrowserKeepsFocusInsideAfterPaging()
+    {
+        var page = ConfigPage();
+        var keep = FunctionBody(page, "keepFocusInBrowser");
+        Assert.Contains("activeElement", keep, System.StringComparison.Ordinal);
+        Assert.Contains("ccaBrowserSearch", keep, System.StringComparison.Ordinal);
+        Assert.Contains("keepFocusInBrowser();", FunctionBody(page, "loadBrowserItems"), System.StringComparison.Ordinal);
+
+        var render = FunctionBody(page, "renderBrowserItems");
+        Assert.Contains("createElement('span')", render, System.StringComparison.Ordinal);
+        Assert.DoesNotContain("createElement('div')", render, System.StringComparison.Ordinal);
+
+        var theme = FunctionBody(page, "applyThemeSurface");
+        Assert.Contains("--theme-body-background-color", theme, System.StringComparison.Ordinal);
+        Assert.Contains("isOpaqueColor", theme, System.StringComparison.Ordinal);
+        Assert.Contains("isOpaqueColor", page.Substring(page.IndexOf("function isOpaqueColor", System.StringComparison.Ordinal)), System.StringComparison.Ordinal);
+    }
+
     /// <summary>A hard-coded dark box with inherited text colour is unreadable on the light theme.</summary>
     [Fact]
     public void ModalAndStickyBarsFollowTheTheme()
