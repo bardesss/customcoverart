@@ -655,6 +655,11 @@ public class ConfigPageStructureTests
         var keep = FunctionBody(page, "keepFocusInBrowser");
         Assert.Contains("activeElement", keep, System.StringComparison.Ordinal);
         Assert.Contains("ccaBrowserSearch", keep, System.StringComparison.Ordinal);
+        // A just-disabled focused button still reports as activeElement/contained.
+        Assert.Contains("!ae.disabled", keep, System.StringComparison.Ordinal);
+        Assert.Contains("document.body", keep, System.StringComparison.Ordinal);
+        Assert.Contains("_browserLastPager", keep, System.StringComparison.Ordinal);
+        Assert.Contains("_browserLastPager = ", FunctionBody(page, "bindEvents"), System.StringComparison.Ordinal);
         Assert.Contains("keepFocusInBrowser();", FunctionBody(page, "loadBrowserItems"), System.StringComparison.Ordinal);
 
         var render = FunctionBody(page, "renderBrowserItems");
