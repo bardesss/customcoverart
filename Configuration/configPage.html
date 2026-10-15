@@ -896,7 +896,7 @@
         #CustomCoverArtConfigPage .ccaGridItem:hover,
         #CustomCoverArtConfigPage .ccaGridItem:focus-visible { border-color: var(--theme-primary-color, #00a4dc); outline: none; }
         #CustomCoverArtConfigPage .ccaGridItem img { width: 100%; height: 190px; object-fit: cover; display: block; background: #000; }
-        #CustomCoverArtConfigPage .ccaGridItem .cap { padding: 7px 8px; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        #CustomCoverArtConfigPage .ccaGridItem .cap { display: block; padding: 7px 8px; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         #CustomCoverArtConfigPage .ccaModalPager { display: flex; gap: 1em; align-items: center; justify-content: center; padding: .85em; border-top: 1px solid rgba(127, 127, 127, .2); }
         #CustomCoverArtConfigPage .ccaGridEmpty { padding: 2em; text-align: center; opacity: .7; grid-column: 1 / -1; }
         #CustomCoverArtConfigPage .ccaModalClose { min-width: 0; }
@@ -4924,11 +4924,28 @@
         // Jellyfin theme, which not every Jellyfin version exposes as a CSS variable. Read
         // it off the nearest ancestor that actually paints a background, and the text
         // colour off the page; fall back to the dark theme's pair.
+        // True for a fully opaque CSS colour string as getComputedStyle reports it:
+        // not 'transparent', no alpha below 1 in rgba(r,g,b,a), rgb(r g b / a) or color(... / a).
+        function isOpaqueColor(c) {
+            if (!c || c === 'transparent') { return false; }
+            var a = null, m = /\/\s*([\d.]+)(%?)\s*\)\s*$/.exec(c);
+            if (m) { a = parseFloat(m[1]) / (m[2] ? 100 : 1); }
+            else if (/^rgba\(/.test(c)) {
+                var parts = c.replace(/^rgba\(|\)\s*$/g, '').split(',');
+                if (parts.length === 4) { a = parseFloat(parts[3]); }
+            }
+            return a === null || isNaN(a) || a >= 1;
+        }
+
         function applyThemeSurface() {
             var bg = '';
-            for (var n = page; n && n.nodeType === 1; n = n.parentElement) {
+            // Prefer the theme's own variable when this Jellyfin exposes it.
+            var themed = (getComputedStyle(document.documentElement).getPropertyValue('--theme-body-background-color') || '').trim();
+            if (!themed) { themed = (getComputedStyle(document.body).getPropertyValue('--theme-body-background-color') || '').trim(); }
+            if (themed && isOpaqueColor(themed)) { bg = themed; }
+            for (var n = page; !bg && n && n.nodeType === 1; n = n.parentElement) {
                 var c = getComputedStyle(n).backgroundColor;
-                if (c && c !== 'transparent' && !/^rgba\(.*,\s*0\)$/.test(c)) { bg = c; break; }
+                if (isOpaqueColor(c)) { bg = c; }
             }
             page.style.setProperty('--cca-surface', bg || '#1b1b1b');
             page.style.setProperty('--cca-text', bg ? getComputedStyle(page).color : '#f2f2f2');
@@ -4952,6 +4969,20 @@
             var back = _browserReturnFocus || el('ccaBrowseBtn');
             _browserReturnFocus = null;
             if (back && back.focus) { back.focus(); }
+        }
+
+        // A pager button that disables itself while focused (Next on the last step, Prev on
+        // page 1) or a re-rendered grid drops focus to <body>, where the dialog's keydown
+        // handler (Esc, Tab trap) never hears it. Called after every grid/pager update: if
+        // the dialog is open and focus escaped it, put focus back on a live control.
+        function keepFocusInBrowser() {
+            var modal = el('ccaBrowserModal');
+            if (!modal || modal.style.display === 'none') { return; }
+            var box = modal.querySelector('.ccaModalBox');
+            if (box.contains(document.activeElement)) { return; }
+            var next = el('ccaBrowserNext'), prev = el('ccaBrowserPrev');
+            var target = !next.disabled ? next : (!prev.disabled ? prev : el('ccaBrowserSearch'));
+            target.focus();
         }
 
         // Esc closes; Tab and Shift+Tab cycle inside the dialog instead of walking out
@@ -4991,6 +5022,7 @@
                 if (!isCurrent()) { return; }
                 if (!pick(res, 'Success')) {
                     gridMessage(grid, t('dyn.errorItems'));
+                    keepFocusInBrowser();
                     return;
                 }
                 var data = pick(res, 'Data') || {};
@@ -4999,9 +5031,11 @@
                 el('ccaBrowserPage').textContent = t('dyn.page', browser.page, browser.totalPages);
                 el('ccaBrowserPrev').disabled = browser.page <= 1;
                 el('ccaBrowserNext').disabled = browser.page >= browser.totalPages;
+                keepFocusInBrowser();
             }).catch(function (e) {
                 if (!isCurrent()) { return; }
                 gridMessage(grid, t('dyn.error', errorText(e)));
+                keepFocusInBrowser();
             });
         }
 
@@ -5029,7 +5063,7 @@
                 try { img.src = ApiClient.getImageUrl(id, { type: 'Primary', fillHeight: 220 }); } catch (e) { /* ignore */ }
                 img.addEventListener('error', function () { img.style.visibility = 'hidden'; });
 
-                var cap = document.createElement('div');
+                var cap = document.createElement('span');
                 cap.className = 'cap';
                 cap.textContent = name + (year ? ' (' + year + ')' : '');
 
