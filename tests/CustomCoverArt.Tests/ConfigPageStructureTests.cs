@@ -809,4 +809,35 @@ public class ConfigPageStructureTests
         Assert.Contains("markClean(appliedJson)", FunctionBody(page, "applyCoverArt"), System.StringComparison.Ordinal);
         Assert.Matches(@"'CustomCoverArt/templates', 'POST'[\s\S]{0,300}?markClean\(savedJson\)", page);
     }
+
+    /// <summary>
+    /// Custom size and Animated GIF revealed their controls inside a CLOSED Advanced
+    /// disclosure (so choosing them appeared to do nothing), and the template and batch
+    /// groups were hidden there too.
+    /// </summary>
+    [Fact]
+    public void OutputStepHasNothingHiddenBehindAdvanced()
+    {
+        var markup = Markup();
+        var start = markup.IndexOf("data-step=\"5\"", System.StringComparison.Ordinal);
+        Assert.True(start > 0, "Step 5 not found.");
+        var end = markup.IndexOf("</section>", start, System.StringComparison.Ordinal);
+        var step5 = markup.Substring(start, end - start);
+        Assert.DoesNotContain("ccaAdv", step5, System.StringComparison.Ordinal);
+        foreach (var id in new[] { "ccaCustomDims", "ccaAnimRow", "ccaTemplateName", "ccaBatchApply" })
+        {
+            Assert.Contains($"id=\"{id}\"", step5, System.StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void CustomSizeIsClampedToWhatTheServerAccepts()
+    {
+        var page = ConfigPage();
+        Assert.Contains("var MIN_DIM = 100, MAX_DIM = 2048;", page, System.StringComparison.Ordinal);
+        var clamp = FunctionBody(page, "clampDim");
+        Assert.Contains("Math.max(MIN_DIM, Math.min(MAX_DIM", clamp, System.StringComparison.Ordinal);
+        Assert.Contains("bindCustomDim('ccaWidth', 'Width')", page, System.StringComparison.Ordinal);
+        Assert.DoesNotContain("parseInt(this.value, 10) || doc.Canvas.Width", page, System.StringComparison.Ordinal);
+    }
 }
