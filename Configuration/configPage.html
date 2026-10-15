@@ -49,7 +49,7 @@
                             <button is="emby-button" type="button" id="ccaResetBackupBtn" class="raised" disabled>
                                 <span data-i18n="restore.reset">Reset backup</span>
                             </button>
-                            <span class="ccaFileName" id="ccaRestoreHint" data-i18n="restore.none">No backup yet</span>
+                            <span class="ccaFileName" id="ccaRestoreHint" data-i18n="restore.none" aria-live="polite">No backup yet</span>
                         </div>
                         <div class="ccaStepGroup">
                             <div class="ccaStepGroupHead" data-i18n="group.startFrom">Start from a saved design</div>
@@ -197,7 +197,7 @@
                             <span class="ccaStepChevron" aria-hidden="true">&#9662;</span>
                         </button>
                         <div class="ccaStepBody" id="ccaStepBody3" hidden>
-                        <div id="ccaLayerList" class="ccaLayerList"></div>
+                        <div id="ccaLayerList" class="ccaLayerList" role="list" aria-label="Layers" data-i18n-aria="layer.list"></div>
                         <div class="ccaFileRow">
                             <button is="emby-button" type="button" id="ccaAddText" class="raised"><span data-i18n="layer.addText">Add text</span></button>
                             <button is="emby-button" type="button" id="ccaAddImage" class="raised"><span data-i18n="layer.addImage">Add logo/icon</span></button>
@@ -209,7 +209,7 @@
                         <div id="ccaSettings">
                         <div class="inputContainer ccaTextOnly">
                             <label for="ccaTitle" data-i18n="text.title">Title</label>
-                            <input is="emby-input" type="text" id="ccaTitle" value="Movies" />
+                            <input is="emby-input" type="text" id="ccaTitle" value="" />
                         </div>
                         <div class="inputContainer ccaTextOnly">
                                 <label for="ccaTextAlign" data-i18n="text.align">Alignment</label>
@@ -235,25 +235,21 @@
                             </button>
                             <div class="ccaAdvBody" hidden>
                         <div class="inputContainer ccaTextOnly">
-                            <div class="inputContainer">
-                                <label for="ccaTextWeight" data-i18n="text.weight">Font weight</label>
-                                <select is="emby-select" id="ccaTextWeight" class="emby-select">
-                                    <option value="300" data-i18n="w.light">Light</option>
-                                    <option value="400" selected data-i18n="w.normal">Normal</option>
-                                    <option value="500" data-i18n="w.medium">Medium</option>
-                                    <option value="600" data-i18n="w.semibold">SemiBold</option>
-                                    <option value="700" data-i18n="w.bold">Bold</option>
-                                    <option value="800" data-i18n="w.extrabold">ExtraBold</option>
-                                </select>
-                            </div>
+                            <label for="ccaTextWeight" data-i18n="text.weight">Font weight</label>
+                            <select is="emby-select" id="ccaTextWeight" class="emby-select">
+                                <option value="300" data-i18n="w.light">Light</option>
+                                <option value="400" selected data-i18n="w.normal">Normal</option>
+                                <option value="500" data-i18n="w.medium">Medium</option>
+                                <option value="600" data-i18n="w.semibold">SemiBold</option>
+                                <option value="700" data-i18n="w.bold">Bold</option>
+                                <option value="800" data-i18n="w.extrabold">ExtraBold</option>
+                            </select>
                         </div>
                         <div class="inputContainer ccaTextOnly">
-                            <div class="inputContainer">
-                                <label data-i18n="text.effects">Effects</label>
-                                <div class="ccaChecks">
-                                    <label class="ccaCheck"><input is="emby-checkbox" type="checkbox" id="ccaShadow" /><span data-i18n="e.shadow">Shadow</span></label>
-                                    <label class="ccaCheck"><input is="emby-checkbox" type="checkbox" id="ccaOutline" /><span data-i18n="e.outline">Outline</span></label>
-                                </div>
+                            <label data-i18n="text.effects">Effects</label>
+                            <div class="ccaChecks">
+                                <label class="ccaCheck"><input is="emby-checkbox" type="checkbox" id="ccaShadow" /><span data-i18n="e.shadow">Shadow</span></label>
+                                <label class="ccaCheck"><input is="emby-checkbox" type="checkbox" id="ccaOutline" /><span data-i18n="e.outline">Outline</span></label>
                             </div>
                         </div>
                         <div class="inputContainer ccaTextOnly">
@@ -277,7 +273,7 @@
                         </div>
                             </div>
                         </div>
-                        <div class="fieldDescription" id="ccaNoLayerHint" data-i18n="layer.none" style="display:none">No layer selected — add one in the Layers card above.</div>
+                        <div class="fieldDescription" id="ccaNoLayerHint" data-i18n="layer.none" style="display:none">No layer selected — add one with Add text or Add logo/icon above.</div>
                         </div>
                         </div>
                         </div>
@@ -405,17 +401,10 @@
                                 </select>
                             </div>
                         </div>
-                        <div class="inputContainer">
-                            <label data-i18n="ui.inContext">In context</label>
-                            <div class="ccaContexts" id="ccaContexts"></div>
-                            <div class="fieldDescription" data-i18n="ui.inContextHint">How the cover looks at other shapes. The canvas above is the real design.</div>
-                        </div>
-                        <div class="ccaAdv">
-                            <button type="button" class="ccaAdvHead" aria-expanded="false">
-                                <span class="ccaStepChevron" aria-hidden="true">&#9662;</span>
-                                <span data-i18n="ui.advanced">Advanced</span>
-                            </button>
-                            <div class="ccaAdvBody" hidden>
+                        <!-- Shown right under Dimensions/Format as soon as Custom or Animated GIF
+                             is chosen (updateUI / updateAnimVisibility own their display). They
+                             used to sit in a closed Advanced disclosure, so choosing either
+                             option appeared to do nothing. -->
                         <div id="ccaCustomDims" class="ccaGrid ccaSub" style="display:none;">
                             <div class="inputContainer">
                                 <label for="ccaWidth" data-i18n="out.width">Width</label>
@@ -445,32 +434,35 @@
                             </div>
                         </div>
                         <div class="fieldDescription" id="ccaAnimHint" data-i18n="anim.hint" style="display:none">Animated GIFs are larger and only animate in views that render GIFs. Capped at 30 frames.</div>
+                        <div class="inputContainer">
+                            <label data-i18n="ui.inContext">In context</label>
+                            <div class="ccaContexts" id="ccaContexts"></div>
+                            <div class="fieldDescription" data-i18n="ui.inContextHint">How the cover looks at other shapes. The canvas above is the real design.</div>
+                        </div>
                         <div class="ccaStepGroup">
                             <div class="ccaStepGroupHead" data-i18n="group.saveTemplate">Save this design</div>
-                        <div class="inputContainer">
-                            <label for="ccaTemplateName" data-i18n="tpl.save">Save current design</label>
-                            <div class="ccaFileRow">
-                                <input type="text" id="ccaTemplateName" class="emby-input ccaGrow" placeholder="Template name" data-i18n-ph="tpl.nameph" />
-                                <button is="emby-button" type="button" id="ccaTemplateSave" class="raised">
-                                    <span data-i18n="tpl.savebtn">Save</span>
-                                </button>
+                            <div class="inputContainer">
+                                <label for="ccaTemplateName" data-i18n="tpl.save">Save current design</label>
+                                <div class="ccaFileRow">
+                                    <input type="text" id="ccaTemplateName" class="emby-input ccaGrow" placeholder="Template name" data-i18n-ph="tpl.nameph" />
+                                    <button is="emby-button" type="button" id="ccaTemplateSave" class="raised">
+                                        <span data-i18n="tpl.savebtn">Save</span>
+                                    </button>
+                                </div>
                             </div>
-                        </div>
-                        <div class="fieldDescription" data-i18n="tpl.hint">Templates store the design but not the title — each target keeps its own name.</div>
+                            <div class="fieldDescription" data-i18n="tpl.hint">Templates store the design but not the title — each target keeps its own name.</div>
                         </div>
                         <div class="ccaStepGroup">
                             <div class="ccaStepGroupHead" data-i18n="group.batch">Apply to several targets</div>
-                        <div class="fieldDescription" data-i18n="batch.hint">Apply the current design (or loaded template) to several targets at once. Each cover is titled with its target's name.</div>
-                        <div id="ccaBatchList" class="ccaBatchList"></div>
-                        <div class="ccaFileRow">
-                            <button is="emby-button" type="button" id="ccaBatchApply" class="raised">
-                                <span data-i18n="batch.apply">Apply to selected</span>
-                            </button>
-                            <span class="ccaFileName" id="ccaBatchStatus"></span>
-                        </div>
-                        </div>
-                        </div>
+                            <div class="fieldDescription" data-i18n="batch.hint">Apply the current design (or loaded template) to several targets at once. Each cover is titled with its target's name.</div>
+                            <div id="ccaBatchList" class="ccaBatchList"></div>
+                            <div class="ccaFileRow">
+                                <button is="emby-button" type="button" id="ccaBatchApply" class="raised">
+                                    <span data-i18n="batch.apply">Apply to selected</span>
+                                </button>
+                                <span class="ccaFileName" id="ccaBatchStatus" role="status" aria-live="polite"></span>
                             </div>
+                        </div>
                         </div>
                     </section>
 
@@ -489,7 +481,7 @@
                             </button>
                         </div>
                         <div class="ccaPreviewWrap">
-                            <canvas id="ccaCanvas" class="ccaCanvas" width="1400" height="1400" aria-label="Cover art canvas"></canvas>
+                            <canvas id="ccaCanvas" class="ccaCanvas" width="1400" height="1400" tabindex="0" role="application" aria-label="Cover design canvas. Select a layer, then use the arrow keys to move it (hold Shift for bigger steps)." data-i18n-aria="canvas.label"></canvas>
                             <div id="ccaPreviewPlaceholder" class="ccaPreviewPlaceholder" data-i18n="preview.placeholder">The preview appears here automatically.</div>
                             <div id="ccaCollageSpinner" class="ccaSpinner" aria-hidden="true" hidden></div>
                             <div id="ccaGifHolder" class="ccaGifHolder" aria-hidden="true"></div>
@@ -503,7 +495,7 @@
                         </div>
                         <div id="ccaServerRenderWrap" class="ccaServerRender" style="display:none">
                             <div class="ccaServerRenderLabel" data-i18n="serverrender.label">Authoritative render (server)</div>
-                            <img id="ccaServerRenderImg" class="ccaServerRenderImg" alt="Server render" />
+                            <img id="ccaServerRenderImg" class="ccaServerRenderImg" alt="Cover as rendered by the server" data-i18n-alt="serverrender.alt" />
                         </div>
                     </section>
                 </div>
@@ -511,14 +503,14 @@
             </div>
 
             <div id="ccaBrowserModal" class="ccaModal" style="display:none;">
-                <div class="ccaModalBox">
+                <div class="ccaModalBox" role="dialog" aria-modal="true" aria-labelledby="ccaBrowserTitle">
                     <div class="ccaModalHead">
-                        <h3 data-i18n="modal.title">Select a poster</h3>
-                        <button is="emby-button" type="button" id="ccaBrowserClose" class="ccaModalClose"><span>✕</span></button>
+                        <h3 id="ccaBrowserTitle" data-i18n="modal.title">Select a poster</h3>
+                        <button is="emby-button" type="button" id="ccaBrowserClose" class="ccaModalClose" aria-label="Close" data-i18n-aria="modal.close"><span aria-hidden="true">✕</span></button>
                     </div>
                     <div class="ccaModalFilters">
-                        <input is="emby-input" type="text" id="ccaBrowserSearch" placeholder="Search…" data-i18n-ph="modal.search" />
-                        <select is="emby-select" id="ccaBrowserType" class="emby-select">
+                        <input is="emby-input" type="text" id="ccaBrowserSearch" placeholder="Search…" data-i18n-ph="modal.search" aria-label="Search…" data-i18n-aria="modal.search" />
+                        <select is="emby-select" id="ccaBrowserType" class="emby-select" aria-label="Type" data-i18n-aria="target.type">
                             <option value="" data-i18n="modal.alltypes">All types</option>
                             <option value="Movie" data-i18n="ty.movies">Movies</option>
                             <option value="Series" data-i18n="ty.series">Series</option>
@@ -533,7 +525,7 @@
                     <div id="ccaBrowserGrid" class="ccaPosterGrid"></div>
                     <div class="ccaModalPager">
                         <button is="emby-button" type="button" id="ccaBrowserPrev" class="raised"><span data-i18n="modal.prev">Previous</span></button>
-                        <span id="ccaBrowserPage">Page 1</span>
+                        <span id="ccaBrowserPage" aria-live="polite"></span>
                         <button is="emby-button" type="button" id="ccaBrowserNext" class="raised"><span data-i18n="modal.next">Next</span></button>
                     </div>
                 </div>
@@ -583,9 +575,27 @@
             #CustomCoverArtConfigPage .ccaGrid { grid-template-columns: 1fr; }
         }
 
-        #CustomCoverArtConfigPage .ccaCard .inputContainer { margin: 0 0 1.05em; }
-        #CustomCoverArtConfigPage .ccaCard > .inputContainer:last-child { margin-bottom: 0; }
-        #CustomCoverArtConfigPage .ccaGrid .inputContainer { margin-bottom: 0; }
+        /* Vertical rhythm inside a step. Every field-level block (an input, a two-column
+           grid, a standalone button row) leaves the same 1.05em below it, a hint sits
+           tight under the field it explains, and the last block in any container leaves
+           nothing, so a step ends on its own padding instead of Jellyfin's 1.8em
+           .inputContainer default. Scoped to .ccaStepBody: the steps stopped being .ccaCard
+           in the guided-editor redesign, which silently orphaned the old card rules. */
+        #CustomCoverArtConfigPage .ccaStepBody .inputContainer,
+        #CustomCoverArtConfigPage .ccaStepBody .ccaGrid,
+        #CustomCoverArtConfigPage .ccaStepBody .ccaFileRow { margin: 0 0 1.05em; }
+        #CustomCoverArtConfigPage .ccaGrid .inputContainer,
+        #CustomCoverArtConfigPage .inputContainer .ccaFileRow { margin-bottom: 0; }
+        #CustomCoverArtConfigPage .ccaStepBody .ccaFileRow:has(+ .fieldDescription),
+        #CustomCoverArtConfigPage .ccaStepBody .inputContainer:has(+ .fieldDescription) { margin-bottom: 0; }
+        #CustomCoverArtConfigPage .ccaStepBody > .fieldDescription,
+        #CustomCoverArtConfigPage .ccaStepGroup > .fieldDescription { margin-bottom: 1.05em; }
+        #CustomCoverArtConfigPage .ccaStepBody > :last-child,
+        #CustomCoverArtConfigPage .ccaStepGroup > :last-child,
+        #CustomCoverArtConfigPage .ccaSub > :last-child,
+        #CustomCoverArtConfigPage .ccaAdvBody > :last-child,
+        #CustomCoverArtConfigPage .ccaFxRow > :last-child,
+        #CustomCoverArtConfigPage #ccaSettings > :last-child { margin-bottom: 0; }
 
         #CustomCoverArtConfigPage .ccaVal { float: right; opacity: .6; font-weight: 400; font-variant-numeric: tabular-nums; }
         #CustomCoverArtConfigPage .ccaRange { width: 100%; margin: .55em 0 0; }
@@ -606,6 +616,11 @@
         /* A control that shares an inline row with a compact button takes the rest. */
         #CustomCoverArtConfigPage .ccaGrow { flex: 1 1 auto; min-width: 0; }
         #CustomCoverArtConfigPage .ccaFileRow .ccaGrow { width: auto; }
+        /* Load template / Delete, template name / Save, density / Shuffle: the row is as
+           tall as its tallest control and both stretch to it, instead of a 46px select
+           centred beside a 55px button. */
+        #CustomCoverArtConfigPage .ccaFileRow .ccaGrow,
+        #CustomCoverArtConfigPage .ccaFileRow .ccaGrow ~ .emby-button { align-self: stretch; }
 
         #CustomCoverArtConfigPage .ccaChecks { display: flex; flex-wrap: wrap; gap: .3em 1.25em; padding-top: .45em; }
         #CustomCoverArtConfigPage .ccaCheck { display: inline-flex; align-items: center; gap: .5em; }
@@ -638,6 +653,7 @@
             background: transparent; color: inherit; cursor: pointer; opacity: .7;
         }
         #CustomCoverArtConfigPage .ccaStopRemove:hover { opacity: 1; }
+        #CustomCoverArtConfigPage .ccaStopRemove:disabled { opacity: .3; cursor: default; }
 
         /* Numbered accordion steps. One open at a time; the header is the map. */
         #CustomCoverArtConfigPage .ccaStep { margin: 0 0 .6em; border: 1px solid rgba(127,127,127,.2); border-radius: 10px; overflow: hidden; }
@@ -679,6 +695,12 @@
         /* Nested inside an effect row, the divider would double up with the row's own. */
         #CustomCoverArtConfigPage .ccaFxRow .ccaAdv { margin-top: .5em; border-top: 0; }
 
+        /* The overflow toggle only exists on narrow screens. These must come BEFORE the
+           mobile block below: its rules have the same specificity, so whichever is later
+           wins, and after it these hid the toggle and showed the actions at every width. */
+        #CustomCoverArtConfigPage .ccaLayerMore { display: none; }
+        #CustomCoverArtConfigPage .ccaLayerActions { display: flex; gap: .2em; }
+
         /* ---- Mobile -------------------------------------------------------
            Verified at 360x640. The rules here are about reach and hit size, not
            just narrowness: everything interactive gets to 44x44 CSS px, the canvas
@@ -689,7 +711,7 @@
             #CustomCoverArtConfigPage .ccaLayout { display: flex; flex-direction: column; }
             #CustomCoverArtConfigPage .ccaPreviewCol {
                 order: -1; position: sticky; top: 0; z-index: 5;
-                background: var(--theme-body-background-color, #101010);
+                background: var(--cca-surface, var(--theme-body-background-color, #101010));
                 padding-bottom: .5em;
             }
             #CustomCoverArtConfigPage .ccaCanvas { max-height: 34vh; }
@@ -710,7 +732,7 @@
             #CustomCoverArtConfigPage .ccaStickyApply {
                 position: sticky; bottom: 0; z-index: 6;
                 padding: .6em 0;
-                background: var(--theme-body-background-color, #101010);
+                background: var(--cca-surface, var(--theme-body-background-color, #101010));
                 border-top: 1px solid rgba(127,127,127,.2);
             }
 
@@ -731,15 +753,12 @@
             }
             #CustomCoverArtConfigPage .ccaModalHead {
                 position: sticky; top: 0; z-index: 2;
-                background: var(--theme-body-background-color, #101010);
+                background: var(--cca-surface, var(--theme-body-background-color, #101010));
             }
             #CustomCoverArtConfigPage .ccaModalFilters { flex-wrap: wrap; gap: .5em; }
             #CustomCoverArtConfigPage .ccaModalClose { min-width: 44px; min-height: 44px; }
             #CustomCoverArtConfigPage .ccaPosterGrid { grid-template-columns: repeat(2, 1fr); }
         }
-        /* The overflow toggle only exists on narrow screens. */
-        #CustomCoverArtConfigPage .ccaLayerMore { display: none; }
-        #CustomCoverArtConfigPage .ccaLayerActions { display: flex; gap: .2em; }
 
         /* Undo/redo sits beside the canvas, not inside a step, so it is reachable
            whichever step is open. */
@@ -783,6 +802,14 @@
         #CustomCoverArtConfigPage .ccaLayerName {
             flex: 1 1 auto; min-width: 0;
             overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+            /* A real <button> (keyboard selection), styled as the plain label it replaced. */
+            background: transparent; border: 0; margin: 0; padding: .25em 0;
+            color: inherit; font: inherit; text-align: left; cursor: pointer;
+        }
+        #CustomCoverArtConfigPage .ccaLayerName:focus-visible,
+        #CustomCoverArtConfigPage .ccaLayerBtn:focus-visible,
+        #CustomCoverArtConfigPage .ccaCanvas:focus-visible {
+            outline: 2px solid var(--theme-primary-color, #00a4dc); outline-offset: 2px;
         }
         #CustomCoverArtConfigPage .ccaLayerHidden .ccaLayerName { opacity: .45; text-decoration: line-through; }
         #CustomCoverArtConfigPage .ccaLayerBtn {
@@ -796,8 +823,6 @@
         #CustomCoverArtConfigPage .ccaHiddenFile { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); border: 0; }
         #CustomCoverArtConfigPage .ccaFileRow { display: flex; align-items: center; gap: .75em; flex-wrap: wrap; }
         #CustomCoverArtConfigPage .ccaFileRow .emby-button { margin: 0; }
-        /* Give a standalone action row (e.g. Restore) the same breathing room as an input. */
-        #CustomCoverArtConfigPage .ccaCard > .ccaFileRow { margin-top: 1.05em; }
         /* A disabled button must read as disabled, not clickable. */
         #CustomCoverArtConfigPage button[disabled] { opacity: .4; cursor: not-allowed; }
         #CustomCoverArtConfigPage .ccaFileName { opacity: .6; font-size: .9em; word-break: break-all; }
@@ -857,16 +882,20 @@
 
         /* Poster picker modal */
         #CustomCoverArtConfigPage .ccaModal { position: fixed; inset: 0; background: rgba(0, 0, 0, .65); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 1em; }
-        #CustomCoverArtConfigPage .ccaModalBox { background: #1b1b1b; width: 100%; max-width: 960px; max-height: 85vh; border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; border: 1px solid rgba(127, 127, 127, .25); }
+        /* --cca-surface/--cca-text are read off the live Jellyfin theme by
+           applyThemeSurface(); the literals are only the dark-theme fallback. */
+        #CustomCoverArtConfigPage .ccaModalBox { background: var(--cca-surface, #1b1b1b); color: var(--cca-text, #f2f2f2); width: 100%; max-width: 960px; max-height: 85vh; border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; border: 1px solid rgba(127, 127, 127, .25); }
         #CustomCoverArtConfigPage .ccaModalHead { display: flex; justify-content: space-between; align-items: center; padding: .75em 1em; border-bottom: 1px solid rgba(127, 127, 127, .2); }
         #CustomCoverArtConfigPage .ccaModalHead h3 { margin: 0; }
         #CustomCoverArtConfigPage .ccaModalFilters { display: flex; gap: .75em; padding: .85em 1em; border-bottom: 1px solid rgba(127, 127, 127, .2); flex-wrap: wrap; }
         #CustomCoverArtConfigPage .ccaModalFilters input { flex: 1; min-width: 180px; }
         #CustomCoverArtConfigPage .ccaPosterGrid { padding: 1em; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px; }
-        #CustomCoverArtConfigPage .ccaGridItem { cursor: pointer; border: 2px solid transparent; border-radius: 8px; overflow: hidden; background: rgba(127, 127, 127, .1); transition: border-color .15s; }
-        #CustomCoverArtConfigPage .ccaGridItem:hover { border-color: var(--theme-primary-color, #00a4dc); }
+        /* A <button> per tile (keyboard-selectable), reset to look like the old card. */
+        #CustomCoverArtConfigPage .ccaGridItem { display: block; width: 100%; margin: 0; padding: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; border: 2px solid transparent; border-radius: 8px; overflow: hidden; background: rgba(127, 127, 127, .1); transition: border-color .15s; }
+        #CustomCoverArtConfigPage .ccaGridItem:hover,
+        #CustomCoverArtConfigPage .ccaGridItem:focus-visible { border-color: var(--theme-primary-color, #00a4dc); outline: none; }
         #CustomCoverArtConfigPage .ccaGridItem img { width: 100%; height: 190px; object-fit: cover; display: block; background: #000; }
-        #CustomCoverArtConfigPage .ccaGridItem .cap { padding: 7px 8px; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        #CustomCoverArtConfigPage .ccaGridItem .cap { display: block; padding: 7px 8px; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         #CustomCoverArtConfigPage .ccaModalPager { display: flex; gap: 1em; align-items: center; justify-content: center; padding: .85em; border-top: 1px solid rgba(127, 127, 127, .2); }
         #CustomCoverArtConfigPage .ccaGridEmpty { padding: 2em; text-align: center; opacity: .7; grid-column: 1 / -1; }
         #CustomCoverArtConfigPage .ccaModalClose { min-width: 0; }
@@ -895,7 +924,7 @@
                 'ctx.wide': 'Wide', 'ctx.square': 'Square', 'ctx.poster': 'Poster',
                 'layer.addText': 'Add text', 'layer.addImage': 'Add logo/icon',
                 'layer.show': 'Show', 'layer.hide': 'Hide', 'layer.up': 'Move up', 'layer.down': 'Move down', 'layer.dup': 'Duplicate', 'layer.del': 'Delete',
-                'layer.text': 'Text', 'layer.logo': 'Logo', 'layer.more': 'More actions', 'layer.none': 'No layer selected — add one in the Layers card above.',
+                'layer.text': 'Text', 'layer.logo': 'Logo', 'layer.more': 'More actions', 'layer.none': 'No layer selected — add one with Add text or Add logo/icon above.',
                 'layer.opacity': 'Opacity', 'layer.rotation': 'Rotation',
                 'hint.logo': 'PNG with transparency · up to 5 MB. The topmost row is drawn last, on top of the others.',
                 'hint.logoSize': 'Drag the corner handles on the preview to resize the logo, or the knob above it to rotate.',
@@ -931,12 +960,25 @@
                 'card.preview': 'Preview', 'preview.placeholder': 'The preview appears here automatically.',
                 'bg.adjust': 'Reposition background (drag to pan, scroll or pinch to zoom)',
                 'action.apply': 'Apply to library', 'action.applying': 'Applying…', 'action.download': 'Download image', 'action.serverRender': 'Show server render', 'serverrender.label': 'Authoritative render (server)', 'preview.hint': 'The preview updates automatically as you adjust settings.', 'preview.collageFail': 'The collage preview could not be loaded. Use Show server render to see it.',
-                'modal.title': 'Select a poster', 'modal.search': 'Search…', 'modal.alltypes': 'All types',
+                'modal.title': 'Select a poster', 'modal.search': 'Search…', 'modal.alltypes': 'All types', 'modal.close': 'Close',
                 'ty.movies': 'Movies', 'ty.series': 'Series', 'ty.seasons': 'Seasons', 'ty.albums': 'Albums', 'ty.artists': 'Artists', 'ty.books': 'Books', 'ty.musicvideos': 'Music videos', 'ty.photos': 'Photos', 'modal.prev': 'Previous', 'modal.next': 'Next',
                 'dyn.loading': 'Loading…', 'dyn.errorItems': 'Error loading items', 'dyn.noItems': 'No items found', 'dyn.page': 'Page {0} of {1}',
                 'dyn.applied': 'Cover art applied successfully.', 'dyn.error': 'Error: {0}', 'dyn.applyFail': 'Could not apply cover art: {0}',
                 'dyn.uploadFail': 'Upload failed: {0}', 'dyn.fontFail': 'Font upload failed: {0}',
                 'dyn.unknown': 'unknown error',
+                'tpl.confirmReplace': 'Loading this template replaces your current design, including changes you have not applied. Continue?',
+                'canvas.label': 'Cover design canvas. Select a layer, then use the arrow keys to move it (hold Shift for bigger steps).',
+                'layer.visible': 'Visible', 'layer.list': 'Layers',
+                'stop.color': 'Colour', 'stop.position': 'Position', 'stop.remove': 'Remove colour', 'fx.swatch': 'Apply colour {0}',
+                'restore.confirm': 'Replace the current cover of this target with its original?', 'tpl.confirmDelete': 'Delete the template “{0}”?',
+                'batch.confirm': 'Apply the current design to the selected targets ({0})? Their current covers will be replaced.', 'batch.fail': 'Batch apply failed: {0}',
+                'err.network': 'Could not reach the server.', 'err.auth': 'The server refused the request (status {0}). Your session may have expired — reload the page and sign in again.',
+                'err.tooLarge': 'The file is too large for the server to accept.', 'err.rateLimited': 'Too many requests — wait a minute and try again.',
+                'err.status': 'The server answered with status {0}.', 'err.badResponse': 'The server sent a response the page could not read.',
+                'poster.noUrl': 'That item has no poster image.', 'poster.empty': 'The poster image came back empty.', 'poster.fail': 'Could not use that poster: {0}',
+                'restore.unknown': 'Could not check for a backup',
+                'text.defaultTitle': 'My library', 'serverrender.alt': 'Cover as rendered by the server',
+                'action.applyCollection': 'Apply to collection', 'action.applyPlaylist': 'Apply to playlist', 'action.applyLivetv': 'Apply to Live TV',
                 'restore.button': 'Restore original cover', 'restore.none': 'No backup yet', 'restore.available': 'A backup exists', 'restore.done': 'Original cover restored.', 'restore.fail': 'No backup found to restore.',
                 'restore.reset': 'Reset backup', 'restore.resetConfirm': 'Delete the current backup? Reset saves nothing by itself. The next apply stores the cover this target shows at that moment as the new original, unless it is a cover this plugin applied. So first put the cover you want to keep back on this target (Edit images, then upload it; or delete the poster and refresh metadata with "Replace existing images"), then reset, then apply.', 'restore.resetDone': 'Backup deleted. The next apply saves the current cover as the new original.', 'restore.resetFail': 'Could not reset the backup: {0}',
                 'bg.source': 'Background source', 'bg.source.image': 'Image', 'bg.source.gradient': 'Gradient', 'bg.source.solid': 'Solid colour', 'bg.source.collage': 'Poster collage from this target', 'bg.collage.density': 'Collage density', 'bg.collage.sparse': 'Sparse', 'bg.collage.medium': 'Medium', 'bg.collage.dense': 'Dense', 'bg.collage.shuffle': 'Shuffle', 'bg.collage.livetv': 'Live TV has no posters to collage.',
@@ -957,7 +999,7 @@
                 'ctx.wide': 'Breed', 'ctx.square': 'Vierkant', 'ctx.poster': 'Poster',
                 'layer.addText': 'Tekst toevoegen', 'layer.addImage': 'Logo/pictogram toevoegen',
                 'layer.show': 'Tonen', 'layer.hide': 'Verbergen', 'layer.up': 'Omhoog', 'layer.down': 'Omlaag', 'layer.dup': 'Dupliceren', 'layer.del': 'Verwijderen',
-                'layer.text': 'Tekst', 'layer.logo': 'Logo', 'layer.more': 'Meer acties', 'layer.none': 'Geen laag geselecteerd — voeg er een toe in de kaart Lagen hierboven.',
+                'layer.text': 'Tekst', 'layer.logo': 'Logo', 'layer.more': 'Meer acties', 'layer.none': 'Geen laag geselecteerd — voeg er een toe met Tekst toevoegen of Logo/pictogram toevoegen hierboven.',
                 'layer.opacity': 'Dekking', 'layer.rotation': 'Rotatie',
                 'hint.logo': 'PNG met transparantie · max. 5 MB. De bovenste rij wordt als laatste getekend, boven op de andere.',
                 'hint.logoSize': 'Sleep de hoekgrepen in het voorbeeld om het logo te vergroten of verkleinen, of de knop erboven om te draaien.',
@@ -993,12 +1035,25 @@
                 'card.preview': 'Voorbeeld', 'preview.placeholder': 'Het voorbeeld verschijnt hier automatisch.',
                 'bg.adjust': 'Achtergrond verplaatsen (sleep om te verschuiven, scroll of knijp om te zoomen)',
                 'action.apply': 'Toepassen op bibliotheek', 'action.applying': 'Bezig met toepassen…', 'action.download': 'Afbeelding downloaden', 'action.serverRender': 'Serverweergave tonen', 'serverrender.label': 'Gezaghebbende weergave (server)', 'preview.hint': 'Het voorbeeld wordt automatisch bijgewerkt terwijl je instellingen aanpast.', 'preview.collageFail': 'Het collagevoorbeeld kon niet worden geladen. Gebruik Serverweergave tonen om het te zien.',
-                'modal.title': 'Selecteer een poster', 'modal.search': 'Zoeken…', 'modal.alltypes': 'Alle types',
+                'modal.title': 'Selecteer een poster', 'modal.search': 'Zoeken…', 'modal.alltypes': 'Alle types', 'modal.close': 'Sluiten',
                 'ty.movies': 'Films', 'ty.series': 'Series', 'ty.seasons': 'Seizoenen', 'ty.albums': 'Albums', 'ty.artists': 'Artiesten', 'ty.books': 'Boeken', 'ty.musicvideos': 'Videoclips', 'ty.photos': 'Foto\'s', 'modal.prev': 'Vorige', 'modal.next': 'Volgende',
                 'dyn.loading': 'Laden…', 'dyn.errorItems': 'Fout bij laden van items', 'dyn.noItems': 'Geen items gevonden', 'dyn.page': 'Pagina {0} van {1}',
                 'dyn.applied': 'Cover art succesvol toegepast.', 'dyn.error': 'Fout: {0}', 'dyn.applyFail': 'Kon cover art niet toepassen: {0}',
                 'dyn.uploadFail': 'Uploaden mislukt: {0}', 'dyn.fontFail': 'Lettertype uploaden mislukt: {0}',
                 'dyn.unknown': 'onbekende fout',
+                'tpl.confirmReplace': 'Dit sjabloon laden vervangt je huidige ontwerp, inclusief wijzigingen die je nog niet hebt toegepast. Doorgaan?',
+                'canvas.label': 'Canvas met het coverontwerp. Selecteer een laag en verplaats die met de pijltjestoetsen (houd Shift ingedrukt voor grotere stappen).',
+                'layer.visible': 'Zichtbaar', 'layer.list': 'Lagen',
+                'stop.color': 'Kleur', 'stop.position': 'Positie', 'stop.remove': 'Kleur verwijderen', 'fx.swatch': 'Kleur {0} toepassen',
+                'restore.confirm': 'De huidige cover van dit doel vervangen door het origineel?', 'tpl.confirmDelete': 'Het sjabloon “{0}” verwijderen?',
+                'batch.confirm': 'Het huidige ontwerp toepassen op de geselecteerde doelen ({0})? Hun huidige covers worden vervangen.', 'batch.fail': 'Toepassen op meerdere doelen mislukt: {0}',
+                'err.network': 'Kan de server niet bereiken.', 'err.auth': 'De server weigerde het verzoek (status {0}). Je sessie is mogelijk verlopen — laad de pagina opnieuw en meld je opnieuw aan.',
+                'err.tooLarge': 'Het bestand is te groot voor de server.', 'err.rateLimited': 'Te veel verzoeken — wacht een minuut en probeer het opnieuw.',
+                'err.status': 'De server antwoordde met status {0}.', 'err.badResponse': 'De server stuurde een antwoord dat de pagina niet kon lezen.',
+                'poster.noUrl': 'Dit item heeft geen posterafbeelding.', 'poster.empty': 'De posterafbeelding was leeg.', 'poster.fail': 'Kon die poster niet gebruiken: {0}',
+                'restore.unknown': 'Kon niet controleren of er een back-up is',
+                'text.defaultTitle': 'Mijn bibliotheek', 'serverrender.alt': 'Cover zoals de server die maakt',
+                'action.applyCollection': 'Toepassen op verzameling', 'action.applyPlaylist': 'Toepassen op afspeellijst', 'action.applyLivetv': 'Toepassen op live-tv',
                 'restore.button': 'Originele cover herstellen', 'restore.none': 'Nog geen back-up', 'restore.available': 'Er is een back-up', 'restore.done': 'Originele cover hersteld.', 'restore.fail': 'Geen back-up gevonden om te herstellen.',
                 'restore.reset': 'Back-up resetten', 'restore.resetConfirm': 'De huidige back-up verwijderen? Resetten bewaart zelf niets. Bij de volgende keer toepassen wordt de cover die dit doel op dat moment toont bewaard als het nieuwe origineel, tenzij het een cover is die deze plug-in heeft toegepast. Zet dus eerst de cover die je wilt houden terug op dit doel (Afbeeldingen bewerken en uploaden; of verwijder de poster en ververs de metadata met "bestaande afbeeldingen vervangen"), reset daarna en pas dan toe.', 'restore.resetDone': 'Back-up verwijderd. Bij de volgende keer toepassen wordt de huidige cover bewaard als het nieuwe origineel.', 'restore.resetFail': 'Kon de back-up niet resetten: {0}',
                 'bg.source': 'Achtergrondbron', 'bg.source.image': 'Afbeelding', 'bg.source.gradient': 'Verloop', 'bg.source.solid': 'Effen kleur', 'bg.source.collage': 'Postercollage van dit doel', 'bg.collage.density': 'Collagedichtheid', 'bg.collage.sparse': 'Dun', 'bg.collage.medium': 'Gemiddeld', 'bg.collage.dense': 'Dicht', 'bg.collage.shuffle': 'Schudden', 'bg.collage.livetv': 'Live TV heeft geen posters voor een collage.',
@@ -1019,7 +1074,7 @@
                 'ctx.wide': 'Ancho', 'ctx.square': 'Cuadrado', 'ctx.poster': 'Póster',
                 'layer.addText': 'Añadir texto', 'layer.addImage': 'Añadir logotipo/icono',
                 'layer.show': 'Mostrar', 'layer.hide': 'Ocultar', 'layer.up': 'Subir', 'layer.down': 'Bajar', 'layer.dup': 'Duplicar', 'layer.del': 'Eliminar',
-                'layer.text': 'Texto', 'layer.logo': 'Logotipo', 'layer.more': 'Más acciones', 'layer.none': 'Ninguna capa seleccionada — añade una en la tarjeta Capas de arriba.',
+                'layer.text': 'Texto', 'layer.logo': 'Logotipo', 'layer.more': 'Más acciones', 'layer.none': 'Ninguna capa seleccionada — añade una con Añadir texto o Añadir logotipo/icono, más arriba.',
                 'layer.opacity': 'Opacidad', 'layer.rotation': 'Rotación',
                 'hint.logo': 'PNG con transparencia · hasta 5 MB. La fila superior se dibuja la última, encima de las demás.',
                 'hint.logoSize': 'Arrastra los tiradores de las esquinas en la vista previa para redimensionar el logotipo, o el mando superior para rotarlo.',
@@ -1055,12 +1110,25 @@
                 'card.preview': 'Vista previa', 'preview.placeholder': 'La vista previa aparecerá aquí automáticamente.',
                 'bg.adjust': 'Reposicionar el fondo (arrastra para desplazar, usa la rueda o pellizca para acercar)',
                 'action.apply': 'Aplicar a la biblioteca', 'action.applying': 'Aplicando…', 'action.download': 'Descargar imagen', 'action.serverRender': 'Mostrar el render del servidor', 'serverrender.label': 'Render de referencia (servidor)', 'preview.hint': 'La vista previa se actualiza automáticamente mientras ajustas los valores.', 'preview.collageFail': 'No se pudo cargar la vista previa del collage. Usa «Mostrar el render del servidor» para verlo.',
-                'modal.title': 'Selecciona un póster', 'modal.search': 'Buscar…', 'modal.alltypes': 'Todos los tipos',
+                'modal.title': 'Selecciona un póster', 'modal.search': 'Buscar…', 'modal.alltypes': 'Todos los tipos', 'modal.close': 'Cerrar',
                 'ty.movies': 'Películas', 'ty.series': 'Series', 'ty.seasons': 'Temporadas', 'ty.albums': 'Álbumes', 'ty.artists': 'Artistas', 'ty.books': 'Libros', 'ty.musicvideos': 'Videoclips', 'ty.photos': 'Fotos', 'modal.prev': 'Anterior', 'modal.next': 'Siguiente',
                 'dyn.loading': 'Cargando…', 'dyn.errorItems': 'Error al cargar los elementos', 'dyn.noItems': 'No se han encontrado elementos', 'dyn.page': 'Página {0} de {1}',
                 'dyn.applied': 'Carátula aplicada correctamente.', 'dyn.error': 'Error: {0}', 'dyn.applyFail': 'No se ha podido aplicar la carátula: {0}',
                 'dyn.uploadFail': 'Error al subir: {0}', 'dyn.fontFail': 'Error al subir la fuente: {0}',
                 'dyn.unknown': 'error desconocido',
+                'tpl.confirmReplace': 'Cargar esta plantilla sustituye tu diseño actual, incluidos los cambios que no has aplicado. ¿Continuar?',
+                'canvas.label': 'Lienzo con el diseño de la carátula. Selecciona una capa y muévela con las flechas del teclado (mantén Mayús para pasos más grandes).',
+                'layer.visible': 'Visible', 'layer.list': 'Capas',
+                'stop.color': 'Color', 'stop.position': 'Posición', 'stop.remove': 'Quitar color', 'fx.swatch': 'Aplicar el color {0}',
+                'restore.confirm': '¿Sustituir la carátula actual de este destino por la original?', 'tpl.confirmDelete': '¿Eliminar la plantilla «{0}»?',
+                'batch.confirm': '¿Aplicar el diseño actual a los destinos seleccionados ({0})? Sus carátulas actuales se sustituirán.', 'batch.fail': 'Error al aplicar a varios destinos: {0}',
+                'err.network': 'No se puede conectar con el servidor.', 'err.auth': 'El servidor rechazó la solicitud (estado {0}). Puede que tu sesión haya caducado: recarga la página e inicia sesión de nuevo.',
+                'err.tooLarge': 'El archivo es demasiado grande para el servidor.', 'err.rateLimited': 'Demasiadas solicitudes: espera un minuto y vuelve a intentarlo.',
+                'err.status': 'El servidor respondió con el estado {0}.', 'err.badResponse': 'El servidor envió una respuesta que la página no pudo leer.',
+                'poster.noUrl': 'Ese elemento no tiene imagen de póster.', 'poster.empty': 'La imagen del póster llegó vacía.', 'poster.fail': 'No se ha podido usar ese póster: {0}',
+                'restore.unknown': 'No se pudo comprobar si hay copia de seguridad',
+                'text.defaultTitle': 'Mi biblioteca', 'serverrender.alt': 'Carátula tal como la genera el servidor',
+                'action.applyCollection': 'Aplicar a la colección', 'action.applyPlaylist': 'Aplicar a la lista de reproducción', 'action.applyLivetv': 'Aplicar a TV en directo',
                 'restore.button': 'Restaurar la carátula original', 'restore.none': 'Aún no hay copia de seguridad', 'restore.available': 'Existe una copia de seguridad', 'restore.done': 'Carátula original restaurada.', 'restore.fail': 'No se ha encontrado ninguna copia de seguridad que restaurar.',
                 'restore.reset': 'Restablecer copia de seguridad', 'restore.resetConfirm': '¿Eliminar la copia de seguridad actual? Restablecer no guarda nada por sí solo. La próxima vez que apliques, la carátula que muestre este destino en ese momento se guardará como el nuevo original, salvo que sea una carátula aplicada por este complemento. Por eso, primero vuelve a poner en este destino la que quieres conservar (Editar imágenes y súbela; o elimina el póster y actualiza los metadatos con "Reemplazar imágenes existentes"), después restablece y luego aplica.', 'restore.resetDone': 'Copia de seguridad eliminada. La próxima vez que apliques, la carátula actual se guardará como el nuevo original.', 'restore.resetFail': 'No se pudo restablecer la copia de seguridad: {0}',
                 'bg.source': 'Origen del fondo', 'bg.source.image': 'Imagen', 'bg.source.gradient': 'Degradado', 'bg.source.solid': 'Color sólido', 'bg.source.collage': 'Collage de pósteres de este destino', 'bg.collage.density': 'Densidad del collage', 'bg.collage.sparse': 'Baja', 'bg.collage.medium': 'Media', 'bg.collage.dense': 'Alta', 'bg.collage.shuffle': 'Barajar', 'bg.collage.livetv': 'La TV en directo no tiene pósteres para hacer un collage.',
@@ -1112,15 +1180,24 @@
             return s;
         }
 
+        // Translated attributes: [marker attribute, attribute it fills].
+        var I18N_ATTRS = [['data-i18n-ph', 'placeholder'], ['data-i18n-aria', 'aria-label'], ['data-i18n-alt', 'alt']];
+
+        // Runs for EVERY language, English included. It used to return early for 'en' on
+        // the theory that the markup already is English: true on a first load, false on a
+        // page Jellyfin reuses after the user switched from Dutch back to English, which
+        // then kept every Dutch label. MarkupDefaultText_MatchesTheEnglishDictionary keeps
+        // the markup and the en block identical, so re-applying en is a no-op otherwise.
         function applyI18n(root) {
-            if (LANG === 'en') { return; }
             root.querySelectorAll('[data-i18n]').forEach(function (elm) {
                 var s = t(elm.getAttribute('data-i18n'));
                 if (s) { elm.textContent = s; }
             });
-            root.querySelectorAll('[data-i18n-ph]').forEach(function (elm) {
-                var s = t(elm.getAttribute('data-i18n-ph'));
-                if (s) { elm.setAttribute('placeholder', s); }
+            I18N_ATTRS.forEach(function (pair) {
+                root.querySelectorAll('[' + pair[0] + ']').forEach(function (elm) {
+                    var s = t(elm.getAttribute(pair[0]));
+                    if (s) { elm.setAttribute(pair[1], s); }
+                });
             });
         }
         // ------------------------------------------------------------------
@@ -1160,12 +1237,77 @@
             return fetch(apiUrl(path), options);
         }
 
+        // --- Requests & errors --------------------------------------------
+        // Every plugin call goes through readJson, so a non-2xx status or an unreadable
+        // body becomes an Error whose message is ALREADY translated and can be shown as
+        // is. Before this, a 401/413/429 (whose bodies are empty or HTML) reached .json()
+        // and surfaced as "Unexpected end of JSON input", naming neither status nor cause.
+        function requestError(status) {
+            if (status === 401 || status === 403) { return new Error(t('err.auth', status)); }
+            if (status === 413) { return new Error(t('err.tooLarge')); }
+            if (status === 429) { return new Error(t('err.rateLimited')); }
+            return new Error(t('err.status', status));
+        }
+
+        // fetch() itself rejects only when the server could not be reached at all.
+        function networkError() { return new Error(t('err.network')); }
+
+        // A failed response, as a rejected promise. The render endpoints answer a
+        // validation failure (CoverValidationException) with 400 { error: <message> }, and
+        // that message is already localized by the server, so it is shown as is; every
+        // other failure is described by its status.
+        function responseError(r) {
+            return r.text().then(function (text) {
+                var msg = '';
+                if (r.status === 400) {
+                    try { msg = pick(JSON.parse(text), 'Error') || ''; } catch (err) { msg = ''; }
+                }
+                throw msg ? new Error(msg) : requestError(r.status);
+            }, function () { throw requestError(r.status); });
+        }
+
+        function readJson(r) {
+            if (!r.ok) { return responseError(r); }
+            return r.text().then(function (text) {
+                try { return JSON.parse(text); }
+                catch (err) { throw new Error(t('err.badResponse')); }
+            });
+        }
+
         function jsonFetch(path, method, body) {
             return authFetch(path, {
                 method: method || 'GET',
                 headers: { 'Content-Type': 'application/json' },
                 body: body ? JSON.stringify(body) : undefined
-            }).then(function (r) { return r.json(); });
+            }).then(readJson, function () { throw networkError(); });
+        }
+
+        // An ApiResponse envelope: its Data on Success, otherwise an Error carrying the
+        // server's own (already localized) ErrorMessage.
+        function dataOrThrow(res) {
+            if (!pick(res, 'Success')) { throw new Error(pick(res, 'ErrorMessage') || t('dyn.unknown')); }
+            return pick(res, 'Data');
+        }
+
+        // The ONE place a caught Error's message is read (pinned by a test).
+        function errorText(e) { return (e && e.message) || t('dyn.unknown'); }
+
+        // The one way a failed action is reported. Takes a finished message so every
+        // translation key stays a literal t('…') call the reachability test can see:
+        //   showError(t('dyn.uploadFail', errorText(e)))
+        function showError(message) {
+            Dashboard.hideLoadingMsg();
+            Dashboard.alert(message);
+        }
+
+        // Latest-wins request ordering. Each call supersedes every earlier call on the same
+        // channel; the returned isCurrent() is false once a newer request has been made, so
+        // a slow stale response is dropped instead of overwriting a fresh one.
+        var _requestSeq = {};
+        function requestGuard(channel) {
+            var n = (_requestSeq[channel] || 0) + 1;
+            _requestSeq[channel] = n;
+            return function isCurrent() { return _requestSeq[channel] === n; };
         }
 
         function el(id) { return page.querySelector('#' + id); }
@@ -1251,7 +1393,11 @@
             openStep((state.libraryId && exists) ? saved : '1');
         }
 
-        var state = { libraryId: '', aspectRatio: 1, collageSeed: 1 };
+        // titleTouched: the user has typed their own title, so picking a target no longer
+        // renames it. applying: an Apply is in flight and owns the Apply button.
+        // templateValue: the template dropdown's value before the current change, so a
+        // declined "replace unapplied changes?" can put it back.
+        var state = { libraryId: '', aspectRatio: 1, collageSeed: 1, titleTouched: false, applying: false, batchRunning: false, templateValue: '' };
         var browser = { page: 1, pageSize: 24, totalPages: 1 };
 
         function debounce(fn, wait) {
@@ -1270,6 +1416,14 @@
             banner: { w: 1920, h: 540 },
             custom: { w: 1920, h: 1080 }
         };
+
+        // The bounds the server enforces (ImageProcessingService.ValidateCoverArtDimensions).
+        var MIN_DIM = 100, MAX_DIM = 2048;
+        function clampDim(value, fallback) {
+            var v = parseInt(value, 10);
+            if (!isFinite(v)) { return fallback; }
+            return Math.max(MIN_DIM, Math.min(MAX_DIM, v));
+        }
 
         // ==================================================================
         // Canvas engine (Phase 1 · Task 7)
@@ -1398,7 +1552,7 @@
                 Effects: defaultEffects(),
                 Layers: [{
                     Id: 'title', Type: 'text', Visible: true, X: 0.5, Y: 0.5, Width: 0, Height: 0,
-                    Rotation: 0, Opacity: 1, Content: 'Movies', Size: 120 / 720, Weight: 400,
+                    Rotation: 0, Opacity: 1, Content: t('text.defaultTitle'), Size: 120 / 720, Weight: 400,
                     Color: '#ffffff', Align: 1, FontPath: '',
                     Shadow: { Enabled: false, Color: '#000000', Blur: 4, OffsetX: 2, OffsetY: 2 },
                     Outline: { Enabled: false, Color: '#000000', Width: 2 }
@@ -1606,15 +1760,18 @@
             }
         }
 
-        function bindGifLoopListeners() {
-            document.addEventListener('visibilitychange', updateGifLoop);
-            if (_reducedMotion) {
-                if (_reducedMotion.addEventListener) { _reducedMotion.addEventListener('change', updateGifLoop); }
-                else if (_reducedMotion.addListener) { _reducedMotion.addListener(updateGifLoop); }
+        // Re-evaluates the loop when the reduced-motion preference changes. Switched on
+        // and off with the page (bindPageListeners / unbindPageListeners); older engines
+        // only have addListener/removeListener on a MediaQueryList.
+        function watchReducedMotion(on) {
+            if (!_reducedMotion) { return; }
+            if (_reducedMotion.addEventListener) {
+                if (on) { _reducedMotion.addEventListener('change', updateGifLoop); }
+                else { _reducedMotion.removeEventListener('change', updateGifLoop); }
+            } else if (_reducedMotion.addListener) {
+                if (on) { _reducedMotion.addListener(updateGifLoop); }
+                else { _reducedMotion.removeListener(updateGifLoop); }
             }
-            // Leaving the page stops at once; pageshow's scheduleRender() restarts it.
-            page.addEventListener('pagehide', stopGifLoop);
-            page.addEventListener('viewhide', stopGifLoop);
         }
 
         // Background pan/zoom mode (Task 9): when true, canvas drag/wheel/pinch
@@ -1662,9 +1819,36 @@
             scheduleRender();
         }
 
+        // The panel is rebuilt on every select/move/show-hide, which used to drop keyboard
+        // focus to <body> after each action. Remember which control of which row had it...
+        function focusedLayerControl() {
+            var a = document.activeElement;
+            var box = el('ccaLayerList');
+            if (!a || !box || !box.contains(a)) { return null; }
+            var row = a.closest('.ccaLayerRow');
+            return row ? { id: row.getAttribute('data-layer-id'), act: a.getAttribute('data-act') } : null;
+        }
+
+        // ...and put it back on the same control after the rebuild. A deleted layer's
+        // focus moves to the newly selected layer's name.
+        function restoreLayerFocus(box, prev) {
+            if (!prev) { return; }
+            var rows = box.querySelectorAll('.ccaLayerRow');
+            var target = null;
+            for (var i = 0; i < rows.length; i++) {
+                if (rows[i].getAttribute('data-layer-id') === prev.id) {
+                    target = rows[i].querySelector('[data-act="' + prev.act + '"]') || rows[i].querySelector('[data-act="pick"]');
+                    break;
+                }
+            }
+            if (!target) { target = box.querySelector('.ccaLayerSel [data-act="pick"]') || box.querySelector('[data-act="pick"]'); }
+            if (target) { target.focus(); }
+        }
+
         function renderLayersPanel() {
             var box = el('ccaLayerList');
             if (!box) { return; }
+            var prevFocus = focusedLayerControl();
             box.innerHTML = '';
             for (var i = doc.Layers.length - 1; i >= 0; i--) {
                 (function (layer) {
@@ -1672,11 +1856,16 @@
                     row.className = 'ccaLayerRow'
                         + (layer.Id === doc._selectedId ? ' ccaLayerSel' : '')
                         + (layer.Visible ? '' : ' ccaLayerHidden');
+                    row.setAttribute('role', 'listitem');
+                    row.setAttribute('data-layer-id', layer.Id);
 
                     var vis = document.createElement('button');
                     vis.type = 'button'; vis.className = 'ccaLayerBtn';
+                    vis.setAttribute('data-act', 'vis');
                     vis.textContent = layer.Visible ? '👁' : '∅';
                     vis.title = layer.Visible ? t('layer.hide') : t('layer.show');
+                    vis.setAttribute('aria-label', t('layer.visible'));
+                    vis.setAttribute('aria-pressed', layer.Visible ? 'true' : 'false');
                     vis.addEventListener('click', function (e) {
                         e.stopPropagation();
                         layer.Visible = !layer.Visible;
@@ -1684,8 +1873,15 @@
                         scheduleRender();
                     });
 
-                    var name = document.createElement('span');
+                    // The name is a real button, so a layer can be selected from the
+                    // keyboard (Tab to it, Enter or Space). It has no handler of its own:
+                    // its click bubbles to the row's, which is what selects, so a mouse
+                    // click anywhere on the row still works.
+                    var name = document.createElement('button');
+                    name.type = 'button';
                     name.className = 'ccaLayerName';
+                    name.setAttribute('data-act', 'pick');
+                    name.setAttribute('aria-pressed', layer.Id === doc._selectedId ? 'true' : 'false');
                     name.textContent = layerLabel(layer);
 
                     row.appendChild(vis);
@@ -1699,8 +1895,10 @@
                     ['up', 'down', 'dup', 'del'].forEach(function (act) {
                         var b = document.createElement('button');
                         b.type = 'button'; b.className = 'ccaLayerBtn';
+                        b.setAttribute('data-act', act);
                         b.textContent = act === 'up' ? '▲' : act === 'down' ? '▼' : act === 'dup' ? '⧉' : '✕';
                         b.title = t('layer.' + act);
+                        b.setAttribute('aria-label', t('layer.' + act));
                         b.addEventListener('click', function (e) {
                             e.stopPropagation();
                             // "Up" in the panel means later in the array = drawn on top.
@@ -1715,11 +1913,15 @@
                     var more = document.createElement('button');
                     more.type = 'button';
                     more.className = 'ccaLayerBtn ccaLayerMore';
+                    more.setAttribute('data-act', 'more');
                     more.textContent = '⋯';
                     more.title = t('layer.more');
+                    more.setAttribute('aria-label', t('layer.more'));
+                    more.setAttribute('aria-expanded', 'false');
                     more.addEventListener('click', function (e) {
                         e.stopPropagation();
-                        row.classList.toggle('ccaLayerActionsOpen');
+                        var open = row.classList.toggle('ccaLayerActionsOpen');
+                        more.setAttribute('aria-expanded', open ? 'true' : 'false');
                     });
 
                     row.appendChild(actions);
@@ -1729,6 +1931,7 @@
                     box.appendChild(row);
                 })(doc.Layers[i]);
             }
+            restoreLayerFocus(box, prevFocus);
             var atCap = doc.Layers.length >= MAX_LAYERS;
             if (el('ccaAddText')) { el('ccaAddText').disabled = atCap; }
             if (el('ccaAddImage')) { el('ccaAddImage').disabled = atCap; }
@@ -1830,6 +2033,112 @@
             });
         }
         // ------------------------------------------------------------------
+
+        // --- Background bitmap & file names -------------------------------
+        // bgImageEl (the uploaded or poster-picked image) has exactly two writers:
+        // setBackgroundBitmap and clearBackgroundBitmap. collageBgEl has its own
+        // (fetchCollageBitmap / releaseCollageBitmap) and is never touched here;
+        // activeBgBitmap() decides which of the two the canvas paints.
+        //
+        // _bgImageUrl is bgImageEl's object URL. It lives exactly as long as its bitmap is
+        // the background and is revoked when the bitmap is replaced or dropped, like
+        // _collageUrl: an animated GIF keeps decoding frames from it while it plays, and an
+        // unrevoked URL per pick pinned a full-size copy of every image ever chosen.
+        var _bgImageUrl = null;
+
+        function clearBackgroundBitmap() {
+            if (_bgImageUrl) { URL.revokeObjectURL(_bgImageUrl); }
+            _bgImageUrl = null;
+            bgImageEl = null;
+        }
+
+        // `isCurrent` comes from requestGuard('bg'), taken when the user acted, so two quick
+        // picks cannot land out of order: the older pick's bitmap is simply dropped.
+        function setBackgroundBitmap(blob, isCurrent) {
+            var url = URL.createObjectURL(blob);
+            var img = new Image();
+            img.onload = function () {
+                if (!isCurrent()) { URL.revokeObjectURL(url); return; }
+                clearBackgroundBitmap();
+                bgImageEl = img;
+                _bgImageUrl = url;
+                scheduleRender();
+            };
+            img.onerror = function () { URL.revokeObjectURL(url); };
+            img.src = url;
+            // Flags the <img> if the bytes are a multi-frame GIF, so the repaint loop runs.
+            watchForAnimatedGif(img, blob);
+        }
+
+        // Makes bgImageEl agree with doc.Background.ImagePath after the document was
+        // replaced (undo, redo, template load). Keeps the bitmap when the path is
+        // unchanged; otherwise fetches the path back as a Blob through the uploads-only
+        // layerImage endpoint (where background uploads and poster picks both live), never
+        // as an <img src> on the server (canvas-source invariant). The source is not
+        // consulted: a collage keeps the uploaded bitmap in reserve, and activeBgBitmap()
+        // decides what is painted.
+        function hydrateBackgroundImage(previousPath) {
+            var path = doc.Background.ImagePath || '';
+            // Nothing changed for the background: keep the bitmap, and do NOT take a new
+            // 'bg' token, or undoing an unrelated edit would cancel a pick still in flight.
+            if (path === (previousPath || '') && (bgImageEl || !path)) { return; }
+            var isCurrent = requestGuard('bg');
+            clearBackgroundBitmap();
+            if (!path) { return; }
+            authFetch('CustomCoverArt/layerImage?path=' + encodeURIComponent(path))
+                .then(function (r) {
+                    if (!r.ok) { throw requestError(r.status); }
+                    return r.blob();
+                })
+                .then(function (blob) {
+                    if (isCurrent() && doc.Background.ImagePath === path) { setBackgroundBitmap(blob, isCurrent); }
+                })
+                .catch(function () {
+                    // Best-effort, like hydrateLayerImages: the authoritative server
+                    // render still has the image, only the canvas preview lacks it.
+                });
+        }
+
+        // JSON cannot carry a decoded <img> or a display name. After undo/redo or a
+        // template load, a logo whose server path is unchanged keeps both instead of being
+        // downloaded again (and blinking out of the preview meanwhile).
+        function reuseLayerClientState(previousLayers) {
+            var known = {};
+            (previousLayers || []).forEach(function (l) {
+                if (l.ImagePath && (l._img || l._name)) { known[l.ImagePath] = { img: l._img, name: l._name }; }
+            });
+            doc.Layers.forEach(function (l) {
+                var k = l.ImagePath ? known[l.ImagePath] : null;
+                if (!k) { return; }
+                if (!l._img && k.img) { l._img = k.img; }
+                if (!l._name && k.name) { l._name = k.name; }
+            });
+        }
+
+        // Original file names by server path. Uploads are stored under randomised names,
+        // so the path alone cannot tell the user which file they picked; a path missing
+        // from this map (a template from an earlier session) falls back to its own name.
+        var _fileNames = {};
+
+        function displayNameFor(path) {
+            if (!path) { return ''; }
+            var known = _fileNames[path];
+            return known ? known.name : String(path).split(/[\\/]/).pop();
+        }
+
+        // Owns the "which file is in use" labels. Called from syncControlsFromDocument, so
+        // a layer switch, template load or undo can never leave a stale name behind.
+        function syncFileNames() {
+            var bgPath = doc.Background.ImagePath || '';
+            var known = bgPath ? _fileNames[bgPath] : null;
+            var isPoster = !!(known && known.poster);
+            el('ccaBgImageName').textContent = (bgPath && !isPoster) ? displayNameFor(bgPath) : t('f.none');
+            el('ccaSelectedBgName').textContent = isPoster ? known.name : '';
+            el('ccaSelectedBg').style.display = isPoster ? '' : 'none';
+            var l = selectedLayer();
+            var fontPath = (l && l.Type === 'text') ? (l.FontPath || '') : '';
+            el('ccaFontName').textContent = fontPath ? displayNameFor(fontPath) : t('f.none');
+        }
 
         var _rafPending = false;
         function scheduleRender() {
@@ -2164,6 +2473,8 @@
 
         function restoreSnapshot(json) {
             var selected = doc._selectedId;
+            var previousImagePath = doc.Background.ImagePath;
+            var previousLayers = doc.Layers;
             doc = JSON.parse(json);
             // A snapshot is a plain serialized document, so it needs the same normalization
             // a template load gets before anything dereferences it.
@@ -2172,8 +2483,10 @@
             normalizeOverlay(doc);
             normalizeGradientStops(doc);
             doc._selectedId = selected;
-            // It carries server paths but no decoded bitmaps.
-            bgImageEl = null;
+            // It carries server paths but no decoded bitmaps: reuse the ones we already
+            // have for unchanged paths, fetch the rest.
+            reuseLayerClientState(previousLayers);
+            hydrateBackgroundImage(previousImagePath);
             hydrateLayerImages();
             renderLayersPanel();
             syncControlsFromDocument();
@@ -2254,6 +2567,7 @@
                 s.className = 'ccaSwatch';
                 s.style.background = hex;
                 s.title = hex;
+                s.setAttribute('aria-label', t('fx.swatch', hex));
                 // Read the focus state one event EARLIER than the click: pressing the mouse
                 // on a button moves focus to it (Chrome/Edge/Firefox on Windows) before
                 // 'click' fires, and some browsers (Safari) do not focus buttons on click at
@@ -2849,6 +3163,27 @@
             return null;
         }
 
+        // Keyboard move for the selected layer: arrows nudge 1 canvas pixel, Shift+arrow
+        // 10, clamped like a pointer drag. Off while repositioning the background, where
+        // the canvas belongs to the background gesture instead.
+        function onCanvasKeydown(ev) {
+            // Modified arrows belong to the browser/OS (Alt+Left is Back, etc.).
+            if (ev.altKey || ev.ctrlKey || ev.metaKey) { return; }
+            var dx = 0, dy = 0;
+            if (ev.key === 'ArrowLeft') { dx = -1; }
+            else if (ev.key === 'ArrowRight') { dx = 1; }
+            else if (ev.key === 'ArrowUp') { dy = -1; }
+            else if (ev.key === 'ArrowDown') { dy = 1; }
+            else { return; }
+            var layer = selectedLayer();
+            if (!layer || bgAdjustMode) { return; }
+            var step = ev.shiftKey ? 10 : 1;
+            layer.X = Math.max(0, Math.min(1, layer.X + dx * step / doc.Canvas.Width));
+            layer.Y = Math.max(0, Math.min(1, layer.Y + dy * step / doc.Canvas.Height));
+            ev.preventDefault();
+            scheduleRender();
+        }
+
         var _drag = null;       // layer move drag (bgAdjustMode off)
         var _handleDrag = null; // corner-resize / rotate-knob drag on the selected layer
         var _bgDrag = null;     // background pan drag (bgAdjustMode on, single pointer)
@@ -2869,6 +3204,12 @@
         }
 
         function onCanvasPointerDown(ev) {
+            // preventDefault below suppresses the mouse events that would normally focus
+            // the canvas, so focus it explicitly: click a layer, then nudge with arrows.
+            var cvEl = el('ccaCanvas');
+            if (cvEl && document.activeElement !== cvEl) {
+                try { cvEl.focus({ preventScroll: true }); } catch (err) { /* ignore */ }
+            }
             _pointers[ev.pointerId] = { x: ev.clientX, y: ev.clientY };
 
             if (bgAdjustMode) {
@@ -3477,6 +3818,7 @@
             setRange('ccaFxBorderGap', fx.Border.Gap);
 
             // Re-sync dependent visibility + labels.
+            syncFileNames();
             updateUI();
             updateBackgroundVisibility();
             updateAnimVisibility();
@@ -3527,11 +3869,10 @@
 
             // The gradient is the point of the preset, so drop any background bitmap that
             // would paint over it (both the canvas copy and the path the server renders).
-            bgImageEl = null;
             doc.Background.ImagePath = '';
             state.backgroundImagePath = '';
-            var sel = el('ccaSelectedBg');
-            if (sel) { sel.style.display = 'none'; }
+            requestGuard('bg');       // an upload or poster pick still in flight must not land now
+            clearBackgroundBitmap();  // syncControlsFromDocument below updates the file labels
 
             renderLayersPanel();
             syncControlsFromDocument();
@@ -3557,11 +3898,50 @@
         }
         // ------------------------------------------------------------------
 
+        // The primary button names what it is about to change. One literal t() call per
+        // type, so the translation reachability test can see every key.
+        function applyLabelFor(type) {
+            if (type === 'collection') { return t('action.applyCollection'); }
+            if (type === 'playlist') { return t('action.applyPlaylist'); }
+            if (type === 'livetv') { return t('action.applyLivetv'); }
+            return t('action.apply');
+        }
+
+        // The stock title layer (Id 'title'), if the design still has one.
+        function titleLayer() {
+            for (var i = 0; i < doc.Layers.length; i++) {
+                if (doc.Layers[i].Id === 'title' && doc.Layers[i].Type === 'text') { return doc.Layers[i]; }
+            }
+            return null;
+        }
+
+        // The title follows the chosen target's name (or a translated placeholder when no
+        // target is chosen) until the user types their own; after that it is theirs.
+        function prefillTitle(name) {
+            if (state.titleTouched) { return; }
+            var l = titleLayer();
+            if (!l) { return; }
+            // Following the target's name is not the user's edit: stay clean if we were.
+            var wasClean = _cleanJson !== null && !isDirty();
+            l.Content = name || t('text.defaultTitle');
+            if (wasClean) { markClean(); }
+            renderLayersPanel();
+            if (doc._selectedId === l.Id) { el('ccaTitle').value = l.Content; }
+            scheduleRender();
+        }
+
         // Enable/disable controls based on current selection. Deliberately does NOT touch
         // the gradient rows — updateBackgroundVisibility owns those, and two owners of the
         // same element fight.
         function updateUI() {
-            el('ccaApplyBtn').disabled = !state.libraryId;
+            var btn = el('ccaApplyBtn');
+            // While an apply runs, applyCoverArt owns the button ("Applying…", disabled)
+            // and calls updateUI() itself when it is done.
+            if (!state.applying) {
+                btn.disabled = !state.libraryId;
+                var label = btn.querySelector('span');
+                if (label) { label.textContent = applyLabelFor(el('ccaTargetType') ? el('ccaTargetType').value : 'library'); }
+            }
             el('ccaCustomDims').style.display = el('ccaPreset').value === 'custom' ? '' : 'none';
         }
 
@@ -3619,6 +3999,11 @@
                 btn.disabled = !has;
                 reset.disabled = !has;
                 hint.textContent = has ? t('restore.available') : t('restore.none');
+            }).catch(function () {
+                if (requestedId !== state.libraryId) { return; }
+                btn.disabled = true;
+                reset.disabled = true;
+                hint.textContent = t('restore.unknown');
             });
         }
 
@@ -3626,21 +4011,21 @@
         function loadLibraries() {
             var type = el('ccaTargetType') ? el('ccaTargetType').value : 'library';
             state.libraryId = '';
+            var isCurrent = requestGuard('targets');
             return jsonFetch('CustomCoverArt/targets/' + type).then(function (res) {
+                if (!isCurrent()) { return; }
                 var select = el('ccaLibrarySelect');
                 select.innerHTML = '';
                 var placeholder = document.createElement('option');
                 placeholder.value = '';
                 placeholder.textContent = t('lib.selectOption');
                 select.appendChild(placeholder);
-                if (pick(res, 'Success')) {
-                    (pick(res, 'Data') || []).forEach(function (lib) {
-                        var opt = document.createElement('option');
-                        opt.value = pick(lib, 'Id');
-                        opt.textContent = pick(lib, 'Name');
-                        select.appendChild(opt);
-                    });
-                }
+                (dataOrThrow(res) || []).forEach(function (lib) {
+                    var opt = document.createElement('option');
+                    opt.value = pick(lib, 'Id');
+                    opt.textContent = pick(lib, 'Name');
+                    select.appendChild(opt);
+                });
                 updateUI();
             });
         }
@@ -3723,10 +4108,12 @@
 
         function loadTemplates() {
             return jsonFetch('CustomCoverArt/templates').then(function (res) {
+                var templates = dataOrThrow(res) || [];
                 var sel = el('ccaTemplateSelect');
                 sel.innerHTML = '';
+                state.templateValue = ''; // the rebuilt list selects "—"
                 var none = document.createElement('option'); none.value = ''; none.textContent = '—'; sel.appendChild(none);
-                (pick(res, 'Data') || []).forEach(function (tpl) {
+                templates.forEach(function (tpl) {
                     var o = document.createElement('option');
                     o.value = pick(tpl, 'Name'); o.textContent = pick(tpl, 'Name');
                     o._document = pick(tpl, 'Document');
@@ -3736,15 +4123,25 @@
                     o._settings = pick(tpl, 'Settings');
                     sel.appendChild(o);
                 });
+            }).catch(function (e) {
+                // Shown in the dropdown itself: this runs on every page show, next to the
+                // target list, and a dead server should not stack three alerts.
+                var sel = el('ccaTemplateSelect');
+                sel.innerHTML = '';
+                state.templateValue = '';
+                var none = document.createElement('option'); none.value = ''; none.textContent = t('dyn.error', errorText(e)); sel.appendChild(none);
             });
         }
 
         // --- Batch apply --------------------------------------------------
         function loadBatchList() {
             var type = el('ccaTargetType') ? el('ccaTargetType').value : 'library';
+            var isCurrent = requestGuard('batchTargets');
             return jsonFetch('CustomCoverArt/targets/' + type).then(function (res) {
+                if (!isCurrent()) { return; }
+                var targets = dataOrThrow(res) || [];
                 var box = el('ccaBatchList'); box.innerHTML = '';
-                (pick(res, 'Data') || []).forEach(function (lib) {
+                targets.forEach(function (lib) {
                     var id = pick(lib, 'Id'), name = pick(lib, 'Name');
                     var row = document.createElement('label'); row.className = 'ccaCheck ccaCheckBlock';
                     var cb = document.createElement('input'); cb.type = 'checkbox'; cb.setAttribute('is', 'emby-checkbox');
@@ -3752,6 +4149,10 @@
                     var span = document.createElement('span'); span.textContent = name;
                     row.appendChild(cb); row.appendChild(span); box.appendChild(row);
                 });
+            }).catch(function (e) {
+                if (!isCurrent()) { return; }
+                el('ccaBatchList').innerHTML = '';
+                el('ccaBatchStatus').textContent = t('dyn.error', errorText(e));
             });
         }
 
@@ -3776,6 +4177,15 @@
             return collectStops('ccaGradientStops');
         }
 
+        // A gradient needs two stops, so ✕ is disabled at two instead of silently ignored.
+        function updateStopRemoveButtons(container) {
+            var rows = container.querySelectorAll('.ccaStop');
+            rows.forEach(function (row) {
+                var rm = row.querySelector('.ccaStopRemove');
+                if (rm) { rm.disabled = rows.length <= 2; }
+            });
+        }
+
         function addStopRow(containerId, color, posPercent, alphaPercent, withAlpha) {
             var container = el(containerId);
             if (!container) { return; }
@@ -3785,12 +4195,14 @@
             var c = document.createElement('input');
             c.type = 'color';
             c.value = color || '#888888';
+            c.setAttribute('aria-label', t('stop.color'));
 
             var p = document.createElement('input');
             p.type = 'range';
             p.min = '0'; p.max = '100'; p.step = '1';
             p.value = (posPercent == null ? 50 : posPercent);
             p.className = 'ccaRange ccaStopPos';
+            p.setAttribute('aria-label', t('stop.position'));
 
             var a = null, aTag = null;
             if (withAlpha) {
@@ -3814,9 +4226,12 @@
             rm.type = 'button';
             rm.className = 'ccaStopRemove';
             rm.textContent = '✕';
+            rm.title = t('stop.remove');
+            rm.setAttribute('aria-label', t('stop.remove'));
             rm.addEventListener('click', function () {
                 if (container.querySelectorAll('.ccaStop').length > 2) {
                     container.removeChild(row);
+                    updateStopRemoveButtons(container);
                     onStopsEdited(containerId);
                     scheduleRender();
                 }
@@ -3831,6 +4246,7 @@
                 row.addEventListener('focusin', function () { selectOverlayStopFrom(row); });
             }
             container.appendChild(row);
+            updateStopRemoveButtons(container);
         }
 
         function addGradientStop(color, posPercent) {
@@ -3852,7 +4268,7 @@
             var fd = new FormData();
             fd.append('file', file);
             return authFetch('CustomCoverArt/' + endpoint, { method: 'POST', body: fd })
-                .then(function (r) { return r.json(); });
+                .then(readJson, function () { throw networkError(); });
         }
 
         // Heuristic animated-GIF detection: an animated GIF has more than one
@@ -3920,22 +4336,26 @@
         }
 
         function applyCoverArt() {
-            if (!state.libraryId) { return; }
+            if (!state.libraryId || state.applying) { return; }
             var btn = el('ccaApplyBtn');
-            if (btn.disabled) { return; } // an apply is already running
             var label = btn.querySelector('span');
-            var original = label ? label.textContent : '';
             // Applying can be slow (an animated GIF renders many frames), so lock
             // the button and show progress — otherwise it looks like nothing happens.
+            state.applying = true;
             btn.disabled = true;
             if (label) { label.textContent = t('action.applying'); }
             Dashboard.showLoadingMsg();
+            // collectDocument() normalizes doc (collage source, GIF animation), so the clean
+            // snapshot must come from what it returned, not from doc beforehand.
+            var sent = collectDocument();
+            var appliedJson = JSON.stringify(sent);
             jsonFetch('CustomCoverArt/document/apply', 'POST', {
                 LibraryId: state.libraryId,
-                Document: collectDocument()
+                Document: sent
             }).then(function (res) {
                 Dashboard.hideLoadingMsg();
                 if (pick(res, 'Success')) {
+                    markClean(appliedJson);
                     Dashboard.alert(t('dyn.applied'));
                     // Applying backs the previous cover up, so Restore and Reset may have just
                     // become available.
@@ -3944,11 +4364,10 @@
                     Dashboard.alert(t('dyn.error', pick(res, 'ErrorMessage') || t('dyn.unknown')));
                 }
             }).catch(function (e) {
-                Dashboard.hideLoadingMsg();
-                Dashboard.alert(t('dyn.applyFail', e.message));
+                showError(t('dyn.applyFail', errorText(e)));
             }).then(function () {
-                if (label) { label.textContent = original; }
-                btn.disabled = !state.libraryId;
+                state.applying = false;
+                updateUI(); // restores the per-target label and the enabled state
             });
         }
 
@@ -3956,6 +4375,17 @@
         // endpoint and show the returned PNG/GIF in a labelled overlay, so the user
         // can compare the exact server output against the live canvas before applying.
         var _serverRenderUrl = null;
+
+        // collectDocument() normalizes doc (collage source, GIF animation), which would flip
+        // a clean design to dirty. Callers that only read the document (server render, batch
+        // apply) use this so a clean design stays clean.
+        function collectDocumentKeepingCleanState() {
+            var wasClean = _cleanJson !== null && !isDirty();
+            var sent = collectDocument();
+            if (wasClean) { markClean(); }
+            return sent;
+        }
+
         function showServerRender() {
             var btn = el('ccaServerRender');
             if (btn.disabled) { return; }
@@ -3966,9 +4396,12 @@
             authFetch('CustomCoverArt/document/preview', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(collectDocument())
+                body: JSON.stringify(collectDocumentKeepingCleanState())
+            }).catch(function () {
+                throw networkError();
             }).then(function (r) {
-                if (!r.ok) { throw new Error('render returned ' + r.status); }
+                // A 400 here carries the server's validation message (e.g. a size it refuses).
+                if (!r.ok) { return responseError(r); }
                 return r.blob();
             }).then(function (blob) {
                 if (_serverRenderUrl) { URL.revokeObjectURL(_serverRenderUrl); }
@@ -3977,19 +4410,63 @@
                 el('ccaServerRenderWrap').style.display = '';
                 Dashboard.hideLoadingMsg();
             }).catch(function (e) {
-                Dashboard.hideLoadingMsg();
-                Dashboard.alert(t('dyn.error', e.message));
+                showError(t('dyn.error', errorText(e)));
             }).then(function () {
                 btn.disabled = false;
                 if (label) { label.textContent = original; }
             });
         }
 
+        // Replaces the working design with a saved template. Called only once the user has
+        // confirmed, or had nothing unapplied to lose — see the dropdown's handler.
+        function loadTemplateOption(opt) {
+            var tplDoc = opt._document;
+            if (!tplDoc) {
+                // Legacy template saved before the canvas engine: no Document,
+                // only the flat Settings — migrate on the fly so it still loads.
+                if (opt._settings) { tplDoc = migrateTemplateToDocument(opt._settings); }
+                else { return; }
+            }
+            // Preserve THIS target's title if the template's title layer is blank
+            // (templates intentionally store the design, not the name).
+            var curLayer = selectedLayer();
+            var currentTitle = curLayer ? curLayer.Content : '';
+            var previousImagePath = doc.Background.ImagePath;
+            var previousLayers = doc.Layers;
+            doc = JSON.parse(JSON.stringify(tplDoc));
+            if (!doc.Layers) { doc.Layers = []; }
+            reuseLayerClientState(previousLayers);
+            // Templates saved before Phase 3 have no effect sub-objects; the draw
+            // functions dereference them, so fill them in like the server does.
+            normalizeEffects(doc);
+            normalizeBackgroundSource(doc);
+            normalizeOverlay(doc);
+            normalizeGradientStops(doc);
+            var title = titleLayer();
+            if (title && (!title.Content || !title.Content.trim()) && currentTitle) {
+                title.Content = currentTitle;
+            }
+            doc._selectedId = title ? title.Id : (doc.Layers[0] ? doc.Layers[0].Id : null);
+            // A template carries only a server ImagePath, never a client blob: fetch
+            // it back as one (or keep the bitmap we have when it is the same image).
+            hydrateBackgroundImage(previousImagePath);
+            renderLayersPanel();
+            // Logo layers arrive as server paths only (a template can't carry the
+            // bitmap), so pull them back as blobs to preview them on the canvas.
+            hydrateLayerImages();
+            syncControlsFromDocument();
+            resetOverlayEditorState();
+            scheduleRender();
+            markClean();
+        }
+
         function bindEvents() {
-            // Document and media-query listeners for the GIF repaint loop (bindEvents runs once).
-            bindGifLoopListeners();
+            // Global listeners (resize, Ctrl+Z/Y, the GIF loop's visibility and reduced-
+            // motion watchers) are page-scoped instead: see bindPageListeners.
             el('ccaLibrarySelect').addEventListener('change', function () {
                 state.libraryId = this.value;
+                var opt = this.options[this.selectedIndex];
+                prefillTitle(this.value && opt ? opt.textContent : '');
                 updateUI();
                 refreshRestoreState();
                 scheduleRender(); // a collage background follows the target
@@ -3998,10 +4475,20 @@
             el('ccaRestoreBtn').addEventListener('click', function () {
                 if (!state.libraryId) { return; }
                 var type = el('ccaTargetType') ? el('ccaTargetType').value : 'library';
-                jsonFetch('CustomCoverArt/targets/' + type + '/' + encodeURIComponent(state.libraryId) + '/restore', 'POST')
-                    .then(function (res) {
-                        Dashboard.alert(pick(res, 'Success') ? t('restore.done') : t('restore.fail'));
-                    });
+                var id = state.libraryId;
+                confirmAction(t('restore.confirm')).then(function (ok) {
+                    if (!ok) { return; }
+                    Dashboard.showLoadingMsg();
+                    return jsonFetch('CustomCoverArt/targets/' + type + '/' + encodeURIComponent(id) + '/restore', 'POST')
+                        .then(function (res) {
+                            Dashboard.hideLoadingMsg();
+                            Dashboard.alert(pick(res, 'Success')
+                                ? t('restore.done')
+                                : pick(res, 'ErrorMessage') || t('restore.fail'));
+                        })
+                        .catch(function (e) { showError(t('dyn.error', errorText(e))); })
+                        .then(refreshRestoreState);
+                });
             });
 
             el('ccaResetBackupBtn').addEventListener('click', function () {
@@ -4015,7 +4502,7 @@
                                 ? t('restore.resetDone')
                                 : t('restore.resetFail', pick(res, 'ErrorMessage') || t('dyn.unknown')));
                         })
-                        .catch(function (e) { Dashboard.alert(t('restore.resetFail', e.message)); })
+                        .catch(function (e) { showError(t('restore.resetFail', errorText(e))); })
                         .then(refreshRestoreState);
                 });
             });
@@ -4024,6 +4511,7 @@
                 var l = selectedLayer();
                 if (l) {
                     l.Content = this.value;
+                    if (l.Id === 'title') { state.titleTouched = true; }
                     renderLayersPanel(); // the panel labels a text layer with its content
                     scheduleRender();
                 }
@@ -4072,9 +4560,8 @@
                     // a blob: URL, never from the server path we just received.
                     img.src = url;
                 }).catch(function (e) {
-                    Dashboard.hideLoadingMsg();
                     input.value = '';
-                    Dashboard.alert(e.message);
+                    showError(t('dyn.uploadFail', errorText(e)));
                 });
             });
 
@@ -4188,13 +4675,15 @@
                 if (doc.Background.Gradient) {
                     doc.Background.Gradient.IsEnabled = (this.value === 'gradient');
                 }
-                // A gradient or solid background must not keep painting a stale bitmap.
+                // A gradient or solid background forgets the image entirely. A collage keeps
+                // it in reserve: activeBgBitmap() paints the mosaic instead, and switching
+                // back to Image shows the upload again without a refetch.
                 if (this.value === 'gradient' || this.value === 'solid') {
-                    bgImageEl = null;
                     doc.Background.ImagePath = '';
                     state.backgroundImagePath = '';
-                    var selBg = el('ccaSelectedBg');
-                    if (selBg) { selBg.style.display = 'none'; }
+                    requestGuard('bg');       // an upload or poster pick still in flight must not land now
+                    clearBackgroundBitmap();
+                    syncFileNames();
                 }
                 updateBackgroundVisibility(); scheduleRender();
             });
@@ -4262,12 +4751,28 @@
                 doc.Canvas.DimensionPreset = this.value;
                 updateUI(); scheduleRender();
             });
-            el('ccaWidth').addEventListener('input', function () {
-                if (el('ccaPreset').value === 'custom') { doc.Canvas.Width = parseInt(this.value, 10) || doc.Canvas.Width; scheduleRender(); }
-            });
-            el('ccaHeight').addEventListener('input', function () {
-                if (el('ccaPreset').value === 'custom') { doc.Canvas.Height = parseInt(this.value, 10) || doc.Canvas.Height; scheduleRender(); }
-            });
+            // While typing, only an in-range value reaches the canvas: "9" on the way to
+            // "900" must not shrink it to 9px, and 9000 must never resize the live canvas
+            // (or ask the server for a 9000px collage). On change (blur/Enter) the field
+            // itself is clamped, so it shows what is used.
+            function bindCustomDim(id, prop) {
+                el(id).addEventListener('input', function () {
+                    var v = parseInt(this.value, 10);
+                    if (el('ccaPreset').value !== 'custom' || !(v >= MIN_DIM && v <= MAX_DIM)) { return; }
+                    doc.Canvas[prop] = v;
+                    scheduleRender();
+                });
+                el(id).addEventListener('change', function () {
+                    var v = clampDim(this.value, doc.Canvas[prop]);
+                    this.value = v;
+                    if (el('ccaPreset').value === 'custom' && doc.Canvas[prop] !== v) {
+                        doc.Canvas[prop] = v;
+                        scheduleRender();
+                    }
+                });
+            }
+            bindCustomDim('ccaWidth', 'Width');
+            bindCustomDim('ccaHeight', 'Height');
             el('ccaFormat').addEventListener('change', applyFormatFromControl);
             el('ccaKenBurns').addEventListener('change', function () {
                 if (doc.Background.Animation) { doc.Background.Animation.KenBurns = this.checked; }
@@ -4287,8 +4792,8 @@
             el('ccaTargetType').addEventListener('change', function () {
                 Dashboard.showLoadingMsg();
                 loadLibraries()
-                    .then(function () { updateUI(); updateBackgroundVisibility(); refreshRestoreState(); loadBatchList(); Dashboard.hideLoadingMsg(); scheduleRender(); })
-                    .catch(function () { Dashboard.hideLoadingMsg(); });
+                    .then(function () { prefillTitle(''); updateUI(); updateBackgroundVisibility(); refreshRestoreState(); loadBatchList(); Dashboard.hideLoadingMsg(); scheduleRender(); })
+                    .catch(function (e) { showError(t('dyn.error', errorText(e))); });
             });
 
             el('ccaBgImageBtn').addEventListener('click', function () { el('ccaBgImage').click(); });
@@ -4297,65 +4802,54 @@
             el('ccaBgImage').addEventListener('change', function () {
                 if (!this.files || !this.files[0]) { return; }
                 var file = this.files[0];
-                el('ccaBgImageName').textContent = file.name;
+                var input = this;
+                var isCurrent = requestGuard('bg');
                 Dashboard.showLoadingMsg();
                 uploadFile('upload', file).then(function (res) {
                     Dashboard.hideLoadingMsg();
-                    if (pick(res, 'Success')) {
-                        // Server path drives the authoritative render + apply; the
-                        // client canvas bitmap loads from the SAME client File via a
-                        // blob: URL so the canvas stays untainted (canvas-source
-                        // invariant). state.backgroundImagePath is kept for the legacy
-                        // batch/collectSettings projection.
-                        doc.Background.ImagePath = pick(res, 'Data');
-                        state.backgroundImagePath = doc.Background.ImagePath;
-                        var img = new Image();
-                        img.onload = function () { bgImageEl = img; scheduleRender(); };
-                        img.src = URL.createObjectURL(file);
-                        watchForAnimatedGif(img, file);
-                        maybeSwitchToAnimated(file);
-                        scheduleRender();
-                    } else {
-                        Dashboard.alert(t('dyn.uploadFail', pick(res, 'ErrorMessage') || t('dyn.unknown')));
-                    }
-                }).catch(function (e) { Dashboard.hideLoadingMsg(); Dashboard.alert(e.message); });
+                    input.value = ''; // let the same file be picked again later
+                    var path = dataOrThrow(res);
+                    if (!isCurrent()) { return; } // a newer pick, a preset or gradient/solid won
+                    // Server path drives the authoritative render + apply; the canvas bitmap
+                    // comes from the SAME client File via a blob: URL so the canvas stays
+                    // untainted (canvas-source invariant). state.backgroundImagePath is kept
+                    // for the legacy batch/collectSettings projection.
+                    doc.Background.ImagePath = path;
+                    state.backgroundImagePath = path;
+                    _fileNames[path] = { name: file.name, poster: false };
+                    syncFileNames();
+                    setBackgroundBitmap(file, isCurrent);
+                    maybeSwitchToAnimated(file);
+                    scheduleRender();
+                }).catch(function (e) {
+                    input.value = '';
+                    showError(t('dyn.uploadFail', errorText(e)));
+                });
             });
 
             el('ccaFont').addEventListener('change', function () {
                 if (!this.files || !this.files[0]) { return; }
-                el('ccaFontName').textContent = this.files[0].name;
+                var file = this.files[0];
+                var input = this;
                 Dashboard.showLoadingMsg();
-                uploadFile('uploadFont', this.files[0]).then(function (res) {
+                uploadFile('uploadFont', file).then(function (res) {
                     Dashboard.hideLoadingMsg();
-                    if (pick(res, 'Success')) {
-                        state.customFontPath = pick(res, 'Data');
-                        var l = selectedLayer();
-                        if (l) { l.FontPath = state.customFontPath; }
-                        scheduleRender();
-                    } else {
-                        Dashboard.alert(t('dyn.fontFail', pick(res, 'ErrorMessage') || t('dyn.unknown')));
-                    }
-                }).catch(function (e) { Dashboard.hideLoadingMsg(); Dashboard.alert(e.message); });
+                    input.value = '';
+                    var path = dataOrThrow(res);
+                    _fileNames[path] = { name: file.name, poster: false };
+                    state.customFontPath = path;
+                    var l = selectedLayer();
+                    if (l) { l.FontPath = path; }
+                    syncFileNames();
+                    scheduleRender();
+                }).catch(function (e) {
+                    input.value = '';
+                    showError(t('dyn.fontFail', errorText(e)));
+                });
             });
-
-            // Handle sizes and hit tolerances are derived from the canvas's CSS display
-            // size, so a viewport change (rotating a phone, resizing a window) must redraw
-            // or the handles keep the size they had at the old width.
-            window.addEventListener('resize', debounce(function () { scheduleRender(); }, 150));
 
             el('ccaUndo').addEventListener('click', undo);
             el('ccaRedo').addEventListener('click', redo);
-
-            document.addEventListener('keydown', function (ev) {
-                if (!(ev.ctrlKey || ev.metaKey)) { return; }
-                // Never hijack text editing: inside a field the browser's own undo is the
-                // one the user means.
-                var target = ev.target;
-                if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) { return; }
-                var k = String(ev.key || '').toLowerCase();
-                if (k === 'z' && !ev.shiftKey) { ev.preventDefault(); undo(); }
-                else if (k === 'y' || (k === 'z' && ev.shiftKey)) { ev.preventDefault(); redo(); }
-            });
 
             el('ccaApplyBtn').addEventListener('click', applyCoverArt);
             el('ccaServerRender').addEventListener('click', showServerRender);
@@ -4368,6 +4862,7 @@
             cv.addEventListener('pointermove', onCanvasPointerMove);
             cv.addEventListener('pointerup', onCanvasPointerUp);
             cv.addEventListener('pointercancel', onCanvasPointerUp);
+            cv.addEventListener('keydown', onCanvasKeydown);
 
             // Mouse-wheel zoom of the background, only while repositioning it and
             // only when an image is actually loaded (activeBgBitmap) — otherwise a no-op
@@ -4389,76 +4884,73 @@
             });
 
             el('ccaTemplateSelect').addEventListener('change', function () {
-                var opt = this.options[this.selectedIndex];
-                if (!opt) { return; }
-                var tplDoc = opt._document;
-                if (!tplDoc) {
-                    // Legacy template saved before the canvas engine: no Document,
-                    // only the flat Settings — migrate on the fly so it still loads.
-                    if (opt._settings) { tplDoc = migrateTemplateToDocument(opt._settings); }
-                    else { return; } // neither Document nor Settings (e.g. the "—" placeholder)
-                }
-                // Preserve THIS target's title if the template's title layer is blank
-                // (templates intentionally store the design, not the name).
-                var curLayer = selectedLayer();
-                var currentTitle = curLayer ? curLayer.Content : '';
-                doc = JSON.parse(JSON.stringify(tplDoc));
-                if (!doc.Layers) { doc.Layers = []; }
-                // Templates saved before Phase 3 have no effect sub-objects; the draw
-                // functions dereference them, so fill them in like the server does.
-                normalizeEffects(doc);
-                normalizeBackgroundSource(doc);
-                normalizeOverlay(doc);
-                normalizeGradientStops(doc);
-                var titleLayer = null;
-                for (var i = 0; i < doc.Layers.length; i++) {
-                    if (doc.Layers[i].Id === 'title') { titleLayer = doc.Layers[i]; break; }
-                }
-                if (titleLayer && (!titleLayer.Content || !titleLayer.Content.trim()) && currentTitle) {
-                    titleLayer.Content = currentTitle;
-                }
-                doc._selectedId = titleLayer ? titleLayer.Id : (doc.Layers[0] ? doc.Layers[0].Id : null);
-                // A template carries only a server ImagePath, never a client blob, so
-                // drop any stale canvas bitmap (the invariant forbids loading the
-                // server path); the gradient/flat background renders instead.
-                bgImageEl = null;
-                renderLayersPanel();
-                // Logo layers arrive as server paths only (a template can't carry the
-                // bitmap), so pull them back as blobs to preview them on the canvas.
-                hydrateLayerImages();
-                syncControlsFromDocument();
-                resetOverlayEditorState();
-                scheduleRender();
+                var sel = this;
+                var opt = sel.options[sel.selectedIndex];
+                // The "—" placeholder (no Document, no Settings) loads nothing.
+                if (!opt || (!opt._document && !opt._settings)) { state.templateValue = sel.value; return; }
+                var go = isDirty() ? confirmAction(t('tpl.confirmReplace')) : Promise.resolve(true);
+                go.then(function (ok) {
+                    if (!ok) { sel.value = state.templateValue || ''; return; }
+                    state.templateValue = sel.value;
+                    loadTemplateOption(opt);
+                });
             });
             el('ccaTemplateSave').addEventListener('click', function () {
                 var name = el('ccaTemplateName').value.trim();
                 if (!name) { Dashboard.alert(t('tpl.named')); return; }
-                jsonFetch('CustomCoverArt/templates', 'POST', { Name: name, Document: collectDocument() })
-                    .then(function () { Dashboard.alert(t('tpl.saved')); loadTemplates(); });
+                var sentDoc = collectDocument();
+                var savedJson = JSON.stringify(sentDoc);
+                jsonFetch('CustomCoverArt/templates', 'POST', { Name: name, Document: sentDoc })
+                    .then(function (res) { dataOrThrow(res); markClean(savedJson); Dashboard.alert(t('tpl.saved')); return loadTemplates(); })
+                    .catch(function (e) { showError(t('dyn.error', errorText(e))); });
             });
             el('ccaTemplateDelete').addEventListener('click', function () {
                 var name = el('ccaTemplateSelect').value;
                 if (!name) { return; }
-                jsonFetch('CustomCoverArt/templates/' + encodeURIComponent(name), 'DELETE').then(loadTemplates);
+                confirmAction(t('tpl.confirmDelete', name)).then(function (ok) {
+                    if (!ok) { return; }
+                    return jsonFetch('CustomCoverArt/templates/' + encodeURIComponent(name), 'DELETE')
+                        .then(function (res) { dataOrThrow(res); return loadTemplates(); })
+                        .catch(function (e) { showError(t('dyn.error', errorText(e))); });
+                });
             });
 
             el('ccaBatchApply').addEventListener('click', function () {
+                var btn = this;
+                // Set before the confirm dialog, not after: a double click must not open two.
+                if (state.batchRunning) { return; }
                 var checks = el('ccaBatchList').querySelectorAll('input[type=checkbox]:checked');
                 if (!checks.length) { Dashboard.alert(t('batch.none')); return; }
                 var targets = Array.prototype.map.call(checks, function (c) { return { Id: c.value, Type: c.dataset.type }; });
-                el('ccaBatchStatus').textContent = t('batch.running');
-                // Send the layered document as well: the server prefers it, so batching
-                // a multi-layer design no longer collapses to the flat single-title
-                // model. Settings stays for older servers / the template path.
-                jsonFetch('CustomCoverArt/batchApply', 'POST', { Document: collectDocument(), Settings: collectSettings(), Targets: targets })
-                    .then(function (res) {
-                        var data = pick(res, 'Data') || [];
-                        var ok = data.filter(function (r) { return pick(r, 'Success'); }).length;
-                        var fail = data.length - ok;
-                        el('ccaBatchStatus').textContent = t('batch.done').replace('{0}', ok).replace('{1}', fail);
-                        // The selected target may have been part of the batch.
-                        refreshRestoreState();
-                    });
+                var status = el('ccaBatchStatus');
+                state.batchRunning = true;
+                confirmAction(t('batch.confirm', targets.length)).then(function (ok) {
+                    if (!ok) { state.batchRunning = false; return; }
+                    btn.disabled = true;
+                    status.textContent = t('batch.running');
+                    // Collecting runs inside the promise chain so a throw reaches the catch
+                    // and the cleanup below instead of leaving the button locked.
+                    return Promise.resolve().then(function () {
+                        // Send the layered document as well: the server prefers it, so batching
+                        // a multi-layer design no longer collapses to the flat single-title
+                        // model. Settings stays until plan D removes it.
+                        // Batch apply neither cleans nor dirties the design.
+                        var batchDoc = collectDocumentKeepingCleanState();
+                        return jsonFetch('CustomCoverArt/batchApply', 'POST', { Document: batchDoc, Settings: collectSettings(), Targets: targets });
+                    })
+                        .then(function (res) {
+                            var data = dataOrThrow(res) || [];
+                            var okCount = data.filter(function (r) { return pick(r, 'Success'); }).length;
+                            status.textContent = t('batch.done', okCount, data.length - okCount);
+                        })
+                        .catch(function (e) { status.textContent = t('batch.fail', errorText(e)); })
+                        .then(function () {
+                            state.batchRunning = false;
+                            btn.disabled = false;
+                            // The selected target may have been part of the batch.
+                            refreshRestoreState();
+                        });
+                });
             });
 
             // Delegated handler for the dynamically-added gradient-stop rows (the
@@ -4469,6 +4961,7 @@
 
             el('ccaBrowseBtn').addEventListener('click', openBrowser);
             el('ccaBrowserClose').addEventListener('click', closeBrowser);
+            el('ccaBrowserModal').addEventListener('keydown', onBrowserKeydown);
             el('ccaBrowserModal').addEventListener('click', function (e) {
                 if (e.target === this) { closeBrowser(); }
             });
@@ -4479,21 +4972,98 @@
                 browser.page = 1; loadBrowserItems();
             });
             el('ccaBrowserPrev').addEventListener('click', function () {
+                _browserLastPager = 'ccaBrowserPrev';
                 if (browser.page > 1) { browser.page--; loadBrowserItems(); }
             });
             el('ccaBrowserNext').addEventListener('click', function () {
+                _browserLastPager = 'ccaBrowserNext';
                 if (browser.page < browser.totalPages) { browser.page++; loadBrowserItems(); }
             });
         }
 
+        // The modal and the mobile sticky bars need an OPAQUE surface in the current
+        // Jellyfin theme, which not every Jellyfin version exposes as a CSS variable. Read
+        // it off the nearest ancestor that actually paints a background, and the text
+        // colour off the page; fall back to the dark theme's pair.
+        // True for a fully opaque CSS colour string as getComputedStyle reports it:
+        // not 'transparent', no alpha below 1 in rgba(r,g,b,a), rgb(r g b / a) or color(... / a).
+        function isOpaqueColor(c) {
+            if (!c || c === 'transparent') { return false; }
+            var a = null, m = /\/\s*([\d.]+)(%?)\s*\)\s*$/.exec(c);
+            if (m) { a = parseFloat(m[1]) / (m[2] ? 100 : 1); }
+            else if (/^rgba\(/.test(c)) {
+                var parts = c.replace(/^rgba\(|\)\s*$/g, '').split(',');
+                if (parts.length === 4) { a = parseFloat(parts[3]); }
+            }
+            return a === null || isNaN(a) || a >= 1;
+        }
+
+        function applyThemeSurface() {
+            var bg = '';
+            // Prefer the theme's own variable when this Jellyfin exposes it.
+            var themed = (getComputedStyle(document.documentElement).getPropertyValue('--theme-body-background-color') || '').trim();
+            if (!themed) { themed = (getComputedStyle(document.body).getPropertyValue('--theme-body-background-color') || '').trim(); }
+            if (themed && isOpaqueColor(themed)) { bg = themed; }
+            for (var n = page; !bg && n && n.nodeType === 1; n = n.parentElement) {
+                var c = getComputedStyle(n).backgroundColor;
+                if (isOpaqueColor(c)) { bg = c; }
+            }
+            page.style.setProperty('--cca-surface', bg || '#1b1b1b');
+            page.style.setProperty('--cca-text', bg ? getComputedStyle(page).color : '#f2f2f2');
+        }
+
+        var _browserReturnFocus = null;
+        var _browserLastPager = 'ccaBrowserNext'; // the pager button the user pressed last
+
         function openBrowser() {
+            _browserReturnFocus = document.activeElement;
             el('ccaBrowserModal').style.display = 'flex';
             browser.page = 1;
             loadBrowserItems();
+            el('ccaBrowserSearch').focus();
         }
 
+        // Safe to call when already closed (pagehide calls it unconditionally).
         function closeBrowser() {
-            el('ccaBrowserModal').style.display = 'none';
+            var modal = el('ccaBrowserModal');
+            if (!modal || modal.style.display === 'none') { return; }
+            modal.style.display = 'none';
+            var back = _browserReturnFocus || el('ccaBrowseBtn');
+            _browserReturnFocus = null;
+            if (back && back.focus) { back.focus(); }
+        }
+
+        // A pager button that disables itself while focused (Next on the last step, Prev on
+        // page 1) or a re-rendered grid drops focus to <body>, where the dialog's keydown
+        // handler (Esc, Tab trap) never hears it. Called after every grid/pager update: if
+        // the dialog is open and focus escaped it, put focus back on a live control.
+        function keepFocusInBrowser() {
+            var modal = el('ccaBrowserModal');
+            if (!modal || modal.style.display === 'none') { return; }
+            var box = modal.querySelector('.ccaModalBox');
+            // A button disabled a moment ago still reports as activeElement (and as inside
+            // the box) until the browser's later focus fixup, so a disabled, null or body
+            // activeElement counts as escaped.
+            var ae = document.activeElement;
+            if (ae && ae !== document.body && box.contains(ae) && !ae.disabled) { return; }
+            var last = el(_browserLastPager), other = el(_browserLastPager === 'ccaBrowserPrev' ? 'ccaBrowserNext' : 'ccaBrowserPrev');
+            var target = !last.disabled ? last : (!other.disabled ? other : el('ccaBrowserSearch'));
+            target.focus();
+        }
+
+        // Esc closes; Tab and Shift+Tab cycle inside the dialog instead of walking out
+        // into the page behind it (aria-modal informs assistive tech, not the browser).
+        function onBrowserKeydown(ev) {
+            if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); closeBrowser(); return; }
+            if (ev.key !== 'Tab') { return; }
+            var box = el('ccaBrowserModal').querySelector('.ccaModalBox');
+            var focusable = Array.prototype.filter.call(
+                box.querySelectorAll('button, input, select, [tabindex]:not([tabindex="-1"])'),
+                function (n) { return !n.disabled && n.getClientRects().length > 0; });
+            if (!focusable.length) { return; }
+            var first = focusable[0], last = focusable[focusable.length - 1];
+            if (ev.shiftKey && document.activeElement === first) { ev.preventDefault(); last.focus(); }
+            else if (!ev.shiftKey && document.activeElement === last) { ev.preventDefault(); first.focus(); }
         }
 
         function gridMessage(grid, text) {
@@ -4506,6 +5076,7 @@
 
         function loadBrowserItems() {
             var grid = el('ccaBrowserGrid');
+            var isCurrent = requestGuard('posters');
             gridMessage(grid, t('dyn.loading'));
             var typeVal = el('ccaBrowserType').value;
             jsonFetch('CustomCoverArt/search/items', 'POST', {
@@ -4514,8 +5085,10 @@
                 Page: browser.page,
                 PageSize: browser.pageSize
             }).then(function (res) {
+                if (!isCurrent()) { return; }
                 if (!pick(res, 'Success')) {
                     gridMessage(grid, t('dyn.errorItems'));
+                    keepFocusInBrowser();
                     return;
                 }
                 var data = pick(res, 'Data') || {};
@@ -4524,8 +5097,11 @@
                 el('ccaBrowserPage').textContent = t('dyn.page', browser.page, browser.totalPages);
                 el('ccaBrowserPrev').disabled = browser.page <= 1;
                 el('ccaBrowserNext').disabled = browser.page >= browser.totalPages;
+                keepFocusInBrowser();
             }).catch(function (e) {
-                gridMessage(grid, e.message);
+                if (!isCurrent()) { return; }
+                gridMessage(grid, t('dyn.error', errorText(e)));
+                keepFocusInBrowser();
             });
         }
 
@@ -4541,32 +5117,35 @@
                 var name = pick(item, 'Name') || '';
                 var year = pick(item, 'Year');
 
-                var div = document.createElement('div');
-                div.className = 'ccaGridItem';
+                var tile = document.createElement('button');
+                tile.type = 'button';
+                tile.className = 'ccaGridItem';
 
                 var img = document.createElement('img');
-                img.alt = name;
+                // Decorative: the caption below already names the tile.
+                img.alt = '';
                 // Use Jellyfin's own image endpoint (token in query string) so the
                 // <img> loads without needing a custom auth header.
                 try { img.src = ApiClient.getImageUrl(id, { type: 'Primary', fillHeight: 220 }); } catch (e) { /* ignore */ }
                 img.addEventListener('error', function () { img.style.visibility = 'hidden'; });
 
-                var cap = document.createElement('div');
+                var cap = document.createElement('span');
                 cap.className = 'cap';
                 cap.textContent = name + (year ? ' (' + year + ')' : '');
 
-                div.appendChild(img);
-                div.appendChild(cap);
-                div.addEventListener('click', function () { selectBrowserItem(id, name); });
-                grid.appendChild(div);
+                tile.appendChild(img);
+                tile.appendChild(cap);
+                tile.addEventListener('click', function () { selectBrowserItem(id, name); });
+                grid.appendChild(tile);
             });
         }
 
         function selectBrowserItem(itemId, name) {
             var imgUrl;
-            try { imgUrl = ApiClient.getImageUrl(itemId, { type: 'Primary', maxHeight: 2000 }); } catch (e) { imgUrl = null; }
-            if (!imgUrl) { Dashboard.alert('No image URL for that item.'); return; }
+            try { imgUrl = ApiClient.getImageUrl(itemId, { type: 'Primary', maxHeight: 2000 }); } catch (err) { imgUrl = null; }
+            if (!imgUrl) { Dashboard.alert(t('poster.noUrl')); return; }
 
+            var isCurrent = requestGuard('bg');
             Dashboard.showLoadingMsg();
             // Fetch the poster through Jellyfin's own image endpoint (authenticated,
             // since some servers require a token even for images) and upload it as a
@@ -4574,64 +5153,160 @@
             // File constructor, which isn't reliable in every webview.
             var posterBlob = null;
             fetch(imgUrl, { headers: { 'Authorization': authHeader() }, credentials: 'include' })
-                .then(function (r) { if (!r.ok) { throw new Error('image fetch returned ' + r.status); } return r.blob(); })
+                .catch(function () { throw networkError(); })
+                .then(function (r) { if (!r.ok) { throw requestError(r.status); } return r.blob(); })
                 .then(function (blob) {
-                    if (!blob || blob.size === 0) { throw new Error('the downloaded image was empty'); }
+                    if (!blob || blob.size === 0) { throw new Error(t('poster.empty')); }
                     posterBlob = blob;
                     var ext = blob.type === 'image/png' ? 'png' : (blob.type === 'image/webp' ? 'webp' : 'jpg');
                     var fd = new FormData();
                     fd.append('file', blob, 'poster.' + ext);
-                    return authFetch('CustomCoverArt/upload', { method: 'POST', body: fd }).then(function (r) { return r.json(); });
+                    return authFetch('CustomCoverArt/upload', { method: 'POST', body: fd })
+                        .then(readJson, function () { throw networkError(); });
                 })
                 .then(function (res) {
                     Dashboard.hideLoadingMsg();
-                    var path = pick(res, 'Data');
-                    if (pick(res, 'Success') && path) {
-                        // Server path for render/apply; canvas bitmap from the fetched
-                        // Blob via a blob: URL (canvas-source invariant — never the
-                        // server path / ApiClient.getImageUrl).
-                        doc.Background.ImagePath = path;
-                        state.backgroundImagePath = path;
-                        var img = new Image();
-                        img.onload = function () { bgImageEl = img; scheduleRender(); };
-                        img.src = URL.createObjectURL(posterBlob);
-                        watchForAnimatedGif(img, posterBlob);
-                        el('ccaSelectedBgName').textContent = name;
-                        el('ccaSelectedBg').style.display = '';
-                        scheduleRender();
-                        closeBrowser();
-                    } else {
-                        Dashboard.alert('Upload rejected: ' + (pick(res, 'ErrorMessage') || 'unknown reason'));
-                    }
+                    var path = dataOrThrow(res);
+                    if (!path) { throw new Error(t('dyn.unknown')); }
+                    // Server path for render/apply; canvas bitmap from the fetched
+                    // Blob via a blob: URL (canvas-source invariant — never the
+                    // server path / ApiClient.getImageUrl).
+                    if (!isCurrent()) { return; } // a newer pick won the race
+                    doc.Background.ImagePath = path;
+                    state.backgroundImagePath = path;
+                    _fileNames[path] = { name: name, poster: true };
+                    syncFileNames();
+                    setBackgroundBitmap(posterBlob, isCurrent);
+                    scheduleRender();
+                    closeBrowser();
                 })
                 .catch(function (e) {
-                    Dashboard.hideLoadingMsg();
-                    Dashboard.alert('Poster background failed: ' + e.message);
+                    showError(t('poster.fail', errorText(e)));
                 });
         }
+
+        // --- Page-level listeners -----------------------------------------
+        // window/document listeners outlive this page: Jellyfin keeps it in the DOM while
+        // you browse the rest of the dashboard, and a leftover Ctrl+Z handler would
+        // preventDefault the undo of every other settings page. They are added on pageshow
+        // and removed on pagehide/viewhide, and the keyboard and resize handlers also check
+        // that the page is on screen in case a hide event is ever missed.
+        var TEXT_INPUT_TYPES = { text: 1, search: 1, number: 1, email: 1, url: 1, tel: 1, password: 1 };
+
+        function isTextEditingTarget(n) {
+            if (!n) { return false; }
+            if (n.isContentEditable || n.tagName === 'TEXTAREA') { return true; }
+            if (n.tagName === 'INPUT') { return !!TEXT_INPUT_TYPES[String(n.type || 'text').toLowerCase()]; }
+            return false;
+        }
+
+        // The page is attached and displayed. Unlike isEditorOnScreen (the GIF loop's
+        // test) this ignores document.hidden: closing a background tab must still be able
+        // to ask about unapplied work.
+        function isPageVisible() {
+            return !!(page && page.isConnected && page.getClientRects().length > 0);
+        }
+
+        // Handle sizes and hit tolerances are derived from the canvas's CSS display size,
+        // so a viewport change (rotating a phone, resizing a window) must redraw or the
+        // handles keep the size they had at the old width.
+        var onWindowResize = debounce(function () {
+            if (isPageVisible()) { scheduleRender(); }
+        }, 150);
+
+        function onDocumentKeydown(ev) {
+            if (!(ev.ctrlKey || ev.metaKey) || !isPageVisible()) { return; }
+            // Never hijack text editing: in a text field the browser's own undo is the one
+            // the user means. Sliders, colour pickers and checkboxes are not text, so
+            // Ctrl+Z there undoes the design like anywhere else on the page.
+            if (isTextEditingTarget(ev.target)) { return; }
+            // Do not change the design underneath the open poster browser.
+            if (el('ccaBrowserModal').style.display !== 'none') { return; }
+            var k = String(ev.key || '').toLowerCase();
+            if (k === 'z' && !ev.shiftKey) { ev.preventDefault(); undo(); }
+            else if (k === 'y' || (k === 'z' && ev.shiftKey)) { ev.preventDefault(); redo(); }
+        }
+
+        // --- Unsaved work --------------------------------------------------
+        // The design as of the last page load, apply, template load or template save,
+        // serialized the same way undo history compares documents. Apply and template
+        // save pass the JSON they actually sent, so an edit made while the request was in
+        // flight still counts as unapplied.
+        var _cleanJson = null;
+        function markClean(json) { _cleanJson = json || JSON.stringify(stripUiKeys(doc)); }
+        function isDirty() { return _cleanJson !== null && JSON.stringify(stripUiKeys(doc)) !== _cleanJson; }
+
+        // Closing or reloading the tab with unapplied changes asks first. In-dashboard
+        // navigation needs no prompt: the page and its design stay in memory.
+        function onBeforeUnload(ev) {
+            if (!isPageVisible() || !isDirty()) { return; }
+            ev.preventDefault();
+            ev.returnValue = ''; // required by Chromium to show the prompt
+        }
+
+        function bindPageListeners() {
+            unbindPageListeners(); // pageshow can fire again without a hide in between
+            window.addEventListener('resize', onWindowResize);
+            document.addEventListener('keydown', onDocumentKeydown);
+            // The GIF loop re-evaluates when the tab hides/shows or reduced motion changes.
+            document.addEventListener('visibilitychange', updateGifLoop);
+            watchReducedMotion(true);
+            window.addEventListener('beforeunload', onBeforeUnload);
+        }
+
+        function unbindPageListeners() {
+            window.removeEventListener('resize', onWindowResize);
+            document.removeEventListener('keydown', onDocumentKeydown);
+            document.removeEventListener('visibilitychange', updateGifLoop);
+            watchReducedMotion(false);
+            window.removeEventListener('beforeunload', onBeforeUnload);
+        }
+
+        // Leaving the page: drop the global listeners, stop the GIF loop at once (pageshow's
+        // scheduleRender() restarts it) and close the poster browser.
+        function onPageHide() {
+            unbindPageListeners();
+            stopGifLoop();
+            if (page) { closeBrowser(); }
+        }
+
+        // The bundled Noto faces are document-wide: register them once per page load, not
+        // once per visit (every pageshow used to add six more FontFace objects).
+        var _canvasFontsLoaded = null;
+
+        document.querySelector('#CustomCoverArtConfigPage').addEventListener('pagehide', onPageHide);
+        document.querySelector('#CustomCoverArtConfigPage').addEventListener('viewhide', onPageHide);
 
         document.querySelector('#CustomCoverArtConfigPage').addEventListener('pageshow', function () {
             page = this;
             LANG = detectLang();
             applyI18n(page);
+            applyThemeSurface(); // every show: the user may have switched theme meanwhile
             if (!page.dataset.ccaInit) {
                 bindEvents();
                 initSteps();
                 initAdvanced();
                 page.dataset.ccaInit = 'true';
             }
+            bindPageListeners();
             Dashboard.showLoadingMsg();
             // Seed every control (incl. the brand gradient stops) from the default
             // document, so the UI and the live canvas start in agreement.
             normalizeOverlay(doc);
             normalizeGradientStops(doc);
+            // The default document was built before the language was known.
+            prefillTitle('');
             renderLayersPanel();
             syncControlsFromDocument();
             resetOverlayEditorState();
+            // The starting design is "clean" — but only on the first show: a return visit
+            // keeps whatever unapplied edits the user left behind.
+            if (_cleanJson === null) { markClean(); }
             // Render immediately with a sane fallback, then re-render once the
             // bundled Noto weights register so canvas text metrics match the server.
             scheduleRender();
-            loadCanvasFonts().then(scheduleRender);
+            if (!_canvasFontsLoaded) { _canvasFontsLoaded = loadCanvasFonts(); }
+            _canvasFontsLoaded.then(scheduleRender);
             loadTemplates();
             loadBatchList();
             loadLibraries().then(function () {
@@ -4640,7 +5315,7 @@
                 refreshRestoreState();
                 Dashboard.hideLoadingMsg();
                 scheduleRender();
-            }).catch(function () { Dashboard.hideLoadingMsg(); });
+            }).catch(function (e) { showError(t('dyn.error', errorText(e))); });
         });
     })();
     </script>
