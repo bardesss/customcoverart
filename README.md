@@ -48,10 +48,11 @@ Layered text and logos, backgrounds, composition effects — designed on a live 
 | ⚡ | **Jellyfin-style preset** | One click for the familiar dark-gradient look, editable afterwards |
 | 🧭 | **Guided steps** | Five numbered steps, essentials up front and advanced controls one click away |
 | ↩️ | **Undo / redo** | Ctrl+Z and Ctrl+Y across the whole design |
+| ⌨️ | **Keyboard & screen readers** | Select layers with Tab and Enter, nudge the selected layer with the arrow keys (Shift for bigger steps), a poster browser that Esc closes and keeps focus inside, and a name on every icon button |
 | 📱 | **Mobile-friendly** | Large touch targets, sticky preview, full-screen poster browser, grabbable canvas handles |
 | 🔍 | **In-context preview** | See the cover wide, square and poster-shaped before applying |
 | 🔠 | **Fonts** | Bundled Noto Sans (matches Jellyfin's UI, so text always renders) — or upload your own `.ttf` / `.otf` / `.ttc` / `.woff` / `.woff2`, which the live canvas renders too |
-| 📐 | **Presets & sizes** | Landscape 16:9 (the default), square cover, portrait poster, wide banner, or custom dimensions |
+| 📐 | **Presets & sizes** | Landscape 16:9 (the default), square cover, portrait poster, wide banner, or custom dimensions from 100 to 2048 px |
 | 🖱️ | **Interactive canvas** | The preview is a live canvas — drag layers to position them, resize/rotate them with handles, drag/scroll/pinch to reposition and zoom the background |
 | 🎯 | **Authoritative server render** | The canvas is a fast approximation; "Show server render" renders the exact same design on the server before you apply |
 | 🧩 | **Poster collage** | Auto-build a grid-mosaic background from a target's own item posters |
@@ -171,24 +172,30 @@ a wall of controls. Each step shows what most people need, with the rest under *
 4. **Effects** — colour wash, vignette, film grain and a border, plus the Jellyfin-style preset
    and Auto palette.
 5. **Output & apply** — size and format, a preview of the cover **in context** at other shapes,
-   then Apply or Download. Saving a template and batch-applying live under Advanced here.
+   then Apply or Download. Saving a template and batch-applying sit at the end of this step.
 
 While you work, the canvas on the right (top, on a phone) updates live. Click a layer and **drag**
 it to reposition, or use its corner handles to resize and the knob to rotate. Toggle **Reposition
 background** to drag-pan the background image and scroll or pinch to zoom it — up to 4×. With the
 **Fill** image fit you can pan straight away to choose which part of the picture the cover shows;
 **Fit** and **Stretch** show the whole image already, so there is nothing to pan into until you
-zoom in. **Ctrl+Z** and **Ctrl+Y** undo and redo anything.
+zoom in. **Ctrl+Z** and **Ctrl+Y** undo and redo anything, sliders and colours included (in a text
+field they undo your typing instead). Click the canvas, or Tab to it, and the **arrow keys** move
+the selected layer one pixel at a time — hold **Shift** for ten. Combinations with Alt, Ctrl or
+Meta are left to the browser.
 
 Before applying, **Show server render** produces the exact server-rendered output — the canvas is
 a fast approximation and the server render is authoritative.
+
+The page asks before you close or reload the browser tab with changes you have not applied, saved
+or loaded, and loading a template asks first when it would replace them.
 
 ### Text and logo layers
 
 **Add text** stacks another independently styled text layer; **Add logo/icon** uploads a PNG
 (transparency preserved) as an image layer. The Layers list shows the top-most layer first — use
 ▲/▼ to restack, 👁 to hide a layer without deleting it, ⧉ to duplicate and ✕ to remove. Click any
-row to select it; the **Selected layer** section below edits that layer, and text-only controls
+row — or Tab to a layer's name and press Enter — to select it; the **Selected layer** section below edits that layer, and text-only controls
 hide when a logo is selected. On a narrow screen those actions sit behind the row's **⋯** button,
 so tapping anywhere else on the row simply selects it.
 
@@ -249,10 +256,13 @@ a new mosaic is only fetched when you change the target, density, shuffle or siz
 
 ### Templates and batch apply
 
-Design a cover, then **Save this design** under **Advanced** in step 5. **Apply to several
-targets**, in the same place, applies your design (or a saved template) to many libraries at once —
+Design a cover, then **Save this design** at the end of step 5. **Apply to several
+targets**, right below it, applies your design (or a saved template) to many libraries at once —
 each cover titled with its target's own name. To start from a saved design, pick it in step 1. Templates saved before the canvas editor still load fine —
 they're migrated to the new design format automatically the first time you pick them.
+
+Batch apply first asks you to confirm how many covers it is about to replace, and can't be started
+twice while it runs. Deleting a template asks first too.
 
 ### Animated covers
 
@@ -265,7 +275,8 @@ on in your system it stays still.
 ### Restoring the original
 
 Applying a cover automatically backs up the target's previous image once. Use **Restore original
-cover** in step 1 to revert — you can restore, apply and restore again as often as you like.
+cover** in step 1 to revert (it asks first, and the note beside it updates as soon as a backup
+exists) — you can restore, apply and restore again as often as you like.
 Applied covers are handed to Jellyfin's own image store (the same as uploading an image in the
 dashboard), so covers applied or restored from version 4.0.2.0 on keep working even if the
 plugin's data folder is cleared (covers applied by 4.0.1.0 and never re-applied still live in
@@ -334,6 +345,9 @@ validation and apply errors the server returns.
 label, button and hint you see in the dashboard. Add a block alongside `en`, `nl` and
 `es`, keyed by the two-letter language code; the page picks it from Jellyfin's stored UI
 language. Regional codes fold to the base language, so `es-MX` and `es-419` both use `es`.
+Markup picks its text up through `data-i18n` (text), `data-i18n-ph` (placeholder),
+`data-i18n-aria` (screen-reader label) and `data-i18n-alt` (image description); script code uses
+literal `t('key')` calls.
 
 Then rebuild — five guards fail the build before a half-finished translation can ship:
 
