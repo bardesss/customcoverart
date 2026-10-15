@@ -78,7 +78,7 @@ public class ConfigPageStructureTests
         "ccaAutoPalette", "ccaBatchApply", "ccaBatchList", "ccaBatchStatus", "ccaBgAdjust",
         "ccaBgFit", "ccaBgImage", "ccaBgImageBtn", "ccaBgImageName", "ccaBgSource", "ccaBlur",
         "ccaBlurVal", "ccaBrowseBtn", "ccaBrowserClose", "ccaBrowserGrid", "ccaBrowserModal",
-        "ccaBrowserNext", "ccaBrowserPage", "ccaBrowserPrev", "ccaBrowserSearch", "ccaBrowserType",
+        "ccaBrowserNext", "ccaBrowserPage", "ccaBrowserPrev", "ccaBrowserSearch", "ccaBrowserTitle", "ccaBrowserType",
         "ccaCanvas", "ccaCollageDensity", "ccaCollageLiveTvHint", "ccaCollageRow", "ccaCollageShuffle",
         "ccaCustomDims",
         "ccaDim", "ccaDimColor", "ccaDimVal", "ccaDownloadBtn", "ccaFont", "ccaFontBtn",
@@ -629,5 +629,33 @@ public class ConfigPageStructureTests
         Assert.Contains("ccaFontName", sync, System.StringComparison.Ordinal);
         Assert.Contains("ccaBgImageName", sync, System.StringComparison.Ordinal);
         Assert.Contains("ccaSelectedBg", sync, System.StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PosterBrowserIsARealDialog()
+    {
+        var markup = Markup();
+        Assert.Matches(@"class=""ccaModalBox""[^>]*role=""dialog""", markup);
+        Assert.Matches(@"class=""ccaModalBox""[^>]*aria-modal=""true""", markup);
+        Assert.Matches(@"class=""ccaModalBox""[^>]*aria-labelledby=""ccaBrowserTitle""", markup);
+        Assert.Matches(@"id=""ccaBrowserClose""[^>]*data-i18n-aria=""modal.close""", markup);
+
+        var page = ConfigPage();
+        Assert.Contains("createElement('button')", FunctionBody(page, "renderBrowserItems"), System.StringComparison.Ordinal);
+        Assert.Contains("'Escape'", FunctionBody(page, "onBrowserKeydown"), System.StringComparison.Ordinal);
+        Assert.Contains(".focus()", FunctionBody(page, "closeBrowser"), System.StringComparison.Ordinal);
+        Assert.Contains(".focus()", FunctionBody(page, "openBrowser"), System.StringComparison.Ordinal);
+    }
+
+    /// <summary>A hard-coded dark box with inherited text colour is unreadable on the light theme.</summary>
+    [Fact]
+    public void ModalAndStickyBarsFollowTheTheme()
+    {
+        var css = Styles();
+        Assert.DoesNotMatch(@"background:\s*#1b1b1b", css);
+        Assert.Matches(@"\.ccaModalBox \{[^}]*background: var\(--cca-surface", css);
+        Assert.Matches(@"\.ccaModalBox \{[^}]*color: var\(--cca-text", css);
+        Assert.DoesNotContain("background: var(--theme-body-background-color, #101010);", css, System.StringComparison.Ordinal);
+        Assert.Contains("--cca-surface", FunctionBody(ConfigPage(), "applyThemeSurface"), System.StringComparison.Ordinal);
     }
 }
