@@ -1276,6 +1276,16 @@
             Dashboard.alert(message);
         }
 
+        // Latest-wins request ordering. Each call supersedes every earlier call on the same
+        // channel; the returned isCurrent() is false once a newer request has been made, so
+        // a slow stale response is dropped instead of overwriting a fresh one.
+        var _requestSeq = {};
+        function requestGuard(channel) {
+            var n = (_requestSeq[channel] || 0) + 1;
+            _requestSeq[channel] = n;
+            return function isCurrent() { return _requestSeq[channel] === n; };
+        }
+
         function el(id) { return page.querySelector('#' + id); }
 
         // Promise<boolean>. Jellyfin's own themed confirm dialog when the dashboard exposes
@@ -3777,7 +3787,9 @@
         function loadLibraries() {
             var type = el('ccaTargetType') ? el('ccaTargetType').value : 'library';
             state.libraryId = '';
+            var isCurrent = requestGuard('targets');
             return jsonFetch('CustomCoverArt/targets/' + type).then(function (res) {
+                if (!isCurrent()) { return; }
                 var select = el('ccaLibrarySelect');
                 select.innerHTML = '';
                 var placeholder = document.createElement('option');
@@ -3898,8 +3910,10 @@
         // --- Batch apply --------------------------------------------------
         function loadBatchList() {
             var type = el('ccaTargetType') ? el('ccaTargetType').value : 'library';
+            var isCurrent = requestGuard('batchTargets');
             return jsonFetch('CustomCoverArt/targets/' + type).then(function (res) {
-                var targets = dataOrThrow(res) || [];
+                if (!isCurrent()) { return; }
+                var targets =dataOrThrow(res) || [];
                 var box = el('ccaBatchList'); box.innerHTML = '';
                 targets.forEach(function (lib) {
                     var id = pick(lib, 'Id'), name = pick(lib, 'Name');
@@ -3910,6 +3924,7 @@
                     row.appendChild(cb); row.appendChild(span); box.appendChild(row);
                 });
             }).catch(function (e) {
+                if (!isCurrent()) { return; }
                 el('ccaBatchList').innerHTML = '';
                 el('ccaBatchStatus').textContent = t('dyn.error', errorText(e));
             });
@@ -4695,6 +4710,7 @@
 
         function loadBrowserItems() {
             var grid = el('ccaBrowserGrid');
+            var isCurrent = requestGuard('posters');
             gridMessage(grid, t('dyn.loading'));
             var typeVal = el('ccaBrowserType').value;
             jsonFetch('CustomCoverArt/search/items', 'POST', {
@@ -4703,6 +4719,7 @@
                 Page: browser.page,
                 PageSize: browser.pageSize
             }).then(function (res) {
+                if (!isCurrent()) { return; }
                 if (!pick(res, 'Success')) {
                     gridMessage(grid, t('dyn.errorItems'));
                     return;
@@ -4714,6 +4731,7 @@
                 el('ccaBrowserPrev').disabled = browser.page <= 1;
                 el('ccaBrowserNext').disabled = browser.page >= browser.totalPages;
             }).catch(function (e) {
+                if (!isCurrent()) { return; }
                 gridMessage(grid, t('dyn.error', errorText(e)));
             });
         }
