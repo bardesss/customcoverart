@@ -822,10 +822,65 @@ public class ConfigPageStructureTests
         Assert.Matches(@"var sentDoc = collectDocument\(\);\s*var savedJson = JSON\.stringify\(sentDoc\);", page);
 
         var batch = HandlerBody(page, "el('ccaBatchApply').addEventListener('click'");
-        Assert.Matches(@"var wasClean = !isDirty\(\);[\s\S]*?collectDocument\(\)[\s\S]*?if \(wasClean\) \{ markClean\(\); \}", batch);
+        Assert.Contains("collectDocumentKeepingCleanState()", batch, System.StringComparison.Ordinal);
+        Assert.DoesNotContain("var wasClean", batch, System.StringComparison.Ordinal);
 
         var load = FunctionBody(page, "loadTemplates");
         Assert.Equal(2, System.Text.RegularExpressions.Regex.Matches(load, @"state\.templateValue = '';").Count);
+    }
+
+    /// <summary>
+    /// Show server render and batch apply both run collectDocument(), which normalizes
+    /// doc; a clean design must stay clean across it or the unapplied-changes prompt lies.
+    /// </summary>
+    [Fact]
+    public void ServerRenderAndBatchKeepACleanDesignClean()
+    {
+        var page = ConfigPage();
+        var helper = FunctionBody(page, "collectDocumentKeepingCleanState");
+        Assert.Matches(@"var wasClean = _cleanJson !== null && !isDirty\(\);[\s\S]*?collectDocument\(\)[\s\S]*?if \(wasClean\) \{ markClean\(\); \}", helper);
+        var render = FunctionBody(page, "showServerRender");
+        Assert.Contains("collectDocumentKeepingCleanState()", render, System.StringComparison.Ordinal);
+        Assert.DoesNotContain("JSON.stringify(collectDocument())", render, System.StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// collectDocument()/collectSettings() ran synchronously before the request's catch,
+    /// so a throw left the batch button disabled and the status on "Applying…".
+    /// </summary>
+    [Fact]
+    public void BatchCollectionIsInsideTheErrorPath()
+    {
+        var handler = HandlerBody(ConfigPage(), "el('ccaBatchApply').addEventListener('click'");
+        Assert.Matches(@"Promise\.resolve\(\)\.then\(function \(\) \{[\s\S]*?collectDocumentKeepingCleanState\(\)[\s\S]*?collectSettings\(\)[\s\S]*?\.catch\(", handler);
+    }
+
+    [Fact]
+    public void RestoreShowsTheServerErrorMessage()
+    {
+        var handler = HandlerBody(ConfigPage(), "el('ccaRestoreBtn').addEventListener('click'");
+        Assert.Contains("pick(res, 'ErrorMessage')", handler, System.StringComparison.Ordinal);
+        Assert.Contains("pick(res, 'ErrorMessage') || t('restore.fail')", handler, System.StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PosterBrowserEscapeDoesNotBubbleToJellyfinWeb()
+    {
+        var body = FunctionBody(ConfigPage(), "onBrowserKeydown");
+        Assert.Contains("ev.stopPropagation()", body, System.StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void BatchConfirmIsCountNeutralInEveryLanguage()
+    {
+        var page = ConfigPage();
+        var matches = System.Text.RegularExpressions.Regex.Matches(page, @"'batch\.confirm': '([^']*)'");
+        Assert.Equal(3, matches.Count);
+        foreach (System.Text.RegularExpressions.Match m in matches)
+        {
+            Assert.Contains("({0})", m.Groups[1].Value, System.StringComparison.Ordinal);
+            Assert.DoesNotMatch(@"\{0\} (targets|doelen|destinos)", m.Groups[1].Value);
+        }
     }
 
     /// <summary>
