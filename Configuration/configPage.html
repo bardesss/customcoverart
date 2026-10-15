@@ -4918,9 +4918,11 @@
                 browser.page = 1; loadBrowserItems();
             });
             el('ccaBrowserPrev').addEventListener('click', function () {
+                _browserLastPager = 'ccaBrowserPrev';
                 if (browser.page > 1) { browser.page--; loadBrowserItems(); }
             });
             el('ccaBrowserNext').addEventListener('click', function () {
+                _browserLastPager = 'ccaBrowserNext';
                 if (browser.page < browser.totalPages) { browser.page++; loadBrowserItems(); }
             });
         }
@@ -4957,6 +4959,7 @@
         }
 
         var _browserReturnFocus = null;
+        var _browserLastPager = 'ccaBrowserNext'; // the pager button the user pressed last
 
         function openBrowser() {
             _browserReturnFocus = document.activeElement;
@@ -4984,9 +4987,13 @@
             var modal = el('ccaBrowserModal');
             if (!modal || modal.style.display === 'none') { return; }
             var box = modal.querySelector('.ccaModalBox');
-            if (box.contains(document.activeElement)) { return; }
-            var next = el('ccaBrowserNext'), prev = el('ccaBrowserPrev');
-            var target = !next.disabled ? next : (!prev.disabled ? prev : el('ccaBrowserSearch'));
+            // A button disabled a moment ago still reports as activeElement (and as inside
+            // the box) until the browser's later focus fixup, so a disabled, null or body
+            // activeElement counts as escaped.
+            var ae = document.activeElement;
+            if (ae && ae !== document.body && box.contains(ae) && !ae.disabled) { return; }
+            var last = el(_browserLastPager), other = el(_browserLastPager === 'ccaBrowserPrev' ? 'ccaBrowserNext' : 'ccaBrowserPrev');
+            var target = !last.disabled ? last : (!other.disabled ? other : el('ccaBrowserSearch'));
             target.focus();
         }
 
