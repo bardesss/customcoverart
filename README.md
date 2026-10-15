@@ -48,7 +48,7 @@ Layered text and logos, backgrounds, composition effects — designed on a live 
 | ⚡ | **Jellyfin-style preset** | One click for the familiar dark-gradient look, editable afterwards |
 | 🧭 | **Guided steps** | Five numbered steps, essentials up front and advanced controls one click away |
 | ↩️ | **Undo / redo** | Ctrl+Z and Ctrl+Y across the whole design |
-| ⌨️ | **Keyboard & screen readers** | Select layers with Tab and Enter, nudge the selected layer with the arrow keys (Shift for bigger steps), a poster browser that Esc closes and keeps focus inside, and a name on every icon button |
+| ⌨️ | **Keyboard & screen readers** | Select layers with Tab and Enter, nudge with the arrow keys (Shift for bigger steps), Esc closes the poster browser, every icon button is named |
 | 📱 | **Mobile-friendly** | Large touch targets, sticky preview, full-screen poster browser, grabbable canvas handles |
 | 🔍 | **In-context preview** | See the cover wide, square and poster-shaped before applying |
 | 🔠 | **Fonts** | Bundled Noto Sans (matches Jellyfin's UI, so text always renders) — or upload your own `.ttf` / `.otf` / `.ttc` / `.woff` / `.woff2`, which the live canvas renders too |
@@ -181,8 +181,8 @@ background** to drag-pan the background image and scroll or pinch to zoom it —
 **Fit** and **Stretch** show the whole image already, so there is nothing to pan into until you
 zoom in. **Ctrl+Z** and **Ctrl+Y** undo and redo anything, sliders and colours included (in a text
 field they undo your typing instead). Click the canvas, or Tab to it, and the **arrow keys** move
-the selected layer one pixel at a time — hold **Shift** for ten. Combinations with Alt, Ctrl or
-Meta are left to the browser.
+the selected layer one pixel at a time — hold **Shift** for ten. Nudging is off while **Reposition
+background** is on. Combinations with Alt, Ctrl or Meta are left to the browser.
 
 Before applying, **Show server render** produces the exact server-rendered output — the canvas is
 a fast approximation and the server render is authoritative.

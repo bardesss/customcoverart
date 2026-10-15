@@ -971,7 +971,7 @@
                 'layer.visible': 'Visible', 'layer.list': 'Layers',
                 'stop.color': 'Colour', 'stop.position': 'Position', 'stop.remove': 'Remove colour', 'fx.swatch': 'Apply colour {0}',
                 'restore.confirm': 'Replace the current cover of this target with its original?', 'tpl.confirmDelete': 'Delete the template “{0}”?',
-                'batch.confirm': 'Apply the current design to {0} targets? Their current covers will be replaced.', 'batch.fail': 'Batch apply failed: {0}',
+                'batch.confirm': 'Apply the current design to the selected targets ({0})? Their current covers will be replaced.', 'batch.fail': 'Batch apply failed: {0}',
                 'err.network': 'Could not reach the server.', 'err.auth': 'The server refused the request (status {0}). Your session may have expired — reload the page and sign in again.',
                 'err.tooLarge': 'The file is too large for the server to accept.', 'err.rateLimited': 'Too many requests — wait a minute and try again.',
                 'err.status': 'The server answered with status {0}.', 'err.badResponse': 'The server sent a response the page could not read.',
@@ -1046,7 +1046,7 @@
                 'layer.visible': 'Zichtbaar', 'layer.list': 'Lagen',
                 'stop.color': 'Kleur', 'stop.position': 'Positie', 'stop.remove': 'Kleur verwijderen', 'fx.swatch': 'Kleur {0} toepassen',
                 'restore.confirm': 'De huidige cover van dit doel vervangen door het origineel?', 'tpl.confirmDelete': 'Het sjabloon “{0}” verwijderen?',
-                'batch.confirm': 'Het huidige ontwerp toepassen op {0} doelen? Hun huidige covers worden vervangen.', 'batch.fail': 'Toepassen op meerdere doelen mislukt: {0}',
+                'batch.confirm': 'Het huidige ontwerp toepassen op de geselecteerde doelen ({0})? Hun huidige covers worden vervangen.', 'batch.fail': 'Toepassen op meerdere doelen mislukt: {0}',
                 'err.network': 'Kan de server niet bereiken.', 'err.auth': 'De server weigerde het verzoek (status {0}). Je sessie is mogelijk verlopen — laad de pagina opnieuw en meld je opnieuw aan.',
                 'err.tooLarge': 'Het bestand is te groot voor de server.', 'err.rateLimited': 'Te veel verzoeken — wacht een minuut en probeer het opnieuw.',
                 'err.status': 'De server antwoordde met status {0}.', 'err.badResponse': 'De server stuurde een antwoord dat de pagina niet kon lezen.',
@@ -1121,7 +1121,7 @@
                 'layer.visible': 'Visible', 'layer.list': 'Capas',
                 'stop.color': 'Color', 'stop.position': 'Posición', 'stop.remove': 'Quitar color', 'fx.swatch': 'Aplicar el color {0}',
                 'restore.confirm': '¿Sustituir la carátula actual de este destino por la original?', 'tpl.confirmDelete': '¿Eliminar la plantilla «{0}»?',
-                'batch.confirm': '¿Aplicar el diseño actual a {0} destinos? Sus carátulas actuales se sustituirán.', 'batch.fail': 'Error al aplicar a varios destinos: {0}',
+                'batch.confirm': '¿Aplicar el diseño actual a los destinos seleccionados ({0})? Sus carátulas actuales se sustituirán.', 'batch.fail': 'Error al aplicar a varios destinos: {0}',
                 'err.network': 'No se puede conectar con el servidor.', 'err.auth': 'El servidor rechazó la solicitud (estado {0}). Puede que tu sesión haya caducado: recarga la página e inicia sesión de nuevo.',
                 'err.tooLarge': 'El archivo es demasiado grande para el servidor.', 'err.rateLimited': 'Demasiadas solicitudes: espera un minuto y vuelve a intentarlo.',
                 'err.status': 'El servidor respondió con el estado {0}.', 'err.badResponse': 'El servidor envió una respuesta que la página no pudo leer.',
@@ -4139,7 +4139,7 @@
             var isCurrent = requestGuard('batchTargets');
             return jsonFetch('CustomCoverArt/targets/' + type).then(function (res) {
                 if (!isCurrent()) { return; }
-                var targets =dataOrThrow(res) || [];
+                var targets = dataOrThrow(res) || [];
                 var box = el('ccaBatchList'); box.innerHTML = '';
                 targets.forEach(function (lib) {
                     var id = pick(lib, 'Id'), name = pick(lib, 'Name');
@@ -4375,6 +4375,17 @@
         // endpoint and show the returned PNG/GIF in a labelled overlay, so the user
         // can compare the exact server output against the live canvas before applying.
         var _serverRenderUrl = null;
+
+        // collectDocument() normalizes doc (collage source, GIF animation), which would flip
+        // a clean design to dirty. Callers that only read the document (server render, batch
+        // apply) use this so a clean design stays clean.
+        function collectDocumentKeepingCleanState() {
+            var wasClean = _cleanJson !== null && !isDirty();
+            var sent = collectDocument();
+            if (wasClean) { markClean(); }
+            return sent;
+        }
+
         function showServerRender() {
             var btn = el('ccaServerRender');
             if (btn.disabled) { return; }
@@ -4385,7 +4396,7 @@
             authFetch('CustomCoverArt/document/preview', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(collectDocument())
+                body: JSON.stringify(collectDocumentKeepingCleanState())
             }).catch(function () {
                 throw networkError();
             }).then(function (r) {
@@ -4471,7 +4482,9 @@
                     return jsonFetch('CustomCoverArt/targets/' + type + '/' + encodeURIComponent(id) + '/restore', 'POST')
                         .then(function (res) {
                             Dashboard.hideLoadingMsg();
-                            Dashboard.alert(pick(res, 'Success') ? t('restore.done') : t('restore.fail'));
+                            Dashboard.alert(pick(res, 'Success')
+                                ? t('restore.done')
+                                : pick(res, 'ErrorMessage') || t('restore.fail'));
                         })
                         .catch(function (e) { showError(t('dyn.error', errorText(e))); })
                         .then(refreshRestoreState);
@@ -4915,15 +4928,16 @@
                     if (!ok) { state.batchRunning = false; return; }
                     btn.disabled = true;
                     status.textContent = t('batch.running');
-                    // Send the layered document as well: the server prefers it, so batching
-                    // a multi-layer design no longer collapses to the flat single-title
-                    // model. Settings stays until plan D removes it.
-                    // Batch apply neither cleans nor dirties the design: collectDocument()
-                    // normalizes doc, so keep a clean design clean across that call.
-                    var wasClean = !isDirty();
-                    var batchDoc = collectDocument();
-                    if (wasClean) { markClean(); }
-                    return jsonFetch('CustomCoverArt/batchApply', 'POST', { Document: batchDoc, Settings: collectSettings(), Targets: targets })
+                    // Collecting runs inside the promise chain so a throw reaches the catch
+                    // and the cleanup below instead of leaving the button locked.
+                    return Promise.resolve().then(function () {
+                        // Send the layered document as well: the server prefers it, so batching
+                        // a multi-layer design no longer collapses to the flat single-title
+                        // model. Settings stays until plan D removes it.
+                        // Batch apply neither cleans nor dirties the design.
+                        var batchDoc = collectDocumentKeepingCleanState();
+                        return jsonFetch('CustomCoverArt/batchApply', 'POST', { Document: batchDoc, Settings: collectSettings(), Targets: targets });
+                    })
                         .then(function (res) {
                             var data = dataOrThrow(res) || [];
                             var okCount = data.filter(function (r) { return pick(r, 'Success'); }).length;
@@ -5040,7 +5054,7 @@
         // Esc closes; Tab and Shift+Tab cycle inside the dialog instead of walking out
         // into the page behind it (aria-modal informs assistive tech, not the browser).
         function onBrowserKeydown(ev) {
-            if (ev.key === 'Escape') { ev.preventDefault(); closeBrowser(); return; }
+            if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); closeBrowser(); return; }
             if (ev.key !== 'Tab') { return; }
             var box = el('ccaBrowserModal').querySelector('.ccaModalBox');
             var focusable = Array.prototype.filter.call(
