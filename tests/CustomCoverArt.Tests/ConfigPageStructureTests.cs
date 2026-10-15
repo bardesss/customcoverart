@@ -457,9 +457,12 @@ public class ConfigPageStructureTests
     [Fact]
     public void GifPreview_BothBackgroundPathsWatchForAnimation()
     {
+        // Every background bitmap goes through setBackgroundBitmap, which flags a GIF: the
+        // upload, the poster pick, and the undo/template re-hydration alike.
         var page = ConfigPage();
-        Assert.Contains("watchForAnimatedGif(img, file);", page, System.StringComparison.Ordinal);
-        Assert.Contains("watchForAnimatedGif(img, posterBlob);", page, System.StringComparison.Ordinal);
+        Assert.Contains("watchForAnimatedGif(img, blob);", FunctionBody(page, "setBackgroundBitmap"), System.StringComparison.Ordinal);
+        Assert.Contains("setBackgroundBitmap(file, isCurrent);", page, System.StringComparison.Ordinal);
+        Assert.Contains("setBackgroundBitmap(posterBlob, isCurrent);", page, System.StringComparison.Ordinal);
         Assert.Contains("isAnimatedGif(buf)", FunctionBody(page, "watchForAnimatedGif"), System.StringComparison.Ordinal);
     }
 
@@ -580,5 +583,51 @@ public class ConfigPageStructureTests
         Assert.Matches(@"'CustomCoverArt/templates', 'POST'[\s\S]{0,300}?dataOrThrow\(res\)[\s\S]{0,300}?\.catch\(", page);
         Assert.Matches(@"'CustomCoverArt/templates/' \+ encodeURIComponent\(name\), 'DELETE'\)[\s\S]{0,300}?dataOrThrow\(res\)[\s\S]{0,300}?\.catch\(", page);
         Assert.Matches(@"'/restore', 'POST'\)[\s\S]{0,400}?\.catch\(", page);
+    }
+
+    /// <summary>
+    /// Undo and template load replaced the document and nulled the background bitmap, so
+    /// the canvas showed the gradient/flat fallback while the server still rendered the
+    /// image (and an animated GIF background stopped moving).
+    /// </summary>
+    [Fact]
+    public void UndoAndTemplateLoadKeepOrRefetchTheBackground()
+    {
+        var page = ConfigPage();
+        var restore = FunctionBody(page, "restoreSnapshot");
+        Assert.Contains("hydrateBackgroundImage(previousImagePath)", restore, System.StringComparison.Ordinal);
+        Assert.DoesNotContain("bgImageEl = null", restore, System.StringComparison.Ordinal);
+        Assert.True(Regex.Matches(page, @"hydrateBackgroundImage\(previousImagePath\)").Count >= 2,
+            "The template load must re-hydrate the background too.");
+        var hydrate = FunctionBody(page, "hydrateBackgroundImage");
+        Assert.Contains("CustomCoverArt/layerImage?path=", hydrate, System.StringComparison.Ordinal);
+        Assert.Contains("setBackgroundBitmap(blob, isCurrent)", hydrate, System.StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void BackgroundObjectUrlsAreRevokedAndRacesDropped()
+    {
+        var page = ConfigPage();
+        var setter = FunctionBody(page, "setBackgroundBitmap");
+        Assert.Contains("if (!isCurrent()) { URL.revokeObjectURL(url); return; }", setter, System.StringComparison.Ordinal);
+        Assert.Contains("clearBackgroundBitmap();", setter, System.StringComparison.Ordinal);
+        Assert.Contains("URL.revokeObjectURL(_bgImageUrl)", FunctionBody(page, "clearBackgroundBitmap"), System.StringComparison.Ordinal);
+        // The leaky inline pattern (an object URL assigned straight to an <img>, never revoked).
+        Assert.DoesNotContain("img.src = URL.createObjectURL(file)", page, System.StringComparison.Ordinal);
+        Assert.DoesNotContain("img.src = URL.createObjectURL(posterBlob)", page, System.StringComparison.Ordinal);
+        Assert.Contains("requestGuard('bg')", FunctionBody(page, "selectBrowserItem"), System.StringComparison.Ordinal);
+        // bgImageEl has exactly two writers besides its declaration.
+        Assert.Equal(3, Regex.Matches(page, @"bgImageEl = ").Count);
+    }
+
+    [Fact]
+    public void FileNameLabelsFollowTheDocument()
+    {
+        var page = ConfigPage();
+        Assert.Contains("syncFileNames()", FunctionBody(page, "syncControlsFromDocument"), System.StringComparison.Ordinal);
+        var sync = FunctionBody(page, "syncFileNames");
+        Assert.Contains("ccaFontName", sync, System.StringComparison.Ordinal);
+        Assert.Contains("ccaBgImageName", sync, System.StringComparison.Ordinal);
+        Assert.Contains("ccaSelectedBg", sync, System.StringComparison.Ordinal);
     }
 }

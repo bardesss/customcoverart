@@ -1951,6 +1951,112 @@
         }
         // ------------------------------------------------------------------
 
+        // --- Background bitmap & file names -------------------------------
+        // bgImageEl (the uploaded or poster-picked image) has exactly two writers:
+        // setBackgroundBitmap and clearBackgroundBitmap. collageBgEl has its own
+        // (fetchCollageBitmap / releaseCollageBitmap) and is never touched here;
+        // activeBgBitmap() decides which of the two the canvas paints.
+        //
+        // _bgImageUrl is bgImageEl's object URL. It lives exactly as long as its bitmap is
+        // the background and is revoked when the bitmap is replaced or dropped, like
+        // _collageUrl: an animated GIF keeps decoding frames from it while it plays, and an
+        // unrevoked URL per pick pinned a full-size copy of every image ever chosen.
+        var _bgImageUrl = null;
+
+        function clearBackgroundBitmap() {
+            if (_bgImageUrl) { URL.revokeObjectURL(_bgImageUrl); }
+            _bgImageUrl = null;
+            bgImageEl = null;
+        }
+
+        // `isCurrent` comes from requestGuard('bg'), taken when the user acted, so two quick
+        // picks cannot land out of order: the older pick's bitmap is simply dropped.
+        function setBackgroundBitmap(blob, isCurrent) {
+            var url = URL.createObjectURL(blob);
+            var img = new Image();
+            img.onload = function () {
+                if (!isCurrent()) { URL.revokeObjectURL(url); return; }
+                clearBackgroundBitmap();
+                bgImageEl = img;
+                _bgImageUrl = url;
+                scheduleRender();
+            };
+            img.onerror = function () { URL.revokeObjectURL(url); };
+            img.src = url;
+            // Flags the <img> if the bytes are a multi-frame GIF, so the repaint loop runs.
+            watchForAnimatedGif(img, blob);
+        }
+
+        // Makes bgImageEl agree with doc.Background.ImagePath after the document was
+        // replaced (undo, redo, template load). Keeps the bitmap when the path is
+        // unchanged; otherwise fetches the path back as a Blob through the uploads-only
+        // layerImage endpoint (where background uploads and poster picks both live), never
+        // as an <img src> on the server (canvas-source invariant). The source is not
+        // consulted: a collage keeps the uploaded bitmap in reserve, and activeBgBitmap()
+        // decides what is painted.
+        function hydrateBackgroundImage(previousPath) {
+            var path = doc.Background.ImagePath || '';
+            // Nothing changed for the background: keep the bitmap, and do NOT take a new
+            // 'bg' token, or undoing an unrelated edit would cancel a pick still in flight.
+            if (path === (previousPath || '') && (bgImageEl || !path)) { return; }
+            var isCurrent = requestGuard('bg');
+            clearBackgroundBitmap();
+            if (!path) { return; }
+            authFetch('CustomCoverArt/layerImage?path=' + encodeURIComponent(path))
+                .then(function (r) {
+                    if (!r.ok) { throw requestError(r.status); }
+                    return r.blob();
+                })
+                .then(function (blob) {
+                    if (isCurrent() && doc.Background.ImagePath === path) { setBackgroundBitmap(blob, isCurrent); }
+                })
+                .catch(function () {
+                    // Best-effort, like hydrateLayerImages: the authoritative server
+                    // render still has the image, only the canvas preview lacks it.
+                });
+        }
+
+        // JSON cannot carry a decoded <img> or a display name. After undo/redo or a
+        // template load, a logo whose server path is unchanged keeps both instead of being
+        // downloaded again (and blinking out of the preview meanwhile).
+        function reuseLayerClientState(previousLayers) {
+            var known = {};
+            (previousLayers || []).forEach(function (l) {
+                if (l.ImagePath && (l._img || l._name)) { known[l.ImagePath] = { img: l._img, name: l._name }; }
+            });
+            doc.Layers.forEach(function (l) {
+                var k = l.ImagePath ? known[l.ImagePath] : null;
+                if (!k) { return; }
+                if (!l._img && k.img) { l._img = k.img; }
+                if (!l._name && k.name) { l._name = k.name; }
+            });
+        }
+
+        // Original file names by server path. Uploads are stored under randomised names,
+        // so the path alone cannot tell the user which file they picked; a path missing
+        // from this map (a template from an earlier session) falls back to its own name.
+        var _fileNames = {};
+
+        function displayNameFor(path) {
+            if (!path) { return ''; }
+            var known = _fileNames[path];
+            return known ? known.name : String(path).split(/[\\/]/).pop();
+        }
+
+        // Owns the "which file is in use" labels. Called from syncControlsFromDocument, so
+        // a layer switch, template load or undo can never leave a stale name behind.
+        function syncFileNames() {
+            var bgPath = doc.Background.ImagePath || '';
+            var known = bgPath ? _fileNames[bgPath] : null;
+            var isPoster = !!(known && known.poster);
+            el('ccaBgImageName').textContent = (bgPath && !isPoster) ? displayNameFor(bgPath) : t('f.none');
+            el('ccaSelectedBgName').textContent = isPoster ? known.name : '';
+            el('ccaSelectedBg').style.display = isPoster ? '' : 'none';
+            var l = selectedLayer();
+            var fontPath = (l && l.Type === 'text') ? (l.FontPath || '') : '';
+            el('ccaFontName').textContent = fontPath ? displayNameFor(fontPath) : t('f.none');
+        }
+
         var _rafPending = false;
         function scheduleRender() {
             if (_rafPending) { return; }
@@ -2284,6 +2390,8 @@
 
         function restoreSnapshot(json) {
             var selected = doc._selectedId;
+            var previousImagePath = doc.Background.ImagePath;
+            var previousLayers = doc.Layers;
             doc = JSON.parse(json);
             // A snapshot is a plain serialized document, so it needs the same normalization
             // a template load gets before anything dereferences it.
@@ -2292,8 +2400,10 @@
             normalizeOverlay(doc);
             normalizeGradientStops(doc);
             doc._selectedId = selected;
-            // It carries server paths but no decoded bitmaps.
-            bgImageEl = null;
+            // It carries server paths but no decoded bitmaps: reuse the ones we already
+            // have for unchanged paths, fetch the rest.
+            reuseLayerClientState(previousLayers);
+            hydrateBackgroundImage(previousImagePath);
             hydrateLayerImages();
             renderLayersPanel();
             syncControlsFromDocument();
@@ -3597,6 +3707,7 @@
             setRange('ccaFxBorderGap', fx.Border.Gap);
 
             // Re-sync dependent visibility + labels.
+            syncFileNames();
             updateUI();
             updateBackgroundVisibility();
             updateAnimVisibility();
@@ -3647,11 +3758,10 @@
 
             // The gradient is the point of the preset, so drop any background bitmap that
             // would paint over it (both the canvas copy and the path the server renders).
-            bgImageEl = null;
             doc.Background.ImagePath = '';
             state.backgroundImagePath = '';
-            var sel = el('ccaSelectedBg');
-            if (sel) { sel.style.display = 'none'; }
+            requestGuard('bg');       // an upload or poster pick still in flight must not land now
+            clearBackgroundBitmap();  // syncControlsFromDocument below updates the file labels
 
             renderLayersPanel();
             syncControlsFromDocument();
@@ -4373,13 +4483,15 @@
                 if (doc.Background.Gradient) {
                     doc.Background.Gradient.IsEnabled = (this.value === 'gradient');
                 }
-                // A gradient or solid background must not keep painting a stale bitmap.
+                // A gradient or solid background forgets the image entirely. A collage keeps
+                // it in reserve: activeBgBitmap() paints the mosaic instead, and switching
+                // back to Image shows the upload again without a refetch.
                 if (this.value === 'gradient' || this.value === 'solid') {
-                    bgImageEl = null;
                     doc.Background.ImagePath = '';
                     state.backgroundImagePath = '';
-                    var selBg = el('ccaSelectedBg');
-                    if (selBg) { selBg.style.display = 'none'; }
+                    requestGuard('bg');       // an upload or poster pick still in flight must not land now
+                    clearBackgroundBitmap();
+                    syncFileNames();
                 }
                 updateBackgroundVisibility(); scheduleRender();
             });
@@ -4482,45 +4594,50 @@
             el('ccaBgImage').addEventListener('change', function () {
                 if (!this.files || !this.files[0]) { return; }
                 var file = this.files[0];
-                el('ccaBgImageName').textContent = file.name;
+                var input = this;
+                var isCurrent = requestGuard('bg');
                 Dashboard.showLoadingMsg();
                 uploadFile('upload', file).then(function (res) {
                     Dashboard.hideLoadingMsg();
-                    if (pick(res, 'Success')) {
-                        // Server path drives the authoritative render + apply; the
-                        // client canvas bitmap loads from the SAME client File via a
-                        // blob: URL so the canvas stays untainted (canvas-source
-                        // invariant). state.backgroundImagePath is kept for the legacy
-                        // batch/collectSettings projection.
-                        doc.Background.ImagePath = pick(res, 'Data');
-                        state.backgroundImagePath = doc.Background.ImagePath;
-                        var img = new Image();
-                        img.onload = function () { bgImageEl = img; scheduleRender(); };
-                        img.src = URL.createObjectURL(file);
-                        watchForAnimatedGif(img, file);
-                        maybeSwitchToAnimated(file);
-                        scheduleRender();
-                    } else {
-                        Dashboard.alert(t('dyn.uploadFail', pick(res, 'ErrorMessage') || t('dyn.unknown')));
-                    }
-                }).catch(function (e) { showError(t('dyn.uploadFail', errorText(e))); });
+                    input.value = ''; // let the same file be picked again later
+                    var path = dataOrThrow(res);
+                    if (!isCurrent()) { return; } // a newer pick, a preset or gradient/solid won
+                    // Server path drives the authoritative render + apply; the canvas bitmap
+                    // comes from the SAME client File via a blob: URL so the canvas stays
+                    // untainted (canvas-source invariant). state.backgroundImagePath is kept
+                    // for the legacy batch/collectSettings projection.
+                    doc.Background.ImagePath = path;
+                    state.backgroundImagePath = path;
+                    _fileNames[path] = { name: file.name, poster: false };
+                    syncFileNames();
+                    setBackgroundBitmap(file, isCurrent);
+                    maybeSwitchToAnimated(file);
+                    scheduleRender();
+                }).catch(function (e) {
+                    input.value = '';
+                    showError(t('dyn.uploadFail', errorText(e)));
+                });
             });
 
             el('ccaFont').addEventListener('change', function () {
                 if (!this.files || !this.files[0]) { return; }
-                el('ccaFontName').textContent = this.files[0].name;
+                var file = this.files[0];
+                var input = this;
                 Dashboard.showLoadingMsg();
-                uploadFile('uploadFont', this.files[0]).then(function (res) {
+                uploadFile('uploadFont', file).then(function (res) {
                     Dashboard.hideLoadingMsg();
-                    if (pick(res, 'Success')) {
-                        state.customFontPath = pick(res, 'Data');
-                        var l = selectedLayer();
-                        if (l) { l.FontPath = state.customFontPath; }
-                        scheduleRender();
-                    } else {
-                        Dashboard.alert(t('dyn.fontFail', pick(res, 'ErrorMessage') || t('dyn.unknown')));
-                    }
-                }).catch(function (e) { showError(t('dyn.fontFail', errorText(e))); });
+                    input.value = '';
+                    var path = dataOrThrow(res);
+                    _fileNames[path] = { name: file.name, poster: false };
+                    state.customFontPath = path;
+                    var l = selectedLayer();
+                    if (l) { l.FontPath = path; }
+                    syncFileNames();
+                    scheduleRender();
+                }).catch(function (e) {
+                    input.value = '';
+                    showError(t('dyn.fontFail', errorText(e)));
+                });
             });
 
             // Handle sizes and hit tolerances are derived from the canvas's CSS display
@@ -4587,8 +4704,11 @@
                 // (templates intentionally store the design, not the name).
                 var curLayer = selectedLayer();
                 var currentTitle = curLayer ? curLayer.Content : '';
+                var previousImagePath = doc.Background.ImagePath;
+                var previousLayers = doc.Layers;
                 doc = JSON.parse(JSON.stringify(tplDoc));
                 if (!doc.Layers) { doc.Layers = []; }
+                reuseLayerClientState(previousLayers);
                 // Templates saved before Phase 3 have no effect sub-objects; the draw
                 // functions dereference them, so fill them in like the server does.
                 normalizeEffects(doc);
@@ -4603,10 +4723,9 @@
                     titleLayer.Content = currentTitle;
                 }
                 doc._selectedId = titleLayer ? titleLayer.Id : (doc.Layers[0] ? doc.Layers[0].Id : null);
-                // A template carries only a server ImagePath, never a client blob, so
-                // drop any stale canvas bitmap (the invariant forbids loading the
-                // server path); the gradient/flat background renders instead.
-                bgImageEl = null;
+                // A template carries only a server ImagePath, never a client blob: fetch
+                // it back as one (or keep the bitmap we have when it is the same image).
+                hydrateBackgroundImage(previousImagePath);
                 renderLayersPanel();
                 // Logo layers arrive as server paths only (a template can't carry the
                 // bitmap), so pull them back as blobs to preview them on the canvas.
@@ -4774,6 +4893,7 @@
             try { imgUrl = ApiClient.getImageUrl(itemId, { type: 'Primary', maxHeight: 2000 }); } catch (err) { imgUrl = null; }
             if (!imgUrl) { Dashboard.alert(t('poster.noUrl')); return; }
 
+            var isCurrent = requestGuard('bg');
             Dashboard.showLoadingMsg();
             // Fetch the poster through Jellyfin's own image endpoint (authenticated,
             // since some servers require a token even for images) and upload it as a
@@ -4799,14 +4919,12 @@
                     // Server path for render/apply; canvas bitmap from the fetched
                     // Blob via a blob: URL (canvas-source invariant — never the
                     // server path / ApiClient.getImageUrl).
+                    if (!isCurrent()) { return; } // a newer pick won the race
                     doc.Background.ImagePath = path;
                     state.backgroundImagePath = path;
-                    var img = new Image();
-                    img.onload = function () { bgImageEl = img; scheduleRender(); };
-                    img.src = URL.createObjectURL(posterBlob);
-                    watchForAnimatedGif(img, posterBlob);
-                    el('ccaSelectedBgName').textContent = name;
-                    el('ccaSelectedBg').style.display = '';
+                    _fileNames[path] = { name: name, poster: true };
+                    syncFileNames();
+                    setBackgroundBitmap(posterBlob, isCurrent);
                     scheduleRender();
                     closeBrowser();
                 })
