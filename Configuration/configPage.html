@@ -401,17 +401,10 @@
                                 </select>
                             </div>
                         </div>
-                        <div class="inputContainer">
-                            <label data-i18n="ui.inContext">In context</label>
-                            <div class="ccaContexts" id="ccaContexts"></div>
-                            <div class="fieldDescription" data-i18n="ui.inContextHint">How the cover looks at other shapes. The canvas above is the real design.</div>
-                        </div>
-                        <div class="ccaAdv">
-                            <button type="button" class="ccaAdvHead" aria-expanded="false">
-                                <span class="ccaStepChevron" aria-hidden="true">&#9662;</span>
-                                <span data-i18n="ui.advanced">Advanced</span>
-                            </button>
-                            <div class="ccaAdvBody" hidden>
+                        <!-- Shown right under Dimensions/Format as soon as Custom or Animated GIF
+                             is chosen (updateUI / updateAnimVisibility own their display). They
+                             used to sit in a closed Advanced disclosure, so choosing either
+                             option appeared to do nothing. -->
                         <div id="ccaCustomDims" class="ccaGrid ccaSub" style="display:none;">
                             <div class="inputContainer">
                                 <label for="ccaWidth" data-i18n="out.width">Width</label>
@@ -441,32 +434,35 @@
                             </div>
                         </div>
                         <div class="fieldDescription" id="ccaAnimHint" data-i18n="anim.hint" style="display:none">Animated GIFs are larger and only animate in views that render GIFs. Capped at 30 frames.</div>
+                        <div class="inputContainer">
+                            <label data-i18n="ui.inContext">In context</label>
+                            <div class="ccaContexts" id="ccaContexts"></div>
+                            <div class="fieldDescription" data-i18n="ui.inContextHint">How the cover looks at other shapes. The canvas above is the real design.</div>
+                        </div>
                         <div class="ccaStepGroup">
                             <div class="ccaStepGroupHead" data-i18n="group.saveTemplate">Save this design</div>
-                        <div class="inputContainer">
-                            <label for="ccaTemplateName" data-i18n="tpl.save">Save current design</label>
-                            <div class="ccaFileRow">
-                                <input type="text" id="ccaTemplateName" class="emby-input ccaGrow" placeholder="Template name" data-i18n-ph="tpl.nameph" />
-                                <button is="emby-button" type="button" id="ccaTemplateSave" class="raised">
-                                    <span data-i18n="tpl.savebtn">Save</span>
-                                </button>
+                            <div class="inputContainer">
+                                <label for="ccaTemplateName" data-i18n="tpl.save">Save current design</label>
+                                <div class="ccaFileRow">
+                                    <input type="text" id="ccaTemplateName" class="emby-input ccaGrow" placeholder="Template name" data-i18n-ph="tpl.nameph" />
+                                    <button is="emby-button" type="button" id="ccaTemplateSave" class="raised">
+                                        <span data-i18n="tpl.savebtn">Save</span>
+                                    </button>
+                                </div>
                             </div>
-                        </div>
-                        <div class="fieldDescription" data-i18n="tpl.hint">Templates store the design but not the title — each target keeps its own name.</div>
+                            <div class="fieldDescription" data-i18n="tpl.hint">Templates store the design but not the title — each target keeps its own name.</div>
                         </div>
                         <div class="ccaStepGroup">
                             <div class="ccaStepGroupHead" data-i18n="group.batch">Apply to several targets</div>
-                        <div class="fieldDescription" data-i18n="batch.hint">Apply the current design (or loaded template) to several targets at once. Each cover is titled with its target's name.</div>
-                        <div id="ccaBatchList" class="ccaBatchList"></div>
-                        <div class="ccaFileRow">
-                            <button is="emby-button" type="button" id="ccaBatchApply" class="raised">
-                                <span data-i18n="batch.apply">Apply to selected</span>
-                            </button>
-                            <span class="ccaFileName" id="ccaBatchStatus" role="status" aria-live="polite"></span>
-                        </div>
-                        </div>
-                        </div>
+                            <div class="fieldDescription" data-i18n="batch.hint">Apply the current design (or loaded template) to several targets at once. Each cover is titled with its target's name.</div>
+                            <div id="ccaBatchList" class="ccaBatchList"></div>
+                            <div class="ccaFileRow">
+                                <button is="emby-button" type="button" id="ccaBatchApply" class="raised">
+                                    <span data-i18n="batch.apply">Apply to selected</span>
+                                </button>
+                                <span class="ccaFileName" id="ccaBatchStatus" role="status" aria-live="polite"></span>
                             </div>
+                        </div>
                         </div>
                     </section>
 
@@ -1420,6 +1416,14 @@
             banner: { w: 1920, h: 540 },
             custom: { w: 1920, h: 1080 }
         };
+
+        // The bounds the server enforces (ImageProcessingService.ValidateCoverArtDimensions).
+        var MIN_DIM = 100, MAX_DIM = 2048;
+        function clampDim(value, fallback) {
+            var v = parseInt(value, 10);
+            if (!isFinite(v)) { return fallback; }
+            return Math.max(MIN_DIM, Math.min(MAX_DIM, v));
+        }
 
         // ==================================================================
         // Canvas engine (Phase 1 · Task 7)
@@ -4729,12 +4733,28 @@
                 doc.Canvas.DimensionPreset = this.value;
                 updateUI(); scheduleRender();
             });
-            el('ccaWidth').addEventListener('input', function () {
-                if (el('ccaPreset').value === 'custom') { doc.Canvas.Width = parseInt(this.value, 10) || doc.Canvas.Width; scheduleRender(); }
-            });
-            el('ccaHeight').addEventListener('input', function () {
-                if (el('ccaPreset').value === 'custom') { doc.Canvas.Height = parseInt(this.value, 10) || doc.Canvas.Height; scheduleRender(); }
-            });
+            // While typing, only an in-range value reaches the canvas: "9" on the way to
+            // "900" must not shrink it to 9px, and 9000 must never resize the live canvas
+            // (or ask the server for a 9000px collage). On change (blur/Enter) the field
+            // itself is clamped, so it shows what is used.
+            function bindCustomDim(id, prop) {
+                el(id).addEventListener('input', function () {
+                    var v = parseInt(this.value, 10);
+                    if (el('ccaPreset').value !== 'custom' || !(v >= MIN_DIM && v <= MAX_DIM)) { return; }
+                    doc.Canvas[prop] = v;
+                    scheduleRender();
+                });
+                el(id).addEventListener('change', function () {
+                    var v = clampDim(this.value, doc.Canvas[prop]);
+                    this.value = v;
+                    if (el('ccaPreset').value === 'custom' && doc.Canvas[prop] !== v) {
+                        doc.Canvas[prop] = v;
+                        scheduleRender();
+                    }
+                });
+            }
+            bindCustomDim('ccaWidth', 'Width');
+            bindCustomDim('ccaHeight', 'Height');
             el('ccaFormat').addEventListener('change', applyFormatFromControl);
             el('ccaKenBurns').addEventListener('change', function () {
                 if (doc.Background.Animation) { doc.Background.Animation.KenBurns = this.checked; }
