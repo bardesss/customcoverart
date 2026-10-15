@@ -235,25 +235,21 @@
                             </button>
                             <div class="ccaAdvBody" hidden>
                         <div class="inputContainer ccaTextOnly">
-                            <div class="inputContainer">
-                                <label for="ccaTextWeight" data-i18n="text.weight">Font weight</label>
-                                <select is="emby-select" id="ccaTextWeight" class="emby-select">
-                                    <option value="300" data-i18n="w.light">Light</option>
-                                    <option value="400" selected data-i18n="w.normal">Normal</option>
-                                    <option value="500" data-i18n="w.medium">Medium</option>
-                                    <option value="600" data-i18n="w.semibold">SemiBold</option>
-                                    <option value="700" data-i18n="w.bold">Bold</option>
-                                    <option value="800" data-i18n="w.extrabold">ExtraBold</option>
-                                </select>
-                            </div>
+                            <label for="ccaTextWeight" data-i18n="text.weight">Font weight</label>
+                            <select is="emby-select" id="ccaTextWeight" class="emby-select">
+                                <option value="300" data-i18n="w.light">Light</option>
+                                <option value="400" selected data-i18n="w.normal">Normal</option>
+                                <option value="500" data-i18n="w.medium">Medium</option>
+                                <option value="600" data-i18n="w.semibold">SemiBold</option>
+                                <option value="700" data-i18n="w.bold">Bold</option>
+                                <option value="800" data-i18n="w.extrabold">ExtraBold</option>
+                            </select>
                         </div>
                         <div class="inputContainer ccaTextOnly">
-                            <div class="inputContainer">
-                                <label data-i18n="text.effects">Effects</label>
-                                <div class="ccaChecks">
-                                    <label class="ccaCheck"><input is="emby-checkbox" type="checkbox" id="ccaShadow" /><span data-i18n="e.shadow">Shadow</span></label>
-                                    <label class="ccaCheck"><input is="emby-checkbox" type="checkbox" id="ccaOutline" /><span data-i18n="e.outline">Outline</span></label>
-                                </div>
+                            <label data-i18n="text.effects">Effects</label>
+                            <div class="ccaChecks">
+                                <label class="ccaCheck"><input is="emby-checkbox" type="checkbox" id="ccaShadow" /><span data-i18n="e.shadow">Shadow</span></label>
+                                <label class="ccaCheck"><input is="emby-checkbox" type="checkbox" id="ccaOutline" /><span data-i18n="e.outline">Outline</span></label>
                             </div>
                         </div>
                         <div class="inputContainer ccaTextOnly">
@@ -583,9 +579,27 @@
             #CustomCoverArtConfigPage .ccaGrid { grid-template-columns: 1fr; }
         }
 
-        #CustomCoverArtConfigPage .ccaCard .inputContainer { margin: 0 0 1.05em; }
-        #CustomCoverArtConfigPage .ccaCard > .inputContainer:last-child { margin-bottom: 0; }
-        #CustomCoverArtConfigPage .ccaGrid .inputContainer { margin-bottom: 0; }
+        /* Vertical rhythm inside a step. Every field-level block (an input, a two-column
+           grid, a standalone button row) leaves the same 1.05em below it, a hint sits
+           tight under the field it explains, and the last block in any container leaves
+           nothing, so a step ends on its own padding instead of Jellyfin's 1.8em
+           .inputContainer default. Scoped to .ccaStepBody: the steps stopped being .ccaCard
+           in the guided-editor redesign, which silently orphaned the old card rules. */
+        #CustomCoverArtConfigPage .ccaStepBody .inputContainer,
+        #CustomCoverArtConfigPage .ccaStepBody .ccaGrid,
+        #CustomCoverArtConfigPage .ccaStepBody .ccaFileRow { margin: 0 0 1.05em; }
+        #CustomCoverArtConfigPage .ccaGrid .inputContainer,
+        #CustomCoverArtConfigPage .inputContainer .ccaFileRow { margin-bottom: 0; }
+        #CustomCoverArtConfigPage .ccaStepBody .ccaFileRow:has(+ .fieldDescription),
+        #CustomCoverArtConfigPage .ccaStepBody .inputContainer:has(+ .fieldDescription) { margin-bottom: 0; }
+        #CustomCoverArtConfigPage .ccaStepBody > .fieldDescription,
+        #CustomCoverArtConfigPage .ccaStepGroup > .fieldDescription { margin-bottom: 1.05em; }
+        #CustomCoverArtConfigPage .ccaStepBody > :last-child,
+        #CustomCoverArtConfigPage .ccaStepGroup > :last-child,
+        #CustomCoverArtConfigPage .ccaSub > :last-child,
+        #CustomCoverArtConfigPage .ccaAdvBody > :last-child,
+        #CustomCoverArtConfigPage .ccaFxRow > :last-child,
+        #CustomCoverArtConfigPage #ccaSettings > :last-child { margin-bottom: 0; }
 
         #CustomCoverArtConfigPage .ccaVal { float: right; opacity: .6; font-weight: 400; font-variant-numeric: tabular-nums; }
         #CustomCoverArtConfigPage .ccaRange { width: 100%; margin: .55em 0 0; }
@@ -606,6 +620,11 @@
         /* A control that shares an inline row with a compact button takes the rest. */
         #CustomCoverArtConfigPage .ccaGrow { flex: 1 1 auto; min-width: 0; }
         #CustomCoverArtConfigPage .ccaFileRow .ccaGrow { width: auto; }
+        /* Load template / Delete, template name / Save, density / Shuffle: the row is as
+           tall as its tallest control and both stretch to it, instead of a 46px select
+           centred beside a 55px button. */
+        #CustomCoverArtConfigPage .ccaFileRow .ccaGrow,
+        #CustomCoverArtConfigPage .ccaFileRow .ccaGrow ~ .emby-button { align-self: stretch; }
 
         #CustomCoverArtConfigPage .ccaChecks { display: flex; flex-wrap: wrap; gap: .3em 1.25em; padding-top: .45em; }
         #CustomCoverArtConfigPage .ccaCheck { display: inline-flex; align-items: center; gap: .5em; }
@@ -796,8 +815,6 @@
         #CustomCoverArtConfigPage .ccaHiddenFile { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); border: 0; }
         #CustomCoverArtConfigPage .ccaFileRow { display: flex; align-items: center; gap: .75em; flex-wrap: wrap; }
         #CustomCoverArtConfigPage .ccaFileRow .emby-button { margin: 0; }
-        /* Give a standalone action row (e.g. Restore) the same breathing room as an input. */
-        #CustomCoverArtConfigPage .ccaCard > .ccaFileRow { margin-top: 1.05em; }
         /* A disabled button must read as disabled, not clickable. */
         #CustomCoverArtConfigPage button[disabled] { opacity: .4; cursor: not-allowed; }
         #CustomCoverArtConfigPage .ccaFileName { opacity: .6; font-size: .9em; word-break: break-all; }

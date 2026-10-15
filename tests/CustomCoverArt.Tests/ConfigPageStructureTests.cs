@@ -56,6 +56,17 @@ public class ConfigPageStructureTests
         return page.Substring(start, end - start);
     }
 
+    /// <summary>The page's one &lt;style&gt; block.</summary>
+    private static string Styles()
+    {
+        var page = ConfigPage();
+        var start = page.IndexOf("<style>", System.StringComparison.Ordinal);
+        Assert.True(start > 0, "Could not find the style block.");
+        var end = page.IndexOf("</style>", start, System.StringComparison.Ordinal);
+        Assert.True(end > start, "Could not find the end of the style block.");
+        return page.Substring(start, end - start);
+    }
+
     // Every cca* element id present at the start of the guided-editor restructure, minus
     // ccaPreviewSpinner (dead since Phase 1, removed here) and ccaGradient (replaced by the
     // background source dropdown). Add to this list when you add a control; never remove
@@ -397,5 +408,30 @@ public class ConfigPageStructureTests
         Assert.Contains("watchForAnimatedGif(img, file);", page, System.StringComparison.Ordinal);
         Assert.Contains("watchForAnimatedGif(img, posterBlob);", page, System.StringComparison.Ordinal);
         Assert.Contains("isAnimatedGif(buf)", FunctionBody(page, "watchForAnimatedGif"), System.StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The steps stopped being .ccaCard in the guided-editor redesign, which silently
+    /// orphaned every .ccaCard-scoped field rule: controls after a grid sat flush, and the
+    /// rest fell back to Jellyfin's 1.8em .inputContainer margin.
+    /// </summary>
+    [Fact]
+    public void StepSpacingIsScopedToStepBodies_NotTheRetiredCardClass()
+    {
+        var css = Styles();
+        Assert.DoesNotContain(".ccaCard .inputContainer", css, System.StringComparison.Ordinal);
+        Assert.DoesNotContain(".ccaCard > .inputContainer", css, System.StringComparison.Ordinal);
+        Assert.DoesNotContain(".ccaCard > .ccaFileRow", css, System.StringComparison.Ordinal);
+        Assert.Contains(".ccaStepBody .inputContainer", css, System.StringComparison.Ordinal);
+        Assert.Contains(".ccaStepBody .ccaGrid", css, System.StringComparison.Ordinal);
+        Assert.Contains(".ccaStepBody > :last-child", css, System.StringComparison.Ordinal);
+        // A dropdown and the button beside it share one height.
+        Assert.Contains(".ccaFileRow .ccaGrow ~ .emby-button", css, System.StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void NoInputContainerIsNestedDirectlyInAnother()
+    {
+        Assert.DoesNotMatch(@"class=""inputContainer[^""]*"">\s*<div class=""inputContainer""", Markup());
     }
 }
