@@ -970,6 +970,7 @@
                 'dyn.applied': 'Cover art applied successfully.', 'dyn.error': 'Error: {0}', 'dyn.applyFail': 'Could not apply cover art: {0}',
                 'dyn.uploadFail': 'Upload failed: {0}', 'dyn.fontFail': 'Font upload failed: {0}',
                 'dyn.unknown': 'unknown error',
+                'tpl.confirmReplace': 'Loading this template replaces your current design, including changes you have not applied. Continue?',
                 'canvas.label': 'Cover design canvas. Select a layer, then use the arrow keys to move it (hold Shift for bigger steps).',
                 'layer.visible': 'Visible', 'layer.list': 'Layers',
                 'stop.color': 'Colour', 'stop.position': 'Position', 'stop.remove': 'Remove colour', 'fx.swatch': 'Apply colour {0}',
@@ -1044,6 +1045,7 @@
                 'dyn.applied': 'Cover art succesvol toegepast.', 'dyn.error': 'Fout: {0}', 'dyn.applyFail': 'Kon cover art niet toepassen: {0}',
                 'dyn.uploadFail': 'Uploaden mislukt: {0}', 'dyn.fontFail': 'Lettertype uploaden mislukt: {0}',
                 'dyn.unknown': 'onbekende fout',
+                'tpl.confirmReplace': 'Dit sjabloon laden vervangt je huidige ontwerp, inclusief wijzigingen die je nog niet hebt toegepast. Doorgaan?',
                 'canvas.label': 'Canvas met het coverontwerp. Selecteer een laag en verplaats die met de pijltjestoetsen (houd Shift ingedrukt voor grotere stappen).',
                 'layer.visible': 'Zichtbaar', 'layer.list': 'Lagen',
                 'stop.color': 'Kleur', 'stop.position': 'Positie', 'stop.remove': 'Kleur verwijderen', 'fx.swatch': 'Kleur {0} toepassen',
@@ -1118,6 +1120,7 @@
                 'dyn.applied': 'Carátula aplicada correctamente.', 'dyn.error': 'Error: {0}', 'dyn.applyFail': 'No se ha podido aplicar la carátula: {0}',
                 'dyn.uploadFail': 'Error al subir: {0}', 'dyn.fontFail': 'Error al subir la fuente: {0}',
                 'dyn.unknown': 'error desconocido',
+                'tpl.confirmReplace': 'Cargar esta plantilla sustituye tu diseño actual, incluidos los cambios que no has aplicado. ¿Continuar?',
                 'canvas.label': 'Lienzo con el diseño de la carátula. Selecciona una capa y muévela con las flechas del teclado (mantén Mayús para pasos más grandes).',
                 'layer.visible': 'Visible', 'layer.list': 'Capas',
                 'stop.color': 'Color', 'stop.position': 'Posición', 'stop.remove': 'Quitar color', 'fx.swatch': 'Aplicar el color {0}',
@@ -1396,7 +1399,9 @@
 
         // titleTouched: the user has typed their own title, so picking a target no longer
         // renames it. applying: an Apply is in flight and owns the Apply button.
-        var state = { libraryId: '', aspectRatio: 1, collageSeed: 1, titleTouched: false, applying: false, batchRunning: false };
+        // templateValue: the template dropdown's value before the current change, so a
+        // declined "replace unapplied changes?" can put it back.
+        var state = { libraryId: '', aspectRatio: 1, collageSeed: 1, titleTouched: false, applying: false, batchRunning: false, templateValue: '' };
         var browser = { page: 1, pageSize: 24, totalPages: 1 };
 
         function debounce(fn, wait) {
@@ -3912,7 +3917,10 @@
             if (state.titleTouched) { return; }
             var l = titleLayer();
             if (!l) { return; }
+            // Following the target's name is not the user's edit: stay clean if we were.
+            var wasClean = _cleanJson !== null && !isDirty();
             l.Content = name || t('text.defaultTitle');
+            if (wasClean) { markClean(); }
             renderLayersPanel();
             if (doc._selectedId === l.Id) { el('ccaTitle').value = l.Content; }
             scheduleRender();
@@ -4331,12 +4339,14 @@
             btn.disabled = true;
             if (label) { label.textContent = t('action.applying'); }
             Dashboard.showLoadingMsg();
+            var appliedJson = JSON.stringify(stripUiKeys(doc));
             jsonFetch('CustomCoverArt/document/apply', 'POST', {
                 LibraryId: state.libraryId,
                 Document: collectDocument()
             }).then(function (res) {
                 Dashboard.hideLoadingMsg();
                 if (pick(res, 'Success')) {
+                    markClean(appliedJson);
                     Dashboard.alert(t('dyn.applied'));
                     // Applying backs the previous cover up, so Restore and Reset may have just
                     // become available.
@@ -4385,6 +4395,49 @@
                 btn.disabled = false;
                 if (label) { label.textContent = original; }
             });
+        }
+
+        // Replaces the working design with a saved template. Called only once the user has
+        // confirmed, or had nothing unapplied to lose — see the dropdown's handler.
+        function loadTemplateOption(opt) {
+            var tplDoc = opt._document;
+            if (!tplDoc) {
+                // Legacy template saved before the canvas engine: no Document,
+                // only the flat Settings — migrate on the fly so it still loads.
+                if (opt._settings) { tplDoc = migrateTemplateToDocument(opt._settings); }
+                else { return; }
+            }
+            // Preserve THIS target's title if the template's title layer is blank
+            // (templates intentionally store the design, not the name).
+            var curLayer = selectedLayer();
+            var currentTitle = curLayer ? curLayer.Content : '';
+            var previousImagePath = doc.Background.ImagePath;
+            var previousLayers = doc.Layers;
+            doc = JSON.parse(JSON.stringify(tplDoc));
+            if (!doc.Layers) { doc.Layers = []; }
+            reuseLayerClientState(previousLayers);
+            // Templates saved before Phase 3 have no effect sub-objects; the draw
+            // functions dereference them, so fill them in like the server does.
+            normalizeEffects(doc);
+            normalizeBackgroundSource(doc);
+            normalizeOverlay(doc);
+            normalizeGradientStops(doc);
+            var title = titleLayer();
+            if (title && (!title.Content || !title.Content.trim()) && currentTitle) {
+                title.Content = currentTitle;
+            }
+            doc._selectedId = title ? title.Id : (doc.Layers[0] ? doc.Layers[0].Id : null);
+            // A template carries only a server ImagePath, never a client blob: fetch
+            // it back as one (or keep the bitmap we have when it is the same image).
+            hydrateBackgroundImage(previousImagePath);
+            renderLayersPanel();
+            // Logo layers arrive as server paths only (a template can't carry the
+            // bitmap), so pull them back as blobs to preview them on the canvas.
+            hydrateLayerImages();
+            syncControlsFromDocument();
+            resetOverlayEditorState();
+            scheduleRender();
+            markClean();
         }
 
         function bindEvents() {
@@ -4793,54 +4846,23 @@
             });
 
             el('ccaTemplateSelect').addEventListener('change', function () {
-                var opt = this.options[this.selectedIndex];
-                if (!opt) { return; }
-                var tplDoc = opt._document;
-                if (!tplDoc) {
-                    // Legacy template saved before the canvas engine: no Document,
-                    // only the flat Settings — migrate on the fly so it still loads.
-                    if (opt._settings) { tplDoc = migrateTemplateToDocument(opt._settings); }
-                    else { return; } // neither Document nor Settings (e.g. the "—" placeholder)
-                }
-                // Preserve THIS target's title if the template's title layer is blank
-                // (templates intentionally store the design, not the name).
-                var curLayer = selectedLayer();
-                var currentTitle = curLayer ? curLayer.Content : '';
-                var previousImagePath = doc.Background.ImagePath;
-                var previousLayers = doc.Layers;
-                doc = JSON.parse(JSON.stringify(tplDoc));
-                if (!doc.Layers) { doc.Layers = []; }
-                reuseLayerClientState(previousLayers);
-                // Templates saved before Phase 3 have no effect sub-objects; the draw
-                // functions dereference them, so fill them in like the server does.
-                normalizeEffects(doc);
-                normalizeBackgroundSource(doc);
-                normalizeOverlay(doc);
-                normalizeGradientStops(doc);
-                var titleLayer = null;
-                for (var i = 0; i < doc.Layers.length; i++) {
-                    if (doc.Layers[i].Id === 'title') { titleLayer = doc.Layers[i]; break; }
-                }
-                if (titleLayer && (!titleLayer.Content || !titleLayer.Content.trim()) && currentTitle) {
-                    titleLayer.Content = currentTitle;
-                }
-                doc._selectedId = titleLayer ? titleLayer.Id : (doc.Layers[0] ? doc.Layers[0].Id : null);
-                // A template carries only a server ImagePath, never a client blob: fetch
-                // it back as one (or keep the bitmap we have when it is the same image).
-                hydrateBackgroundImage(previousImagePath);
-                renderLayersPanel();
-                // Logo layers arrive as server paths only (a template can't carry the
-                // bitmap), so pull them back as blobs to preview them on the canvas.
-                hydrateLayerImages();
-                syncControlsFromDocument();
-                resetOverlayEditorState();
-                scheduleRender();
+                var sel = this;
+                var opt = sel.options[sel.selectedIndex];
+                // The "—" placeholder (no Document, no Settings) loads nothing.
+                if (!opt || (!opt._document && !opt._settings)) { state.templateValue = sel.value; return; }
+                var go = isDirty() ? confirmAction(t('tpl.confirmReplace')) : Promise.resolve(true);
+                go.then(function (ok) {
+                    if (!ok) { sel.value = state.templateValue || ''; return; }
+                    state.templateValue = sel.value;
+                    loadTemplateOption(opt);
+                });
             });
             el('ccaTemplateSave').addEventListener('click', function () {
                 var name = el('ccaTemplateName').value.trim();
                 if (!name) { Dashboard.alert(t('tpl.named')); return; }
+                var savedJson = JSON.stringify(stripUiKeys(doc));
                 jsonFetch('CustomCoverArt/templates', 'POST', { Name: name, Document: collectDocument() })
-                    .then(function (res) { dataOrThrow(res); Dashboard.alert(t('tpl.saved')); return loadTemplates(); })
+                    .then(function (res) { dataOrThrow(res); markClean(savedJson); Dashboard.alert(t('tpl.saved')); return loadTemplates(); })
                     .catch(function (e) { showError(t('dyn.error', errorText(e))); });
             });
             el('ccaTemplateDelete').addEventListener('click', function () {
@@ -5160,6 +5182,23 @@
             else if (k === 'y' || (k === 'z' && ev.shiftKey)) { ev.preventDefault(); redo(); }
         }
 
+        // --- Unsaved work --------------------------------------------------
+        // The design as of the last page load, apply, template load or template save,
+        // serialized the same way undo history compares documents. Apply and template
+        // save pass the JSON they actually sent, so an edit made while the request was in
+        // flight still counts as unapplied.
+        var _cleanJson = null;
+        function markClean(json) { _cleanJson = json || JSON.stringify(stripUiKeys(doc)); }
+        function isDirty() { return _cleanJson !== null && JSON.stringify(stripUiKeys(doc)) !== _cleanJson; }
+
+        // Closing or reloading the tab with unapplied changes asks first. In-dashboard
+        // navigation needs no prompt: the page and its design stay in memory.
+        function onBeforeUnload(ev) {
+            if (!isPageVisible() || !isDirty()) { return; }
+            ev.preventDefault();
+            ev.returnValue = ''; // required by Chromium to show the prompt
+        }
+
         function bindPageListeners() {
             unbindPageListeners(); // pageshow can fire again without a hide in between
             window.addEventListener('resize', onWindowResize);
@@ -5167,6 +5206,7 @@
             // The GIF loop re-evaluates when the tab hides/shows or reduced motion changes.
             document.addEventListener('visibilitychange', updateGifLoop);
             watchReducedMotion(true);
+            window.addEventListener('beforeunload', onBeforeUnload);
         }
 
         function unbindPageListeners() {
@@ -5174,6 +5214,7 @@
             document.removeEventListener('keydown', onDocumentKeydown);
             document.removeEventListener('visibilitychange', updateGifLoop);
             watchReducedMotion(false);
+            window.removeEventListener('beforeunload', onBeforeUnload);
         }
 
         // Leaving the page: drop the global listeners, stop the GIF loop at once (pageshow's
@@ -5213,6 +5254,9 @@
             renderLayersPanel();
             syncControlsFromDocument();
             resetOverlayEditorState();
+            // The starting design is "clean" — but only on the first show: a return visit
+            // keeps whatever unapplied edits the user left behind.
+            if (_cleanJson === null) { markClean(); }
             // Render immediately with a sane fallback, then re-render once the
             // bundled Noto weights register so canvas text metrics match the server.
             scheduleRender();

@@ -792,4 +792,21 @@ public class ConfigPageStructureTests
         Assert.Contains("_canvasFontsLoaded = loadCanvasFonts()", page, System.StringComparison.Ordinal);
         Assert.DoesNotContain("loadCanvasFonts().then(", page, System.StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void UnsavedWorkIsProtected()
+    {
+        var page = ConfigPage();
+        Assert.Contains("window.addEventListener('beforeunload', onBeforeUnload)", FunctionBody(page, "bindPageListeners"), System.StringComparison.Ordinal);
+        Assert.Contains("window.removeEventListener('beforeunload', onBeforeUnload)", FunctionBody(page, "unbindPageListeners"), System.StringComparison.Ordinal);
+        Assert.Contains("isDirty()", FunctionBody(page, "onBeforeUnload"), System.StringComparison.Ordinal);
+
+        var select = HandlerBody(page, "el('ccaTemplateSelect').addEventListener('change'");
+        Assert.Contains("confirmAction(t('tpl.confirmReplace'))", select, System.StringComparison.Ordinal);
+        Assert.Contains("loadTemplateOption(opt)", select, System.StringComparison.Ordinal);
+
+        Assert.Contains("markClean()", FunctionBody(page, "loadTemplateOption"), System.StringComparison.Ordinal);
+        Assert.Contains("markClean(appliedJson)", FunctionBody(page, "applyCoverArt"), System.StringComparison.Ordinal);
+        Assert.Matches(@"'CustomCoverArt/templates', 'POST'[\s\S]{0,300}?markClean\(savedJson\)", page);
+    }
 }
