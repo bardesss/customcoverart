@@ -434,4 +434,43 @@ public class ConfigPageStructureTests
     {
         Assert.DoesNotMatch(@"class=""inputContainer[^""]*"">\s*<div class=""inputContainer""", Markup());
     }
+
+    /// <summary>
+    /// Jellyfin reuses the page: switching the display language from Dutch back to
+    /// English used to leave every Dutch label in place because English was skipped.
+    /// </summary>
+    [Fact]
+    public void ApplyI18n_RunsForEnglishToo_AndTranslatesAttributes()
+    {
+        var page = ConfigPage();
+        Assert.DoesNotContain("LANG === 'en'", FunctionBody(page, "applyI18n"), System.StringComparison.Ordinal);
+        Assert.Contains("['data-i18n-aria', 'aria-label']", page, System.StringComparison.Ordinal);
+        Assert.Contains("['data-i18n-alt', 'alt']", page, System.StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void NoHardCodedEnglishIsLeftInTheMarkupOrDefaults()
+    {
+        var markup = Markup();
+        Assert.DoesNotContain("value=\"Movies\"", markup, System.StringComparison.Ordinal);
+        Assert.DoesNotContain("alt=\"Server render\"", markup, System.StringComparison.Ordinal);
+        Assert.DoesNotContain(">Page 1<", markup, System.StringComparison.Ordinal);
+        var page = ConfigPage();
+        Assert.DoesNotContain("Content: 'Movies'", page, System.StringComparison.Ordinal);
+        Assert.DoesNotContain("Layers card above", page, System.StringComparison.Ordinal);
+        Assert.DoesNotContain("kaart Lagen", page, System.StringComparison.Ordinal);
+        Assert.DoesNotContain("tarjeta Capas", page, System.StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ApplyButtonNamesTheTargetType()
+    {
+        var page = ConfigPage();
+        var body = FunctionBody(page, "applyLabelFor");
+        foreach (var key in new[] { "action.applyCollection", "action.applyPlaylist", "action.applyLivetv", "action.apply" })
+        {
+            Assert.Contains("t('" + key + "')", body, System.StringComparison.Ordinal);
+        }
+        Assert.Contains("applyLabelFor(", FunctionBody(page, "updateUI"), System.StringComparison.Ordinal);
+    }
 }

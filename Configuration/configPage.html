@@ -209,7 +209,7 @@
                         <div id="ccaSettings">
                         <div class="inputContainer ccaTextOnly">
                             <label for="ccaTitle" data-i18n="text.title">Title</label>
-                            <input is="emby-input" type="text" id="ccaTitle" value="Movies" />
+                            <input is="emby-input" type="text" id="ccaTitle" value="" />
                         </div>
                         <div class="inputContainer ccaTextOnly">
                                 <label for="ccaTextAlign" data-i18n="text.align">Alignment</label>
@@ -273,7 +273,7 @@
                         </div>
                             </div>
                         </div>
-                        <div class="fieldDescription" id="ccaNoLayerHint" data-i18n="layer.none" style="display:none">No layer selected — add one in the Layers card above.</div>
+                        <div class="fieldDescription" id="ccaNoLayerHint" data-i18n="layer.none" style="display:none">No layer selected — add one with Add text or Add logo/icon above.</div>
                         </div>
                         </div>
                         </div>
@@ -499,7 +499,7 @@
                         </div>
                         <div id="ccaServerRenderWrap" class="ccaServerRender" style="display:none">
                             <div class="ccaServerRenderLabel" data-i18n="serverrender.label">Authoritative render (server)</div>
-                            <img id="ccaServerRenderImg" class="ccaServerRenderImg" alt="Server render" />
+                            <img id="ccaServerRenderImg" class="ccaServerRenderImg" alt="Cover as rendered by the server" data-i18n-alt="serverrender.alt" />
                         </div>
                     </section>
                 </div>
@@ -529,7 +529,7 @@
                     <div id="ccaBrowserGrid" class="ccaPosterGrid"></div>
                     <div class="ccaModalPager">
                         <button is="emby-button" type="button" id="ccaBrowserPrev" class="raised"><span data-i18n="modal.prev">Previous</span></button>
-                        <span id="ccaBrowserPage">Page 1</span>
+                        <span id="ccaBrowserPage" aria-live="polite"></span>
                         <button is="emby-button" type="button" id="ccaBrowserNext" class="raised"><span data-i18n="modal.next">Next</span></button>
                     </div>
                 </div>
@@ -912,7 +912,7 @@
                 'ctx.wide': 'Wide', 'ctx.square': 'Square', 'ctx.poster': 'Poster',
                 'layer.addText': 'Add text', 'layer.addImage': 'Add logo/icon',
                 'layer.show': 'Show', 'layer.hide': 'Hide', 'layer.up': 'Move up', 'layer.down': 'Move down', 'layer.dup': 'Duplicate', 'layer.del': 'Delete',
-                'layer.text': 'Text', 'layer.logo': 'Logo', 'layer.more': 'More actions', 'layer.none': 'No layer selected — add one in the Layers card above.',
+                'layer.text': 'Text', 'layer.logo': 'Logo', 'layer.more': 'More actions', 'layer.none': 'No layer selected — add one with Add text or Add logo/icon above.',
                 'layer.opacity': 'Opacity', 'layer.rotation': 'Rotation',
                 'hint.logo': 'PNG with transparency · up to 5 MB. The topmost row is drawn last, on top of the others.',
                 'hint.logoSize': 'Drag the corner handles on the preview to resize the logo, or the knob above it to rotate.',
@@ -954,6 +954,8 @@
                 'dyn.applied': 'Cover art applied successfully.', 'dyn.error': 'Error: {0}', 'dyn.applyFail': 'Could not apply cover art: {0}',
                 'dyn.uploadFail': 'Upload failed: {0}', 'dyn.fontFail': 'Font upload failed: {0}',
                 'dyn.unknown': 'unknown error',
+                'text.defaultTitle': 'My library', 'serverrender.alt': 'Cover as rendered by the server',
+                'action.applyCollection': 'Apply to collection', 'action.applyPlaylist': 'Apply to playlist', 'action.applyLivetv': 'Apply to Live TV',
                 'restore.button': 'Restore original cover', 'restore.none': 'No backup yet', 'restore.available': 'A backup exists', 'restore.done': 'Original cover restored.', 'restore.fail': 'No backup found to restore.',
                 'restore.reset': 'Reset backup', 'restore.resetConfirm': 'Delete the current backup? Reset saves nothing by itself. The next apply stores the cover this target shows at that moment as the new original, unless it is a cover this plugin applied. So first put the cover you want to keep back on this target (Edit images, then upload it; or delete the poster and refresh metadata with "Replace existing images"), then reset, then apply.', 'restore.resetDone': 'Backup deleted. The next apply saves the current cover as the new original.', 'restore.resetFail': 'Could not reset the backup: {0}',
                 'bg.source': 'Background source', 'bg.source.image': 'Image', 'bg.source.gradient': 'Gradient', 'bg.source.solid': 'Solid colour', 'bg.source.collage': 'Poster collage from this target', 'bg.collage.density': 'Collage density', 'bg.collage.sparse': 'Sparse', 'bg.collage.medium': 'Medium', 'bg.collage.dense': 'Dense', 'bg.collage.shuffle': 'Shuffle', 'bg.collage.livetv': 'Live TV has no posters to collage.',
@@ -974,7 +976,7 @@
                 'ctx.wide': 'Breed', 'ctx.square': 'Vierkant', 'ctx.poster': 'Poster',
                 'layer.addText': 'Tekst toevoegen', 'layer.addImage': 'Logo/pictogram toevoegen',
                 'layer.show': 'Tonen', 'layer.hide': 'Verbergen', 'layer.up': 'Omhoog', 'layer.down': 'Omlaag', 'layer.dup': 'Dupliceren', 'layer.del': 'Verwijderen',
-                'layer.text': 'Tekst', 'layer.logo': 'Logo', 'layer.more': 'Meer acties', 'layer.none': 'Geen laag geselecteerd — voeg er een toe in de kaart Lagen hierboven.',
+                'layer.text': 'Tekst', 'layer.logo': 'Logo', 'layer.more': 'Meer acties', 'layer.none': 'Geen laag geselecteerd — voeg er een toe met Tekst toevoegen of Logo/pictogram toevoegen hierboven.',
                 'layer.opacity': 'Dekking', 'layer.rotation': 'Rotatie',
                 'hint.logo': 'PNG met transparantie · max. 5 MB. De bovenste rij wordt als laatste getekend, boven op de andere.',
                 'hint.logoSize': 'Sleep de hoekgrepen in het voorbeeld om het logo te vergroten of verkleinen, of de knop erboven om te draaien.',
@@ -1016,6 +1018,8 @@
                 'dyn.applied': 'Cover art succesvol toegepast.', 'dyn.error': 'Fout: {0}', 'dyn.applyFail': 'Kon cover art niet toepassen: {0}',
                 'dyn.uploadFail': 'Uploaden mislukt: {0}', 'dyn.fontFail': 'Lettertype uploaden mislukt: {0}',
                 'dyn.unknown': 'onbekende fout',
+                'text.defaultTitle': 'Mijn bibliotheek', 'serverrender.alt': 'Cover zoals de server die maakt',
+                'action.applyCollection': 'Toepassen op verzameling', 'action.applyPlaylist': 'Toepassen op afspeellijst', 'action.applyLivetv': 'Toepassen op live-tv',
                 'restore.button': 'Originele cover herstellen', 'restore.none': 'Nog geen back-up', 'restore.available': 'Er is een back-up', 'restore.done': 'Originele cover hersteld.', 'restore.fail': 'Geen back-up gevonden om te herstellen.',
                 'restore.reset': 'Back-up resetten', 'restore.resetConfirm': 'De huidige back-up verwijderen? Resetten bewaart zelf niets. Bij de volgende keer toepassen wordt de cover die dit doel op dat moment toont bewaard als het nieuwe origineel, tenzij het een cover is die deze plug-in heeft toegepast. Zet dus eerst de cover die je wilt houden terug op dit doel (Afbeeldingen bewerken en uploaden; of verwijder de poster en ververs de metadata met "bestaande afbeeldingen vervangen"), reset daarna en pas dan toe.', 'restore.resetDone': 'Back-up verwijderd. Bij de volgende keer toepassen wordt de huidige cover bewaard als het nieuwe origineel.', 'restore.resetFail': 'Kon de back-up niet resetten: {0}',
                 'bg.source': 'Achtergrondbron', 'bg.source.image': 'Afbeelding', 'bg.source.gradient': 'Verloop', 'bg.source.solid': 'Effen kleur', 'bg.source.collage': 'Postercollage van dit doel', 'bg.collage.density': 'Collagedichtheid', 'bg.collage.sparse': 'Dun', 'bg.collage.medium': 'Gemiddeld', 'bg.collage.dense': 'Dicht', 'bg.collage.shuffle': 'Schudden', 'bg.collage.livetv': 'Live TV heeft geen posters voor een collage.',
@@ -1036,7 +1040,7 @@
                 'ctx.wide': 'Ancho', 'ctx.square': 'Cuadrado', 'ctx.poster': 'Póster',
                 'layer.addText': 'Añadir texto', 'layer.addImage': 'Añadir logotipo/icono',
                 'layer.show': 'Mostrar', 'layer.hide': 'Ocultar', 'layer.up': 'Subir', 'layer.down': 'Bajar', 'layer.dup': 'Duplicar', 'layer.del': 'Eliminar',
-                'layer.text': 'Texto', 'layer.logo': 'Logotipo', 'layer.more': 'Más acciones', 'layer.none': 'Ninguna capa seleccionada — añade una en la tarjeta Capas de arriba.',
+                'layer.text': 'Texto', 'layer.logo': 'Logotipo', 'layer.more': 'Más acciones', 'layer.none': 'Ninguna capa seleccionada — añade una con Añadir texto o Añadir logotipo/icono, más arriba.',
                 'layer.opacity': 'Opacidad', 'layer.rotation': 'Rotación',
                 'hint.logo': 'PNG con transparencia · hasta 5 MB. La fila superior se dibuja la última, encima de las demás.',
                 'hint.logoSize': 'Arrastra los tiradores de las esquinas en la vista previa para redimensionar el logotipo, o el mando superior para rotarlo.',
@@ -1078,6 +1082,8 @@
                 'dyn.applied': 'Carátula aplicada correctamente.', 'dyn.error': 'Error: {0}', 'dyn.applyFail': 'No se ha podido aplicar la carátula: {0}',
                 'dyn.uploadFail': 'Error al subir: {0}', 'dyn.fontFail': 'Error al subir la fuente: {0}',
                 'dyn.unknown': 'error desconocido',
+                'text.defaultTitle': 'Mi biblioteca', 'serverrender.alt': 'Carátula tal como la genera el servidor',
+                'action.applyCollection': 'Aplicar a la colección', 'action.applyPlaylist': 'Aplicar a la lista de reproducción', 'action.applyLivetv': 'Aplicar a TV en directo',
                 'restore.button': 'Restaurar la carátula original', 'restore.none': 'Aún no hay copia de seguridad', 'restore.available': 'Existe una copia de seguridad', 'restore.done': 'Carátula original restaurada.', 'restore.fail': 'No se ha encontrado ninguna copia de seguridad que restaurar.',
                 'restore.reset': 'Restablecer copia de seguridad', 'restore.resetConfirm': '¿Eliminar la copia de seguridad actual? Restablecer no guarda nada por sí solo. La próxima vez que apliques, la carátula que muestre este destino en ese momento se guardará como el nuevo original, salvo que sea una carátula aplicada por este complemento. Por eso, primero vuelve a poner en este destino la que quieres conservar (Editar imágenes y súbela; o elimina el póster y actualiza los metadatos con "Reemplazar imágenes existentes"), después restablece y luego aplica.', 'restore.resetDone': 'Copia de seguridad eliminada. La próxima vez que apliques, la carátula actual se guardará como el nuevo original.', 'restore.resetFail': 'No se pudo restablecer la copia de seguridad: {0}',
                 'bg.source': 'Origen del fondo', 'bg.source.image': 'Imagen', 'bg.source.gradient': 'Degradado', 'bg.source.solid': 'Color sólido', 'bg.source.collage': 'Collage de pósteres de este destino', 'bg.collage.density': 'Densidad del collage', 'bg.collage.sparse': 'Baja', 'bg.collage.medium': 'Media', 'bg.collage.dense': 'Alta', 'bg.collage.shuffle': 'Barajar', 'bg.collage.livetv': 'La TV en directo no tiene pósteres para hacer un collage.',
@@ -1129,15 +1135,24 @@
             return s;
         }
 
+        // Translated attributes: [marker attribute, attribute it fills].
+        var I18N_ATTRS = [['data-i18n-ph', 'placeholder'], ['data-i18n-aria', 'aria-label'], ['data-i18n-alt', 'alt']];
+
+        // Runs for EVERY language, English included. It used to return early for 'en' on
+        // the theory that the markup already is English: true on a first load, false on a
+        // page Jellyfin reuses after the user switched from Dutch back to English, which
+        // then kept every Dutch label. MarkupDefaultText_MatchesTheEnglishDictionary keeps
+        // the markup and the en block identical, so re-applying en is a no-op otherwise.
         function applyI18n(root) {
-            if (LANG === 'en') { return; }
             root.querySelectorAll('[data-i18n]').forEach(function (elm) {
                 var s = t(elm.getAttribute('data-i18n'));
                 if (s) { elm.textContent = s; }
             });
-            root.querySelectorAll('[data-i18n-ph]').forEach(function (elm) {
-                var s = t(elm.getAttribute('data-i18n-ph'));
-                if (s) { elm.setAttribute('placeholder', s); }
+            I18N_ATTRS.forEach(function (pair) {
+                root.querySelectorAll('[' + pair[0] + ']').forEach(function (elm) {
+                    var s = t(elm.getAttribute(pair[0]));
+                    if (s) { elm.setAttribute(pair[1], s); }
+                });
             });
         }
         // ------------------------------------------------------------------
@@ -1268,7 +1283,9 @@
             openStep((state.libraryId && exists) ? saved : '1');
         }
 
-        var state = { libraryId: '', aspectRatio: 1, collageSeed: 1 };
+        // titleTouched: the user has typed their own title, so picking a target no longer
+        // renames it. applying: an Apply is in flight and owns the Apply button.
+        var state = { libraryId: '', aspectRatio: 1, collageSeed: 1, titleTouched: false, applying: false };
         var browser = { page: 1, pageSize: 24, totalPages: 1 };
 
         function debounce(fn, wait) {
@@ -1415,7 +1432,7 @@
                 Effects: defaultEffects(),
                 Layers: [{
                     Id: 'title', Type: 'text', Visible: true, X: 0.5, Y: 0.5, Width: 0, Height: 0,
-                    Rotation: 0, Opacity: 1, Content: 'Movies', Size: 120 / 720, Weight: 400,
+                    Rotation: 0, Opacity: 1, Content: t('text.defaultTitle'), Size: 120 / 720, Weight: 400,
                     Color: '#ffffff', Align: 1, FontPath: '',
                     Shadow: { Enabled: false, Color: '#000000', Blur: 4, OffsetX: 2, OffsetY: 2 },
                     Outline: { Enabled: false, Color: '#000000', Width: 2 }
@@ -3574,11 +3591,47 @@
         }
         // ------------------------------------------------------------------
 
+        // The primary button names what it is about to change. One literal t() call per
+        // type, so the translation reachability test can see every key.
+        function applyLabelFor(type) {
+            if (type === 'collection') { return t('action.applyCollection'); }
+            if (type === 'playlist') { return t('action.applyPlaylist'); }
+            if (type === 'livetv') { return t('action.applyLivetv'); }
+            return t('action.apply');
+        }
+
+        // The stock title layer (Id 'title'), if the design still has one.
+        function titleLayer() {
+            for (var i = 0; i < doc.Layers.length; i++) {
+                if (doc.Layers[i].Id === 'title' && doc.Layers[i].Type === 'text') { return doc.Layers[i]; }
+            }
+            return null;
+        }
+
+        // The title follows the chosen target's name (or a translated placeholder when no
+        // target is chosen) until the user types their own; after that it is theirs.
+        function prefillTitle(name) {
+            if (state.titleTouched) { return; }
+            var l = titleLayer();
+            if (!l) { return; }
+            l.Content = name || t('text.defaultTitle');
+            renderLayersPanel();
+            if (doc._selectedId === l.Id) { el('ccaTitle').value = l.Content; }
+            scheduleRender();
+        }
+
         // Enable/disable controls based on current selection. Deliberately does NOT touch
         // the gradient rows — updateBackgroundVisibility owns those, and two owners of the
         // same element fight.
         function updateUI() {
-            el('ccaApplyBtn').disabled = !state.libraryId;
+            var btn = el('ccaApplyBtn');
+            // While an apply runs, applyCoverArt owns the button ("Applying…", disabled)
+            // and calls updateUI() itself when it is done.
+            if (!state.applying) {
+                btn.disabled = !state.libraryId;
+                var label = btn.querySelector('span');
+                if (label) { label.textContent = applyLabelFor(el('ccaTargetType') ? el('ccaTargetType').value : 'library'); }
+            }
             el('ccaCustomDims').style.display = el('ccaPreset').value === 'custom' ? '' : 'none';
         }
 
@@ -3937,13 +3990,12 @@
         }
 
         function applyCoverArt() {
-            if (!state.libraryId) { return; }
+            if (!state.libraryId || state.applying) { return; }
             var btn = el('ccaApplyBtn');
-            if (btn.disabled) { return; } // an apply is already running
             var label = btn.querySelector('span');
-            var original = label ? label.textContent : '';
             // Applying can be slow (an animated GIF renders many frames), so lock
             // the button and show progress — otherwise it looks like nothing happens.
+            state.applying = true;
             btn.disabled = true;
             if (label) { label.textContent = t('action.applying'); }
             Dashboard.showLoadingMsg();
@@ -3964,8 +4016,8 @@
                 Dashboard.hideLoadingMsg();
                 Dashboard.alert(t('dyn.applyFail', e.message));
             }).then(function () {
-                if (label) { label.textContent = original; }
-                btn.disabled = !state.libraryId;
+                state.applying = false;
+                updateUI(); // restores the per-target label and the enabled state
             });
         }
 
@@ -4007,6 +4059,8 @@
             bindGifLoopListeners();
             el('ccaLibrarySelect').addEventListener('change', function () {
                 state.libraryId = this.value;
+                var opt = this.options[this.selectedIndex];
+                prefillTitle(this.value && opt ? opt.textContent : '');
                 updateUI();
                 refreshRestoreState();
                 scheduleRender(); // a collage background follows the target
@@ -4041,6 +4095,7 @@
                 var l = selectedLayer();
                 if (l) {
                     l.Content = this.value;
+                    if (l.Id === 'title') { state.titleTouched = true; }
                     renderLayersPanel(); // the panel labels a text layer with its content
                     scheduleRender();
                 }
@@ -4304,7 +4359,7 @@
             el('ccaTargetType').addEventListener('change', function () {
                 Dashboard.showLoadingMsg();
                 loadLibraries()
-                    .then(function () { updateUI(); updateBackgroundVisibility(); refreshRestoreState(); loadBatchList(); Dashboard.hideLoadingMsg(); scheduleRender(); })
+                    .then(function () { prefillTitle(''); updateUI(); updateBackgroundVisibility(); refreshRestoreState(); loadBatchList(); Dashboard.hideLoadingMsg(); scheduleRender(); })
                     .catch(function () { Dashboard.hideLoadingMsg(); });
             });
 
@@ -4642,6 +4697,8 @@
             // document, so the UI and the live canvas start in agreement.
             normalizeOverlay(doc);
             normalizeGradientStops(doc);
+            // The default document was built before the language was known.
+            prefillTitle('');
             renderLayersPanel();
             syncControlsFromDocument();
             resetOverlayEditorState();
