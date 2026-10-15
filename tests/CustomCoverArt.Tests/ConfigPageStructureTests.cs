@@ -469,6 +469,117 @@ public class ConfigPageStructureTests
     }
 
     /// <summary>
+    /// Firefox keeps drawing one frame of an animated GIF &lt;img&gt;, so the frames are decoded
+    /// with WebCodecs' ImageDecoder where it exists. The &lt;img&gt; flag is still set first, so
+    /// engines without ImageDecoder (or a failing decoder) keep the old repaint path.
+    /// </summary>
+    [Fact]
+    public void GifPreview_DecodesFramesWithImageDecoder_KeepingTheImgFallback()
+    {
+        var page = ConfigPage();
+        var watch = FunctionBody(page, "watchForAnimatedGif");
+        Assert.Contains("typeof ImageDecoder === 'function'", watch, System.StringComparison.Ordinal);
+        Assert.Contains("img._ccaAnimatedGif = true;", watch, System.StringComparison.Ordinal);
+        Assert.Contains("updateGifLoop();", watch, System.StringComparison.Ordinal);
+        Assert.True(
+            watch.IndexOf("img._ccaAnimatedGif = true;", System.StringComparison.Ordinal)
+                < watch.IndexOf("typeof ImageDecoder", System.StringComparison.Ordinal),
+            "The <img> fallback flag must be set before (and regardless of) the decoder.");
+
+        var attach = FunctionBody(page, "attachGifDecoder");
+        Assert.Contains("new ImageDecoder({ data: buf, type: 'image/gif' })", attach, System.StringComparison.Ordinal);
+        Assert.Contains("decoder.tracks.ready", attach, System.StringComparison.Ordinal);
+        // frameCount can still grow until all data is in (Firefox reports it late): read it
+        // only after decoder.completed, or a real animation looks like one frame.
+        Assert.Contains("Promise.all([decoder.tracks.ready, decoder.completed])", attach, System.StringComparison.Ordinal);
+        Assert.Contains("decoder.tracks.selectedTrack", attach, System.StringComparison.Ordinal);
+        Assert.Contains("delays: []", attach, System.StringComparison.Ordinal);
+        Assert.Contains("frameCount", attach, System.StringComparison.Ordinal);
+        Assert.Contains("img._ccaGifDecoder = {", attach, System.StringComparison.Ordinal);
+        Assert.Contains("decoder.close()", attach, System.StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// One decoded frame at a time: each VideoFrame is closed as soon as it is painted, a
+    /// frame that arrives for a replaced background or a stopped loop is dropped, and the
+    /// GIF's own delays pace the frames (browser convention: 10 ms or less means 100 ms).
+    /// </summary>
+    [Fact]
+    public void GifPreview_DecodedFramesAreDrawnOnceAndClosed()
+    {
+        var page = ConfigPage();
+        var step = FunctionBody(page, "stepGifDecoder");
+        Assert.Contains("decode({ frameIndex: index })", step, System.StringComparison.Ordinal);
+        // Playback keeps a schedule: the next frame is due one delay after this one was due
+        // (not after the late tick that drew it), frames that are already over are skipped,
+        // and a pause (hidden page, more than a loop behind) restarts the clock instead of
+        // fast-forwarding.
+        Assert.Contains("gif.nextAt += delay;", step, System.StringComparison.Ordinal);
+        Assert.DoesNotContain("now + delay", step, System.StringComparison.Ordinal);
+        Assert.Contains("while (now >= gif.nextAt + gifDelayAt(gif, gif.index))", step, System.StringComparison.Ordinal);
+        Assert.Contains("gif.delays[index] = delay;", step, System.StringComparison.Ordinal);
+        Assert.Contains("gif.resync", step, System.StringComparison.Ordinal);
+        Assert.Contains("gifLoopLength(gif)", step, System.StringComparison.Ordinal);
+        Assert.Contains("gif._ccaGifDecoder.resync = true;", FunctionBody(page, "updateGifLoop"), System.StringComparison.Ordinal);
+        // frameCount may grow after attach; the modulo follows it.
+        Assert.Contains("selectedTrack", step, System.StringComparison.Ordinal);
+        // A real decode failure is logged before falling back to the <img>.
+        Assert.Contains("console.debug(", step, System.StringComparison.Ordinal);
+        Assert.Contains("frame.close();", step, System.StringComparison.Ordinal);
+        Assert.Contains("drawImage(frame,", step, System.StringComparison.Ordinal);
+        Assert.Contains("img !== bgImageEl", step, System.StringComparison.Ordinal);
+        Assert.Contains("!_gifLoopId", step, System.StringComparison.Ordinal);
+        Assert.Contains("% gif.frameCount", step, System.StringComparison.Ordinal);
+        Assert.Contains("renderDocument(true)", step, System.StringComparison.Ordinal);
+        Assert.Contains("gif.pending", step, System.StringComparison.Ordinal);
+        Assert.Contains("gif.nextAt", step, System.StringComparison.Ordinal);
+        // The decoded frame is closed before anything else can throw after drawing it.
+        Assert.True(
+            step.IndexOf("frame.close();", System.StringComparison.Ordinal)
+                < step.IndexOf("renderDocument(true)", System.StringComparison.Ordinal),
+            "The VideoFrame must be closed before the render.");
+        // It never arms its own loop or chains decodes: the one gifTick loop drives it.
+        Assert.DoesNotContain("requestAnimationFrame", step, System.StringComparison.Ordinal);
+        Assert.DoesNotContain("stepGifDecoder(", step.Substring(step.IndexOf('{')), System.StringComparison.Ordinal);
+
+        var duration = FunctionBody(page, "gifFrameDelay");
+        Assert.Contains("/ 1000", duration, System.StringComparison.Ordinal);
+        Assert.Contains("<= 10", duration, System.StringComparison.Ordinal);
+        Assert.Contains("100", duration, System.StringComparison.Ordinal);
+
+        var tick = FunctionBody(page, "gifTick");
+        Assert.Contains("stepGifDecoder(bgImageEl, ", tick, System.StringComparison.Ordinal);
+        Assert.Contains("GIF_FRAME_MS", tick, System.StringComparison.Ordinal);
+
+        // Still exactly the two arming sites of the one loop (re-arm in gifTick, start in
+        // updateGifLoop): the decoder adds no second loop.
+        var arms = System.Text.RegularExpressions.Regex.Matches(page, @"requestAnimationFrame\(gifTick\)").Count;
+        Assert.Equal(2, arms);
+        Assert.Contains("_gifLoopId = requestAnimationFrame(gifTick);", tick, System.StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void GifPreview_DrawsTheDecodedFrame_AndClosesTheDecoderWithItsBitmap()
+    {
+        var page = ConfigPage();
+        var draw = FunctionBody(page, "drawBackgroundImage");
+        Assert.Contains("img._ccaGifDecoder", draw, System.StringComparison.Ordinal);
+        Assert.Contains("var source = (gif && gif.drawn) ? gif.canvas : img;", draw, System.StringComparison.Ordinal);
+        // Geometry still comes from the <img>: the decoded canvas has the same size.
+        Assert.Contains("backgroundGeometry(img, W, H)", draw, System.StringComparison.Ordinal);
+
+        var close = FunctionBody(page, "closeGifDecoder");
+        Assert.Contains("decoder.close()", close, System.StringComparison.Ordinal);
+        Assert.Contains("img._ccaGifDecoder = null;", close, System.StringComparison.Ordinal);
+
+        Assert.Contains("closeGifDecoder(bgImageEl);", FunctionBody(page, "clearBackgroundBitmap"), System.StringComparison.Ordinal);
+        // A pick that lost the race (or failed to load) never becomes bgImageEl, so it
+        // closes its own decoder.
+        var set = FunctionBody(page, "setBackgroundBitmap");
+        Assert.Contains("closeGifDecoder(img);", set, System.StringComparison.Ordinal);
+    }
+
+    /// <summary>
     /// The steps stopped being .ccaCard in the guided-editor redesign, which silently
     /// orphaned every .ccaCard-scoped field rule: controls after a grid sat flush, and the
     /// rest fell back to Jellyfin's 1.8em .inputContainer margin.
@@ -611,7 +722,7 @@ public class ConfigPageStructureTests
     {
         var page = ConfigPage();
         var setter = FunctionBody(page, "setBackgroundBitmap");
-        Assert.Contains("if (!isCurrent()) { URL.revokeObjectURL(url); return; }", setter, System.StringComparison.Ordinal);
+        Assert.Contains("if (!isCurrent()) { URL.revokeObjectURL(url); closeGifDecoder(img); return; }", setter, System.StringComparison.Ordinal);
         Assert.Contains("clearBackgroundBitmap();", setter, System.StringComparison.Ordinal);
         Assert.Contains("URL.revokeObjectURL(_bgImageUrl)", FunctionBody(page, "clearBackgroundBitmap"), System.StringComparison.Ordinal);
         // The leaky inline pattern (an object URL assigned straight to an <img>, never revoked).
