@@ -197,7 +197,7 @@
                             <span class="ccaStepChevron" aria-hidden="true">&#9662;</span>
                         </button>
                         <div class="ccaStepBody" id="ccaStepBody3" hidden>
-                        <div id="ccaLayerList" class="ccaLayerList"></div>
+                        <div id="ccaLayerList" class="ccaLayerList" role="list" aria-label="Layers" data-i18n-aria="layer.list"></div>
                         <div class="ccaFileRow">
                             <button is="emby-button" type="button" id="ccaAddText" class="raised"><span data-i18n="layer.addText">Add text</span></button>
                             <button is="emby-button" type="button" id="ccaAddImage" class="raised"><span data-i18n="layer.addImage">Add logo/icon</span></button>
@@ -485,7 +485,7 @@
                             </button>
                         </div>
                         <div class="ccaPreviewWrap">
-                            <canvas id="ccaCanvas" class="ccaCanvas" width="1400" height="1400" aria-label="Cover art canvas"></canvas>
+                            <canvas id="ccaCanvas" class="ccaCanvas" width="1400" height="1400" tabindex="0" role="application" aria-label="Cover design canvas. Select a layer, then use the arrow keys to move it (hold Shift for bigger steps)." data-i18n-aria="canvas.label"></canvas>
                             <div id="ccaPreviewPlaceholder" class="ccaPreviewPlaceholder" data-i18n="preview.placeholder">The preview appears here automatically.</div>
                             <div id="ccaCollageSpinner" class="ccaSpinner" aria-hidden="true" hidden></div>
                             <div id="ccaGifHolder" class="ccaGifHolder" aria-hidden="true"></div>
@@ -657,6 +657,7 @@
             background: transparent; color: inherit; cursor: pointer; opacity: .7;
         }
         #CustomCoverArtConfigPage .ccaStopRemove:hover { opacity: 1; }
+        #CustomCoverArtConfigPage .ccaStopRemove:disabled { opacity: .3; cursor: default; }
 
         /* Numbered accordion steps. One open at a time; the header is the map. */
         #CustomCoverArtConfigPage .ccaStep { margin: 0 0 .6em; border: 1px solid rgba(127,127,127,.2); border-radius: 10px; overflow: hidden; }
@@ -802,6 +803,14 @@
         #CustomCoverArtConfigPage .ccaLayerName {
             flex: 1 1 auto; min-width: 0;
             overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+            /* A real <button> (keyboard selection), styled as the plain label it replaced. */
+            background: transparent; border: 0; margin: 0; padding: .25em 0;
+            color: inherit; font: inherit; text-align: left; cursor: pointer;
+        }
+        #CustomCoverArtConfigPage .ccaLayerName:focus-visible,
+        #CustomCoverArtConfigPage .ccaLayerBtn:focus-visible,
+        #CustomCoverArtConfigPage .ccaCanvas:focus-visible {
+            outline: 2px solid var(--theme-primary-color, #00a4dc); outline-offset: 2px;
         }
         #CustomCoverArtConfigPage .ccaLayerHidden .ccaLayerName { opacity: .45; text-decoration: line-through; }
         #CustomCoverArtConfigPage .ccaLayerBtn {
@@ -958,6 +967,9 @@
                 'dyn.applied': 'Cover art applied successfully.', 'dyn.error': 'Error: {0}', 'dyn.applyFail': 'Could not apply cover art: {0}',
                 'dyn.uploadFail': 'Upload failed: {0}', 'dyn.fontFail': 'Font upload failed: {0}',
                 'dyn.unknown': 'unknown error',
+                'canvas.label': 'Cover design canvas. Select a layer, then use the arrow keys to move it (hold Shift for bigger steps).',
+                'layer.visible': 'Visible', 'layer.list': 'Layers',
+                'stop.color': 'Colour', 'stop.position': 'Position', 'stop.remove': 'Remove colour', 'fx.swatch': 'Apply colour {0}',
                 'restore.confirm': 'Replace the current cover of this target with its original?', 'tpl.confirmDelete': 'Delete the template “{0}”?',
                 'batch.confirm': 'Apply the current design to {0} targets? Their current covers will be replaced.', 'batch.fail': 'Batch apply failed: {0}',
                 'err.network': 'Could not reach the server.', 'err.auth': 'The server refused the request (status {0}). Your session may have expired — reload the page and sign in again.',
@@ -1029,6 +1041,9 @@
                 'dyn.applied': 'Cover art succesvol toegepast.', 'dyn.error': 'Fout: {0}', 'dyn.applyFail': 'Kon cover art niet toepassen: {0}',
                 'dyn.uploadFail': 'Uploaden mislukt: {0}', 'dyn.fontFail': 'Lettertype uploaden mislukt: {0}',
                 'dyn.unknown': 'onbekende fout',
+                'canvas.label': 'Canvas met het coverontwerp. Selecteer een laag en verplaats die met de pijltjestoetsen (houd Shift ingedrukt voor grotere stappen).',
+                'layer.visible': 'Zichtbaar', 'layer.list': 'Lagen',
+                'stop.color': 'Kleur', 'stop.position': 'Positie', 'stop.remove': 'Kleur verwijderen', 'fx.swatch': 'Kleur {0} toepassen',
                 'restore.confirm': 'De huidige cover van dit doel vervangen door het origineel?', 'tpl.confirmDelete': 'Het sjabloon “{0}” verwijderen?',
                 'batch.confirm': 'Het huidige ontwerp toepassen op {0} doelen? Hun huidige covers worden vervangen.', 'batch.fail': 'Toepassen op meerdere doelen mislukt: {0}',
                 'err.network': 'Kan de server niet bereiken.', 'err.auth': 'De server weigerde het verzoek (status {0}). Je sessie is mogelijk verlopen — laad de pagina opnieuw en meld je opnieuw aan.',
@@ -1100,6 +1115,9 @@
                 'dyn.applied': 'Carátula aplicada correctamente.', 'dyn.error': 'Error: {0}', 'dyn.applyFail': 'No se ha podido aplicar la carátula: {0}',
                 'dyn.uploadFail': 'Error al subir: {0}', 'dyn.fontFail': 'Error al subir la fuente: {0}',
                 'dyn.unknown': 'error desconocido',
+                'canvas.label': 'Lienzo con el diseño de la carátula. Selecciona una capa y muévela con las flechas del teclado (mantén Mayús para pasos más grandes).',
+                'layer.visible': 'Visible', 'layer.list': 'Capas',
+                'stop.color': 'Color', 'stop.position': 'Posición', 'stop.remove': 'Quitar color', 'fx.swatch': 'Aplicar el color {0}',
                 'restore.confirm': '¿Sustituir la carátula actual de este destino por la original?', 'tpl.confirmDelete': '¿Eliminar la plantilla «{0}»?',
                 'batch.confirm': '¿Aplicar el diseño actual a {0} destinos? Sus carátulas actuales se sustituirán.', 'batch.fail': 'Error al aplicar a varios destinos: {0}',
                 'err.network': 'No se puede conectar con el servidor.', 'err.auth': 'El servidor rechazó la solicitud (estado {0}). Puede que tu sesión haya caducado: recarga la página e inicia sesión de nuevo.',
@@ -1786,9 +1804,36 @@
             scheduleRender();
         }
 
+        // The panel is rebuilt on every select/move/show-hide, which used to drop keyboard
+        // focus to <body> after each action. Remember which control of which row had it...
+        function focusedLayerControl() {
+            var a = document.activeElement;
+            var box = el('ccaLayerList');
+            if (!a || !box || !box.contains(a)) { return null; }
+            var row = a.closest('.ccaLayerRow');
+            return row ? { id: row.getAttribute('data-layer-id'), act: a.getAttribute('data-act') } : null;
+        }
+
+        // ...and put it back on the same control after the rebuild. A deleted layer's
+        // focus moves to the newly selected layer's name.
+        function restoreLayerFocus(box, prev) {
+            if (!prev) { return; }
+            var rows = box.querySelectorAll('.ccaLayerRow');
+            var target = null;
+            for (var i = 0; i < rows.length; i++) {
+                if (rows[i].getAttribute('data-layer-id') === prev.id) {
+                    target = rows[i].querySelector('[data-act="' + prev.act + '"]') || rows[i].querySelector('[data-act="pick"]');
+                    break;
+                }
+            }
+            if (!target) { target = box.querySelector('.ccaLayerSel [data-act="pick"]') || box.querySelector('[data-act="pick"]'); }
+            if (target) { target.focus(); }
+        }
+
         function renderLayersPanel() {
             var box = el('ccaLayerList');
             if (!box) { return; }
+            var prevFocus = focusedLayerControl();
             box.innerHTML = '';
             for (var i = doc.Layers.length - 1; i >= 0; i--) {
                 (function (layer) {
@@ -1796,11 +1841,16 @@
                     row.className = 'ccaLayerRow'
                         + (layer.Id === doc._selectedId ? ' ccaLayerSel' : '')
                         + (layer.Visible ? '' : ' ccaLayerHidden');
+                    row.setAttribute('role', 'listitem');
+                    row.setAttribute('data-layer-id', layer.Id);
 
                     var vis = document.createElement('button');
                     vis.type = 'button'; vis.className = 'ccaLayerBtn';
+                    vis.setAttribute('data-act', 'vis');
                     vis.textContent = layer.Visible ? '👁' : '∅';
                     vis.title = layer.Visible ? t('layer.hide') : t('layer.show');
+                    vis.setAttribute('aria-label', t('layer.visible'));
+                    vis.setAttribute('aria-pressed', layer.Visible ? 'true' : 'false');
                     vis.addEventListener('click', function (e) {
                         e.stopPropagation();
                         layer.Visible = !layer.Visible;
@@ -1808,8 +1858,15 @@
                         scheduleRender();
                     });
 
-                    var name = document.createElement('span');
+                    // The name is a real button, so a layer can be selected from the
+                    // keyboard (Tab to it, Enter or Space). It has no handler of its own:
+                    // its click bubbles to the row's, which is what selects, so a mouse
+                    // click anywhere on the row still works.
+                    var name = document.createElement('button');
+                    name.type = 'button';
                     name.className = 'ccaLayerName';
+                    name.setAttribute('data-act', 'pick');
+                    name.setAttribute('aria-pressed', layer.Id === doc._selectedId ? 'true' : 'false');
                     name.textContent = layerLabel(layer);
 
                     row.appendChild(vis);
@@ -1823,8 +1880,10 @@
                     ['up', 'down', 'dup', 'del'].forEach(function (act) {
                         var b = document.createElement('button');
                         b.type = 'button'; b.className = 'ccaLayerBtn';
+                        b.setAttribute('data-act', act);
                         b.textContent = act === 'up' ? '▲' : act === 'down' ? '▼' : act === 'dup' ? '⧉' : '✕';
                         b.title = t('layer.' + act);
+                        b.setAttribute('aria-label', t('layer.' + act));
                         b.addEventListener('click', function (e) {
                             e.stopPropagation();
                             // "Up" in the panel means later in the array = drawn on top.
@@ -1839,11 +1898,15 @@
                     var more = document.createElement('button');
                     more.type = 'button';
                     more.className = 'ccaLayerBtn ccaLayerMore';
+                    more.setAttribute('data-act', 'more');
                     more.textContent = '⋯';
                     more.title = t('layer.more');
+                    more.setAttribute('aria-label', t('layer.more'));
+                    more.setAttribute('aria-expanded', 'false');
                     more.addEventListener('click', function (e) {
                         e.stopPropagation();
-                        row.classList.toggle('ccaLayerActionsOpen');
+                        var open = row.classList.toggle('ccaLayerActionsOpen');
+                        more.setAttribute('aria-expanded', open ? 'true' : 'false');
                     });
 
                     row.appendChild(actions);
@@ -1853,6 +1916,7 @@
                     box.appendChild(row);
                 })(doc.Layers[i]);
             }
+            restoreLayerFocus(box, prevFocus);
             var atCap = doc.Layers.length >= MAX_LAYERS;
             if (el('ccaAddText')) { el('ccaAddText').disabled = atCap; }
             if (el('ccaAddImage')) { el('ccaAddImage').disabled = atCap; }
@@ -2488,6 +2552,7 @@
                 s.className = 'ccaSwatch';
                 s.style.background = hex;
                 s.title = hex;
+                s.setAttribute('aria-label', t('fx.swatch', hex));
                 // Read the focus state one event EARLIER than the click: pressing the mouse
                 // on a button moves focus to it (Chrome/Edge/Firefox on Windows) before
                 // 'click' fires, and some browsers (Safari) do not focus buttons on click at
@@ -3083,6 +3148,25 @@
             return null;
         }
 
+        // Keyboard move for the selected layer: arrows nudge 1 canvas pixel, Shift+arrow
+        // 10, clamped like a pointer drag. Off while repositioning the background, where
+        // the canvas belongs to the background gesture instead.
+        function onCanvasKeydown(ev) {
+            var dx = 0, dy = 0;
+            if (ev.key === 'ArrowLeft') { dx = -1; }
+            else if (ev.key === 'ArrowRight') { dx = 1; }
+            else if (ev.key === 'ArrowUp') { dy = -1; }
+            else if (ev.key === 'ArrowDown') { dy = 1; }
+            else { return; }
+            var layer = selectedLayer();
+            if (!layer || bgAdjustMode) { return; }
+            var step = ev.shiftKey ? 10 : 1;
+            layer.X = Math.max(0, Math.min(1, layer.X + dx * step / doc.Canvas.Width));
+            layer.Y = Math.max(0, Math.min(1, layer.Y + dy * step / doc.Canvas.Height));
+            ev.preventDefault();
+            scheduleRender();
+        }
+
         var _drag = null;       // layer move drag (bgAdjustMode off)
         var _handleDrag = null; // corner-resize / rotate-knob drag on the selected layer
         var _bgDrag = null;     // background pan drag (bgAdjustMode on, single pointer)
@@ -3103,6 +3187,12 @@
         }
 
         function onCanvasPointerDown(ev) {
+            // preventDefault below suppresses the mouse events that would normally focus
+            // the canvas, so focus it explicitly: click a layer, then nudge with arrows.
+            var cvEl = el('ccaCanvas');
+            if (cvEl && document.activeElement !== cvEl) {
+                try { cvEl.focus({ preventScroll: true }); } catch (err) { /* ignore */ }
+            }
             _pointers[ev.pointerId] = { x: ev.clientX, y: ev.clientY };
 
             if (bgAdjustMode) {
@@ -4065,6 +4155,15 @@
             return collectStops('ccaGradientStops');
         }
 
+        // A gradient needs two stops, so ✕ is disabled at two instead of silently ignored.
+        function updateStopRemoveButtons(container) {
+            var rows = container.querySelectorAll('.ccaStop');
+            rows.forEach(function (row) {
+                var rm = row.querySelector('.ccaStopRemove');
+                if (rm) { rm.disabled = rows.length <= 2; }
+            });
+        }
+
         function addStopRow(containerId, color, posPercent, alphaPercent, withAlpha) {
             var container = el(containerId);
             if (!container) { return; }
@@ -4074,12 +4173,14 @@
             var c = document.createElement('input');
             c.type = 'color';
             c.value = color || '#888888';
+            c.setAttribute('aria-label', t('stop.color'));
 
             var p = document.createElement('input');
             p.type = 'range';
             p.min = '0'; p.max = '100'; p.step = '1';
             p.value = (posPercent == null ? 50 : posPercent);
             p.className = 'ccaRange ccaStopPos';
+            p.setAttribute('aria-label', t('stop.position'));
 
             var a = null, aTag = null;
             if (withAlpha) {
@@ -4103,9 +4204,12 @@
             rm.type = 'button';
             rm.className = 'ccaStopRemove';
             rm.textContent = '✕';
+            rm.title = t('stop.remove');
+            rm.setAttribute('aria-label', t('stop.remove'));
             rm.addEventListener('click', function () {
                 if (container.querySelectorAll('.ccaStop').length > 2) {
                     container.removeChild(row);
+                    updateStopRemoveButtons(container);
                     onStopsEdited(containerId);
                     scheduleRender();
                 }
@@ -4120,6 +4224,7 @@
                 row.addEventListener('focusin', function () { selectOverlayStopFrom(row); });
             }
             container.appendChild(row);
+            updateStopRemoveButtons(container);
         }
 
         function addGradientStop(color, posPercent) {
@@ -4674,6 +4779,7 @@
             cv.addEventListener('pointermove', onCanvasPointerMove);
             cv.addEventListener('pointerup', onCanvasPointerUp);
             cv.addEventListener('pointercancel', onCanvasPointerUp);
+            cv.addEventListener('keydown', onCanvasKeydown);
 
             // Mouse-wheel zoom of the background, only while repositioning it and
             // only when an image is actually loaded (activeBgBitmap) — otherwise a no-op

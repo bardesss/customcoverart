@@ -658,4 +658,43 @@ public class ConfigPageStructureTests
         Assert.DoesNotContain("background: var(--theme-body-background-color, #101010);", css, System.StringComparison.Ordinal);
         Assert.Contains("--cca-surface", FunctionBody(ConfigPage(), "applyThemeSurface"), System.StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void LayersPanelIsKeyboardUsableAndLabelled()
+    {
+        var page = ConfigPage();
+        var panel = FunctionBody(page, "renderLayersPanel");
+        Assert.Contains("name.setAttribute('data-act', 'pick')", panel, System.StringComparison.Ordinal);
+        Assert.Contains("var name = document.createElement('button')", panel, System.StringComparison.Ordinal);
+        Assert.Contains("vis.setAttribute('aria-pressed'", panel, System.StringComparison.Ordinal);
+        Assert.Contains("b.setAttribute('aria-label', t('layer.' + act))", panel, System.StringComparison.Ordinal);
+        Assert.Contains("more.setAttribute('aria-expanded'", panel, System.StringComparison.Ordinal);
+        Assert.Contains("restoreLayerFocus(box, prevFocus)", panel, System.StringComparison.Ordinal);
+        Assert.Matches(@"id=""ccaLayerList""[^>]*role=""list""", Markup());
+    }
+
+    [Fact]
+    public void CanvasIsFocusableAndArrowKeysNudgeTheSelectedLayer()
+    {
+        Assert.Matches(@"id=""ccaCanvas""[^>]*tabindex=""0""", Markup());
+        Assert.Matches(@"id=""ccaCanvas""[^>]*data-i18n-aria=""canvas.label""", Markup());
+        var page = ConfigPage();
+        var keys = FunctionBody(page, "onCanvasKeydown");
+        Assert.Contains("ArrowLeft", keys, System.StringComparison.Ordinal);
+        Assert.Contains("ev.shiftKey ? 10 : 1", keys, System.StringComparison.Ordinal);
+        Assert.Contains("cv.addEventListener('keydown', onCanvasKeydown)", page, System.StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void StopRowsAndSwatchesAreLabelled()
+    {
+        var page = ConfigPage();
+        var row = FunctionBody(page, "addStopRow");
+        Assert.Contains("t('stop.color')", row, System.StringComparison.Ordinal);
+        Assert.Contains("t('stop.position')", row, System.StringComparison.Ordinal);
+        Assert.Contains("t('stop.remove')", row, System.StringComparison.Ordinal);
+        Assert.Contains("updateStopRemoveButtons(container)", row, System.StringComparison.Ordinal);
+        Assert.Contains("rows.length <= 2", FunctionBody(page, "updateStopRemoveButtons"), System.StringComparison.Ordinal);
+        Assert.Contains("t('fx.swatch', hex)", FunctionBody(page, "renderSwatches"), System.StringComparison.Ordinal);
+    }
 }
