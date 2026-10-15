@@ -435,10 +435,12 @@ public class ConfigPageStructureTests
         Assert.Contains("renderDocument(true)", tick, System.StringComparison.Ordinal);
         Assert.Contains("var GIF_FRAME_MS = 1000 / 15;", page, System.StringComparison.Ordinal);
 
-        var listeners = FunctionBody(page, "bindGifLoopListeners");
-        Assert.Contains("'visibilitychange'", listeners, System.StringComparison.Ordinal);
-        Assert.Contains("'pagehide'", listeners, System.StringComparison.Ordinal);
-        Assert.Contains("bindGifLoopListeners();", FunctionBody(page, "bindEvents"), System.StringComparison.Ordinal);
+        // Its watchers are page-scoped (bound on pageshow, removed on pagehide/viewhide),
+        // and leaving the page stops the loop at once.
+        var bindPage = FunctionBody(page, "bindPageListeners");
+        Assert.Contains("document.addEventListener('visibilitychange', updateGifLoop)", bindPage, System.StringComparison.Ordinal);
+        Assert.Contains("watchReducedMotion(true)", bindPage, System.StringComparison.Ordinal);
+        Assert.Contains("stopGifLoop()", FunctionBody(page, "onPageHide"), System.StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -745,5 +747,49 @@ public class ConfigPageStructureTests
     {
         var keys = FunctionBody(ConfigPage(), "onCanvasKeydown");
         Assert.Contains("if (ev.altKey || ev.ctrlKey || ev.metaKey) { return; }", keys, System.StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// bindEvents runs once, but the page stays in the DOM while you browse the rest of
+    /// the dashboard: a document-level Ctrl+Z handler bound there hijacked undo on every
+    /// other settings page, and the GIF loop's visibility/reduced-motion watchers leaked
+    /// the same way.
+    /// </summary>
+    [Fact]
+    public void GlobalListenersArePageScoped()
+    {
+        var page = ConfigPage();
+        var bind = FunctionBody(page, "bindEvents");
+        Assert.DoesNotContain("window.addEventListener('resize'", bind, System.StringComparison.Ordinal);
+        Assert.DoesNotContain("document.addEventListener('keydown'", bind, System.StringComparison.Ordinal);
+        Assert.DoesNotContain("function bindGifLoopListeners(", page, System.StringComparison.Ordinal);
+
+        var unbind = FunctionBody(page, "unbindPageListeners");
+        Assert.Contains("window.removeEventListener('resize', onWindowResize)", unbind, System.StringComparison.Ordinal);
+        Assert.Contains("document.removeEventListener('keydown', onDocumentKeydown)", unbind, System.StringComparison.Ordinal);
+        Assert.Contains("document.removeEventListener('visibilitychange', updateGifLoop)", unbind, System.StringComparison.Ordinal);
+        Assert.Contains("watchReducedMotion(false)", unbind, System.StringComparison.Ordinal);
+
+        Assert.Contains("addEventListener('pagehide', onPageHide)", page, System.StringComparison.Ordinal);
+        Assert.Contains("addEventListener('viewhide', onPageHide)", page, System.StringComparison.Ordinal);
+        Assert.Contains("isPageVisible()", FunctionBody(page, "onDocumentKeydown"), System.StringComparison.Ordinal);
+    }
+
+    /// <summary>Only text-like fields keep the browser's own undo; sliders and pickers undo the design.</summary>
+    [Fact]
+    public void UndoShortcutBailsOnlyForTextFields()
+    {
+        var page = ConfigPage();
+        Assert.Contains("TEXT_INPUT_TYPES", FunctionBody(page, "isTextEditingTarget"), System.StringComparison.Ordinal);
+        Assert.Contains("isTextEditingTarget(ev.target)", FunctionBody(page, "onDocumentKeydown"), System.StringComparison.Ordinal);
+        Assert.DoesNotContain("target.tagName === 'INPUT' || target.tagName === 'TEXTAREA'", page, System.StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void BundledFontsAreRegisteredOncePerLoad()
+    {
+        var page = ConfigPage();
+        Assert.Contains("_canvasFontsLoaded = loadCanvasFonts()", page, System.StringComparison.Ordinal);
+        Assert.DoesNotContain("loadCanvasFonts().then(", page, System.StringComparison.Ordinal);
     }
 }
