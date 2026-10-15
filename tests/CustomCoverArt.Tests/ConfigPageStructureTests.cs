@@ -298,6 +298,40 @@ public class ConfigPageStructureTests
         Assert.Contains("refreshRestoreState();", handler, System.StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void DestructiveActionsAskFirst()
+    {
+        var page = ConfigPage();
+        Assert.Contains("confirmAction(t('restore.confirm'))", page, System.StringComparison.Ordinal);
+        Assert.Contains("confirmAction(t('restore.resetConfirm'))", page, System.StringComparison.Ordinal);
+        Assert.Contains("confirmAction(t('tpl.confirmDelete', name))", page, System.StringComparison.Ordinal);
+        Assert.Contains("confirmAction(t('batch.confirm', targets.length))", page, System.StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Batch apply used to have no guard and no error path: a second click started a
+    /// second batch, and a failure left "Applying…" on screen forever.
+    /// </summary>
+    [Fact]
+    public void BatchApplyCannotRunTwiceAndAlwaysFinishes()
+    {
+        var handler = HandlerBody(ConfigPage(), "el('ccaBatchApply').addEventListener('click'");
+        Assert.Contains("state.batchRunning", handler, System.StringComparison.Ordinal);
+        Assert.Contains("btn.disabled = true", handler, System.StringComparison.Ordinal);
+        Assert.Contains(".catch(", handler, System.StringComparison.Ordinal);
+        Assert.Contains("t('batch.fail'", handler, System.StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RestoreRefreshesItsHint_AndStatusLinesAreAnnounced()
+    {
+        var restore = HandlerBody(ConfigPage(), "el('ccaRestoreBtn').addEventListener('click'");
+        Assert.Contains(".then(refreshRestoreState)", restore, System.StringComparison.Ordinal);
+        var markup = Markup();
+        Assert.Matches(@"id=""ccaRestoreHint""[^>]*aria-live=""polite""", markup);
+        Assert.Matches(@"id=""ccaBatchStatus""[^>]*aria-live=""polite""", markup);
+    }
+
     /// <summary>
     /// The canvas draws dim, blur, pan/zoom, overlay, effects and layers itself. The server
     /// must therefore return the bare mosaic only, or each would be applied twice.

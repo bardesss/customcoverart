@@ -49,7 +49,7 @@
                             <button is="emby-button" type="button" id="ccaResetBackupBtn" class="raised" disabled>
                                 <span data-i18n="restore.reset">Reset backup</span>
                             </button>
-                            <span class="ccaFileName" id="ccaRestoreHint" data-i18n="restore.none">No backup yet</span>
+                            <span class="ccaFileName" id="ccaRestoreHint" data-i18n="restore.none" aria-live="polite">No backup yet</span>
                         </div>
                         <div class="ccaStepGroup">
                             <div class="ccaStepGroupHead" data-i18n="group.startFrom">Start from a saved design</div>
@@ -462,7 +462,7 @@
                             <button is="emby-button" type="button" id="ccaBatchApply" class="raised">
                                 <span data-i18n="batch.apply">Apply to selected</span>
                             </button>
-                            <span class="ccaFileName" id="ccaBatchStatus"></span>
+                            <span class="ccaFileName" id="ccaBatchStatus" role="status" aria-live="polite"></span>
                         </div>
                         </div>
                         </div>
@@ -954,6 +954,8 @@
                 'dyn.applied': 'Cover art applied successfully.', 'dyn.error': 'Error: {0}', 'dyn.applyFail': 'Could not apply cover art: {0}',
                 'dyn.uploadFail': 'Upload failed: {0}', 'dyn.fontFail': 'Font upload failed: {0}',
                 'dyn.unknown': 'unknown error',
+                'restore.confirm': 'Replace the current cover of this target with its original?', 'tpl.confirmDelete': 'Delete the template “{0}”?',
+                'batch.confirm': 'Apply the current design to {0} targets? Their current covers will be replaced.', 'batch.fail': 'Batch apply failed: {0}',
                 'err.network': 'Could not reach the server.', 'err.auth': 'The server refused the request (status {0}). Your session may have expired — reload the page and sign in again.',
                 'err.tooLarge': 'The file is too large for the server to accept.', 'err.rateLimited': 'Too many requests — wait a minute and try again.',
                 'err.status': 'The server answered with status {0}.', 'err.badResponse': 'The server sent a response the page could not read.',
@@ -1023,6 +1025,8 @@
                 'dyn.applied': 'Cover art succesvol toegepast.', 'dyn.error': 'Fout: {0}', 'dyn.applyFail': 'Kon cover art niet toepassen: {0}',
                 'dyn.uploadFail': 'Uploaden mislukt: {0}', 'dyn.fontFail': 'Lettertype uploaden mislukt: {0}',
                 'dyn.unknown': 'onbekende fout',
+                'restore.confirm': 'De huidige cover van dit doel vervangen door het origineel?', 'tpl.confirmDelete': 'Het sjabloon “{0}” verwijderen?',
+                'batch.confirm': 'Het huidige ontwerp toepassen op {0} doelen? Hun huidige covers worden vervangen.', 'batch.fail': 'Toepassen op meerdere doelen mislukt: {0}',
                 'err.network': 'Kan de server niet bereiken.', 'err.auth': 'De server weigerde het verzoek (status {0}). Je sessie is mogelijk verlopen — laad de pagina opnieuw en meld je opnieuw aan.',
                 'err.tooLarge': 'Het bestand is te groot voor de server.', 'err.rateLimited': 'Te veel verzoeken — wacht een minuut en probeer het opnieuw.',
                 'err.status': 'De server antwoordde met status {0}.', 'err.badResponse': 'De server stuurde een antwoord dat de pagina niet kon lezen.',
@@ -1092,6 +1096,8 @@
                 'dyn.applied': 'Carátula aplicada correctamente.', 'dyn.error': 'Error: {0}', 'dyn.applyFail': 'No se ha podido aplicar la carátula: {0}',
                 'dyn.uploadFail': 'Error al subir: {0}', 'dyn.fontFail': 'Error al subir la fuente: {0}',
                 'dyn.unknown': 'error desconocido',
+                'restore.confirm': '¿Sustituir la carátula actual de este destino por la original?', 'tpl.confirmDelete': '¿Eliminar la plantilla «{0}»?',
+                'batch.confirm': '¿Aplicar el diseño actual a {0} destinos? Sus carátulas actuales se sustituirán.', 'batch.fail': 'Error al aplicar a varios destinos: {0}',
                 'err.network': 'No se puede conectar con el servidor.', 'err.auth': 'El servidor rechazó la solicitud (estado {0}). Puede que tu sesión haya caducado: recarga la página e inicia sesión de nuevo.',
                 'err.tooLarge': 'El archivo es demasiado grande para el servidor.', 'err.rateLimited': 'Demasiadas solicitudes: espera un minuto y vuelve a intentarlo.',
                 'err.status': 'El servidor respondió con el estado {0}.', 'err.badResponse': 'El servidor envió una respuesta que la página no pudo leer.',
@@ -1355,7 +1361,7 @@
 
         // titleTouched: the user has typed their own title, so picking a target no longer
         // renames it. applying: an Apply is in flight and owns the Apply button.
-        var state = { libraryId: '', aspectRatio: 1, collageSeed: 1, titleTouched: false, applying: false };
+        var state = { libraryId: '', aspectRatio: 1, collageSeed: 1, titleTouched: false, applying: false, batchRunning: false };
         var browser = { page: 1, pageSize: 24, totalPages: 1 };
 
         function debounce(fn, wait) {
@@ -4154,11 +4160,18 @@
             el('ccaRestoreBtn').addEventListener('click', function () {
                 if (!state.libraryId) { return; }
                 var type = el('ccaTargetType') ? el('ccaTargetType').value : 'library';
-                jsonFetch('CustomCoverArt/targets/' + type + '/' + encodeURIComponent(state.libraryId) + '/restore', 'POST')
-                    .then(function (res) {
-                        Dashboard.alert(pick(res, 'Success') ? t('restore.done') : t('restore.fail'));
-                    })
-                    .catch(function (e) { showError(t('dyn.error', errorText(e))); });
+                var id = state.libraryId;
+                confirmAction(t('restore.confirm')).then(function (ok) {
+                    if (!ok) { return; }
+                    Dashboard.showLoadingMsg();
+                    return jsonFetch('CustomCoverArt/targets/' + type + '/' + encodeURIComponent(id) + '/restore', 'POST')
+                        .then(function (res) {
+                            Dashboard.hideLoadingMsg();
+                            Dashboard.alert(pick(res, 'Success') ? t('restore.done') : t('restore.fail'));
+                        })
+                        .catch(function (e) { showError(t('dyn.error', errorText(e))); })
+                        .then(refreshRestoreState);
+                });
             });
 
             el('ccaResetBackupBtn').addEventListener('click', function () {
@@ -4597,28 +4610,44 @@
             el('ccaTemplateDelete').addEventListener('click', function () {
                 var name = el('ccaTemplateSelect').value;
                 if (!name) { return; }
-                jsonFetch('CustomCoverArt/templates/' + encodeURIComponent(name), 'DELETE')
-                    .then(function (res) { dataOrThrow(res); return loadTemplates(); })
-                    .catch(function (e) { showError(t('dyn.error', errorText(e))); });
+                confirmAction(t('tpl.confirmDelete', name)).then(function (ok) {
+                    if (!ok) { return; }
+                    return jsonFetch('CustomCoverArt/templates/' + encodeURIComponent(name), 'DELETE')
+                        .then(function (res) { dataOrThrow(res); return loadTemplates(); })
+                        .catch(function (e) { showError(t('dyn.error', errorText(e))); });
+                });
             });
 
             el('ccaBatchApply').addEventListener('click', function () {
+                var btn = this;
+                // Set before the confirm dialog, not after: a double click must not open two.
+                if (state.batchRunning) { return; }
                 var checks = el('ccaBatchList').querySelectorAll('input[type=checkbox]:checked');
                 if (!checks.length) { Dashboard.alert(t('batch.none')); return; }
                 var targets = Array.prototype.map.call(checks, function (c) { return { Id: c.value, Type: c.dataset.type }; });
-                el('ccaBatchStatus').textContent = t('batch.running');
-                // Send the layered document as well: the server prefers it, so batching
-                // a multi-layer design no longer collapses to the flat single-title
-                // model. Settings stays for older servers / the template path.
-                jsonFetch('CustomCoverArt/batchApply', 'POST', { Document: collectDocument(), Settings: collectSettings(), Targets: targets })
-                    .then(function (res) {
-                        var data = pick(res, 'Data') || [];
-                        var ok = data.filter(function (r) { return pick(r, 'Success'); }).length;
-                        var fail = data.length - ok;
-                        el('ccaBatchStatus').textContent = t('batch.done').replace('{0}', ok).replace('{1}', fail);
-                        // The selected target may have been part of the batch.
-                        refreshRestoreState();
-                    });
+                var status = el('ccaBatchStatus');
+                state.batchRunning = true;
+                confirmAction(t('batch.confirm', targets.length)).then(function (ok) {
+                    if (!ok) { state.batchRunning = false; return; }
+                    btn.disabled = true;
+                    status.textContent = t('batch.running');
+                    // Send the layered document as well: the server prefers it, so batching
+                    // a multi-layer design no longer collapses to the flat single-title
+                    // model. Settings stays until plan D removes it.
+                    return jsonFetch('CustomCoverArt/batchApply', 'POST', { Document: collectDocument(), Settings: collectSettings(), Targets: targets })
+                        .then(function (res) {
+                            var data = dataOrThrow(res) || [];
+                            var okCount = data.filter(function (r) { return pick(r, 'Success'); }).length;
+                            status.textContent = t('batch.done', okCount, data.length - okCount);
+                        })
+                        .catch(function (e) { status.textContent = t('batch.fail', errorText(e)); })
+                        .then(function () {
+                            state.batchRunning = false;
+                            btn.disabled = false;
+                            // The selected target may have been part of the batch.
+                            refreshRestoreState();
+                        });
+                });
             });
 
             // Delegated handler for the dynamically-added gradient-stop rows (the
