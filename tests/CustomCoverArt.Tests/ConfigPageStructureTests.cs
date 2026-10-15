@@ -810,6 +810,24 @@ public class ConfigPageStructureTests
         Assert.Matches(@"'CustomCoverArt/templates', 'POST'[\s\S]{0,300}?markClean\(savedJson\)", page);
     }
 
+    [Fact]
+    public void CleanStateIsTakenAfterCollectDocumentMutatesTheDesign()
+    {
+        var page = ConfigPage();
+        var apply = FunctionBody(page, "applyCoverArt");
+        Assert.Contains("var sent = collectDocument();", apply, System.StringComparison.Ordinal);
+        Assert.Contains("var appliedJson = JSON.stringify(sent);", apply, System.StringComparison.Ordinal);
+        Assert.DoesNotContain("Document: collectDocument()", apply, System.StringComparison.Ordinal);
+
+        Assert.Matches(@"var sentDoc = collectDocument\(\);\s*var savedJson = JSON\.stringify\(sentDoc\);", page);
+
+        var batch = HandlerBody(page, "el('ccaBatchApply').addEventListener('click'");
+        Assert.Matches(@"var wasClean = !isDirty\(\);[\s\S]*?collectDocument\(\)[\s\S]*?if \(wasClean\) \{ markClean\(\); \}", batch);
+
+        var load = FunctionBody(page, "loadTemplates");
+        Assert.Equal(2, System.Text.RegularExpressions.Regex.Matches(load, @"state\.templateValue = '';").Count);
+    }
+
     /// <summary>
     /// Custom size and Animated GIF revealed their controls inside a CLOSED Advanced
     /// disclosure (so choosing them appeared to do nothing), and the template and batch

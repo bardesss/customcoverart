@@ -4111,6 +4111,7 @@
                 var templates = dataOrThrow(res) || [];
                 var sel = el('ccaTemplateSelect');
                 sel.innerHTML = '';
+                state.templateValue = ''; // the rebuilt list selects "—"
                 var none = document.createElement('option'); none.value = ''; none.textContent = '—'; sel.appendChild(none);
                 templates.forEach(function (tpl) {
                     var o = document.createElement('option');
@@ -4127,6 +4128,7 @@
                 // target list, and a dead server should not stack three alerts.
                 var sel = el('ccaTemplateSelect');
                 sel.innerHTML = '';
+                state.templateValue = '';
                 var none = document.createElement('option'); none.value = ''; none.textContent = t('dyn.error', errorText(e)); sel.appendChild(none);
             });
         }
@@ -4343,10 +4345,13 @@
             btn.disabled = true;
             if (label) { label.textContent = t('action.applying'); }
             Dashboard.showLoadingMsg();
-            var appliedJson = JSON.stringify(stripUiKeys(doc));
+            // collectDocument() normalizes doc (collage source, GIF animation), so the clean
+            // snapshot must come from what it returned, not from doc beforehand.
+            var sent = collectDocument();
+            var appliedJson = JSON.stringify(sent);
             jsonFetch('CustomCoverArt/document/apply', 'POST', {
                 LibraryId: state.libraryId,
-                Document: collectDocument()
+                Document: sent
             }).then(function (res) {
                 Dashboard.hideLoadingMsg();
                 if (pick(res, 'Success')) {
@@ -4880,8 +4885,9 @@
             el('ccaTemplateSave').addEventListener('click', function () {
                 var name = el('ccaTemplateName').value.trim();
                 if (!name) { Dashboard.alert(t('tpl.named')); return; }
-                var savedJson = JSON.stringify(stripUiKeys(doc));
-                jsonFetch('CustomCoverArt/templates', 'POST', { Name: name, Document: collectDocument() })
+                var sentDoc = collectDocument();
+                var savedJson = JSON.stringify(sentDoc);
+                jsonFetch('CustomCoverArt/templates', 'POST', { Name: name, Document: sentDoc })
                     .then(function (res) { dataOrThrow(res); markClean(savedJson); Dashboard.alert(t('tpl.saved')); return loadTemplates(); })
                     .catch(function (e) { showError(t('dyn.error', errorText(e))); });
             });
@@ -4912,7 +4918,12 @@
                     // Send the layered document as well: the server prefers it, so batching
                     // a multi-layer design no longer collapses to the flat single-title
                     // model. Settings stays until plan D removes it.
-                    return jsonFetch('CustomCoverArt/batchApply', 'POST', { Document: collectDocument(), Settings: collectSettings(), Targets: targets })
+                    // Batch apply neither cleans nor dirties the design: collectDocument()
+                    // normalizes doc, so keep a clean design clean across that call.
+                    var wasClean = !isDirty();
+                    var batchDoc = collectDocument();
+                    if (wasClean) { markClean(); }
+                    return jsonFetch('CustomCoverArt/batchApply', 'POST', { Document: batchDoc, Settings: collectSettings(), Targets: targets })
                         .then(function (res) {
                             var data = dataOrThrow(res) || [];
                             var okCount = data.filter(function (r) { return pick(r, 'Success'); }).length;
