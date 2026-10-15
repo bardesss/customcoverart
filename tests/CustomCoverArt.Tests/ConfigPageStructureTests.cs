@@ -717,4 +717,28 @@ public class ConfigPageStructureTests
         Assert.Contains("rows.length <= 2", FunctionBody(page, "updateStopRemoveButtons"), System.StringComparison.Ordinal);
         Assert.Contains("t('fx.swatch', hex)", FunctionBody(page, "renderSwatches"), System.StringComparison.Ordinal);
     }
+
+    /// <summary>
+    /// The narrow-screen rules that show ⋯ and collapse the layer actions have the same
+    /// specificity as the base rules, so the base rules must come first or they win at
+    /// every width.
+    /// </summary>
+    [Fact]
+    public void LayerOverflowBaseRulesPrecedeTheNarrowScreenBlock()
+    {
+        var css = Styles();
+        var media = css.IndexOf("@media (max-width: 700px)", System.StringComparison.Ordinal);
+        Assert.True(media > 0, "max-width: 700px block not found.");
+        var baseMore = css.IndexOf("\n        #CustomCoverArtConfigPage .ccaLayerMore { display: none; }", System.StringComparison.Ordinal);
+        var baseActions = css.IndexOf("\n        #CustomCoverArtConfigPage .ccaLayerActions { display: flex;", System.StringComparison.Ordinal);
+        Assert.True(baseMore > 0 && baseMore < media, "Base .ccaLayerMore rule must precede the 700px block.");
+        Assert.True(baseActions > 0 && baseActions < media, "Base .ccaLayerActions rule must precede the 700px block.");
+    }
+
+    [Fact]
+    public void CanvasNudgeLeavesModifiedArrowKeysToTheBrowser()
+    {
+        var keys = FunctionBody(ConfigPage(), "onCanvasKeydown");
+        Assert.Contains("if (ev.altKey || ev.ctrlKey || ev.metaKey) { return; }", keys, System.StringComparison.Ordinal);
+    }
 }
