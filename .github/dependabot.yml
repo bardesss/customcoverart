@@ -37,12 +37,16 @@ updates:
       # "No Six Labors license found" before any of our code compiles. Adopting
       # them is a licensing decision, not a version bump: a free Community tier
       # exists (licensing.sixlabors.com) but it puts a build-time credential in
-      # the chain and every fork would need its own key. 3.1.x / 2.1.x build
-      # green and are not end-of-life, so only MAJORS are ignored here --
-      # minor and patch updates still come through. See PR #42 for the detail.
-      - dependency-name: "SixLabors.*"
-        update-types:
-          - version-update:semver-major
+      # the chain and every fork would need its own key. See PR #42 for the detail.
+      #
+      # The same enforcement was then backported to the old lines: ImageSharp
+      # 3.2.0 and ImageSharp.Drawing 2.2.0 also fail the build without a key
+      # (Dependabot PRs #58/#59, 2026-11). So everything from those versions up
+      # is ignored; 3.1.x / 2.1.x patch releases still come through.
+      - dependency-name: "SixLabors.ImageSharp"
+        versions: [">= 3.2.0"]
+      - dependency-name: "SixLabors.ImageSharp.Drawing"
+        versions: [">= 2.2.0"]
 
   # ---------------------------------------------------------------------------
   # Workflow actions (actions/checkout, actions/setup-dotnet).
