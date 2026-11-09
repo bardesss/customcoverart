@@ -61,7 +61,7 @@ Layered text and logos, backgrounds, composition effects — designed on a live 
 | 🕗 | **Restore original** | One-click revert to a target's original cover, and Reset backup to choose a new original |
 | 🎞️ | **Animated GIF** | Export animated covers (animated-source passthrough or Ken Burns pan/zoom) |
 | 🌍 | **Localisation** | English, Dutch and Spanish included; easy to add more |
-| 🪶 | **Lightweight** | Small footprint — the plugin DLL is ~1.8 MB (fonts are subset-embedded), so it stays easy on the server |
+| 🪶 | **Lightweight** | Small footprint — the plugin DLL is ~1.9 MB (fonts are subset-embedded), so it stays easy on the server |
 
 ## 📸 Screenshots
 
@@ -160,7 +160,8 @@ The output is in `bin/Release/net10.0/`. Copy `CustomCoverArt.dll` plus the
 
 Go to **Dashboard → Plugins → Custom Cover Art**. The page walks through five numbered steps.
 Nothing is locked — open any step at any time, and only one stays open so the page never becomes
-a wall of controls. Each step shows what most people need, with the rest under **Advanced**.
+a wall of controls. Each step shows what most people need first; in steps 2 to 4 the rest sits
+under **Advanced**.
 
 1. **Target & start** — pick a library, collection, playlist or Live TV. Optionally start from a
    saved template, or restore (or reset) the target's original cover.
@@ -171,8 +172,9 @@ a wall of controls. Each step shows what most people need, with the rest under *
    layers* below.
 4. **Effects** — colour wash, vignette, film grain and a border, plus the Jellyfin-style preset
    and Auto palette.
-5. **Output & apply** — size and format, a preview of the cover **in context** at other shapes,
-   then Apply or Download. Saving a template and batch-applying sit at the end of this step.
+5. **Output & apply** — size and format, and a preview of the cover **in context** at other
+   shapes. Saving a template and batch-applying sit at the end of this step. **Apply** and
+   **Download** sit under the live preview, so they are always at hand.
 
 While you work, the canvas on the right (top, on a phone) updates live. Click a layer and **drag**
 it to reposition, or use its corner handles to resize and the knob to rotate. Toggle **Reposition
@@ -239,8 +241,10 @@ animated covers.
 
 **Auto palette** samples the dominant colours from your background and shows them as swatches.
 Click one to recolour the overlay-gradient stop you last touched, when the overlay is on and one of
-its stops has focus — otherwise the selected text layer, falling back to the colour wash. It runs
-entirely in your browser — nothing is uploaded — and stays off until you enable it.
+its stops has focus — otherwise the selected text layer. With no text layer selected it goes to
+that overlay stop while the overlay is on, else to the colour wash while that is on; with neither,
+the click changes nothing. It runs entirely in your browser — nothing is uploaded — and stays off
+until you enable it.
 
 > Film grain is the one effect where the preview is an approximation: the canvas scales a noise
 > tile for speed, while the server draws true per-pixel noise. Use **Show server render** to see
@@ -257,9 +261,11 @@ a new mosaic is only fetched when you change the target, density, shuffle or siz
 ### Templates and batch apply
 
 Design a cover, then **Save this design** at the end of step 5. **Apply to several
-targets**, right below it, applies your design (or a saved template) to many libraries at once —
-each cover titled with its target's own name. To start from a saved design, pick it in step 1. Templates saved before the canvas editor still load fine —
-they're migrated to the new design format automatically the first time you pick them.
+targets**, right below it, applies your design (or a saved template) to many targets of the type
+chosen in step 1 — libraries, collections or playlists, up to 100 at once — each cover titled
+with its target's own name. To start from a saved design, pick it in step 1. Templates saved
+before the canvas editor still load fine — they're migrated to the new design format
+automatically the first time you pick them.
 
 Batch apply first asks you to confirm how many covers it is about to replace, and can't be started
 twice while it runs. Deleting a template asks first too.
@@ -307,6 +313,9 @@ resets of the same target run one at a time.
 ## 🔒 Security & privacy
 
 - All endpoints require an authenticated **administrator** (`RequiresElevation` policy).
+- The configuration page's own files (its HTML, CSS and script) are served by Jellyfin like
+  every plugin page. They are static and hold no data: everything the page shows comes from
+  the administrator-only endpoints.
 - Uploads are **rate‑limited** (rejected uploads count too), size‑capped and validated by
   **content** (not just extension) — executables and non‑image payloads are rejected even if
   renamed to `.png`. Accepted image formats: JPG, PNG, GIF, BMP and WebP. The background limit is
@@ -332,8 +341,8 @@ resets of the same target run one at a time.
 Strings live in **two** places, and a language needs both — translating only the first
 leaves the whole configuration page in English.
 
-**1. Server messages** — `Resources/<language-code>.json`. A short file: the eight upload,
-validation and apply errors the server returns.
+**1. Server messages** — `Resources/<language-code>.json`. A short file: the nine upload,
+validation, apply and reset-backup errors the server returns.
 
 1. Copy `Resources/en.json` as a starting point.
 2. Translate the values; keep the keys identical.
@@ -342,8 +351,8 @@ validation and apply errors the server returns.
 5. Detection order: `JELLYFIN_LANGUAGE` → `LANG` → system culture → English fallback.
    Note this is the **server's** locale, not the browser's — the two can disagree.
 
-**2. The configuration page** — the `I18N` object near the top of the `<script>` block in
-`Configuration/configPage.html`. This is by far the larger of the two and covers every
+**2. The configuration page** — the `I18N` object in section 1 (*i18n*) at the top of
+`Configuration/configPage.js`. This is by far the larger of the two and covers every
 label, button and hint you see in the dashboard. Add a block alongside `en`, `nl` and
 `es`, keyed by the two-letter language code; the page picks it from Jellyfin's stored UI
 language. Regional codes fold to the base language, so `es-MX` and `es-419` both use `es`.
@@ -377,7 +386,15 @@ Because the plugin references the Jellyfin server assemblies with `ExcludeAssets
 the test project references `Jellyfin.Common` / `Jellyfin.Controller` / `Jellyfin.Model`
 directly to supply them at test time.
 
-Two guards are worth knowing about before editing `Configuration/configPage.html`:
+The configuration page is three embedded files: `configPage.html` (markup),
+`configPage.css` (styles) and `configPage.js` (the script, which Jellyfin Web loads as the
+page's controller module through `data-controller="__plugin/customcoverartjs"`).
+`Plugin.GetPages()` registers all three. The script is laid out in numbered sections —
+i18n, api, state and document model, canvas engine, history, bindings, poster browser modal
+and page lifecycle — and the tests read the three files as one bundle (`ConfigPageSource`),
+so a guard does not care which file a line lives in.
+
+Two guards are worth knowing about before editing the configuration page:
 `ConfigPageStructureTests` pins every `cca*` element id, so a control cannot be silently
 dropped while markup is moved — add new ids to that list. And the translation checks fail
 the build if a `data-i18n` key in the markup is missing from any language, if a language
@@ -411,9 +428,11 @@ stays a human decision.
 
 The version lives in one place: `<Version>` in `CustomCoverArt.csproj`. To ship a release,
 bump it in a pull request and merge to `main`. The **Release** GitHub Action then builds the
-plugin, publishes a GitHub release with the packaged zip, and appends the new version to
-`manifest.json` — so servers subscribed to the repository auto-update. If the version has
-already been released, the workflow is a no-op.
+plugin, publishes a GitHub release with the packaged zip, and opens a
+`chore: manifest <version>` pull request that adds the new version to `manifest.json`.
+Merge that pull request too: servers subscribed to the repository only see the release
+once it is in `manifest.json` on `main`. If the version has already been released, the
+workflow is a no-op.
 
 ## 🧩 Project layout
 
@@ -421,7 +440,9 @@ already been released, the workflow is a no-op.
 |---|---|
 | `Plugin.cs` | Plugin entry point (`BasePlugin` + `IHasWebPages`) |
 | `PluginServiceRegistrator.cs` | DI registration (`IPluginServiceRegistrator`) |
-| `Configuration/configPage.html` | The dashboard config UI — markup, styles, and the canvas engine (static, embedded) |
+| `Configuration/configPage.html` | The dashboard config UI's markup (static, embedded) |
+| `Configuration/configPage.css` | Its styles, served as a plugin page and linked from the markup |
+| `Configuration/configPage.js` | Its script, loaded as the page's controller module: translations, API calls, the canvas engine, undo history and every control binding |
 | `Controllers/` | REST API endpoints (`ControllerBase`, admin‑only) |
 | `Models/CoverDocument.cs` | The layered design document shared by the client canvas and the server renderer |
 | `Services/DocumentRenderer.cs` | The compositor: backgrounds, text and image layers |
