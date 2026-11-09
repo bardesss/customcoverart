@@ -326,6 +326,9 @@ resets of the same target run one at a time.
   render needs are decoded (one for a still cover, at most 60 for an animated one), and an
   animation with more frames than fit the memory budget is cut to the frames that do. A single
   frame larger than 8192×8192 pixels is refused at upload.
+- The plugin only ever decodes **PNG, JPEG, GIF, BMP and WebP**, whatever a file is called, so a
+  TIFF or other image renamed to `.png`, or a library poster in another format, is treated as
+  unreadable. Embedded colour (ICC) profiles are ignored and never parsed.
 - Background, font and layer-image paths supplied by the browser are **sandboxed** to the
   plugin's data directory, so the generator cannot be pointed at arbitrary files on the server.
 - Uploaded files are stored under Jellyfin's data path using randomised names.
