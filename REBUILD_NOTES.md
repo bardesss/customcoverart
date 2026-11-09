@@ -29,13 +29,13 @@ callback signature; `System.Drawing`/ImageSharp `Color` ambiguity; `TextOptions`
 
 ## Build & test status
 
-**Builds clean** against `Jellyfin.Controller`/`Model` 10.11.3 on .NET 9
+Builds clean against `Jellyfin.Controller`/`Model` 10.11.3 on .NET 9
 (`dotnet build -c Release` → 0 errors). ImageSharp pinned to **3.1.12** and
 ImageSharp.Drawing **2.1.7** (the 3.1.5 originally specified had known
 vulnerabilities and caused a downgrade conflict). `SortOrder` was resolved to
 `Jellyfin.Database.Implementations.Enums` (10.11 moved it there).
 
-**14 unit tests pass** (in a separate test project): a real end-to-end cover-art
+14 unit tests pass (in a separate test project): a real end-to-end cover-art
 render (gradient + shadow + outline → valid PNG), upload validation (accepts a
 real PNG; rejects an executable and an HTML/JS polyglot renamed to `.png`), the
 path-traversal sandbox, and reflection checks that the plugin implements the
@@ -52,14 +52,14 @@ Copy `bin/Release/net9.0/CustomCoverArt.dll` (and the SixLabors DLLs) into a
 ## VERIFY against a running server (could not be exercised without live Jellyfin)
 Compilation is confirmed; these depend on live server/DB behaviour:
 
-1. **`LibraryDetectionService.UpdateLibraryCoverArtAsync`** — `item.SetImage(...)`
-   + `item.UpdateToRepositoryAsync(ItemUpdateType.ImageUpdate, ...)`. The core
-   "apply cover to library" call. If the image doesn't appear, a metadata refresh
-   may also be needed. **Highest-risk spot.**
-2. **`MediaItemService`** query execution — that `InternalItemsQuery` returns the
+1. **`LibraryDetectionService.UpdateLibraryCoverArtAsync`**: `item.SetImage(...)`
+   + `item.UpdateToRepositoryAsync(ItemUpdateType.ImageUpdate, ...)`. This is the core
+   "apply cover to library" call and the highest-risk spot. If the image doesn't appear,
+   a metadata refresh may also be needed.
+2. **`MediaItemService`** query execution: check that `InternalItemsQuery` returns the
    expected items/counts against a real library database.
-3. **`LibraryDetectionService.GetLibraryType`** — `CollectionType` values (handled
+3. **`LibraryDetectionService.GetLibraryType`**: `CollectionType` values (handled
    case-insensitively, but confirm the labels come out right).
-4. **Config page in the live dashboard** — response JSON casing (page reads
+4. **Config page in the live dashboard**: response JSON casing (page reads
    case-agnostically and sends PascalCase + numeric enums) and the `ApiClient`
    token/image-URL helpers behaving as expected.

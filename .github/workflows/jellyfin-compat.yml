@@ -4,7 +4,7 @@ name: Jellyfin compatibility
 # pinned in the csprojs, so a server update that breaks the plugin surfaces here
 # instead of in a user's server log.
 #
-# This workflow never changes the pin, the targetAbi, or manifest.json — bumping
+# This workflow never changes the pin, the targetAbi, or manifest.json. Bumping
 # those stays a human decision (see the issue body it files).
 on:
   schedule:
@@ -96,7 +96,7 @@ jobs:
             --json number,title \
             --jq "[.[] | select(.title == \"$TITLE\")] | first | .number // empty")
           if [ -n "$EXISTING" ]; then
-            echo "Issue #$EXISTING already tracks $LATEST — not filing a duplicate."
+            echo "Issue #$EXISTING already tracks $LATEST; not filing a duplicate."
             exit 0
           fi
           RUN_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
@@ -117,7 +117,7 @@ jobs:
             echo
             echo "### What this does and does not tell you"
             echo
-            echo "This is a **compile and unit-test** check. It says nothing about whether the plugin still *loads* into a running server, and it deliberately leaves \`targetAbi\` alone — \`manifest.json\` and the hardcoded ABI in \`release.yml\` are a separate, human decision."
+            echo "This is a **compile and unit-test** check. It says nothing about whether the plugin still *loads* into a running server, and it deliberately leaves \`targetAbi\` alone: \`manifest.json\` and the hardcoded ABI in \`release.yml\` are a separate, human decision."
             echo
             echo "To bump the pin once this is fixed, edit \`<JellyfinVersion>\` in \`CustomCoverArt.csproj\` and \`tests/CustomCoverArt.Tests/CustomCoverArt.Tests.csproj\`."
           } > /tmp/issue.md
@@ -130,8 +130,8 @@ jobs:
   preview:
     name: Jellyfin preview (advisory)
     runs-on: ubuntu-latest
-    # Advisory only: a red preview job is early warning, not a broken repo. It
-    # never files an issue and never fails the workflow run.
+    # Advisory only: a red preview job is an early warning. It never files an
+    # issue and never fails the workflow run.
     continue-on-error: true
     steps:
       - uses: actions/checkout@v7
@@ -146,8 +146,8 @@ jobs:
           set -euo pipefail
           ALL=$(curl -sSfL "$NUGET_INDEX" | jq -r '.versions | last')
           STABLE=$(curl -sSfL "$NUGET_INDEX" | jq -r '[.versions[] | select(test("-") | not)] | last')
-          # Nothing to do when the newest package overall is the newest stable —
-          # that case is already covered by the stable job.
+          # Nothing to do when the newest package overall is the newest stable;
+          # the stable job already covers that case.
           if [ "$ALL" = "$STABLE" ]; then
             echo "No preview newer than stable ($STABLE)."
             echo "preview=" >> "$GITHUB_OUTPUT"

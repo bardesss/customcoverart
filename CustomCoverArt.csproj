@@ -18,7 +18,7 @@
     <IsPackable>false</IsPackable>
     <!-- GPL-3.0-only: the plugin links against Jellyfin.Controller/Jellyfin.Model,
          which are themselves GPL-3.0-only. See LICENSE. -->
-    <Copyright>Copyright © 2026 Bardesss — licensed under GPL-3.0-only</Copyright>
+    <Copyright>Copyright © 2026 Bardesss. Licensed under GPL-3.0-only.</Copyright>
     <!-- Single source of truth for the plugin version. Bump this in a PR;
          merging to main triggers a release of the new version. -->
     <Version>4.1.2.0</Version>
