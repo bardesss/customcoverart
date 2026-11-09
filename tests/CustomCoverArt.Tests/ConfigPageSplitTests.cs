@@ -90,6 +90,32 @@ public class ConfigPageSplitTests
         Assert.DoesNotContain("<style", html, StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>
+    /// The link's href is relative to the document. Clients that bundle their own copy of
+    /// Jellyfin Web (desktop and TV apps, a separately hosted web client) resolve it
+    /// against their own origin, where it 404s, while the controller still loads because
+    /// Jellyfin Web fetches it through ApiClient.getUrl. So the controller, first thing,
+    /// points the link at the server the same way (Dashboard.getConfigurationResourceUrl
+    /// builds the same URL), guarded so a missing ApiClient keeps the relative fallback.
+    /// </summary>
+    [Fact]
+    public void Script_PointsTheStylesheetLinkAtTheServer_BeforeAnythingElse()
+    {
+        var js = ConfigPageSource.Js();
+
+        var strict = js.IndexOf("'use strict';", StringComparison.Ordinal);
+        var find = js.IndexOf("view.querySelector('link[rel=\"stylesheet\"][href*=\"" + Plugin.StylePageName + "\"]')", StringComparison.Ordinal);
+        var guard = js.IndexOf("if (cssLink && window.ApiClient && typeof ApiClient.getUrl === 'function') {", StringComparison.Ordinal);
+        var rewrite = js.IndexOf("cssLink.href = ApiClient.getUrl('web/ConfigurationPage', { name: '" + Plugin.StylePageName + "' });", StringComparison.Ordinal);
+
+        Assert.True(strict > 0, "'use strict' not found.");
+        Assert.True(find > strict, "The controller must look up the stylesheet link in its view.");
+        Assert.True(guard > find, "The rewrite must be guarded.");
+        Assert.True(rewrite > guard, "The controller must point the link at the server via ApiClient.getUrl.");
+        Assert.True(rewrite < js.IndexOf("// 1. i18n", StringComparison.Ordinal),
+            "The rewrite must run before anything else in the controller.");
+    }
+
     [Fact]
     public void Script_IsAControllerModule_ScopedToItsView()
     {
@@ -134,7 +160,7 @@ public class ConfigPageSplitTests
         // Banner titles sit alone on a line at the body's 8-space indentation; the file
         // header lists the sections too, but at column 0, so it cannot match.
         var at = titles
-            .Select(t => Regex.Match(js, "^        // " + Regex.Escape(t) + @"?$", RegexOptions.Multiline))
+            .Select(t => Regex.Match(js, "^        // " + Regex.Escape(t) + @"\r?$", RegexOptions.Multiline))
             .Select(m => m.Success ? m.Index : -1)
             .ToArray();
         for (var i = 0; i < titles.Length; i++)

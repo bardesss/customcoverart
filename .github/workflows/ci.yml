@@ -23,5 +23,12 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
+      # Jellyfin Web imports the config page controller as an ES module; a syntax error
+      # there leaves a blank editor and nothing in the server log.
+      - name: Syntax-check config page controller
+        run: |
+          cp Configuration/configPage.js "$RUNNER_TEMP/configPage.mjs"
+          node --check "$RUNNER_TEMP/configPage.mjs"
+
       - name: Test
         run: dotnet test tests/CustomCoverArt.Tests/CustomCoverArt.Tests.csproj -c Release

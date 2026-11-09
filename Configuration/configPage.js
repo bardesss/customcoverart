@@ -19,6 +19,21 @@
 export default function (view) {
         'use strict';
 
+        // --- Stylesheet ---------------------------------------------------
+        // configPage.html links the styles with a document-relative href. Clients that
+        // bundle their own Jellyfin Web (desktop and TV apps, a separately hosted web
+        // client) resolve that against their own origin and get a 404, while this module
+        // loads because Jellyfin Web fetched it through ApiClient.getUrl. Point the link at
+        // the server the same way (Dashboard.getConfigurationResourceUrl builds this URL
+        // too). It runs first so the request starts before the first pageshow; without an
+        // ApiClient, or if getUrl throws, the relative href stays as the fallback.
+        var cssLink = view.querySelector('link[rel="stylesheet"][href*="customcoverartcss"]');
+        if (cssLink && window.ApiClient && typeof ApiClient.getUrl === 'function') {
+            try {
+                cssLink.href = ApiClient.getUrl('web/ConfigurationPage', { name: 'customcoverartcss' });
+            } catch (e) { /* keep the relative href */ }
+        }
+
         // ==================================================================
         // 1. i18n
         // The page's own translations (en, nl, es), Jellyfin UI language detection, t()
@@ -473,12 +488,9 @@ export default function (view) {
 
         function el(id) { return page.querySelector('#' + id); }
 
-        // --- Step accordion -----------------------------------------------
-        // Owns .ccaStepBody and NOTHING else. Every other visibility helper
-        // (updateBackgroundVisibility, updateEffectsVisibility, updateAnimVisibility, the
-        // .ccaTextOnly/.ccaImageOnly toggles) writes style.display on elements INSIDE a
-        // body; if this controller touched those too, the two owners would fight and a
-        // control could reappear inside a collapsed step.
+        // --- Page state, presets and limits --------------------------------
+        // STEP_KEY: the localStorage key under which the step accordion (openStep and
+        // restoreLastStep, section 6) remembers the last open step.
         var STEP_KEY = 'cca.lastStep';
 
         // titleTouched: the user has typed their own title, so picking a target no longer
@@ -676,8 +688,9 @@ export default function (view) {
             return layer._name || t('layer.logo');
         }
 
-        // --- Document <-> controls binding (Task 8) -----------------------
-        // Every request carries the design as a CoverDocument built by collectDocument().
+        // --- Serialization and the title layer -----------------------------
+        // Every request carries the design as a CoverDocument built by collectDocument(),
+        // and undo history compares documents the same way; both go through stripUiKeys.
 
         // Recursively deep-clone `doc`, dropping UI-only keys (any `_`-prefixed key,
         // e.g. _selectedId) so nothing internal leaks onto the wire.
@@ -702,7 +715,7 @@ export default function (view) {
             return null;
         }
 
-        // --- Templates ----------------------------------------------------
+        // --- Legacy template migration ------------------------------------
 
         // Pick helper for legacy CoverArtSettings that treats 0/false as present
         // (unlike a plain `||` fallback, which would replace a real 0 dim/blur).
@@ -1438,7 +1451,7 @@ export default function (view) {
             });
         }, 300);
 
-        // --- Colour palette (Phase 3) -------------------------------------
+        // --- Colour palette -----------------------------------------------
         // Dominant colours of the BACKGROUND, extracted entirely client-side — no new
         // endpoint, no upload round-trip. Sampled from a tiny offscreen render (the
         // cover's aspect ratio, 64px wide) so it costs a few thousand pixels, not
@@ -1479,6 +1492,8 @@ export default function (view) {
                     return '#' + p.map(function (n) { return ('0' + n.toString(16)).slice(-2); }).join('');
                 });
         }
+
+        // --- Gradients, overlay and background image ----------------------
 
         // Builds the canvas colour-stop list from gradient settings — the explicit
         // Stops (sorted, clamped) when there are 2+, else the server's StartColor/EndColor
@@ -1670,6 +1685,8 @@ export default function (view) {
             ctx.restore();
         }
 
+        // --- Fonts, text and image layers ---------------------------------
+
         // The font a layer should be drawn AND measured with. Both callers must agree:
         // drawing with one face and measuring with another puts the selection box and the
         // hit-test somewhere the glyphs are not. Custom uploads are registered lazily by
@@ -1830,6 +1847,8 @@ export default function (view) {
             ctx.drawImage(img, -w / 2, -h / 2, w, h);
             ctx.restore();
         }
+
+        // --- Layer geometry, selection handles and hit-testing -------------
 
         // Measured bounding box (canvas px) of a text layer, honouring alignment and
         // the middle baseline used by drawTextLayer. Used for hit-testing and the
@@ -2017,6 +2036,7 @@ export default function (view) {
             return null;
         }
 
+        // --- Bundled canvas fonts -----------------------------------------
         // Loads the SAME bundled Noto weights the server renders with, via the
         // authenticated font endpoint + the FontFace API (which — unlike CSS
         // @font-face — accepts an ArrayBuffer fetched WITH the auth token). Tolerant
@@ -2128,6 +2148,12 @@ export default function (view) {
         // batch apply, actions, bindEvents() and the page-scoped window/document listeners.
         // ==================================================================
 
+        // --- Step accordion -----------------------------------------------
+        // Owns .ccaStepBody and NOTHING else. Every other visibility helper
+        // (updateBackgroundVisibility, updateEffectsVisibility, updateAnimVisibility, the
+        // .ccaTextOnly/.ccaImageOnly toggles) writes style.display on elements INSIDE a
+        // body; if this controller touched those too, the two owners would fight and a
+        // control could reappear inside a collapsed step.
         function openStep(n) {
             page.querySelectorAll('.ccaStep').forEach(function (section) {
                 var isTarget = section.getAttribute('data-step') === String(n);
@@ -2189,12 +2215,13 @@ export default function (view) {
             openStep((state.libraryId && exists) ? saved : '1');
         }
 
-        // Background pan/zoom mode (Task 9): when true, canvas drag/wheel/pinch
+        // --- Background pan/zoom mode -------------------------------------
+        // When true, canvas drag/wheel/pinch
         // mutate doc.Background.Transform instead of selecting/dragging a text
         // layer. Toggled by the #ccaBgAdjust checkbox.
         var bgAdjustMode = false;
 
-        // --- Layer management (Phase 2) ------------------------------------
+        // --- Layer management ---------------------------------------------
         // doc.Layers[0] is the BOTTOM layer (drawn first); the panel lists the array
         // reversed so the top-most layer sits at the top of the list, like every other
         // layers panel. Server-side the count is capped at 40 (CoverArtService), so the
@@ -3263,7 +3290,13 @@ export default function (view) {
             snapshot();
             l.Content = name || t('text.defaultTitle');
             if (wasClean) { markClean(); }
-            if (history.index >= 0) { history.stack[history.index] = JSON.stringify(stripUiKeys(doc)); }
+            if (history.index >= 0) {
+                history.stack[history.index] = JSON.stringify(stripUiKeys(doc));
+                // snapshot() returns early right after an undo, so the redo tail is still
+                // there; it belongs to the previous target and must not be redone onto this one.
+                history.stack.length = history.index + 1;
+                updateHistoryButtons();
+            }
             renderLayersPanel();
             if (doc._selectedId === l.Id) { el('ccaTitle').value = l.Content; }
             scheduleRender();
@@ -3922,8 +3955,9 @@ export default function (view) {
             el('ccaBgSource').addEventListener('change', function () {
                 doc.Background.Source = this.value;
                 if (this.value === 'collage') { doc.Background.Collage = buildCollageFromControls(); }
-                // Two-way compatibility: an older server reading this document decides on
-                // IsEnabled, so keep it in step with Source.
+                // The server still falls back on IsEnabled where Source alone does not decide
+                // (an upload source with no image, see DocumentMigration.NormalizeBackgroundSource
+                // and DocumentRenderer.CreateGradientBackground), so keep it in step with Source.
                 if (doc.Background.Gradient) {
                     doc.Background.Gradient.IsEnabled = (this.value === 'gradient');
                 }
@@ -4266,7 +4300,7 @@ export default function (view) {
             if (el('ccaBrowserModal').style.display !== 'none') { return; }
             // Nor behind an open confirmation: the question is about the design as it is.
             if (_confirmsOpen > 0) { return; }
-            var k =String(ev.key || '').toLowerCase();
+            var k = String(ev.key || '').toLowerCase();
             if (k === 'z' && !ev.shiftKey) { ev.preventDefault(); undo(); }
             else if (k === 'y' || (k === 'z' && ev.shiftKey)) { ev.preventDefault(); redo(); }
         }

@@ -1057,5 +1057,13 @@ public class ConfigPageStructureTests
         var fold = body.IndexOf("history.stack[history.index] = JSON.stringify(stripUiKeys(doc));", System.StringComparison.Ordinal);
         Assert.True(flush > 0 && flush < write, "A pending edit must get its own undo entry before the title changes.");
         Assert.True(fold > write, "The prefilled title must be folded into the current undo entry.");
+
+        // snapshot() returns early when the document still equals the current entry (right
+        // after an undo), which leaves the redo tail in place. Without dropping it, undo →
+        // pick another target → Ctrl+Y brought back the previous target's title.
+        var trim = body.IndexOf("history.stack.length = history.index + 1;", System.StringComparison.Ordinal);
+        Assert.True(trim > fold, "Folding the title in must drop the redo tail.");
+        Assert.True(body.IndexOf("updateHistoryButtons();", trim, System.StringComparison.Ordinal) > trim,
+            "The redo button must be refreshed after the redo tail is dropped.");
     }
 }
