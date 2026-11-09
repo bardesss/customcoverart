@@ -37,7 +37,7 @@ public class EffectsRenderTests
         Assert.True(differing > 1000, $"Different seeds should give different noise (differing={differing}).");
     }
 
-    /// <summary>Grain must not punch holes in the cover — alpha stays untouched.</summary>
+    /// <summary>Grain must not punch holes in the cover: alpha stays untouched.</summary>
     [Fact]
     public void Grain_PreservesAlpha()
     {
@@ -146,7 +146,7 @@ public class EffectsRenderTests
     /// <summary>
     /// Effects that are switched ON but turned all the way DOWN must be byte-for-byte
     /// identity. Without the zero guards, "enabled at amount 0" still runs a blend pass
-    /// and the rounding drifts the image — so a user dragging a slider back to 0 would
+    /// and the rounding drifts the image, so a user dragging a slider back to 0 would
     /// not get their original cover back.
     /// </summary>
     [Fact]

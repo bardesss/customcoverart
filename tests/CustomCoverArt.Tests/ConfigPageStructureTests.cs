@@ -7,33 +7,19 @@ namespace CustomCoverArt.Tests;
 /// <summary>
 /// Structural guards over the embedded config page. The element-id pin is the important
 /// one: regrouping ~3,000 lines of markup in place is exactly the operation that silently
-/// drops a control, and a dropped control means a dead handler with no error anywhere —
-/// <c>el('ccaFoo')</c> simply returns null and the feature quietly stops working.
+/// drops a control, and a dropped control means a dead handler with no error anywhere:
+/// <c>el('ccaFoo')</c> returns null and the feature silently stops working.
 /// </summary>
 public class ConfigPageStructureTests
 {
-    private static string ConfigPage()
-    {
-        using var stream = typeof(Plugin).Assembly
-            .GetManifestResourceStream("CustomCoverArt.Configuration.configPage.html");
-        Assert.NotNull(stream);
-        using var reader = new System.IO.StreamReader(stream!);
-        return reader.ReadToEnd();
-    }
+    private static string ConfigPage() => ConfigPageSource.Bundle();
 
     /// <summary>
-    /// Just the markup, stopping at the script block. Element-id assertions must not see
-    /// JS comments: the canvas engine's header comment mentions
-    /// <c>&lt;canvas id="ccaCanvas"&gt;</c>, which would both fake a duplicate and let a
-    /// genuinely deleted control pass unnoticed.
+    /// Just the markup (configPage.html). Element-id assertions must not see script
+    /// comments: the canvas engine's header comment mentions the canvas element's id,
+    /// which would both fake a duplicate and let a genuinely deleted control pass.
     /// </summary>
-    private static string Markup()
-    {
-        var page = ConfigPage();
-        var scriptAt = page.IndexOf("<script type=\"text/javascript\">", System.StringComparison.Ordinal);
-        Assert.True(scriptAt > 0, "Could not find the script block.");
-        return page.Substring(0, scriptAt);
-    }
+    private static string Markup() => ConfigPageSource.Html();
 
     // Body of a top-level `function name(` in the page script (8-space indent), up to its
     // closing brace.
@@ -56,16 +42,8 @@ public class ConfigPageStructureTests
         return page.Substring(start, end - start);
     }
 
-    /// <summary>The page's one &lt;style&gt; block.</summary>
-    private static string Styles()
-    {
-        var page = ConfigPage();
-        var start = page.IndexOf("<style>", System.StringComparison.Ordinal);
-        Assert.True(start > 0, "Could not find the style block.");
-        var end = page.IndexOf("</style>", start, System.StringComparison.Ordinal);
-        Assert.True(end > start, "Could not find the end of the style block.");
-        return page.Substring(start, end - start);
-    }
+    /// <summary>The page's stylesheet (configPage.css).</summary>
+    private static string Styles() => ConfigPageSource.Css();
 
     // Every cca* element id present at the start of the guided-editor restructure, minus
     // ccaPreviewSpinner (dead since Phase 1, removed here) and ccaGradient (replaced by the
@@ -108,7 +86,7 @@ public class ConfigPageStructureTests
     /// <summary>
     /// Live TV has no child posters, so updateBackgroundVisibility disables the collage
     /// option and force-reverts an already-selected collage back to an image. Both are
-    /// correct and both used to happen in total silence — the user's background choice
+    /// correct and both used to happen in total silence: the user's background choice
     /// changed under them with nothing said. The explanation string existed all along and
     /// was bound to nothing, so this pins the binding rather than the string.
     /// </summary>
@@ -223,7 +201,7 @@ public class ConfigPageStructureTests
     [Fact]
     public void DeadPreviewSpinnerIsGone()
     {
-        // Unused since Phase 1 — the canvas renders synchronously, so nothing ever showed it.
+        // Unused since Phase 1: the canvas renders synchronously, so nothing ever showed it.
         Assert.DoesNotContain("ccaPreviewSpinner", ConfigPage(), System.StringComparison.Ordinal);
     }
 
@@ -956,14 +934,14 @@ public class ConfigPageStructureTests
     }
 
     /// <summary>
-    /// collectDocument()/collectSettings() ran synchronously before the request's catch,
+    /// collectDocument() ran synchronously before the request's catch,
     /// so a throw left the batch button disabled and the status on "Applying…".
     /// </summary>
     [Fact]
     public void BatchCollectionIsInsideTheErrorPath()
     {
         var handler = HandlerBody(ConfigPage(), "el('ccaBatchApply').addEventListener('click'");
-        Assert.Matches(@"Promise\.resolve\(\)\.then\(function \(\) \{[\s\S]*?collectDocumentKeepingCleanState\(\)[\s\S]*?collectSettings\(\)[\s\S]*?\.catch\(", handler);
+        Assert.Matches(@"Promise\.resolve\(\)\.then\(function \(\) \{[\s\S]*?collectDocumentKeepingCleanState\(\)[\s\S]*?\.catch\(", handler);
     }
 
     [Fact]
@@ -1023,5 +1001,95 @@ public class ConfigPageStructureTests
         Assert.Contains("Math.max(MIN_DIM, Math.min(MAX_DIM", clamp, System.StringComparison.Ordinal);
         Assert.Contains("bindCustomDim('ccaWidth', 'Width')", page, System.StringComparison.Ordinal);
         Assert.DoesNotContain("parseInt(this.value, 10) || doc.Canvas.Width", page, System.StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The collage seed picks which posters the mosaic shows. It lives in
+    /// state.collageSeed, and Shuffle copies it into doc.Background.Collage.Seed, so undo
+    /// snapshots and saved templates already hold it. Undo, redo and a template load
+    /// replace doc, and they left state.collageSeed behind: the canvas and the next apply
+    /// kept the shuffled posters, not the ones the restored design was made with.
+    /// </summary>
+    [Fact]
+    public void CollageSeedFollowsTheDocument()
+    {
+        var page = ConfigPage();
+        var shuffle = HandlerBody(page, "el('ccaCollageShuffle').addEventListener('click'");
+        Assert.Contains("doc.Background.Collage.Seed = state.collageSeed;", shuffle, System.StringComparison.Ordinal);
+        Assert.Contains("Seed: state.collageSeed", FunctionBody(page, "buildCollageFromControls"), System.StringComparison.Ordinal);
+
+        var sync = FunctionBody(page, "syncControlsFromDocument");
+        Assert.Contains("if (typeof bg.Collage.Seed === 'number') { state.collageSeed = bg.Collage.Seed; }", sync, System.StringComparison.Ordinal);
+        Assert.Contains("syncControlsFromDocument();", FunctionBody(page, "restoreSnapshot"), System.StringComparison.Ordinal);
+        Assert.Contains("syncControlsFromDocument();", FunctionBody(page, "loadTemplateOption"), System.StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Jellyfin's confirm dialog is not part of the page, so the focused element cannot
+    /// tell the Ctrl+Z/Y handler that one is open: undo changed the design behind
+    /// "Replace your unapplied changes?" and the other confirmations.
+    /// </summary>
+    [Fact]
+    public void UndoShortcutWaitsForAnOpenConfirmation()
+    {
+        var page = ConfigPage();
+        var confirm = FunctionBody(page, "confirmAction");
+        Assert.Contains("_confirmsOpen++;", confirm, System.StringComparison.Ordinal);
+        Assert.Contains("_confirmsOpen--;", confirm, System.StringComparison.Ordinal);
+
+        var keys = FunctionBody(page, "onDocumentKeydown");
+        var guard = keys.IndexOf("if (_confirmsOpen > 0) { return; }", System.StringComparison.Ordinal);
+        Assert.True(guard > 0, "onDocumentKeydown must ignore Ctrl+Z/Y while a confirmation is open.");
+        Assert.True(guard < keys.IndexOf("undo();", System.StringComparison.Ordinal), "The confirmation check must come before undo().");
+    }
+
+    /// <summary>
+    /// Choosing a target retitles the design with the target's name. That is not the
+    /// user's edit, so it must not become an undo step of its own: Ctrl+Z used to bring
+    /// back the previous target's name.
+    /// </summary>
+    [Fact]
+    public void TitlePrefillAddsNoUndoStep()
+    {
+        var body = FunctionBody(ConfigPage(), "prefillTitle");
+        var flush = body.IndexOf("snapshot();", System.StringComparison.Ordinal);
+        var write = body.IndexOf("l.Content = name || t('text.defaultTitle');", System.StringComparison.Ordinal);
+        var fold = body.IndexOf("history.stack[history.index] = JSON.stringify(stripUiKeys(doc));", System.StringComparison.Ordinal);
+        Assert.True(flush > 0 && flush < write, "A pending edit must get its own undo entry before the title changes.");
+        Assert.True(fold > write, "The prefilled title must be folded into the current undo entry.");
+
+        // snapshot() returns early when the document still equals the current entry (right
+        // after an undo), which leaves the redo tail in place. Without dropping it, undo →
+        // pick another target → Ctrl+Y brought back the previous target's title.
+        var trim = body.IndexOf("history.stack.length = history.index + 1;", System.StringComparison.Ordinal);
+        Assert.True(trim > fold, "Folding the title in must drop the redo tail.");
+        Assert.True(body.IndexOf("updateHistoryButtons();", trim, System.StringComparison.Ordinal) > trim,
+            "The redo button must be refreshed after the redo tail is dropped.");
+    }
+
+    /// <summary>
+    /// Folding the new title into the current entry alone left older entries with the
+    /// previous target's name: pick Series, change Dim, pick Movies, Ctrl+Z reverted Dim and
+    /// also put "Series" back while Movies was the target. The prefill must rewrite every
+    /// history entry (and the clean baseline) that still carries the old automatic title.
+    /// </summary>
+    [Fact]
+    public void TitlePrefillRetitlesOlderHistoryEntries()
+    {
+        var page = ConfigPage();
+        var body = FunctionBody(page, "prefillTitle");
+        var previous = body.IndexOf("var previous = l.Content;", System.StringComparison.Ordinal);
+        var write = body.IndexOf("l.Content = name || t('text.defaultTitle');", System.StringComparison.Ordinal);
+        var rewrite = body.IndexOf("history.stack[i] = retitleSnapshot(history.stack[i], previous, l.Content);", System.StringComparison.Ordinal);
+        var baseline = body.IndexOf("_cleanJson = retitleSnapshot(_cleanJson, previous, l.Content);", System.StringComparison.Ordinal);
+        var fold = body.IndexOf("history.stack[history.index] = JSON.stringify(stripUiKeys(doc));", System.StringComparison.Ordinal);
+        Assert.True(previous >= 0 && previous < write, "The old automatic title must be remembered before it is replaced.");
+        Assert.True(rewrite > write && rewrite < fold, "Older history entries must follow the new automatic title.");
+        Assert.True(baseline > write, "The clean baseline must follow the new automatic title too.");
+
+        // Only an entry whose title still equals the old automatic one changes, so a title
+        // the user typed keeps undoing normally.
+        var helper = FunctionBody(page, "retitleSnapshot");
+        Assert.Contains("if (layers[i].Content !== from) { return json; }", helper, System.StringComparison.Ordinal);
     }
 }

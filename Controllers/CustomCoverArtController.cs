@@ -13,7 +13,7 @@ namespace CustomCoverArt.Controllers;
 /// <summary>
 /// API controller for Custom Cover Art operations. All endpoints require an
 /// authenticated Jellyfin administrator (the "RequiresElevation" policy, which
-/// is the framework-provided policy — no custom auth filter needed).
+/// is provided by the framework, so no custom auth filter is needed).
 /// </summary>
 [ApiController]
 [Authorize(Policy = "RequiresElevation")]
@@ -81,34 +81,6 @@ public class CustomCoverArtController : ControllerBase
         }
     }
 
-    /// <summary>Generate and stream a preview image.</summary>
-    [HttpPost("preview")]
-    public async Task<IActionResult> GeneratePreview([FromBody] CoverArtSettings settings)
-    {
-        // Higher limit: the config page renders a live preview on every adjustment.
-        if (RateLimited("preview", maxRequests: 240, TimeSpan.FromMinutes(1)))
-        {
-            return StatusCode(429, new { error = "Too many requests" });
-        }
-
-        try
-        {
-            var coverArtPath = await _coverArtService.GenerateCoverArtAsync(settings).ConfigureAwait(false);
-            var imageBytes = await System.IO.File.ReadAllBytesAsync(coverArtPath).ConfigureAwait(false);
-            var contentType = settings.OutputFormat?.ToLowerInvariant() == "gif" ? "image/gif" : "image/png";
-            return File(imageBytes, contentType);
-        }
-        catch (CoverValidationException ex)
-        {
-            return BadRequest(new { error = ex.Message });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to generate preview");
-            return BadRequest(new { error = "Failed to generate preview." });
-        }
-    }
-
     /// <summary>Generate and stream a preview image from a document-native design.</summary>
     [HttpPost("document/preview")]
     public async Task<IActionResult> GeneratePreviewDocument([FromBody] CoverDocument document)
@@ -149,22 +121,6 @@ public class CustomCoverArtController : ControllerBase
 
         return await ApplyDocumentInternal(request.LibraryId, request.Document).ConfigureAwait(false);
     }
-
-    /// <summary>Apply cover art to a library (used by the config page).</summary>
-    [HttpPost("apply")]
-    public async Task<ApiResponse<bool>> Apply([FromBody] ApplyCoverArtRequest request)
-    {
-        // Applying renders a full cover (up to a 30-frame GIF) and writes to disk.
-        if (RateLimited("apply", maxRequests: 30, TimeSpan.FromMinutes(1)))
-        {
-            return Fail<bool>(_localizationService.GetString("errors.too_many_uploads"));
-        }
-
-        return await ApplyInternal(request.LibraryId, request.Settings).ConfigureAwait(false);
-    }
-
-    private Task<ApiResponse<bool>> ApplyInternal(string libraryId, CoverArtSettings settings)
-        => ApplyRenderedAsync(libraryId, () => _coverArtService.GenerateCoverArtAsync(settings));
 
     /// <summary>Render a layered design and apply it (document/apply and batch apply).</summary>
     private Task<ApiResponse<bool>> ApplyDocumentInternal(string libraryId, CoverDocument document)
@@ -499,7 +455,7 @@ public class CustomCoverArtController : ControllerBase
     /// Streams a bundled Noto Sans weight so the config-page canvas can register
     /// the SAME faces the server renders with (via the FontFace API), keeping the
     /// live client preview visually aligned with the authoritative server output.
-    /// Inherits the class-level RequiresElevation policy — no anonymous access.
+    /// Inherits the class-level RequiresElevation policy, so there is no anonymous access.
     /// </summary>
     [HttpGet("font/{weight:int}")]
     public IActionResult GetFont(int weight)
@@ -584,7 +540,7 @@ public class CustomCoverArtController : ControllerBase
     /// and both DRAW and MEASURE text with the same face the server renders with.
     ///
     /// Without this the canvas fell back to Noto Sans whenever a custom font was chosen,
-    /// so the preview showed the wrong typeface and — worse — the selection box and
+    /// so the preview showed the wrong typeface, and the selection box and
     /// hit-testing were measured from the wrong metrics.
     ///
     /// Scoped to the fonts folder alone, mirroring <see cref="GetLayerImage"/>. Inherits
@@ -664,26 +620,12 @@ public class CustomCoverArtController : ControllerBase
         return template;
     }
 
-    /// <summary>Clone base settings for one batch target: title = target name, collage source = target id.</summary>
-    public static CoverArtSettings BuildBatchSettings(CoverArtSettings baseSettings, string targetName, string targetId)
-    {
-        // Shallow JSON clone to avoid mutating the shared base settings.
-        var json = System.Text.Json.JsonSerializer.Serialize(baseSettings);
-        var clone = System.Text.Json.JsonSerializer.Deserialize<CoverArtSettings>(json) ?? new CoverArtSettings();
-        clone.Title = targetName;
-        if (clone.BackgroundSource == BackgroundSources.Collage && clone.Collage is not null)
-        {
-            clone.Collage.SourceId = targetId;
-        }
-        return clone;
-    }
-
     /// <summary>
     /// Clone a document for one batch target: the title layer gets the target's name and
     /// a collage is re-pointed at that target. Prefers the layer with the well-known
     /// "title" id (what DocumentMigration and NormalizeTemplate both use); for a design
     /// built entirely from new layers there is no such id, so the bottom-most text layer
-    /// stands in — the same layer the editor treats as the title.
+    /// stands in. That is the same layer the editor treats as the title.
     /// </summary>
     public static CoverDocument BuildBatchDocument(CoverDocument baseDocument, string targetName, string targetId)
     {
@@ -706,6 +648,15 @@ public class CustomCoverArtController : ControllerBase
         return clone;
     }
 
+    /// <summary>
+    /// The design a saved template applies: its layered document, or, for a template saved
+    /// before the canvas editor (flat Settings only), that design migrated with
+    /// <see cref="DocumentMigration.FromSettings"/>, the same conversion the editor applies
+    /// when such a template is loaded.
+    /// </summary>
+    public static CoverDocument TemplateDocument(SavedTemplate template)
+        => template.Document ?? DocumentMigration.FromSettings(template.Settings ?? new CoverArtSettings());
+
     /// <summary>Apply one design to many targets, auto-titling each from the target's name.</summary>
     [HttpPost("batchApply")]
     public async Task<ApiResponse<List<BatchApplyResult>>> BatchApply([FromBody] BatchApplyRequest request)
@@ -726,12 +677,8 @@ public class CustomCoverArtController : ControllerBase
             return Fail<List<BatchApplyResult>>(_localizationService.GetString("errors.too_many_uploads"));
         }
 
-        // Resolve the base design: a named template, or what the client sent inline.
-        // The layered document wins wherever both exist — the flat settings model has
-        // room for exactly one title layer, so batching through it would quietly throw
-        // away every additional text layer and logo in the design.
+        // Resolve the base design: a named template, or the layered document the client sent.
         CoverDocument? baseDocument = request.Document;
-        CoverArtSettings? baseSettings = request.Settings;
         if (!string.IsNullOrWhiteSpace(request.TemplateName))
         {
             var tpl = Plugin.Instance is { } plugin ? TemplateStore.Find(plugin.Configuration, request.TemplateName) : null;
@@ -739,13 +686,12 @@ public class CustomCoverArtController : ControllerBase
             {
                 return Fail<List<BatchApplyResult>>("Template not found: " + request.TemplateName);
             }
-            baseDocument = tpl.Document;
-            baseSettings = tpl.Settings;
+            baseDocument = TemplateDocument(tpl);
         }
 
-        if (baseDocument is null && baseSettings is null)
+        if (baseDocument is null)
         {
-            return Fail<List<BatchApplyResult>>("No template, document or settings provided.");
+            return Fail<List<BatchApplyResult>>("No template or document provided.");
         }
 
         var results = new List<BatchApplyResult>();
@@ -764,9 +710,7 @@ public class CustomCoverArtController : ControllerBase
             var name = info?.Name ?? "Cover";
             result.Name = name;
 
-            var applied = baseDocument is not null
-                ? await ApplyDocumentInternal(target.Id, BuildBatchDocument(baseDocument, name, target.Id)).ConfigureAwait(false)
-                : await ApplyInternal(target.Id, BuildBatchSettings(baseSettings!, name, target.Id)).ConfigureAwait(false);
+            var applied = await ApplyDocumentInternal(target.Id, BuildBatchDocument(baseDocument, name, target.Id)).ConfigureAwait(false);
             result.Success = applied.Success;
             result.Error = applied.ErrorMessage;
             results.Add(result);

@@ -7,7 +7,7 @@ public class EffectsModelTests
 {
     /// <summary>
     /// Every effect is opt-in. A document that never touched the Effects card must
-    /// render exactly as it did before Phase 3 — defaults that were "on" would
+    /// render exactly as it did before Phase 3. Defaults that were "on" would
     /// silently restyle every saved design and applied cover.
     /// </summary>
     [Fact]
@@ -50,7 +50,7 @@ public class EffectsModelTests
     /// <summary>
     /// An explicit null in the request body overwrites a property initializer, so
     /// Normalize has to put the effect sub-objects back before anything dereferences
-    /// them — the same guard Background.Transform and layer Shadow/Outline already have.
+    /// them. This is the same guard Background.Transform and layer Shadow/Outline already have.
     /// </summary>
     [Fact]
     public void Normalize_NullEffectSubObjects_AreRestored()

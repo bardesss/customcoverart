@@ -7,7 +7,7 @@ namespace CustomCoverArt.Services;
 
 /// <summary>
 /// Builds a full-bleed grid mosaic from a set of poster image files.
-/// Pure image work — no Jellyfin API calls. Never throws on bad/missing files.
+/// Pure image work with no Jellyfin API calls. Never throws on bad/missing files.
 /// </summary>
 public static class CollageComposer
 {

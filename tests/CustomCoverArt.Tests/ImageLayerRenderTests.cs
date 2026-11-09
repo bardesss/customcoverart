@@ -60,7 +60,7 @@ public class ImageLayerRenderTests
     /// A rotated logo stays centred on its anchor: rotation grows the bounding box, so
     /// the top-left has to be recomputed from the ROTATED size, not the pre-rotation one.
     /// A 45°-rotated square leaves its new bounding-box corners transparent while the
-    /// centre stays covered — that asymmetry is what pins the centring down.
+    /// centre stays covered, and that asymmetry is what pins the centring down.
     /// </summary>
     [Fact]
     public void RenderImageLayer_Rotated_StaysCenteredOnAnchor()

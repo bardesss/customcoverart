@@ -52,7 +52,7 @@ public class DocumentMigrationTests
     }
 
     // Pins the null-passthrough contract the client-side migrateTemplateToDocument
-    // (configPage.html) mirrors: a legacy CoverArtSettings with no gradient must
+    // (configPage.js) mirrors: a legacy CoverArtSettings with no gradient must
     // migrate to Background.Gradient == null, NOT the default purple/blue
     // gradient. Falling back to a default here would put a phantom gradient
     // (IsEnabled:true) on every plain-image/flat-colour legacy design.

@@ -12,7 +12,7 @@ namespace CustomCoverArt.Tests;
 /// <summary>
 /// The background gradient overlay: a linear multi-stop gradient with per-stop alpha,
 /// composited over the finished background and under the layers. The alpha is the whole
-/// point — these pin that it survives compositing rather than being flattened to opaque.
+/// point, and these pin that it survives compositing rather than being flattened to opaque.
 /// </summary>
 public class GradientOverlayTests
 {
@@ -40,7 +40,7 @@ public class GradientOverlayTests
 
     /// <summary>
     /// Out-of-range Alpha must saturate rather than wrap or throw. This is NOT a guard on
-    /// the explicit <c>Math.Clamp</c> in <c>BuildColorStops</c> — ImageSharp 3.1.12's own
+    /// the explicit <c>Math.Clamp</c> in <c>BuildColorStops</c>: ImageSharp 3.1.12's own
     /// <c>Color.WithAlpha</c> already saturates its float input (verified empirically:
     /// <c>WithAlpha(2f).A == 255</c>, <c>WithAlpha(-1f).A == 0</c>), so an implementation
     /// with the clamp removed produces byte-identical output for these inputs and this test
@@ -140,7 +140,7 @@ public class GradientOverlayTests
 
     /// <summary>
     /// THE important one. Filling the canvas directly with a semi-transparent brush is the
-    /// trap that once blacked out dimmed backgrounds — ImageSharp's Fill ignores brush alpha
+    /// trap that once blacked out dimmed backgrounds: ImageSharp's Fill ignores brush alpha
     /// on alpha-less pixel formats. If that happens here the middle row goes solid black
     /// instead of mid-grey, so this assertion is the regression guard for the whole feature.
     /// </summary>
@@ -200,9 +200,9 @@ public class GradientOverlayTests
 
     /// <summary>
     /// The overlay lives in ComposeDocumentFrame, not inside ApplyBackgroundLayer, precisely
-    /// so it works for every source. ApplyBackgroundLayer runs only on the image path — which
+    /// so it works for every source. ApplyBackgroundLayer runs only on the image path, which
     /// ComposeDocumentFrame selects by whether a background <see cref="Image"/> was passed in,
-    /// not by <c>Source</c> — so the Upload case must actually be given one, or that path
+    /// not by <c>Source</c>. So the Upload case must actually be given one, or that path
     /// (and the asymmetry this test exists to guard) never runs.
     /// </summary>
     [Theory]

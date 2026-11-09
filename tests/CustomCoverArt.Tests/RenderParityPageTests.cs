@@ -13,14 +13,7 @@ namespace CustomCoverArt.Tests;
 /// </summary>
 public class RenderParityPageTests
 {
-    private static string ConfigPage()
-    {
-        using var stream = typeof(Plugin).Assembly
-            .GetManifestResourceStream("CustomCoverArt.Configuration.configPage.html");
-        Assert.NotNull(stream);
-        using var reader = new System.IO.StreamReader(stream!);
-        return reader.ReadToEnd();
-    }
+    private static string ConfigPage() => ConfigPageSource.Bundle();
 
     // A top-level script function from its declaration to its closing brace, which sits at
     // the script's 8-space function indentation (the convention ConfigPageStructureTests
@@ -29,7 +22,7 @@ public class RenderParityPageTests
     {
         var page = ConfigPage();
         var start = page.IndexOf("function " + name + "(", StringComparison.Ordinal);
-        Assert.True(start > 0, $"function {name} not found in configPage.html.");
+        Assert.True(start > 0, $"function {name} not found in configPage.js.");
         var end = page.IndexOf("\n        }", start, StringComparison.Ordinal);
         Assert.True(end > start, $"Could not find the end of function {name}.");
         return page.Substring(start, end - start);

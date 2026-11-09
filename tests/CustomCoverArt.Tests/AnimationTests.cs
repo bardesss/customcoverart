@@ -72,7 +72,7 @@ public class AnimationTests
         };
 
         var svc = AnimationTestHost.NewCoverArtService();
-        var path = await svc.GenerateCoverArtAsync(settings);
+        var path = await svc.GenerateFromDocumentAsync(CustomCoverArt.Services.DocumentMigration.FromSettings(settings));
 
         Assert.True(System.IO.File.Exists(path));
         using var img = SixLabors.ImageSharp.Image.Load(path);
@@ -108,7 +108,7 @@ public class AnimationTests
             OutputFormat = "gif",
             BackgroundSource = "upload",
             BackgroundImagePath = gifPath,
-            // Request 20 frames — a true passthrough should ignore that and use the
+            // Request 20 frames. A true passthrough should ignore that and use the
             // source's own 3 frames instead of truncating/padding.
             Animation = new CustomCoverArt.Models.AnimationSettings
             {
@@ -116,7 +116,7 @@ public class AnimationTests
             }
         };
 
-        var path = await svc.GenerateCoverArtAsync(settings);
+        var path = await svc.GenerateFromDocumentAsync(CustomCoverArt.Services.DocumentMigration.FromSettings(settings));
 
         Assert.True(System.IO.File.Exists(path));
         using var outImg = SixLabors.ImageSharp.Image.Load(path);
@@ -142,7 +142,7 @@ public class AnimationTests
             }
         };
 
-        var path = await AnimationTestHost.NewCoverArtService().GenerateCoverArtAsync(settings);
+        var path = await AnimationTestHost.NewCoverArtService().GenerateFromDocumentAsync(CustomCoverArt.Services.DocumentMigration.FromSettings(settings));
 
         Assert.True(System.IO.File.Exists(path));
         using var img = SixLabors.ImageSharp.Image.Load(path);
@@ -169,7 +169,7 @@ public class AnimationTests
     /// differently than doc.Canvas would silently mis-size text.
     ///
     /// This test renders the same title/TextSize as a static (non-animated) PNG at
-    /// 2000x1000 — the "ground truth" proportion, unaffected by any downscale path —
+    /// 2000x1000 (the "ground truth" proportion, unaffected by any downscale path)
     /// and as an animated GIF at the same 2000x1000 request (which triggers the 1280
     /// cap). It then measures the rendered glyph's pixel-height fraction of its own
     /// frame in both outputs and asserts they match: the animated/downscaled frame's
@@ -185,7 +185,7 @@ public class AnimationTests
 
         // Ground truth: static (non-animated) render at the full 2000x1000 size.
         // The static path never downscales, so doc.Canvas.Height always equals the
-        // actual canvas height here — this fraction is the "correct" proportion.
+        // actual canvas height here, and this fraction is the "correct" proportion.
         var staticSettings = new CustomCoverArt.Models.CoverArtSettings
         {
             Title = title,
@@ -196,10 +196,10 @@ public class AnimationTests
             ExportHeight = 1000,
             OutputFormat = "png",
         };
-        var staticPath = await AnimationTestHost.NewCoverArtService().GenerateCoverArtAsync(staticSettings);
+        var staticPath = await AnimationTestHost.NewCoverArtService().GenerateFromDocumentAsync(CustomCoverArt.Services.DocumentMigration.FromSettings(staticSettings));
         var staticFraction = MeasureGlyphHeightFraction(staticPath);
 
-        // Same title/TextSize/ExportWidth/ExportHeight, but as an animated GIF —
+        // Same title/TextSize/ExportWidth/ExportHeight, but as an animated GIF.
         // 2000x1000's longest side (2000) exceeds the 1280 cap, so the working
         // frame is downscaled to 1280x640 while ExportHeight (-> doc.Canvas.Height)
         // stays 1000 on the cloned/scaled settings.
@@ -217,16 +217,16 @@ public class AnimationTests
                 Enabled = true, KenBurns = false, FrameCount = 2, DelayMs = 80
             }
         };
-        var animatedPath = await AnimationTestHost.NewCoverArtService().GenerateCoverArtAsync(animatedSettings);
+        var animatedPath = await AnimationTestHost.NewCoverArtService().GenerateFromDocumentAsync(CustomCoverArt.Services.DocumentMigration.FromSettings(animatedSettings));
         var animatedFraction = MeasureGlyphHeightFraction(animatedPath);
 
         // Allow generous tolerance for font rendering/antialiasing noise, but a
         // raw-canvas-height regression would shrink the animated fraction to about
-        // 0.64x the reference (36% smaller) — well outside this band.
+        // 0.64x the reference (36% smaller), well outside this band.
         Assert.True(
             animatedFraction > staticFraction * 0.85,
-            $"Downscaled animated glyph fraction {animatedFraction:F3} vs static reference {staticFraction:F3} " +
-            "— text shrank more than expected on the capped working frame; font sizing may be using the raw " +
+            $"Downscaled animated glyph fraction {animatedFraction:F3} vs static reference {staticFraction:F3}. " +
+            "Text shrank more than expected on the capped working frame; font sizing may be using the raw " +
             "canvas height instead of doc.Canvas.Height.");
 
         try { System.IO.File.Delete(staticPath); } catch { }
@@ -342,7 +342,7 @@ public class AnimationTests
             Animation = new CustomCoverArt.Models.AnimationSettings { Enabled = true, KenBurns = false, FrameCount = 5, DelayMs = 80 }
         };
 
-        var path = await AnimationTestHost.NewCoverArtService().GenerateCoverArtAsync(settings);
+        var path = await AnimationTestHost.NewCoverArtService().GenerateFromDocumentAsync(CustomCoverArt.Services.DocumentMigration.FromSettings(settings));
         using var gif = SixLabors.ImageSharp.Image.Load<SixLabors.ImageSharp.PixelFormats.Rgba32>(path);
 
         Assert.Equal(5, gif.Frames.Count);

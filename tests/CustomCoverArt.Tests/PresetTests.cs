@@ -14,19 +14,12 @@ namespace CustomCoverArt.Tests;
 /// </summary>
 public class PresetTests
 {
-    private static string ConfigPage()
-    {
-        using var stream = typeof(Plugin).Assembly
-            .GetManifestResourceStream("CustomCoverArt.Configuration.configPage.html");
-        Assert.NotNull(stream);
-        using var reader = new System.IO.StreamReader(stream!);
-        return reader.ReadToEnd();
-    }
+    private static string ConfigPage() => ConfigPageSource.Bundle();
 
     private static string PresetValue(string page, string key)
     {
         var block = Regex.Match(page, @"var JELLYFIN_PRESET = \{(.*?)\};", RegexOptions.Singleline);
-        Assert.True(block.Success, "JELLYFIN_PRESET literal not found in configPage.html.");
+        Assert.True(block.Success, "JELLYFIN_PRESET literal not found in configPage.js.");
 
         var m = Regex.Match(block.Groups[1].Value, key + @"\s*:\s*'?([^,'\r\n]+)'?");
         Assert.True(m.Success, $"JELLYFIN_PRESET.{key} not found.");
@@ -48,7 +41,7 @@ public class PresetTests
 
     /// <summary>
     /// The preset's weight is written as a raw number in JS but has to land on the C#
-    /// FontWeight enum — this fails if either side moves.
+    /// FontWeight enum. This fails if either side moves.
     /// </summary>
     [Fact]
     public void JellyfinPreset_TextWeight_IsTheBoldEnumValue()
@@ -59,14 +52,14 @@ public class PresetTests
     /// <summary>
     /// Parses the I18N object out of the shipped page into one key/value map per locale.
     /// Discovers the locale blocks rather than naming them, so adding a language is a
-    /// change to configPage.html alone.
+    /// change to configPage.js alone.
     /// </summary>
     private static Dictionary<string, Dictionary<string, string>> I18nLocales()
     {
         var page = ConfigPage();
 
         var start = page.IndexOf("var I18N = {", System.StringComparison.Ordinal);
-        Assert.True(start > 0, "I18N object not found in configPage.html.");
+        Assert.True(start > 0, "I18N object not found in configPage.js.");
         var end = page.IndexOf("\n        };", start, System.StringComparison.Ordinal);
         Assert.True(end > start, "Could not locate the end of the I18N object.");
         var body = page.Substring(start, end - start);
@@ -151,7 +144,7 @@ public class PresetTests
 
     /// <summary>
     /// The markup is what shows before the script runs, and applyI18n re-applies the en
-    /// block over it for English users — so the two must say the same thing, or English
+    /// block over it for English users, so the two must say the same thing, or English
     /// flickers between two texts and every translation is based on the wrong one.
     /// </summary>
     [Fact]
@@ -194,7 +187,7 @@ public class PresetTests
             used.Add(m.Groups[1].Value);
         }
 
-        // Keys reached by concatenation — t('layer.' + act) — only ever show their prefix
+        // Keys reached by concatenation, such as t('layer.' + act), only ever show their prefix
         // in the source, so everything under that prefix counts as reachable.
         var prefixes = Regex.Matches(page, @"[^A-Za-z0-9_]t\(\s*'([A-Za-z0-9_.]+\.)'\s*\+")
             .Select(m => m.Groups[1].Value)

@@ -30,14 +30,11 @@ public class CoverArtService : ICoverArtService
         _logger = logger;
         _mediaItemService = mediaItemService;
 
-        // Data location comes from Jellyfin's application paths (via DI) — no
-        // more guessing filesystem locations or falling back to temp.
+        // Data location comes from Jellyfin's application paths (via DI), so there
+        // is no guessing at filesystem locations or falling back to temp.
         _outputDirectory = PluginPaths.Generated(applicationPaths);
         Directory.CreateDirectory(_outputDirectory);
     }
-
-    public Task<string> GenerateCoverArtAsync(CoverArtSettings settings)
-        => GenerateFromDocumentAsync(DocumentMigration.FromSettings(settings));
 
     public async Task<string> GenerateFromDocumentAsync(CoverDocument document)
     {
@@ -104,7 +101,7 @@ public class CoverArtService : ICoverArtService
             // Clamp client-controlled background effect sizes (guards against
             // absurd input). Per-layer text/outline clamps (the outline is drawn
             // as an O(n^2) grid of text passes, so an unbounded width could hang
-            // the request) already happen inside DocumentRenderer — do not
+            // the request) already happen inside DocumentRenderer, so do not
             // double-clamp them here.
             document.Background.Blur = Math.Clamp(document.Background.Blur, 0f, 100f);
             document.Background.Dim = Math.Clamp(document.Background.Dim, 0f, 1f);
@@ -122,7 +119,7 @@ public class CoverArtService : ICoverArtService
             // non-fatal and intentionally ignored here.
 
             // Whitelist the output format. The extension is NEVER derived from the
-            // raw client string (which could contain path-traversal segments) —
+            // raw client string (which could contain path-traversal segments):
             // anything that is not "gif" (including "auto") becomes "png".
             var outputFormat = document.Canvas.Format?.ToLowerInvariant() == "gif" ? "gif" : "png";
             document.Canvas.Format = outputFormat;
@@ -214,8 +211,8 @@ public class CoverArtService : ICoverArtService
 
     // Clones a document for a downscaled animated working canvas. Layer.Size is
     // already a fraction of Canvas.Height, so pointing Canvas.Width/Height at the
-    // actual (capped) working dimensions keeps text proportional automatically —
-    // no separate text-size scaling needed (unlike the legacy flat TextSize,
+    // actual (capped) working dimensions keeps text proportional automatically,
+    // with no separate text-size scaling needed (unlike the legacy flat TextSize,
     // which was an absolute pixel value tied to the ORIGINAL ExportHeight and
     // required pre-shrinking to compensate). Shadow/outline offsets, background blur and
     // the border are absolute pixel values, so those are scaled explicitly to
@@ -319,7 +316,7 @@ public class CoverArtService : ICoverArtService
         }
         catch
         {
-            // Directory missing or inaccessible — nothing to prune.
+            // Directory missing or inaccessible: nothing to prune.
         }
     }
 
@@ -335,7 +332,7 @@ public class CoverArtService : ICoverArtService
             Directory.CreateDirectory(libraryDirectory);
 
             // Copy the cover into the stable per-library location and return that
-            // path — this is what gets applied to the library, NOT the transient
+            // path. This is what gets applied to the library, NOT the transient
             // file in the generated root (which the cleanup may later prune).
             var destinationPath = Path.Combine(libraryDirectory, Path.GetFileName(coverArtPath));
             File.Copy(coverArtPath, destinationPath, overwrite: true);

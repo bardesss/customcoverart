@@ -147,7 +147,7 @@ public class CoverArtGenerationTests
             }
         };
 
-        var outputPath = await service.GenerateCoverArtAsync(settings);
+        var outputPath = await service.GenerateFromDocumentAsync(CustomCoverArt.Services.DocumentMigration.FromSettings(settings));
 
         Assert.True(File.Exists(outputPath), "output file should exist");
         using var produced = Image.Load(outputPath);
@@ -174,7 +174,7 @@ public class CoverArtGenerationTests
             TextColor = "#zzzzzz"
         };
 
-        var outputPath = await service.GenerateCoverArtAsync(settings);
+        var outputPath = await service.GenerateFromDocumentAsync(CustomCoverArt.Services.DocumentMigration.FromSettings(settings));
         Assert.True(File.Exists(outputPath));
     }
 }
@@ -188,6 +188,8 @@ public class PluginMetadataTests
         var resources = asm.GetManifestResourceNames();
 
         Assert.Contains("CustomCoverArt.Configuration.configPage.html", resources);
+        Assert.Contains("CustomCoverArt.Configuration.configPage.css", resources);
+        Assert.Contains("CustomCoverArt.Configuration.configPage.js", resources);
         Assert.Contains("CustomCoverArt.Resources.en.json", resources);
         Assert.Contains("CustomCoverArt.Resources.fonts.NotoSans-Regular.ttf", resources);
         Assert.Contains("CustomCoverArt.Resources.fonts.NotoSans-Bold.ttf", resources);
