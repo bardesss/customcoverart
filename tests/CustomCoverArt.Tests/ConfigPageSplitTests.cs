@@ -116,4 +116,64 @@ public class ConfigPageSplitTests
         Assert.DoesNotMatch(@"</?(style|script)\b", css);
         Assert.Contains("#CustomCoverArtConfigPage .ccaLayout", css, StringComparison.Ordinal);
     }
+
+    /// <summary>
+    /// The script is laid out in numbered sections. Each anchor is a declaration that
+    /// defines its section; finding it elsewhere means the layout drifted.
+    /// </summary>
+    [Fact]
+    public void ScriptSectionsAppearInOrder_AndHoldTheirAnchors()
+    {
+        var js = ConfigPageSource.Js();
+        string[] titles =
+        {
+            "1. i18n", "2. api", "3. State and document model", "4. Canvas engine",
+            "5. History", "6. Bindings", "7. Poster browser modal", "8. Page lifecycle"
+        };
+
+        // Banner titles sit alone on a line at the body's 8-space indentation; the file
+        // header lists the sections too, but at column 0, so it cannot match.
+        var at = titles
+            .Select(t => Regex.Match(js, "^        // " + Regex.Escape(t) + @"?$", RegexOptions.Multiline))
+            .Select(m => m.Success ? m.Index : -1)
+            .ToArray();
+        for (var i = 0; i < titles.Length; i++)
+        {
+            Assert.True(at[i] > 0, $"Section banner '{titles[i]}' not found.");
+            if (i > 0)
+            {
+                Assert.True(at[i] > at[i - 1], $"Section '{titles[i]}' comes before '{titles[i - 1]}'.");
+            }
+        }
+
+        (string Anchor, int Section)[] anchors =
+        {
+            ("var I18N = {", 0),
+            ("function jsonFetch(", 1),
+            ("function requestGuard(", 1),
+            ("function confirmAction(", 1),
+            ("var doc = defaultDocument();", 2),
+            ("function normalizeGradientStops(", 2),
+            ("function syncCollageBitmap(", 3),
+            ("function updateGifLoop(", 3),
+            ("function drawTextLayer(", 3),
+            ("function textScale(", 3),
+            ("function undo(", 4),
+            ("function markClean(", 4),
+            ("function bindEvents(", 5),
+            ("function onCanvasPointerDown(", 5),
+            ("function onDocumentKeydown(", 5),
+            ("function openBrowser(", 6),
+            ("view.addEventListener('pageshow'", 7),
+        };
+        foreach (var (anchor, section) in anchors)
+        {
+            var idx = js.IndexOf(anchor, StringComparison.Ordinal);
+            Assert.True(idx > at[section], $"'{anchor}' should be in section '{titles[section]}'.");
+            if (section + 1 < titles.Length)
+            {
+                Assert.True(idx < at[section + 1], $"'{anchor}' should be in section '{titles[section]}'.");
+            }
+        }
+    }
 }

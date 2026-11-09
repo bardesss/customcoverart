@@ -11,10 +11,20 @@
 // The body keeps its original 8-space indentation on purpose. The structure tests
 // (ConfigPageStructureTests, PresetTests, RenderParityPageTests) find the end of a
 // top-level function by "\n        }" and the I18N locale blocks by indentation.
+//
+// Sections, in order: i18n, api, state and document model, canvas engine, history,
+// bindings, poster browser modal, page lifecycle. Function declarations are hoisted,
+// so a function may live in any section. A top-level `var` whose initializer calls
+// anything must stay below every `var` it reads.
 export default function (view) {
         'use strict';
 
-        var page;
+        // ==================================================================
+        // 1. i18n
+        // The page's own translations (en, nl, es), Jellyfin UI language detection, t()
+        // and applyI18n(). Every user-visible string lives in I18N; PresetTests keeps the
+        // languages in step and every key reachable.
+        // ==================================================================
 
         // --- Localization -------------------------------------------------
         // The config page is static HTML, so it carries its own translations
@@ -309,7 +319,13 @@ export default function (view) {
                 });
             });
         }
-        // ------------------------------------------------------------------
+
+        // ==================================================================
+        // 2. api
+        // Talking to the plugin's REST API: the auth header, fetch wrappers, reading
+        // responses, translated errors, confirmations, uploads and latest-wins request
+        // guards.
+        // ==================================================================
 
         // Casing-agnostic read: server may serialize PascalCase (Data) or camelCase (data).
         function pick(obj, name) {
@@ -419,8 +435,6 @@ export default function (view) {
             return function isCurrent() { return _requestSeq[channel] === n; };
         }
 
-        function el(id) { return page.querySelector('#' + id); }
-
         // Promise<boolean>. Jellyfin's own themed confirm dialog when the dashboard exposes
         // it (Dashboard.confirm(message, title, callback)), the browser's otherwise.
         function confirmAction(message) {
@@ -433,6 +447,24 @@ export default function (view) {
             });
         }
 
+        function uploadFile(endpoint, file) {
+            var fd = new FormData();
+            fd.append('file', file);
+            return authFetch('CustomCoverArt/' + endpoint, { method: 'POST', body: fd })
+                .then(readJson, function () { throw networkError(); });
+        }
+
+        // ==================================================================
+        // 3. State and document model
+        // Page-wide state, presets and limits, and the CoverDocument the editor works on:
+        // defaults, normalizers, layer lookups and the legacy-template migration. Field
+        // names are PascalCase to match Models/CoverDocument.cs.
+        // ==================================================================
+
+        var page;
+
+        function el(id) { return page.querySelector('#' + id); }
+
         // --- Step accordion -----------------------------------------------
         // Owns .ccaStepBody and NOTHING else. Every other visibility helper
         // (updateBackgroundVisibility, updateEffectsVisibility, updateAnimVisibility, the
@@ -440,67 +472,6 @@ export default function (view) {
         // body; if this controller touched those too, the two owners would fight and a
         // control could reappear inside a collapsed step.
         var STEP_KEY = 'cca.lastStep';
-
-        function openStep(n) {
-            page.querySelectorAll('.ccaStep').forEach(function (section) {
-                var isTarget = section.getAttribute('data-step') === String(n);
-                var head = section.querySelector('.ccaStepHead');
-                var body = section.querySelector('.ccaStepBody');
-                head.setAttribute('aria-expanded', isTarget ? 'true' : 'false');
-                if (isTarget) { body.removeAttribute('hidden'); } else { body.setAttribute('hidden', ''); }
-            });
-            try { localStorage.setItem(STEP_KEY, String(n)); } catch (e) { /* private mode */ }
-            // Step 5 may have just become visible, and its thumbnails skip drawing
-            // while collapsed.
-            if (typeof renderPreviewContexts === 'function') { renderPreviewContexts(); }
-        }
-
-        function currentOpenStep() {
-            var open = page.querySelector('.ccaStepHead[aria-expanded="true"]');
-            return open ? open.parentNode.getAttribute('data-step') : null;
-        }
-
-        function initSteps() {
-            page.querySelectorAll('.ccaStep').forEach(function (section) {
-                var n = section.getAttribute('data-step');
-                section.querySelector('.ccaStepHead').addEventListener('click', function () {
-                    // Clicking the open step collapses it: all-closed is a valid state, and
-                    // it is how you give the canvas the whole screen on a phone.
-                    if (currentOpenStep() === n) {
-                        section.querySelector('.ccaStepBody').setAttribute('hidden', '');
-                        this.setAttribute('aria-expanded', 'false');
-                        return;
-                    }
-                    openStep(n);
-                });
-            });
-            restoreLastStep();
-        }
-
-        // Advanced disclosures are independent of the step accordion and of each other:
-        // opening a step does not reveal its advanced controls, and the state is not
-        // persisted. In the Effects step they are nested INSIDE each effect's row, because
-        // updateEffectsVisibility owns that row's display — pulling softness out to a
-        // step-level block would show it even with the vignette switched off.
-        function initAdvanced() {
-            page.querySelectorAll('.ccaAdvHead').forEach(function (head) {
-                head.addEventListener('click', function () {
-                    var body = this.parentNode.querySelector('.ccaAdvBody');
-                    var open = this.getAttribute('aria-expanded') === 'true';
-                    this.setAttribute('aria-expanded', open ? 'false' : 'true');
-                    if (open) { body.setAttribute('hidden', ''); } else { body.removeAttribute('hidden'); }
-                });
-            });
-        }
-
-        // Step 1 when nothing is selected yet, otherwise wherever you left off — a first
-        // run starts at the beginning, a return visit lands where you were working.
-        function restoreLastStep() {
-            var saved = null;
-            try { saved = localStorage.getItem(STEP_KEY); } catch (e) { /* ignore */ }
-            var exists = saved && page.querySelector('.ccaStep[data-step="' + saved + '"]');
-            openStep((state.libraryId && exists) ? saved : '1');
-        }
 
         // titleTouched: the user has typed their own title, so picking a target no longer
         // renames it. applying: an Apply is in flight and owns the Apply button.
@@ -534,16 +505,6 @@ export default function (view) {
             return Math.max(MIN_DIM, Math.min(MAX_DIM, v));
         }
 
-        // ==================================================================
-        // Canvas engine (Phase 1 · Task 7)
-        // Renders a client-side CoverDocument onto <canvas id="ccaCanvas">, live,
-        // to mirror the server ImageSharp compositor (Services/DocumentRenderer.cs).
-        // The server stays authoritative; this is a fast visual preview. Field
-        // names/casing on `doc` are PascalCase to match the C# CoverDocument model.
-        // ==================================================================
-
-        // The working document. PascalCase mirrors Models/CoverDocument.cs so the
-        // same object shape can later be POSTed for the authoritative server render.
         // Mirrors Models/CoverDocument.cs EffectSettings, all disabled by default so an
         // untouched design renders exactly as it did before effects existed.
         function defaultEffects() {
@@ -669,6 +630,8 @@ export default function (view) {
                 _selectedId: 'title'
             };
         }
+        // The working document. PascalCase mirrors Models/CoverDocument.cs so the
+        // same object shape can later be POSTed for the authoritative server render.
         var doc = defaultDocument();
 
         // CRITICAL canvas-source invariant: bgImageEl AND collageBgEl must ONLY ever be
@@ -680,6 +643,141 @@ export default function (view) {
         // mosaic. Which one is painted is decided by activeBgBitmap(), so switching between
         // image and collage neither loses the uploaded bitmap nor paints a stale one.
         var bgImageEl = null;
+
+        // Coordinate contract: canvas backing store is doc.Canvas.Width×Height;
+        // normalized layer coordinates map 1:1 across that dimension.
+        function normToPx(n, dim) { return n * dim; }
+        function pxToNorm(px, dim) { return dim ? px / dim : 0; }
+
+        function selectedLayer() {
+            for (var i = 0; i < doc.Layers.length; i++) {
+                if (doc.Layers[i].Id === doc._selectedId) { return doc.Layers[i]; }
+            }
+            return null;
+        }
+
+        function newLayerId() { return 'l' + Date.now().toString(36) + Math.floor(Math.random() * 1e4).toString(36); }
+
+        function layerIndex(id) {
+            for (var i = 0; i < doc.Layers.length; i++) { if (doc.Layers[i].Id === id) { return i; } }
+            return -1;
+        }
+
+        function layerLabel(layer) {
+            if (layer.Type === 'text') { return (layer.Content || '').trim() || t('layer.text'); }
+            return layer._name || t('layer.logo');
+        }
+
+        // --- Document <-> controls binding (Task 8) -----------------------
+        // Every request carries the design as a CoverDocument built by collectDocument().
+
+        // Recursively deep-clone `doc`, dropping UI-only keys (any `_`-prefixed key,
+        // e.g. _selectedId) so nothing internal leaks onto the wire.
+        function stripUiKeys(v) {
+            if (Array.isArray(v)) { return v.map(stripUiKeys); }
+            if (v && typeof v === 'object') {
+                var out = {};
+                Object.keys(v).forEach(function (k) {
+                    if (k.charAt(0) === '_') { return; }
+                    out[k] = stripUiKeys(v[k]);
+                });
+                return out;
+            }
+            return v;
+        }
+
+        // The stock title layer (Id 'title'), if the design still has one.
+        function titleLayer() {
+            for (var i = 0; i < doc.Layers.length; i++) {
+                if (doc.Layers[i].Id === 'title' && doc.Layers[i].Type === 'text') { return doc.Layers[i]; }
+            }
+            return null;
+        }
+
+        // --- Templates ----------------------------------------------------
+
+        // Pick helper for legacy CoverArtSettings that treats 0/false as present
+        // (unlike a plain `||` fallback, which would replace a real 0 dim/blur).
+        function pickNum(s, name, fallback) {
+            var v = pick(s, name);
+            return (v === undefined || v === null) ? fallback : v;
+        }
+
+        // Converts a legacy flat CoverArtSettings (templates saved before the
+        // canvas engine shipped, which carry Settings but no Document) into a
+        // one-text-layer CoverDocument — the client mirror of the server's
+        // Services/DocumentMigration.cs FromSettings, so old templates keep
+        // working. Per template semantics ("templates store the design but not
+        // the title"), the title layer's Content is stripped, same as a
+        // freshly-saved document-native template would have.
+        function migrateTemplateToDocument(s) {
+            var d = defaultDocument();
+
+            d.Canvas.Width = pickNum(s, 'ExportWidth', d.Canvas.Width);
+            d.Canvas.Height = pickNum(s, 'ExportHeight', d.Canvas.Height);
+            d.Canvas.Format = pick(s, 'OutputFormat') || d.Canvas.Format;
+            d.Canvas.DimensionPreset = pick(s, 'DimensionPreset') || d.Canvas.DimensionPreset;
+
+            var bg = d.Background;
+            bg.Source = pick(s, 'BackgroundSource') || bg.Source;
+            bg.ImagePath = pick(s, 'BackgroundImagePath') || '';
+            bg.Fit = pick(s, 'BackgroundFit') || 'cover';
+            bg.Blur = pickNum(s, 'BackgroundBlur', bg.Blur);
+            bg.Dim = pickNum(s, 'BackgroundDim', bg.Dim);
+            bg.DimColor = pick(s, 'DimColor') || bg.DimColor;
+            // Mirrors DocumentMigration.FromSettings: Gradient = s.BackgroundGradient,
+            // i.e. a missing gradient stays null — NOT the default purple/blue
+            // gradient from defaultDocument(). Falling back to that default would
+            // put a phantom gradient (IsEnabled:true) onto any legacy template
+            // that never had one (a plain image, or a flat/dim-only design), and
+            // that phantom gradient would then get baked onto the real applied
+            // cover by the server's CreateGradientBackground.
+            bg.Gradient = pick(s, 'BackgroundGradient') || null;
+            bg.Collage = pick(s, 'Collage') || null;
+            bg.Animation = pick(s, 'Animation') || null;
+            bg.Transform = { OffsetX: 0, OffsetY: 0, Scale: 1 }; // identity, as FromSettings does
+
+            var l = d.Layers[0];
+            l.Content = ''; // template title stripped — each target keeps its own name
+            var height = d.Canvas.Height || 1400;
+            l.Size = pickNum(s, 'TextSize', 120) / height;
+            l.Weight = pickNum(s, 'TextWeight', 400);
+            l.Color = pick(s, 'TextColor') || '#ffffff';
+            l.Align = pickNum(s, 'TextAlign', 1);
+            l.FontPath = pick(s, 'CustomFontPath') || '';
+
+            // Anchor position from align/baseline/padding, mirroring
+            // DocumentMigration.AnchorFor (TextAlign/TextBaseline: 0=start/top,
+            // 1=center/middle, 2=end/bottom).
+            var baseline = pickNum(s, 'TextBaseline', 1);
+            var padding = pickNum(s, 'TextPadding', 0.05);
+            l.X = l.Align === 0 ? padding : (l.Align === 2 ? 1 - padding : 0.5);
+            l.Y = baseline === 0 ? padding : (baseline === 2 ? 1 - padding : 0.5);
+
+            l.Shadow = {
+                Enabled: !!pick(s, 'TextShadow'),
+                Color: pick(s, 'TextShadowColor') || '#000000',
+                Blur: pickNum(s, 'TextShadowBlur', 4),
+                OffsetX: pickNum(s, 'TextShadowOffsetX', 2),
+                OffsetY: pickNum(s, 'TextShadowOffsetY', 2)
+            };
+            l.Outline = {
+                Enabled: !!pick(s, 'TextOutline'),
+                Color: pick(s, 'TextOutlineColor') || '#000000',
+                Width: pickNum(s, 'TextOutlineWidth', 2)
+            };
+
+            return d;
+        }
+
+        // ==================================================================
+        // 4. Canvas engine
+        // Renders `doc` onto the preview canvas, mirroring the server compositor
+        // (Services/DocumentRenderer.cs): background (including the server-built collage
+        // mosaic and the animated-GIF repaint loop), gradients, overlay, effects, text and
+        // image layers, the in-context thumbnails, selection handles and hit-testing. The
+        // server render stays authoritative; this is the fast live preview.
+        // ==================================================================
 
         // The bitmap the canvas paints as the background right now, or null when nothing
         // drawable is loaded (the gradient or flat colour renders instead).
@@ -1023,373 +1121,6 @@ export default function (view) {
             }
         }
 
-        // Background pan/zoom mode (Task 9): when true, canvas drag/wheel/pinch
-        // mutate doc.Background.Transform instead of selecting/dragging a text
-        // layer. Toggled by the #ccaBgAdjust checkbox.
-        var bgAdjustMode = false;
-
-        // Coordinate contract: canvas backing store is doc.Canvas.Width×Height;
-        // normalized layer coordinates map 1:1 across that dimension.
-        function normToPx(n, dim) { return n * dim; }
-        function pxToNorm(px, dim) { return dim ? px / dim : 0; }
-
-        function selectedLayer() {
-            for (var i = 0; i < doc.Layers.length; i++) {
-                if (doc.Layers[i].Id === doc._selectedId) { return doc.Layers[i]; }
-            }
-            return null;
-        }
-
-        // --- Layer management (Phase 2) ------------------------------------
-        // doc.Layers[0] is the BOTTOM layer (drawn first); the panel lists the array
-        // reversed so the top-most layer sits at the top of the list, like every other
-        // layers panel. Server-side the count is capped at 40 (CoverArtService), so the
-        // client refuses to add past that rather than letting layers vanish on apply.
-        var MAX_LAYERS = 40;
-
-        function newLayerId() { return 'l' + Date.now().toString(36) + Math.floor(Math.random() * 1e4).toString(36); }
-
-        function layerIndex(id) {
-            for (var i = 0; i < doc.Layers.length; i++) { if (doc.Layers[i].Id === id) { return i; } }
-            return -1;
-        }
-
-        function layerLabel(layer) {
-            if (layer.Type === 'text') { return (layer.Content || '').trim() || t('layer.text'); }
-            return layer._name || t('layer.logo');
-        }
-
-        function selectLayerById(id) {
-            doc._selectedId = id;
-            renderLayersPanel();
-            syncControlsFromDocument();
-            // The starting document is the base history entry.
-            snapshot();
-            scheduleRender();
-        }
-
-        // The panel is rebuilt on every select/move/show-hide, which used to drop keyboard
-        // focus to <body> after each action. Remember which control of which row had it...
-        function focusedLayerControl() {
-            var a = document.activeElement;
-            var box = el('ccaLayerList');
-            if (!a || !box || !box.contains(a)) { return null; }
-            var row = a.closest('.ccaLayerRow');
-            return row ? { id: row.getAttribute('data-layer-id'), act: a.getAttribute('data-act') } : null;
-        }
-
-        // ...and put it back on the same control after the rebuild. A deleted layer's
-        // focus moves to the newly selected layer's name.
-        function restoreLayerFocus(box, prev) {
-            if (!prev) { return; }
-            var rows = box.querySelectorAll('.ccaLayerRow');
-            var target = null;
-            for (var i = 0; i < rows.length; i++) {
-                if (rows[i].getAttribute('data-layer-id') === prev.id) {
-                    target = rows[i].querySelector('[data-act="' + prev.act + '"]') || rows[i].querySelector('[data-act="pick"]');
-                    break;
-                }
-            }
-            if (!target) { target = box.querySelector('.ccaLayerSel [data-act="pick"]') || box.querySelector('[data-act="pick"]'); }
-            if (target) { target.focus(); }
-        }
-
-        function renderLayersPanel() {
-            var box = el('ccaLayerList');
-            if (!box) { return; }
-            var prevFocus = focusedLayerControl();
-            box.innerHTML = '';
-            for (var i = doc.Layers.length - 1; i >= 0; i--) {
-                (function (layer) {
-                    var row = document.createElement('div');
-                    row.className = 'ccaLayerRow'
-                        + (layer.Id === doc._selectedId ? ' ccaLayerSel' : '')
-                        + (layer.Visible ? '' : ' ccaLayerHidden');
-                    row.setAttribute('role', 'listitem');
-                    row.setAttribute('data-layer-id', layer.Id);
-
-                    var vis = document.createElement('button');
-                    vis.type = 'button'; vis.className = 'ccaLayerBtn';
-                    vis.setAttribute('data-act', 'vis');
-                    vis.textContent = layer.Visible ? '👁' : '∅';
-                    vis.title = layer.Visible ? t('layer.hide') : t('layer.show');
-                    vis.setAttribute('aria-label', t('layer.visible'));
-                    vis.setAttribute('aria-pressed', layer.Visible ? 'true' : 'false');
-                    vis.addEventListener('click', function (e) {
-                        e.stopPropagation();
-                        layer.Visible = !layer.Visible;
-                        renderLayersPanel();
-                        scheduleRender();
-                    });
-
-                    // The name is a real button, so a layer can be selected from the
-                    // keyboard (Tab to it, Enter or Space). It has no handler of its own:
-                    // its click bubbles to the row's, which is what selects, so a mouse
-                    // click anywhere on the row still works.
-                    var name = document.createElement('button');
-                    name.type = 'button';
-                    name.className = 'ccaLayerName';
-                    name.setAttribute('data-act', 'pick');
-                    name.setAttribute('aria-pressed', layer.Id === doc._selectedId ? 'true' : 'false');
-                    name.textContent = layerLabel(layer);
-
-                    row.appendChild(vis);
-                    row.appendChild(name);
-
-                    // Actions live in their own container so a narrow screen can collapse
-                    // them behind one toggle, leaving the whole row as the tap target for
-                    // the action people actually want most: selecting the layer.
-                    var actions = document.createElement('div');
-                    actions.className = 'ccaLayerActions';
-                    ['up', 'down', 'dup', 'del'].forEach(function (act) {
-                        var b = document.createElement('button');
-                        b.type = 'button'; b.className = 'ccaLayerBtn';
-                        b.setAttribute('data-act', act);
-                        b.textContent = act === 'up' ? '▲' : act === 'down' ? '▼' : act === 'dup' ? '⧉' : '✕';
-                        b.title = t('layer.' + act);
-                        b.setAttribute('aria-label', t('layer.' + act));
-                        b.addEventListener('click', function (e) {
-                            e.stopPropagation();
-                            // "Up" in the panel means later in the array = drawn on top.
-                            if (act === 'up') { moveLayer(layer.Id, 1); }
-                            else if (act === 'down') { moveLayer(layer.Id, -1); }
-                            else if (act === 'dup') { duplicateLayer(layer.Id); }
-                            else { deleteLayer(layer.Id); }
-                        });
-                        actions.appendChild(b);
-                    });
-
-                    var more = document.createElement('button');
-                    more.type = 'button';
-                    more.className = 'ccaLayerBtn ccaLayerMore';
-                    more.setAttribute('data-act', 'more');
-                    more.textContent = '⋯';
-                    more.title = t('layer.more');
-                    more.setAttribute('aria-label', t('layer.more'));
-                    more.setAttribute('aria-expanded', 'false');
-                    more.addEventListener('click', function (e) {
-                        e.stopPropagation();
-                        var open = row.classList.toggle('ccaLayerActionsOpen');
-                        more.setAttribute('aria-expanded', open ? 'true' : 'false');
-                    });
-
-                    row.appendChild(actions);
-                    row.appendChild(more);
-
-                    row.addEventListener('click', function () { selectLayerById(layer.Id); });
-                    box.appendChild(row);
-                })(doc.Layers[i]);
-            }
-            restoreLayerFocus(box, prevFocus);
-            var atCap = doc.Layers.length >= MAX_LAYERS;
-            if (el('ccaAddText')) { el('ccaAddText').disabled = atCap; }
-            if (el('ccaAddImage')) { el('ccaAddImage').disabled = atCap; }
-        }
-
-        function addTextLayer() {
-            if (doc.Layers.length >= MAX_LAYERS) { return; }
-            var l = JSON.parse(JSON.stringify(defaultDocument().Layers[0]));
-            l.Id = newLayerId();
-            l.Content = t('layer.text');
-            // Offset from the existing title so a new layer doesn't land exactly on
-            // top of it and look like nothing happened.
-            l.Y = Math.min(0.95, l.Y + 0.15);
-            doc.Layers.push(l);
-            selectLayerById(l.Id);
-        }
-
-        // A logo layer carries the FULL CoverLayer field set (PascalCase) so it
-        // round-trips through the C# model; `_`-prefixed keys are UI-only and are
-        // stripped by stripUiKeys() before anything is POSTed.
-        function newImageLayer(path, name) {
-            return {
-                Id: newLayerId(), Type: 'image', Visible: true,
-                X: 0.5, Y: 0.5, Width: 0.25, Height: 0.25, Rotation: 0, Opacity: 1,
-                ImagePath: path, _name: name,
-                Content: '', Size: 0, Weight: 400, Color: '#ffffff', Align: 1, FontPath: '',
-                Shadow: { Enabled: false, Color: '#000000', Blur: 4, OffsetX: 2, OffsetY: 2 },
-                Outline: { Enabled: false, Color: '#000000', Width: 2 }
-            };
-        }
-
-        function duplicateLayer(id) {
-            if (doc.Layers.length >= MAX_LAYERS) { return; }
-            var i = layerIndex(id);
-            if (i < 0) { return; }
-            var src = doc.Layers[i];
-            var copy = stripUiKeys(src); // deep clone, minus the UI-only keys
-            copy.Id = newLayerId();
-            copy.X = Math.min(1, copy.X + 0.03);
-            copy.Y = Math.min(1, copy.Y + 0.03);
-            // JSON can't carry the decoded bitmap or the display name, so re-attach
-            // them instead of re-downloading what we already have.
-            if (src._img) { copy._img = src._img; }
-            if (src._name) { copy._name = src._name; }
-            doc.Layers.splice(i + 1, 0, copy);
-            selectLayerById(copy.Id);
-        }
-
-        function deleteLayer(id) {
-            doc.Layers = doc.Layers.filter(function (l) { return l.Id !== id; });
-            if (doc._selectedId === id) {
-                doc._selectedId = doc.Layers.length ? doc.Layers[doc.Layers.length - 1].Id : null;
-            }
-            renderLayersPanel();
-            syncControlsFromDocument();
-            scheduleRender();
-        }
-
-        function moveLayer(id, dir) {
-            var i = layerIndex(id);
-            var j = i + dir;
-            if (i < 0 || j < 0 || j >= doc.Layers.length) { return; }
-            var tmp = doc.Layers[i]; doc.Layers[i] = doc.Layers[j]; doc.Layers[j] = tmp;
-            renderLayersPanel();
-            scheduleRender();
-        }
-
-        // Loads the bitmap for any image layer that has a server path but no decoded
-        // image yet — i.e. layers restored from a saved template, where the upload
-        // File is long gone. Fetched as a BLOB and turned into an object URL, never
-        // assigned as a server URL directly: the canvas-source invariant (see
-        // bgImageEl) applies to every canvas source, not just the background.
-        function hydrateLayerImages() {
-            doc.Layers.forEach(function (layer) {
-                if (layer.Type !== 'image' || layer._img || layer._imgPending || !layer.ImagePath) { return; }
-                layer._imgPending = true;
-                authFetch('CustomCoverArt/layerImage?path=' + encodeURIComponent(layer.ImagePath))
-                    .then(function (r) {
-                        if (!r.ok) { throw new Error('layer image returned ' + r.status); }
-                        return r.blob();
-                    })
-                    .then(function (blob) {
-                        var url = URL.createObjectURL(blob);
-                        var img = new Image();
-                        img.onload = function () {
-                            URL.revokeObjectURL(url);
-                            layer._img = img;
-                            layer._imgPending = false;
-                            scheduleRender();
-                        };
-                        img.onerror = function () { URL.revokeObjectURL(url); layer._imgPending = false; };
-                        img.src = url;
-                    })
-                    .catch(function () {
-                        // Best-effort: the layer still renders in the authoritative
-                        // server output, it just can't be previewed on the canvas.
-                        layer._imgPending = false;
-                    });
-            });
-        }
-        // ------------------------------------------------------------------
-
-        // --- Background bitmap & file names -------------------------------
-        // bgImageEl (the uploaded or poster-picked image) has exactly two writers:
-        // setBackgroundBitmap and clearBackgroundBitmap. collageBgEl has its own
-        // (fetchCollageBitmap / releaseCollageBitmap) and is never touched here;
-        // activeBgBitmap() decides which of the two the canvas paints.
-        //
-        // _bgImageUrl is bgImageEl's object URL. It lives exactly as long as its bitmap is
-        // the background and is revoked when the bitmap is replaced or dropped, like
-        // _collageUrl: an animated GIF keeps decoding frames from it while it plays, and an
-        // unrevoked URL per pick pinned a full-size copy of every image ever chosen.
-        var _bgImageUrl = null;
-
-        function clearBackgroundBitmap() {
-            closeGifDecoder(bgImageEl);
-            if (_bgImageUrl) { URL.revokeObjectURL(_bgImageUrl); }
-            _bgImageUrl = null;
-            bgImageEl = null;
-        }
-
-        // `isCurrent` comes from requestGuard('bg'), taken when the user acted, so two quick
-        // picks cannot land out of order: the older pick's bitmap is simply dropped.
-        function setBackgroundBitmap(blob, isCurrent) {
-            var url = URL.createObjectURL(blob);
-            var img = new Image();
-            img.onload = function () {
-                if (!isCurrent()) { URL.revokeObjectURL(url); closeGifDecoder(img); return; }
-                clearBackgroundBitmap();
-                bgImageEl = img;
-                _bgImageUrl = url;
-                scheduleRender();
-            };
-            img.onerror = function () { URL.revokeObjectURL(url); closeGifDecoder(img); };
-            img.src = url;
-            // Flags the <img> if the bytes are a multi-frame GIF, so the repaint loop runs.
-            watchForAnimatedGif(img, blob);
-        }
-
-        // Makes bgImageEl agree with doc.Background.ImagePath after the document was
-        // replaced (undo, redo, template load). Keeps the bitmap when the path is
-        // unchanged; otherwise fetches the path back as a Blob through the uploads-only
-        // layerImage endpoint (where background uploads and poster picks both live), never
-        // as an <img src> on the server (canvas-source invariant). The source is not
-        // consulted: a collage keeps the uploaded bitmap in reserve, and activeBgBitmap()
-        // decides what is painted.
-        function hydrateBackgroundImage(previousPath) {
-            var path = doc.Background.ImagePath || '';
-            // Nothing changed for the background: keep the bitmap, and do NOT take a new
-            // 'bg' token, or undoing an unrelated edit would cancel a pick still in flight.
-            if (path === (previousPath || '') && (bgImageEl || !path)) { return; }
-            var isCurrent = requestGuard('bg');
-            clearBackgroundBitmap();
-            if (!path) { return; }
-            authFetch('CustomCoverArt/layerImage?path=' + encodeURIComponent(path))
-                .then(function (r) {
-                    if (!r.ok) { throw requestError(r.status); }
-                    return r.blob();
-                })
-                .then(function (blob) {
-                    if (isCurrent() && doc.Background.ImagePath === path) { setBackgroundBitmap(blob, isCurrent); }
-                })
-                .catch(function () {
-                    // Best-effort, like hydrateLayerImages: the authoritative server
-                    // render still has the image, only the canvas preview lacks it.
-                });
-        }
-
-        // JSON cannot carry a decoded <img> or a display name. After undo/redo or a
-        // template load, a logo whose server path is unchanged keeps both instead of being
-        // downloaded again (and blinking out of the preview meanwhile).
-        function reuseLayerClientState(previousLayers) {
-            var known = {};
-            (previousLayers || []).forEach(function (l) {
-                if (l.ImagePath && (l._img || l._name)) { known[l.ImagePath] = { img: l._img, name: l._name }; }
-            });
-            doc.Layers.forEach(function (l) {
-                var k = l.ImagePath ? known[l.ImagePath] : null;
-                if (!k) { return; }
-                if (!l._img && k.img) { l._img = k.img; }
-                if (!l._name && k.name) { l._name = k.name; }
-            });
-        }
-
-        // Original file names by server path. Uploads are stored under randomised names,
-        // so the path alone cannot tell the user which file they picked; a path missing
-        // from this map (a template from an earlier session) falls back to its own name.
-        var _fileNames = {};
-
-        function displayNameFor(path) {
-            if (!path) { return ''; }
-            var known = _fileNames[path];
-            return known ? known.name : String(path).split(/[\\/]/).pop();
-        }
-
-        // Owns the "which file is in use" labels. Called from syncControlsFromDocument, so
-        // a layer switch, template load or undo can never leave a stale name behind.
-        function syncFileNames() {
-            var bgPath = doc.Background.ImagePath || '';
-            var known = bgPath ? _fileNames[bgPath] : null;
-            var isPoster = !!(known && known.poster);
-            el('ccaBgImageName').textContent = (bgPath && !isPoster) ? displayNameFor(bgPath) : t('f.none');
-            el('ccaSelectedBgName').textContent = isPoster ? known.name : '';
-            el('ccaSelectedBg').style.display = isPoster ? '' : 'none';
-            var l = selectedLayer();
-            var fontPath = (l && l.Type === 'text') ? (l.FontPath || '') : '';
-            el('ccaFontName').textContent = fontPath ? displayNameFor(fontPath) : t('f.none');
-        }
-
         var _rafPending = false;
         function scheduleRender() {
             if (_rafPending) { return; }
@@ -1698,72 +1429,6 @@ export default function (view) {
                 box.appendChild(wrap);
             });
         }, 300);
-        // ------------------------------------------------------------------
-
-        // --- Undo/redo ----------------------------------------------------
-        // A snapshot stack of the serialized document. UI-only keys are stripped, so a
-        // snapshot can never capture a decoded <img> or the transient selection.
-        var HISTORY_CAP = 50;
-        var history = { stack: [], index: -1 };
-
-        function snapshot() {
-            var json = JSON.stringify(stripUiKeys(doc));
-            if (history.index >= 0 && history.stack[history.index] === json) { return; }
-            // Any new edit truncates the redo tail.
-            history.stack = history.stack.slice(0, history.index + 1);
-            history.stack.push(json);
-            if (history.stack.length > HISTORY_CAP) { history.stack.shift(); }
-            history.index = history.stack.length - 1;
-            updateHistoryButtons();
-        }
-
-        // Bursts of slider input collapse into ONE entry; discrete actions call snapshot()
-        // directly so they land immediately.
-        var commit = debounce(snapshot, 400);
-
-        function restoreSnapshot(json) {
-            var selected = doc._selectedId;
-            var previousImagePath = doc.Background.ImagePath;
-            var previousLayers = doc.Layers;
-            doc = JSON.parse(json);
-            // A snapshot is a plain serialized document, so it needs the same normalization
-            // a template load gets before anything dereferences it.
-            normalizeEffects(doc);
-            normalizeBackgroundSource(doc);
-            normalizeOverlay(doc);
-            normalizeGradientStops(doc);
-            doc._selectedId = selected;
-            // It carries server paths but no decoded bitmaps: reuse the ones we already
-            // have for unchanged paths, fetch the rest.
-            reuseLayerClientState(previousLayers);
-            hydrateBackgroundImage(previousImagePath);
-            hydrateLayerImages();
-            renderLayersPanel();
-            syncControlsFromDocument();
-            resetOverlayEditorState();
-            scheduleRender();
-        }
-
-        function undo() {
-            if (history.index <= 0) { return; }
-            history.index--;
-            restoreSnapshot(history.stack[history.index]);
-            updateHistoryButtons();
-        }
-
-        function redo() {
-            if (history.index >= history.stack.length - 1) { return; }
-            history.index++;
-            restoreSnapshot(history.stack[history.index]);
-            updateHistoryButtons();
-        }
-
-        function updateHistoryButtons() {
-            var u = el('ccaUndo'), r = el('ccaRedo');
-            if (u) { u.disabled = history.index <= 0; }
-            if (r) { r.disabled = history.index >= history.stack.length - 1; }
-        }
-        // ------------------------------------------------------------------
 
         // --- Colour palette (Phase 3) -------------------------------------
         // Dominant colours of the BACKGROUND, extracted entirely client-side — no new
@@ -1806,79 +1471,6 @@ export default function (view) {
                     return '#' + p.map(function (n) { return ('0' + n.toString(16)).slice(-2); }).join('');
                 });
         }
-
-        function renderSwatches(colors) {
-            var box = el('ccaSwatches');
-            if (!box) { return; }
-            box.innerHTML = '';
-            colors.forEach(function (hex) {
-                var s = document.createElement('button');
-                s.type = 'button';
-                s.className = 'ccaSwatch';
-                s.style.background = hex;
-                s.title = hex;
-                s.setAttribute('aria-label', t('fx.swatch', hex));
-                // Read the focus state one event EARLIER than the click: pressing the mouse
-                // on a button moves focus to it (Chrome/Edge/Firefox on Windows) before
-                // 'click' fires, and some browsers (Safari) do not focus buttons on click at
-                // all, so document.activeElement here is the only reading that is true in
-                // both. The focusout handler covers the keyboard path, where no mousedown
-                // ever happens.
-                s.addEventListener('mousedown', function () {
-                    _overlayStopFocused = isInOverlayStops(document.activeElement);
-                });
-                s.addEventListener('click', function () { applySwatch(hex); });
-                box.appendChild(s);
-            });
-        }
-
-        // Where a clicked swatch lands, in order: the selected text layer, then the selected
-        // overlay stop when the overlay is on, then the colour wash when it is on. Each
-        // updates its own control so the card and the canvas never disagree.
-        //
-        // ONE exception jumps the queue: the overlay stop wins over the selected text layer
-        // when the user is demonstrably in the overlay editor (a stop row holds focus, or
-        // held it up to this click — see _overlayStopFocused). Without it the overlay branch
-        // is dead code in practice, because the stock document always has a selected title
-        // layer and nothing ever deselects it: selectLayerById does not toggle off, and a
-        // canvas click that hits no layer returns early. A user would have to DELETE their
-        // title layer before a swatch could tint an overlay stop, which flatly contradicts
-        // the documented "click a palette swatch to tint your overlay". Users who are not
-        // touching the overlay never set the flag, so their text-layer behaviour is unchanged.
-        function applySwatch(hex) {
-            var overlayOn = doc.Background.Overlay && doc.Background.Overlay.IsEnabled;
-            var idx = overlayOn ? overlayStopIndex() : -1;
-
-            var l = selectedLayer();
-            if (l && l.Type === 'text' && !(idx >= 0 && _overlayStopFocused)) {
-                l.Color = hex;
-                el('ccaTextColor').value = hex;
-                scheduleRender();
-                return;
-            }
-            if (idx >= 0) {
-                doc.Background.Overlay.Stops[idx].Color = hex;
-                var container = el('ccaOverlayStops');
-                var rows = container ? container.querySelectorAll('.ccaStop') : null;
-                if (rows && rows[idx]) { rows[idx].querySelector('input[type="color"]').value = hex; }
-            } else if (doc.Effects.SoftLight.Enabled) {
-                doc.Effects.SoftLight.Color = hex;
-                el('ccaFxSoftLightColor').value = hex;
-            } else {
-                return; // nothing sensible to apply it to; leave the design alone
-            }
-            scheduleRender();
-        }
-
-        // Re-extract after the canvas settles rather than wiring every background
-        // trigger (upload, poster pick, gradient stop edit, collage shuffle, preset).
-        // Debounced, and only while the toggle is on, so it costs nothing when unused.
-        var refreshPalette = debounce(function () {
-            var toggle = el('ccaAutoPalette');
-            if (!toggle || !toggle.checked) { return; }
-            renderSwatches(extractPalette());
-        }, 300);
-        // ------------------------------------------------------------------
 
         // Builds the canvas colour-stop list from gradient settings — the explicit
         // Stops (sorted, clamped) when there are 2+, else the server's StartColor/EndColor
@@ -2417,6 +2009,592 @@ export default function (view) {
             return null;
         }
 
+        // Loads the SAME bundled Noto weights the server renders with, via the
+        // authenticated font endpoint + the FontFace API (which — unlike CSS
+        // @font-face — accepts an ArrayBuffer fetched WITH the auth token). Tolerant
+        // of per-weight failure: a missing weight falls back to the browser's
+        // sans-serif for the canvas only; the applied cover is server-authoritative.
+        var FONT_WEIGHTS = [300, 400, 500, 600, 700, 800];
+        function loadCanvasFonts() {
+            return Promise.all(FONT_WEIGHTS.map(function (w) {
+                return authFetch('CustomCoverArt/font/' + w)
+                    .then(function (r) { return r.arrayBuffer(); })
+                    .then(function (buf) {
+                        var ff = new FontFace('Noto Sans', buf, { weight: String(w) });
+                        return ff.load().then(function (loaded) { document.fonts.add(loaded); });
+                    })
+                    .catch(function () { /* fall back to sans-serif for this weight */ });
+            }));
+        }
+
+        // ==================================================================
+        // 5. History
+        // Undo/redo snapshots and unsaved-work tracking.
+        // ==================================================================
+
+        // --- Undo/redo ----------------------------------------------------
+        // A snapshot stack of the serialized document. UI-only keys are stripped, so a
+        // snapshot can never capture a decoded <img> or the transient selection.
+        var HISTORY_CAP = 50;
+        var history = { stack: [], index: -1 };
+
+        function snapshot() {
+            var json = JSON.stringify(stripUiKeys(doc));
+            if (history.index >= 0 && history.stack[history.index] === json) { return; }
+            // Any new edit truncates the redo tail.
+            history.stack = history.stack.slice(0, history.index + 1);
+            history.stack.push(json);
+            if (history.stack.length > HISTORY_CAP) { history.stack.shift(); }
+            history.index = history.stack.length - 1;
+            updateHistoryButtons();
+        }
+
+        // Bursts of slider input collapse into ONE entry; discrete actions call snapshot()
+        // directly so they land immediately.
+        var commit = debounce(snapshot, 400);
+
+        function restoreSnapshot(json) {
+            var selected = doc._selectedId;
+            var previousImagePath = doc.Background.ImagePath;
+            var previousLayers = doc.Layers;
+            doc = JSON.parse(json);
+            // A snapshot is a plain serialized document, so it needs the same normalization
+            // a template load gets before anything dereferences it.
+            normalizeEffects(doc);
+            normalizeBackgroundSource(doc);
+            normalizeOverlay(doc);
+            normalizeGradientStops(doc);
+            doc._selectedId = selected;
+            // It carries server paths but no decoded bitmaps: reuse the ones we already
+            // have for unchanged paths, fetch the rest.
+            reuseLayerClientState(previousLayers);
+            hydrateBackgroundImage(previousImagePath);
+            hydrateLayerImages();
+            renderLayersPanel();
+            syncControlsFromDocument();
+            resetOverlayEditorState();
+            scheduleRender();
+        }
+
+        function undo() {
+            if (history.index <= 0) { return; }
+            history.index--;
+            restoreSnapshot(history.stack[history.index]);
+            updateHistoryButtons();
+        }
+
+        function redo() {
+            if (history.index >= history.stack.length - 1) { return; }
+            history.index++;
+            restoreSnapshot(history.stack[history.index]);
+            updateHistoryButtons();
+        }
+
+        function updateHistoryButtons() {
+            var u = el('ccaUndo'), r = el('ccaRedo');
+            if (u) { u.disabled = history.index <= 0; }
+            if (r) { r.disabled = history.index >= history.stack.length - 1; }
+        }
+
+        // --- Unsaved work --------------------------------------------------
+        // The design as of the last page load, apply, template load or template save,
+        // serialized the same way undo history compares documents. Apply and template
+        // save pass the JSON they actually sent, so an edit made while the request was in
+        // flight still counts as unapplied.
+        var _cleanJson = null;
+        function markClean(json) { _cleanJson = json || JSON.stringify(stripUiKeys(doc)); }
+        function isDirty() { return _cleanJson !== null && JSON.stringify(stripUiKeys(doc)) !== _cleanJson; }
+
+        // Closing or reloading the tab with unapplied changes asks first. In-dashboard
+        // navigation needs no prompt: the page and its design stay in memory.
+        function onBeforeUnload(ev) {
+            if (!isPageVisible() || !isDirty()) { return; }
+            ev.preventDefault();
+            ev.returnValue = ''; // required by Chromium to show the prompt
+        }
+
+        // ==================================================================
+        // 6. Bindings
+        // Everything that connects the controls to `doc`: steps, the layers panel, image
+        // loading, canvas pointer and keyboard input, stop editors, targets, templates,
+        // batch apply, actions, bindEvents() and the page-scoped window/document listeners.
+        // ==================================================================
+
+        function openStep(n) {
+            page.querySelectorAll('.ccaStep').forEach(function (section) {
+                var isTarget = section.getAttribute('data-step') === String(n);
+                var head = section.querySelector('.ccaStepHead');
+                var body = section.querySelector('.ccaStepBody');
+                head.setAttribute('aria-expanded', isTarget ? 'true' : 'false');
+                if (isTarget) { body.removeAttribute('hidden'); } else { body.setAttribute('hidden', ''); }
+            });
+            try { localStorage.setItem(STEP_KEY, String(n)); } catch (e) { /* private mode */ }
+            // Step 5 may have just become visible, and its thumbnails skip drawing
+            // while collapsed.
+            if (typeof renderPreviewContexts === 'function') { renderPreviewContexts(); }
+        }
+
+        function currentOpenStep() {
+            var open = page.querySelector('.ccaStepHead[aria-expanded="true"]');
+            return open ? open.parentNode.getAttribute('data-step') : null;
+        }
+
+        function initSteps() {
+            page.querySelectorAll('.ccaStep').forEach(function (section) {
+                var n = section.getAttribute('data-step');
+                section.querySelector('.ccaStepHead').addEventListener('click', function () {
+                    // Clicking the open step collapses it: all-closed is a valid state, and
+                    // it is how you give the canvas the whole screen on a phone.
+                    if (currentOpenStep() === n) {
+                        section.querySelector('.ccaStepBody').setAttribute('hidden', '');
+                        this.setAttribute('aria-expanded', 'false');
+                        return;
+                    }
+                    openStep(n);
+                });
+            });
+            restoreLastStep();
+        }
+
+        // Advanced disclosures are independent of the step accordion and of each other:
+        // opening a step does not reveal its advanced controls, and the state is not
+        // persisted. In the Effects step they are nested INSIDE each effect's row, because
+        // updateEffectsVisibility owns that row's display — pulling softness out to a
+        // step-level block would show it even with the vignette switched off.
+        function initAdvanced() {
+            page.querySelectorAll('.ccaAdvHead').forEach(function (head) {
+                head.addEventListener('click', function () {
+                    var body = this.parentNode.querySelector('.ccaAdvBody');
+                    var open = this.getAttribute('aria-expanded') === 'true';
+                    this.setAttribute('aria-expanded', open ? 'false' : 'true');
+                    if (open) { body.setAttribute('hidden', ''); } else { body.removeAttribute('hidden'); }
+                });
+            });
+        }
+
+        // Step 1 when nothing is selected yet, otherwise wherever you left off — a first
+        // run starts at the beginning, a return visit lands where you were working.
+        function restoreLastStep() {
+            var saved = null;
+            try { saved = localStorage.getItem(STEP_KEY); } catch (e) { /* ignore */ }
+            var exists = saved && page.querySelector('.ccaStep[data-step="' + saved + '"]');
+            openStep((state.libraryId && exists) ? saved : '1');
+        }
+
+        // Background pan/zoom mode (Task 9): when true, canvas drag/wheel/pinch
+        // mutate doc.Background.Transform instead of selecting/dragging a text
+        // layer. Toggled by the #ccaBgAdjust checkbox.
+        var bgAdjustMode = false;
+
+        // --- Layer management (Phase 2) ------------------------------------
+        // doc.Layers[0] is the BOTTOM layer (drawn first); the panel lists the array
+        // reversed so the top-most layer sits at the top of the list, like every other
+        // layers panel. Server-side the count is capped at 40 (CoverArtService), so the
+        // client refuses to add past that rather than letting layers vanish on apply.
+        var MAX_LAYERS = 40;
+
+        function selectLayerById(id) {
+            doc._selectedId = id;
+            renderLayersPanel();
+            syncControlsFromDocument();
+            // The starting document is the base history entry.
+            snapshot();
+            scheduleRender();
+        }
+
+        // The panel is rebuilt on every select/move/show-hide, which used to drop keyboard
+        // focus to <body> after each action. Remember which control of which row had it...
+        function focusedLayerControl() {
+            var a = document.activeElement;
+            var box = el('ccaLayerList');
+            if (!a || !box || !box.contains(a)) { return null; }
+            var row = a.closest('.ccaLayerRow');
+            return row ? { id: row.getAttribute('data-layer-id'), act: a.getAttribute('data-act') } : null;
+        }
+
+        // ...and put it back on the same control after the rebuild. A deleted layer's
+        // focus moves to the newly selected layer's name.
+        function restoreLayerFocus(box, prev) {
+            if (!prev) { return; }
+            var rows = box.querySelectorAll('.ccaLayerRow');
+            var target = null;
+            for (var i = 0; i < rows.length; i++) {
+                if (rows[i].getAttribute('data-layer-id') === prev.id) {
+                    target = rows[i].querySelector('[data-act="' + prev.act + '"]') || rows[i].querySelector('[data-act="pick"]');
+                    break;
+                }
+            }
+            if (!target) { target = box.querySelector('.ccaLayerSel [data-act="pick"]') || box.querySelector('[data-act="pick"]'); }
+            if (target) { target.focus(); }
+        }
+
+        function renderLayersPanel() {
+            var box = el('ccaLayerList');
+            if (!box) { return; }
+            var prevFocus = focusedLayerControl();
+            box.innerHTML = '';
+            for (var i = doc.Layers.length - 1; i >= 0; i--) {
+                (function (layer) {
+                    var row = document.createElement('div');
+                    row.className = 'ccaLayerRow'
+                        + (layer.Id === doc._selectedId ? ' ccaLayerSel' : '')
+                        + (layer.Visible ? '' : ' ccaLayerHidden');
+                    row.setAttribute('role', 'listitem');
+                    row.setAttribute('data-layer-id', layer.Id);
+
+                    var vis = document.createElement('button');
+                    vis.type = 'button'; vis.className = 'ccaLayerBtn';
+                    vis.setAttribute('data-act', 'vis');
+                    vis.textContent = layer.Visible ? '👁' : '∅';
+                    vis.title = layer.Visible ? t('layer.hide') : t('layer.show');
+                    vis.setAttribute('aria-label', t('layer.visible'));
+                    vis.setAttribute('aria-pressed', layer.Visible ? 'true' : 'false');
+                    vis.addEventListener('click', function (e) {
+                        e.stopPropagation();
+                        layer.Visible = !layer.Visible;
+                        renderLayersPanel();
+                        scheduleRender();
+                    });
+
+                    // The name is a real button, so a layer can be selected from the
+                    // keyboard (Tab to it, Enter or Space). It has no handler of its own:
+                    // its click bubbles to the row's, which is what selects, so a mouse
+                    // click anywhere on the row still works.
+                    var name = document.createElement('button');
+                    name.type = 'button';
+                    name.className = 'ccaLayerName';
+                    name.setAttribute('data-act', 'pick');
+                    name.setAttribute('aria-pressed', layer.Id === doc._selectedId ? 'true' : 'false');
+                    name.textContent = layerLabel(layer);
+
+                    row.appendChild(vis);
+                    row.appendChild(name);
+
+                    // Actions live in their own container so a narrow screen can collapse
+                    // them behind one toggle, leaving the whole row as the tap target for
+                    // the action people actually want most: selecting the layer.
+                    var actions = document.createElement('div');
+                    actions.className = 'ccaLayerActions';
+                    ['up', 'down', 'dup', 'del'].forEach(function (act) {
+                        var b = document.createElement('button');
+                        b.type = 'button'; b.className = 'ccaLayerBtn';
+                        b.setAttribute('data-act', act);
+                        b.textContent = act === 'up' ? '▲' : act === 'down' ? '▼' : act === 'dup' ? '⧉' : '✕';
+                        b.title = t('layer.' + act);
+                        b.setAttribute('aria-label', t('layer.' + act));
+                        b.addEventListener('click', function (e) {
+                            e.stopPropagation();
+                            // "Up" in the panel means later in the array = drawn on top.
+                            if (act === 'up') { moveLayer(layer.Id, 1); }
+                            else if (act === 'down') { moveLayer(layer.Id, -1); }
+                            else if (act === 'dup') { duplicateLayer(layer.Id); }
+                            else { deleteLayer(layer.Id); }
+                        });
+                        actions.appendChild(b);
+                    });
+
+                    var more = document.createElement('button');
+                    more.type = 'button';
+                    more.className = 'ccaLayerBtn ccaLayerMore';
+                    more.setAttribute('data-act', 'more');
+                    more.textContent = '⋯';
+                    more.title = t('layer.more');
+                    more.setAttribute('aria-label', t('layer.more'));
+                    more.setAttribute('aria-expanded', 'false');
+                    more.addEventListener('click', function (e) {
+                        e.stopPropagation();
+                        var open = row.classList.toggle('ccaLayerActionsOpen');
+                        more.setAttribute('aria-expanded', open ? 'true' : 'false');
+                    });
+
+                    row.appendChild(actions);
+                    row.appendChild(more);
+
+                    row.addEventListener('click', function () { selectLayerById(layer.Id); });
+                    box.appendChild(row);
+                })(doc.Layers[i]);
+            }
+            restoreLayerFocus(box, prevFocus);
+            var atCap = doc.Layers.length >= MAX_LAYERS;
+            if (el('ccaAddText')) { el('ccaAddText').disabled = atCap; }
+            if (el('ccaAddImage')) { el('ccaAddImage').disabled = atCap; }
+        }
+
+        function addTextLayer() {
+            if (doc.Layers.length >= MAX_LAYERS) { return; }
+            var l = JSON.parse(JSON.stringify(defaultDocument().Layers[0]));
+            l.Id = newLayerId();
+            l.Content = t('layer.text');
+            // Offset from the existing title so a new layer doesn't land exactly on
+            // top of it and look like nothing happened.
+            l.Y = Math.min(0.95, l.Y + 0.15);
+            doc.Layers.push(l);
+            selectLayerById(l.Id);
+        }
+
+        // A logo layer carries the FULL CoverLayer field set (PascalCase) so it
+        // round-trips through the C# model; `_`-prefixed keys are UI-only and are
+        // stripped by stripUiKeys() before anything is POSTed.
+        function newImageLayer(path, name) {
+            return {
+                Id: newLayerId(), Type: 'image', Visible: true,
+                X: 0.5, Y: 0.5, Width: 0.25, Height: 0.25, Rotation: 0, Opacity: 1,
+                ImagePath: path, _name: name,
+                Content: '', Size: 0, Weight: 400, Color: '#ffffff', Align: 1, FontPath: '',
+                Shadow: { Enabled: false, Color: '#000000', Blur: 4, OffsetX: 2, OffsetY: 2 },
+                Outline: { Enabled: false, Color: '#000000', Width: 2 }
+            };
+        }
+
+        function duplicateLayer(id) {
+            if (doc.Layers.length >= MAX_LAYERS) { return; }
+            var i = layerIndex(id);
+            if (i < 0) { return; }
+            var src = doc.Layers[i];
+            var copy = stripUiKeys(src); // deep clone, minus the UI-only keys
+            copy.Id = newLayerId();
+            copy.X = Math.min(1, copy.X + 0.03);
+            copy.Y = Math.min(1, copy.Y + 0.03);
+            // JSON can't carry the decoded bitmap or the display name, so re-attach
+            // them instead of re-downloading what we already have.
+            if (src._img) { copy._img = src._img; }
+            if (src._name) { copy._name = src._name; }
+            doc.Layers.splice(i + 1, 0, copy);
+            selectLayerById(copy.Id);
+        }
+
+        function deleteLayer(id) {
+            doc.Layers = doc.Layers.filter(function (l) { return l.Id !== id; });
+            if (doc._selectedId === id) {
+                doc._selectedId = doc.Layers.length ? doc.Layers[doc.Layers.length - 1].Id : null;
+            }
+            renderLayersPanel();
+            syncControlsFromDocument();
+            scheduleRender();
+        }
+
+        function moveLayer(id, dir) {
+            var i = layerIndex(id);
+            var j = i + dir;
+            if (i < 0 || j < 0 || j >= doc.Layers.length) { return; }
+            var tmp = doc.Layers[i]; doc.Layers[i] = doc.Layers[j]; doc.Layers[j] = tmp;
+            renderLayersPanel();
+            scheduleRender();
+        }
+
+        // Loads the bitmap for any image layer that has a server path but no decoded
+        // image yet — i.e. layers restored from a saved template, where the upload
+        // File is long gone. Fetched as a BLOB and turned into an object URL, never
+        // assigned as a server URL directly: the canvas-source invariant (see
+        // bgImageEl) applies to every canvas source, not just the background.
+        function hydrateLayerImages() {
+            doc.Layers.forEach(function (layer) {
+                if (layer.Type !== 'image' || layer._img || layer._imgPending || !layer.ImagePath) { return; }
+                layer._imgPending = true;
+                authFetch('CustomCoverArt/layerImage?path=' + encodeURIComponent(layer.ImagePath))
+                    .then(function (r) {
+                        if (!r.ok) { throw new Error('layer image returned ' + r.status); }
+                        return r.blob();
+                    })
+                    .then(function (blob) {
+                        var url = URL.createObjectURL(blob);
+                        var img = new Image();
+                        img.onload = function () {
+                            URL.revokeObjectURL(url);
+                            layer._img = img;
+                            layer._imgPending = false;
+                            scheduleRender();
+                        };
+                        img.onerror = function () { URL.revokeObjectURL(url); layer._imgPending = false; };
+                        img.src = url;
+                    })
+                    .catch(function () {
+                        // Best-effort: the layer still renders in the authoritative
+                        // server output, it just can't be previewed on the canvas.
+                        layer._imgPending = false;
+                    });
+            });
+        }
+
+        // --- Background bitmap & file names -------------------------------
+        // bgImageEl (the uploaded or poster-picked image) has exactly two writers:
+        // setBackgroundBitmap and clearBackgroundBitmap. collageBgEl has its own
+        // (fetchCollageBitmap / releaseCollageBitmap) and is never touched here;
+        // activeBgBitmap() decides which of the two the canvas paints.
+        //
+        // _bgImageUrl is bgImageEl's object URL. It lives exactly as long as its bitmap is
+        // the background and is revoked when the bitmap is replaced or dropped, like
+        // _collageUrl: an animated GIF keeps decoding frames from it while it plays, and an
+        // unrevoked URL per pick pinned a full-size copy of every image ever chosen.
+        var _bgImageUrl = null;
+
+        function clearBackgroundBitmap() {
+            closeGifDecoder(bgImageEl);
+            if (_bgImageUrl) { URL.revokeObjectURL(_bgImageUrl); }
+            _bgImageUrl = null;
+            bgImageEl = null;
+        }
+
+        // `isCurrent` comes from requestGuard('bg'), taken when the user acted, so two quick
+        // picks cannot land out of order: the older pick's bitmap is simply dropped.
+        function setBackgroundBitmap(blob, isCurrent) {
+            var url = URL.createObjectURL(blob);
+            var img = new Image();
+            img.onload = function () {
+                if (!isCurrent()) { URL.revokeObjectURL(url); closeGifDecoder(img); return; }
+                clearBackgroundBitmap();
+                bgImageEl = img;
+                _bgImageUrl = url;
+                scheduleRender();
+            };
+            img.onerror = function () { URL.revokeObjectURL(url); closeGifDecoder(img); };
+            img.src = url;
+            // Flags the <img> if the bytes are a multi-frame GIF, so the repaint loop runs.
+            watchForAnimatedGif(img, blob);
+        }
+
+        // Makes bgImageEl agree with doc.Background.ImagePath after the document was
+        // replaced (undo, redo, template load). Keeps the bitmap when the path is
+        // unchanged; otherwise fetches the path back as a Blob through the uploads-only
+        // layerImage endpoint (where background uploads and poster picks both live), never
+        // as an <img src> on the server (canvas-source invariant). The source is not
+        // consulted: a collage keeps the uploaded bitmap in reserve, and activeBgBitmap()
+        // decides what is painted.
+        function hydrateBackgroundImage(previousPath) {
+            var path = doc.Background.ImagePath || '';
+            // Nothing changed for the background: keep the bitmap, and do NOT take a new
+            // 'bg' token, or undoing an unrelated edit would cancel a pick still in flight.
+            if (path === (previousPath || '') && (bgImageEl || !path)) { return; }
+            var isCurrent = requestGuard('bg');
+            clearBackgroundBitmap();
+            if (!path) { return; }
+            authFetch('CustomCoverArt/layerImage?path=' + encodeURIComponent(path))
+                .then(function (r) {
+                    if (!r.ok) { throw requestError(r.status); }
+                    return r.blob();
+                })
+                .then(function (blob) {
+                    if (isCurrent() && doc.Background.ImagePath === path) { setBackgroundBitmap(blob, isCurrent); }
+                })
+                .catch(function () {
+                    // Best-effort, like hydrateLayerImages: the authoritative server
+                    // render still has the image, only the canvas preview lacks it.
+                });
+        }
+
+        // JSON cannot carry a decoded <img> or a display name. After undo/redo or a
+        // template load, a logo whose server path is unchanged keeps both instead of being
+        // downloaded again (and blinking out of the preview meanwhile).
+        function reuseLayerClientState(previousLayers) {
+            var known = {};
+            (previousLayers || []).forEach(function (l) {
+                if (l.ImagePath && (l._img || l._name)) { known[l.ImagePath] = { img: l._img, name: l._name }; }
+            });
+            doc.Layers.forEach(function (l) {
+                var k = l.ImagePath ? known[l.ImagePath] : null;
+                if (!k) { return; }
+                if (!l._img && k.img) { l._img = k.img; }
+                if (!l._name && k.name) { l._name = k.name; }
+            });
+        }
+
+        // Original file names by server path. Uploads are stored under randomised names,
+        // so the path alone cannot tell the user which file they picked; a path missing
+        // from this map (a template from an earlier session) falls back to its own name.
+        var _fileNames = {};
+
+        function displayNameFor(path) {
+            if (!path) { return ''; }
+            var known = _fileNames[path];
+            return known ? known.name : String(path).split(/[\\/]/).pop();
+        }
+
+        // Owns the "which file is in use" labels. Called from syncControlsFromDocument, so
+        // a layer switch, template load or undo can never leave a stale name behind.
+        function syncFileNames() {
+            var bgPath = doc.Background.ImagePath || '';
+            var known = bgPath ? _fileNames[bgPath] : null;
+            var isPoster = !!(known && known.poster);
+            el('ccaBgImageName').textContent = (bgPath && !isPoster) ? displayNameFor(bgPath) : t('f.none');
+            el('ccaSelectedBgName').textContent = isPoster ? known.name : '';
+            el('ccaSelectedBg').style.display = isPoster ? '' : 'none';
+            var l = selectedLayer();
+            var fontPath = (l && l.Type === 'text') ? (l.FontPath || '') : '';
+            el('ccaFontName').textContent = fontPath ? displayNameFor(fontPath) : t('f.none');
+        }
+
+        function renderSwatches(colors) {
+            var box = el('ccaSwatches');
+            if (!box) { return; }
+            box.innerHTML = '';
+            colors.forEach(function (hex) {
+                var s = document.createElement('button');
+                s.type = 'button';
+                s.className = 'ccaSwatch';
+                s.style.background = hex;
+                s.title = hex;
+                s.setAttribute('aria-label', t('fx.swatch', hex));
+                // Read the focus state one event EARLIER than the click: pressing the mouse
+                // on a button moves focus to it (Chrome/Edge/Firefox on Windows) before
+                // 'click' fires, and some browsers (Safari) do not focus buttons on click at
+                // all, so document.activeElement here is the only reading that is true in
+                // both. The focusout handler covers the keyboard path, where no mousedown
+                // ever happens.
+                s.addEventListener('mousedown', function () {
+                    _overlayStopFocused = isInOverlayStops(document.activeElement);
+                });
+                s.addEventListener('click', function () { applySwatch(hex); });
+                box.appendChild(s);
+            });
+        }
+
+        // Where a clicked swatch lands, in order: the selected text layer, then the selected
+        // overlay stop when the overlay is on, then the colour wash when it is on. Each
+        // updates its own control so the card and the canvas never disagree.
+        //
+        // ONE exception jumps the queue: the overlay stop wins over the selected text layer
+        // when the user is demonstrably in the overlay editor (a stop row holds focus, or
+        // held it up to this click — see _overlayStopFocused). Without it the overlay branch
+        // is dead code in practice, because the stock document always has a selected title
+        // layer and nothing ever deselects it: selectLayerById does not toggle off, and a
+        // canvas click that hits no layer returns early. A user would have to DELETE their
+        // title layer before a swatch could tint an overlay stop, which flatly contradicts
+        // the documented "click a palette swatch to tint your overlay". Users who are not
+        // touching the overlay never set the flag, so their text-layer behaviour is unchanged.
+        function applySwatch(hex) {
+            var overlayOn = doc.Background.Overlay && doc.Background.Overlay.IsEnabled;
+            var idx = overlayOn ? overlayStopIndex() : -1;
+
+            var l = selectedLayer();
+            if (l && l.Type === 'text' && !(idx >= 0 && _overlayStopFocused)) {
+                l.Color = hex;
+                el('ccaTextColor').value = hex;
+                scheduleRender();
+                return;
+            }
+            if (idx >= 0) {
+                doc.Background.Overlay.Stops[idx].Color = hex;
+                var container = el('ccaOverlayStops');
+                var rows = container ? container.querySelectorAll('.ccaStop') : null;
+                if (rows && rows[idx]) { rows[idx].querySelector('input[type="color"]').value = hex; }
+            } else if (doc.Effects.SoftLight.Enabled) {
+                doc.Effects.SoftLight.Color = hex;
+                el('ccaFxSoftLightColor').value = hex;
+            } else {
+                return; // nothing sensible to apply it to; leave the design alone
+            }
+            scheduleRender();
+        }
+
+        // Re-extract after the canvas settles rather than wiring every background
+        // trigger (upload, poster pick, gradient stop edit, collage shuffle, preset).
+        // Debounced, and only while the toggle is on, so it costs nothing when unused.
+        var refreshPalette = debounce(function () {
+            var toggle = el('ccaAutoPalette');
+            if (!toggle || !toggle.checked) { return; }
+            renderSwatches(extractPalette());
+        }, 300);
+
         // Keyboard move for the selected layer: arrows nudge 1 canvas pixel, Shift+arrow
         // 10, clamped like a pointer drag. Off while repositioning the background, where
         // the canvas belongs to the background gesture instead.
@@ -2626,45 +2804,6 @@ export default function (view) {
             if (!_drag) { return; }
             try { el('ccaCanvas').releasePointerCapture(ev.pointerId); } catch (e) { /* ignore */ }
             _drag = null;
-        }
-
-        // Loads the SAME bundled Noto weights the server renders with, via the
-        // authenticated font endpoint + the FontFace API (which — unlike CSS
-        // @font-face — accepts an ArrayBuffer fetched WITH the auth token). Tolerant
-        // of per-weight failure: a missing weight falls back to the browser's
-        // sans-serif for the canvas only; the applied cover is server-authoritative.
-        var FONT_WEIGHTS = [300, 400, 500, 600, 700, 800];
-        function loadCanvasFonts() {
-            return Promise.all(FONT_WEIGHTS.map(function (w) {
-                return authFetch('CustomCoverArt/font/' + w)
-                    .then(function (r) { return r.arrayBuffer(); })
-                    .then(function (buf) {
-                        var ff = new FontFace('Noto Sans', buf, { weight: String(w) });
-                        return ff.load().then(function (loaded) { document.fonts.add(loaded); });
-                    })
-                    .catch(function () { /* fall back to sans-serif for this weight */ });
-            }));
-        }
-        // ==================================================================
-        // End canvas engine
-        // ==================================================================
-
-        // --- Document <-> controls binding (Task 8) -----------------------
-        // Every request carries the design as a CoverDocument built by collectDocument().
-
-        // Recursively deep-clone `doc`, dropping UI-only keys (any `_`-prefixed key,
-        // e.g. _selectedId) so nothing internal leaks onto the wire.
-        function stripUiKeys(v) {
-            if (Array.isArray(v)) { return v.map(stripUiKeys); }
-            if (v && typeof v === 'object') {
-                var out = {};
-                Object.keys(v).forEach(function (k) {
-                    if (k.charAt(0) === '_') { return; }
-                    out[k] = stripUiKeys(v[k]);
-                });
-                return out;
-            }
-            return v;
         }
 
         // Server-only fields that depend on live UI/target state and aren't drawn on
@@ -3088,7 +3227,6 @@ export default function (view) {
             el('ccaFxBorderRow').style.display = el('ccaFxBorder').checked ? '' : 'none';
             el('ccaFxBorderGapRow').style.display = el('ccaFxBorderDouble').checked ? '' : 'none';
         }
-        // ------------------------------------------------------------------
 
         // The primary button names what it is about to change. One literal t() call per
         // type, so the translation reachability test can see every key.
@@ -3097,14 +3235,6 @@ export default function (view) {
             if (type === 'playlist') { return t('action.applyPlaylist'); }
             if (type === 'livetv') { return t('action.applyLivetv'); }
             return t('action.apply');
-        }
-
-        // The stock title layer (Id 'title'), if the design still has one.
-        function titleLayer() {
-            for (var i = 0; i < doc.Layers.length; i++) {
-                if (doc.Layers[i].Id === 'title' && doc.Layers[i].Type === 'text') { return doc.Layers[i]; }
-            }
-            return null;
         }
 
         // The title follows the chosen target's name (or a translated placeholder when no
@@ -3220,82 +3350,6 @@ export default function (view) {
                 });
                 updateUI();
             });
-        }
-
-        // --- Templates ----------------------------------------------------
-
-        // Pick helper for legacy CoverArtSettings that treats 0/false as present
-        // (unlike a plain `||` fallback, which would replace a real 0 dim/blur).
-        function pickNum(s, name, fallback) {
-            var v = pick(s, name);
-            return (v === undefined || v === null) ? fallback : v;
-        }
-
-        // Converts a legacy flat CoverArtSettings (templates saved before the
-        // canvas engine shipped, which carry Settings but no Document) into a
-        // one-text-layer CoverDocument — the client mirror of the server's
-        // Services/DocumentMigration.cs FromSettings, so old templates keep
-        // working. Per template semantics ("templates store the design but not
-        // the title"), the title layer's Content is stripped, same as a
-        // freshly-saved document-native template would have.
-        function migrateTemplateToDocument(s) {
-            var d = defaultDocument();
-
-            d.Canvas.Width = pickNum(s, 'ExportWidth', d.Canvas.Width);
-            d.Canvas.Height = pickNum(s, 'ExportHeight', d.Canvas.Height);
-            d.Canvas.Format = pick(s, 'OutputFormat') || d.Canvas.Format;
-            d.Canvas.DimensionPreset = pick(s, 'DimensionPreset') || d.Canvas.DimensionPreset;
-
-            var bg = d.Background;
-            bg.Source = pick(s, 'BackgroundSource') || bg.Source;
-            bg.ImagePath = pick(s, 'BackgroundImagePath') || '';
-            bg.Fit = pick(s, 'BackgroundFit') || 'cover';
-            bg.Blur = pickNum(s, 'BackgroundBlur', bg.Blur);
-            bg.Dim = pickNum(s, 'BackgroundDim', bg.Dim);
-            bg.DimColor = pick(s, 'DimColor') || bg.DimColor;
-            // Mirrors DocumentMigration.FromSettings: Gradient = s.BackgroundGradient,
-            // i.e. a missing gradient stays null — NOT the default purple/blue
-            // gradient from defaultDocument(). Falling back to that default would
-            // put a phantom gradient (IsEnabled:true) onto any legacy template
-            // that never had one (a plain image, or a flat/dim-only design), and
-            // that phantom gradient would then get baked onto the real applied
-            // cover by the server's CreateGradientBackground.
-            bg.Gradient = pick(s, 'BackgroundGradient') || null;
-            bg.Collage = pick(s, 'Collage') || null;
-            bg.Animation = pick(s, 'Animation') || null;
-            bg.Transform = { OffsetX: 0, OffsetY: 0, Scale: 1 }; // identity, as FromSettings does
-
-            var l = d.Layers[0];
-            l.Content = ''; // template title stripped — each target keeps its own name
-            var height = d.Canvas.Height || 1400;
-            l.Size = pickNum(s, 'TextSize', 120) / height;
-            l.Weight = pickNum(s, 'TextWeight', 400);
-            l.Color = pick(s, 'TextColor') || '#ffffff';
-            l.Align = pickNum(s, 'TextAlign', 1);
-            l.FontPath = pick(s, 'CustomFontPath') || '';
-
-            // Anchor position from align/baseline/padding, mirroring
-            // DocumentMigration.AnchorFor (TextAlign/TextBaseline: 0=start/top,
-            // 1=center/middle, 2=end/bottom).
-            var baseline = pickNum(s, 'TextBaseline', 1);
-            var padding = pickNum(s, 'TextPadding', 0.05);
-            l.X = l.Align === 0 ? padding : (l.Align === 2 ? 1 - padding : 0.5);
-            l.Y = baseline === 0 ? padding : (baseline === 2 ? 1 - padding : 0.5);
-
-            l.Shadow = {
-                Enabled: !!pick(s, 'TextShadow'),
-                Color: pick(s, 'TextShadowColor') || '#000000',
-                Blur: pickNum(s, 'TextShadowBlur', 4),
-                OffsetX: pickNum(s, 'TextShadowOffsetX', 2),
-                OffsetY: pickNum(s, 'TextShadowOffsetY', 2)
-            };
-            l.Outline = {
-                Enabled: !!pick(s, 'TextOutline'),
-                Color: pick(s, 'TextOutlineColor') || '#000000',
-                Width: pickNum(s, 'TextOutlineWidth', 2)
-            };
-
-            return d;
         }
 
         function loadTemplates() {
@@ -3450,13 +3504,6 @@ export default function (view) {
                 var sel = el('ccaOverlayPreset');
                 if (sel) { sel.value = 'custom'; }
             }
-        }
-
-        function uploadFile(endpoint, file) {
-            var fd = new FormData();
-            fd.append('file', file);
-            return authFetch('CustomCoverArt/' + endpoint, { method: 'POST', body: fd })
-                .then(readJson, function () { throw networkError(); });
         }
 
         // Heuristic animated-GIF detection: an animated GIF has more than one
@@ -4163,6 +4210,83 @@ export default function (view) {
             });
         }
 
+        // --- Page-level listeners -----------------------------------------
+        // window/document listeners outlive this page: Jellyfin keeps it in the DOM while
+        // you browse the rest of the dashboard, and a leftover Ctrl+Z handler would
+        // preventDefault the undo of every other settings page. They are added on pageshow
+        // and removed on pagehide/viewhide, and the keyboard and resize handlers also check
+        // that the page is on screen in case a hide event is ever missed.
+        var TEXT_INPUT_TYPES = { text: 1, search: 1, number: 1, email: 1, url: 1, tel: 1, password: 1 };
+
+        function isTextEditingTarget(n) {
+            if (!n) { return false; }
+            if (n.isContentEditable || n.tagName === 'TEXTAREA') { return true; }
+            if (n.tagName === 'INPUT') { return !!TEXT_INPUT_TYPES[String(n.type || 'text').toLowerCase()]; }
+            return false;
+        }
+
+        // The page is attached and displayed. Unlike isEditorOnScreen (the GIF loop's
+        // test) this ignores document.hidden: closing a background tab must still be able
+        // to ask about unapplied work.
+        function isPageVisible() {
+            return !!(page && page.isConnected && page.getClientRects().length > 0);
+        }
+
+        // Handle sizes and hit tolerances are derived from the canvas's CSS display size,
+        // so a viewport change (rotating a phone, resizing a window) must redraw or the
+        // handles keep the size they had at the old width.
+        var onWindowResize = debounce(function () {
+            if (isPageVisible()) { scheduleRender(); }
+        }, 150);
+
+        function onDocumentKeydown(ev) {
+            if (!(ev.ctrlKey || ev.metaKey) || !isPageVisible()) { return; }
+            // Never hijack text editing: in a text field the browser's own undo is the one
+            // the user means. Sliders, colour pickers and checkboxes are not text, so
+            // Ctrl+Z there undoes the design like anywhere else on the page.
+            if (isTextEditingTarget(ev.target)) { return; }
+            // Do not change the design underneath the open poster browser.
+            if (el('ccaBrowserModal').style.display !== 'none') { return; }
+            var k = String(ev.key || '').toLowerCase();
+            if (k === 'z' && !ev.shiftKey) { ev.preventDefault(); undo(); }
+            else if (k === 'y' || (k === 'z' && ev.shiftKey)) { ev.preventDefault(); redo(); }
+        }
+
+        function bindPageListeners() {
+            unbindPageListeners(); // pageshow can fire again without a hide in between
+            window.addEventListener('resize', onWindowResize);
+            document.addEventListener('keydown', onDocumentKeydown);
+            // The GIF loop re-evaluates when the tab hides/shows or reduced motion changes.
+            document.addEventListener('visibilitychange', updateGifLoop);
+            watchReducedMotion(true);
+            window.addEventListener('beforeunload', onBeforeUnload);
+        }
+
+        function unbindPageListeners() {
+            window.removeEventListener('resize', onWindowResize);
+            document.removeEventListener('keydown', onDocumentKeydown);
+            document.removeEventListener('visibilitychange', updateGifLoop);
+            watchReducedMotion(false);
+            window.removeEventListener('beforeunload', onBeforeUnload);
+        }
+
+        // Leaving the page: drop the global listeners, stop the GIF loop at once (pageshow's
+        // scheduleRender() restarts it) and close the poster browser.
+        function onPageHide() {
+            unbindPageListeners();
+            stopGifLoop();
+            if (page) { closeBrowser(); }
+        }
+
+        // The bundled Noto faces are document-wide: register them once per page load, not
+        // once per visit (every pageshow used to add six more FontFace objects).
+        var _canvasFontsLoaded = null;
+
+        // ==================================================================
+        // 7. Poster browser modal
+        // The Browse library posters dialog and the theme surface it is painted with.
+        // ==================================================================
+
         // The modal and the mobile sticky bars need an OPAQUE surface in the current
         // Jellyfin theme, which not every Jellyfin version exposes as a CSS variable. Read
         // it off the nearest ancestor that actually paints a background, and the text
@@ -4366,94 +4490,10 @@ export default function (view) {
                 });
         }
 
-        // --- Page-level listeners -----------------------------------------
-        // window/document listeners outlive this page: Jellyfin keeps it in the DOM while
-        // you browse the rest of the dashboard, and a leftover Ctrl+Z handler would
-        // preventDefault the undo of every other settings page. They are added on pageshow
-        // and removed on pagehide/viewhide, and the keyboard and resize handlers also check
-        // that the page is on screen in case a hide event is ever missed.
-        var TEXT_INPUT_TYPES = { text: 1, search: 1, number: 1, email: 1, url: 1, tel: 1, password: 1 };
-
-        function isTextEditingTarget(n) {
-            if (!n) { return false; }
-            if (n.isContentEditable || n.tagName === 'TEXTAREA') { return true; }
-            if (n.tagName === 'INPUT') { return !!TEXT_INPUT_TYPES[String(n.type || 'text').toLowerCase()]; }
-            return false;
-        }
-
-        // The page is attached and displayed. Unlike isEditorOnScreen (the GIF loop's
-        // test) this ignores document.hidden: closing a background tab must still be able
-        // to ask about unapplied work.
-        function isPageVisible() {
-            return !!(page && page.isConnected && page.getClientRects().length > 0);
-        }
-
-        // Handle sizes and hit tolerances are derived from the canvas's CSS display size,
-        // so a viewport change (rotating a phone, resizing a window) must redraw or the
-        // handles keep the size they had at the old width.
-        var onWindowResize = debounce(function () {
-            if (isPageVisible()) { scheduleRender(); }
-        }, 150);
-
-        function onDocumentKeydown(ev) {
-            if (!(ev.ctrlKey || ev.metaKey) || !isPageVisible()) { return; }
-            // Never hijack text editing: in a text field the browser's own undo is the one
-            // the user means. Sliders, colour pickers and checkboxes are not text, so
-            // Ctrl+Z there undoes the design like anywhere else on the page.
-            if (isTextEditingTarget(ev.target)) { return; }
-            // Do not change the design underneath the open poster browser.
-            if (el('ccaBrowserModal').style.display !== 'none') { return; }
-            var k = String(ev.key || '').toLowerCase();
-            if (k === 'z' && !ev.shiftKey) { ev.preventDefault(); undo(); }
-            else if (k === 'y' || (k === 'z' && ev.shiftKey)) { ev.preventDefault(); redo(); }
-        }
-
-        // --- Unsaved work --------------------------------------------------
-        // The design as of the last page load, apply, template load or template save,
-        // serialized the same way undo history compares documents. Apply and template
-        // save pass the JSON they actually sent, so an edit made while the request was in
-        // flight still counts as unapplied.
-        var _cleanJson = null;
-        function markClean(json) { _cleanJson = json || JSON.stringify(stripUiKeys(doc)); }
-        function isDirty() { return _cleanJson !== null && JSON.stringify(stripUiKeys(doc)) !== _cleanJson; }
-
-        // Closing or reloading the tab with unapplied changes asks first. In-dashboard
-        // navigation needs no prompt: the page and its design stay in memory.
-        function onBeforeUnload(ev) {
-            if (!isPageVisible() || !isDirty()) { return; }
-            ev.preventDefault();
-            ev.returnValue = ''; // required by Chromium to show the prompt
-        }
-
-        function bindPageListeners() {
-            unbindPageListeners(); // pageshow can fire again without a hide in between
-            window.addEventListener('resize', onWindowResize);
-            document.addEventListener('keydown', onDocumentKeydown);
-            // The GIF loop re-evaluates when the tab hides/shows or reduced motion changes.
-            document.addEventListener('visibilitychange', updateGifLoop);
-            watchReducedMotion(true);
-            window.addEventListener('beforeunload', onBeforeUnload);
-        }
-
-        function unbindPageListeners() {
-            window.removeEventListener('resize', onWindowResize);
-            document.removeEventListener('keydown', onDocumentKeydown);
-            document.removeEventListener('visibilitychange', updateGifLoop);
-            watchReducedMotion(false);
-            window.removeEventListener('beforeunload', onBeforeUnload);
-        }
-
-        // Leaving the page: drop the global listeners, stop the GIF loop at once (pageshow's
-        // scheduleRender() restarts it) and close the poster browser.
-        function onPageHide() {
-            unbindPageListeners();
-            stopGifLoop();
-            if (page) { closeBrowser(); }
-        }
-
-        // The bundled Noto faces are document-wide: register them once per page load, not
-        // once per visit (every pageshow used to add six more FontFace objects).
-        var _canvasFontsLoaded = null;
+        // ==================================================================
+        // 8. Page lifecycle
+        // Jellyfin view events. Last on purpose: everything above is declared first.
+        // ==================================================================
 
         view.addEventListener('pagehide', onPageHide);
         view.addEventListener('viewhide', onPageHide);
