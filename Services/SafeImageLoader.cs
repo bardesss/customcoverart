@@ -1,5 +1,10 @@
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats;
+using SixLabors.ImageSharp.Formats.Bmp;
+using SixLabors.ImageSharp.Formats.Gif;
+using SixLabors.ImageSharp.Formats.Jpeg;
+using SixLabors.ImageSharp.Formats.Png;
+using SixLabors.ImageSharp.Formats.Webp;
 using SixLabors.ImageSharp.Metadata;
 using SixLabors.ImageSharp.PixelFormats;
 
@@ -22,6 +27,19 @@ public static class SafeImageLoader
 
     /// <summary>Most frames ever decoded from an animated source (the GIF passthrough cap).</summary>
     public const int MaxAnimatedFrames = 60;
+
+    /// <summary>
+    /// The only ImageSharp configuration the plugin decodes with: PNG, JPEG, GIF, BMP and WebP,
+    /// the formats uploads accept. ImageSharp's default configuration detects the format from
+    /// the bytes, so a TIFF (or TGA, PBM, QOI) renamed to .png, or one picked up as a library
+    /// poster, would otherwise reach a codec the plugin never meant to run.
+    /// </summary>
+    public static SixLabors.ImageSharp.Configuration DecodeConfiguration { get; } = new(
+        new PngConfigurationModule(),
+        new JpegConfigurationModule(),
+        new GifConfigurationModule(),
+        new BmpConfigurationModule(),
+        new WebpConfigurationModule());
 
     /// <summary>Frames the file declares. Formats that report no frame metadata count as one.</summary>
     public static int FrameCount(ImageInfo info) => Math.Max(1, info.FrameMetadataCollection.Count);
@@ -65,7 +83,7 @@ public static class SafeImageLoader
 
             try
             {
-                return Image.Identify(path);
+                return Image.Identify(IdentifyOptions, path);
             }
             catch
             {
@@ -99,7 +117,7 @@ public static class SafeImageLoader
 
         try
         {
-            return Image.Identify(bytes);
+            return Image.Identify(IdentifyOptions, bytes);
         }
         catch
         {
@@ -169,7 +187,7 @@ public static class SafeImageLoader
 
         try
         {
-            return Image.Load(Options(FramesToDecode(info, maxFrames, pixelBudget)), path);
+            return DropColorProfiles(Image.Load(Options(FramesToDecode(info, maxFrames, pixelBudget)), path));
         }
         catch
         {
@@ -188,7 +206,7 @@ public static class SafeImageLoader
 
         try
         {
-            return Image.Load<Rgba32>(Options(FramesToDecode(info, maxFrames, pixelBudget)), path);
+            return DropColorProfiles(Image.Load<Rgba32>(Options(FramesToDecode(info, maxFrames, pixelBudget)), path));
         }
         catch
         {
@@ -196,8 +214,45 @@ public static class SafeImageLoader
         }
     }
 
+    /// <summary>
+    /// Every decode and identify goes through these options: only <see cref="DecodeConfiguration"/>'s
+    /// formats, and no metadata. SkipMetadata stops the JPEG and WebP decoders from reading ICC,
+    /// EXIF, XMP and IPTC blocks and PNG/GIF text and comments. It leaves alone what rendering
+    /// uses: GIF frame delays and repeat count, and PNG/GIF transparency. The plugin never
+    /// auto-orients, so dropping EXIF orientation changes nothing.
+    /// </summary>
+    /// <summary>
+    /// As <see cref="Options"/> without a frame cap, so Identify still reports every declared
+    /// frame for <see cref="FramesToDecode"/>. Identify reads headers only.
+    /// </summary>
+    private static readonly DecoderOptions IdentifyOptions = new()
+    {
+        Configuration = DecodeConfiguration,
+        SkipMetadata = true,
+    };
+
     private static DecoderOptions Options(int maxFrames) => new()
     {
+        Configuration = DecodeConfiguration,
         MaxFrames = (uint)Math.Max(1, maxFrames),
+        SkipMetadata = true,
     };
+
+    /// <summary>
+    /// The PNG (iCCP) and BMP (V5 header) decoders keep an embedded ICC profile even with
+    /// SkipMetadata. ImageSharp 3.1.12 only stores its raw bytes, but its tag parser (where
+    /// GHSA-gwg2-r3hj-4w44 lives) runs as soon as anything reads the profile's entries.
+    /// The plugin never colour-manages, so drop the profile before anything can.
+    /// </summary>
+    private static TImage DropColorProfiles<TImage>(TImage image)
+        where TImage : Image
+    {
+        image.Metadata.IccProfile = null;
+        foreach (var frame in image.Frames)
+        {
+            frame.Metadata.IccProfile = null;
+        }
+
+        return image;
+    }
 }
