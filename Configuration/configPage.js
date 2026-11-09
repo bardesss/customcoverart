@@ -58,7 +58,7 @@ export default function (view) {
                 'ctx.wide': 'Wide', 'ctx.square': 'Square', 'ctx.poster': 'Poster',
                 'layer.addText': 'Add text', 'layer.addImage': 'Add logo/icon',
                 'layer.show': 'Show', 'layer.hide': 'Hide', 'layer.up': 'Move up', 'layer.down': 'Move down', 'layer.dup': 'Duplicate', 'layer.del': 'Delete',
-                'layer.text': 'Text', 'layer.logo': 'Logo', 'layer.more': 'More actions', 'layer.none': 'No layer selected — add one with Add text or Add logo/icon above.',
+                'layer.text': 'Text', 'layer.logo': 'Logo', 'layer.more': 'More actions', 'layer.none': 'No layer selected. Add one with Add text or Add logo/icon above.',
                 'layer.opacity': 'Opacity', 'layer.rotation': 'Rotation',
                 'hint.logo': 'PNG with transparency · up to 5 MB. The topmost row is drawn last, on top of the others.',
                 'hint.logoSize': 'Drag the corner handles on the preview to resize the logo, or the knob above it to rotate.',
@@ -70,8 +70,8 @@ export default function (view) {
                 'fx.softlight': 'Colour wash', 'fx.vignette': 'Vignette', 'fx.grain': 'Film grain', 'fx.border': 'Border',
                 'fx.color': 'Colour', 'fx.opacity': 'Strength', 'fx.amount': 'Strength', 'fx.softness': 'Softness',
                 'fx.thickness': 'Thickness', 'fx.radius': 'Corner radius', 'fx.double': 'Double line', 'fx.gap': 'Gap',
-                'fx.jellyfin': 'Jellyfin style', 'fx.presetHint': 'Applies a dark gradient with clean white text — editable afterwards.',
-                'fx.autopalette': 'Auto palette', 'fx.paletteHint': 'Click a colour to apply it to the overlay stop you last touched, if the overlay is on and a stop is focused — otherwise to the selected text layer, then the colour wash.',
+                'fx.jellyfin': 'Jellyfin style', 'fx.presetHint': 'Applies a dark gradient with white text. You can edit everything afterwards.',
+                'fx.autopalette': 'Auto palette', 'fx.paletteHint': 'Click a colour to apply it to the overlay stop you last touched, if the overlay is on and a stop is focused. Otherwise it goes to the selected text layer, then the colour wash.',
                 'bg.dim': 'Dimming', 'bg.blur': 'Blur', 'bg.dimcolor': 'Dim / base color',
                 'bg.gtype': 'Gradient type', 'g.linear': 'Linear', 'g.radial': 'Radial',
                 'bg.angle': 'Angle', 'bg.colors': 'Colours', 'bg.addcolor': 'Add colour',
@@ -80,7 +80,7 @@ export default function (view) {
                 'bg.overlay.top': 'Top fade', 'bg.overlay.wash': 'Full wash', 'bg.overlay.duotone': 'Duotone',
                 'bg.overlay.colors': 'Colours and opacity', 'bg.overlay.angle': 'Overlay angle',
                 'bg.overlay.alpha': 'Opacity',
-                'hint.overlay': 'Fades a colour over the background, under your text — for the look where a poster resolves into solid colour.',
+                'hint.overlay': 'Fades a colour over the background, under your text. Use it to make a poster fade into a solid colour.',
                 'bg.image': 'Background image (optional)', 'f.chooseImage': 'Choose image…', 'f.none': 'No file chosen',
                 'hint.image': 'JPG, PNG, GIF, BMP or WebP · up to 5 MB.',
                 'bg.fit': 'Image fit', 'fit.cover': 'Fill (crop to fit)', 'fit.contain': 'Fit (show whole image)', 'fit.stretch': 'Stretch to fill',
@@ -106,8 +106,8 @@ export default function (view) {
                 'stop.color': 'Colour', 'stop.position': 'Position', 'stop.remove': 'Remove colour', 'fx.swatch': 'Apply colour {0}',
                 'restore.confirm': 'Replace the current cover of this target with its original?', 'tpl.confirmDelete': 'Delete the template “{0}”?',
                 'batch.confirm': 'Apply the current design to the selected targets ({0})? Their current covers will be replaced.', 'batch.fail': 'Batch apply failed: {0}',
-                'err.network': 'Could not reach the server.', 'err.auth': 'The server refused the request (status {0}). Your session may have expired — reload the page and sign in again.',
-                'err.tooLarge': 'The file is too large for the server to accept.', 'err.rateLimited': 'Too many requests — wait a minute and try again.',
+                'err.network': 'Could not reach the server.', 'err.auth': 'The server refused the request (status {0}). Your session may have expired. Reload the page and sign in again.',
+                'err.tooLarge': 'The file is too large for the server to accept.', 'err.rateLimited': 'Too many requests. Wait a minute and try again.',
                 'err.status': 'The server answered with status {0}.', 'err.badResponse': 'The server sent a response the page could not read.',
                 'poster.noUrl': 'That item has no poster image.', 'poster.empty': 'The poster image came back empty.', 'poster.fail': 'Could not use that poster: {0}',
                 'restore.unknown': 'Could not check for a backup',
@@ -116,7 +116,7 @@ export default function (view) {
                 'restore.button': 'Restore original cover', 'restore.none': 'No backup yet', 'restore.available': 'A backup exists', 'restore.done': 'Original cover restored.', 'restore.fail': 'No backup found to restore.',
                 'restore.reset': 'Reset backup', 'restore.resetConfirm': 'Delete the current backup? Reset saves nothing by itself. The next apply stores the cover this target shows at that moment as the new original, unless it is a cover this plugin applied. So first put the cover you want to keep back on this target (Edit images, then upload it; or delete the poster and refresh metadata with "Replace existing images"), then reset, then apply.', 'restore.resetDone': 'Backup deleted. The next apply saves the current cover as the new original.', 'restore.resetFail': 'Could not reset the backup: {0}',
                 'bg.source': 'Background source', 'bg.source.image': 'Image', 'bg.source.gradient': 'Gradient', 'bg.source.solid': 'Solid colour', 'bg.source.collage': 'Poster collage from this target', 'bg.collage.density': 'Collage density', 'bg.collage.sparse': 'Sparse', 'bg.collage.medium': 'Medium', 'bg.collage.dense': 'Dense', 'bg.collage.shuffle': 'Shuffle', 'bg.collage.livetv': 'Live TV has no posters to collage.',
-                'tpl.load': 'Load template', 'tpl.delete': 'Delete', 'tpl.save': 'Save current design', 'tpl.savebtn': 'Save', 'tpl.nameph': 'Template name', 'tpl.hint': 'Templates store the design but not the title — each target keeps its own name.', 'tpl.saved': 'Template saved.', 'tpl.named': 'Enter a template name first.',
+                'tpl.load': 'Load template', 'tpl.delete': 'Delete', 'tpl.save': 'Save current design', 'tpl.savebtn': 'Save', 'tpl.nameph': 'Template name', 'tpl.hint': 'Templates store the design but not the title, so each target keeps its own name.', 'tpl.saved': 'Template saved.', 'tpl.named': 'Enter a template name first.',
                 'batch.hint': 'Apply the current design (or loaded template) to several targets at once. Each cover is titled with its target\'s name.', 'batch.apply': 'Apply to selected', 'batch.none': 'Select at least one target.', 'batch.running': 'Applying…', 'batch.done': 'Done: {0} ok, {1} failed.',
                 'fmt.animated': 'Animated GIF', 'anim.kenburns': 'Ken Burns pan/zoom', 'anim.frames': 'Frames', 'anim.delay': 'Frame delay (ms)', 'anim.dir': 'Zoom direction', 'anim.in': 'Zoom in', 'anim.out': 'Zoom out', 'anim.hint': 'Animated GIFs are larger and only animate in views that render GIFs. Capped at 30 frames.'
             },
@@ -133,7 +133,7 @@ export default function (view) {
                 'ctx.wide': 'Breed', 'ctx.square': 'Vierkant', 'ctx.poster': 'Poster',
                 'layer.addText': 'Tekst toevoegen', 'layer.addImage': 'Logo/pictogram toevoegen',
                 'layer.show': 'Tonen', 'layer.hide': 'Verbergen', 'layer.up': 'Omhoog', 'layer.down': 'Omlaag', 'layer.dup': 'Dupliceren', 'layer.del': 'Verwijderen',
-                'layer.text': 'Tekst', 'layer.logo': 'Logo', 'layer.more': 'Meer acties', 'layer.none': 'Geen laag geselecteerd — voeg er een toe met Tekst toevoegen of Logo/pictogram toevoegen hierboven.',
+                'layer.text': 'Tekst', 'layer.logo': 'Logo', 'layer.more': 'Meer acties', 'layer.none': 'Geen laag geselecteerd. Voeg er een toe met Tekst toevoegen of Logo/pictogram toevoegen hierboven.',
                 'layer.opacity': 'Dekking', 'layer.rotation': 'Rotatie',
                 'hint.logo': 'PNG met transparantie · max. 5 MB. De bovenste rij wordt als laatste getekend, boven op de andere.',
                 'hint.logoSize': 'Sleep de hoekgrepen in het voorbeeld om het logo te vergroten of verkleinen, of de knop erboven om te draaien.',
@@ -145,8 +145,8 @@ export default function (view) {
                 'fx.softlight': 'Kleurwaas', 'fx.vignette': 'Vignet', 'fx.grain': 'Filmkorrel', 'fx.border': 'Rand',
                 'fx.color': 'Kleur', 'fx.opacity': 'Sterkte', 'fx.amount': 'Sterkte', 'fx.softness': 'Zachtheid',
                 'fx.thickness': 'Dikte', 'fx.radius': 'Hoekafronding', 'fx.double': 'Dubbele lijn', 'fx.gap': 'Tussenruimte',
-                'fx.jellyfin': 'Jellyfin-stijl', 'fx.presetHint': 'Past een donker verloop met strakke witte tekst toe — daarna vrij aanpasbaar.',
-                'fx.autopalette': 'Automatisch kleurenpalet', 'fx.paletteHint': 'Klik op een kleur om die toe te passen op de laatst aangeklikte overlay-kleurstop, als de overlay aan staat en een stop de focus heeft — anders op de geselecteerde tekstlaag en daarna op het kleurwaas.',
+                'fx.jellyfin': 'Jellyfin-stijl', 'fx.presetHint': 'Past een donker verloop met witte tekst toe. Je kunt alles daarna nog aanpassen.',
+                'fx.autopalette': 'Automatisch kleurenpalet', 'fx.paletteHint': 'Klik op een kleur om die toe te passen op de laatst aangeklikte overlay-kleurstop, als de overlay aan staat en een stop de focus heeft. Anders gaat de kleur naar de geselecteerde tekstlaag en daarna naar het kleurwaas.',
                 'bg.dim': 'Dimmen', 'bg.blur': 'Vervaging', 'bg.dimcolor': 'Dim- / basiskleur',
                 'bg.gtype': 'Verlooptype', 'g.linear': 'Lineair', 'g.radial': 'Radiaal',
                 'bg.angle': 'Hoek', 'bg.colors': 'Kleuren', 'bg.addcolor': 'Kleur toevoegen',
@@ -155,7 +155,7 @@ export default function (view) {
                 'bg.overlay.top': 'Vervaging boven', 'bg.overlay.wash': 'Volledige waas', 'bg.overlay.duotone': 'Duotoon',
                 'bg.overlay.colors': 'Kleuren en dekking', 'bg.overlay.angle': 'Overlay-hoek',
                 'bg.overlay.alpha': 'Dekking',
-                'hint.overlay': 'Laat een kleur over de achtergrond vervagen, onder je tekst — voor de stijl waarbij een poster overgaat in een egale kleur.',
+                'hint.overlay': 'Laat een kleur over de achtergrond vervagen, onder je tekst. Zo laat je een poster overgaan in een egale kleur.',
                 'bg.image': 'Achtergrondafbeelding (optioneel)', 'f.chooseImage': 'Kies afbeelding…', 'f.none': 'Geen bestand gekozen',
                 'hint.image': 'JPG, PNG, GIF, BMP of WebP · max. 5 MB.',
                 'bg.fit': 'Afbeelding passen', 'fit.cover': 'Vullen (bijsnijden)', 'fit.contain': 'Passen (volledig tonen)', 'fit.stretch': 'Uitrekken',
@@ -181,8 +181,8 @@ export default function (view) {
                 'stop.color': 'Kleur', 'stop.position': 'Positie', 'stop.remove': 'Kleur verwijderen', 'fx.swatch': 'Kleur {0} toepassen',
                 'restore.confirm': 'De huidige cover van dit doel vervangen door het origineel?', 'tpl.confirmDelete': 'Het sjabloon “{0}” verwijderen?',
                 'batch.confirm': 'Het huidige ontwerp toepassen op de geselecteerde doelen ({0})? Hun huidige covers worden vervangen.', 'batch.fail': 'Toepassen op meerdere doelen mislukt: {0}',
-                'err.network': 'Kan de server niet bereiken.', 'err.auth': 'De server weigerde het verzoek (status {0}). Je sessie is mogelijk verlopen — laad de pagina opnieuw en meld je opnieuw aan.',
-                'err.tooLarge': 'Het bestand is te groot voor de server.', 'err.rateLimited': 'Te veel verzoeken — wacht een minuut en probeer het opnieuw.',
+                'err.network': 'Kan de server niet bereiken.', 'err.auth': 'De server weigerde het verzoek (status {0}). Je sessie is mogelijk verlopen. Laad de pagina opnieuw en meld je opnieuw aan.',
+                'err.tooLarge': 'Het bestand is te groot voor de server.', 'err.rateLimited': 'Te veel verzoeken. Wacht een minuut en probeer het opnieuw.',
                 'err.status': 'De server antwoordde met status {0}.', 'err.badResponse': 'De server stuurde een antwoord dat de pagina niet kon lezen.',
                 'poster.noUrl': 'Dit item heeft geen posterafbeelding.', 'poster.empty': 'De posterafbeelding was leeg.', 'poster.fail': 'Kon die poster niet gebruiken: {0}',
                 'restore.unknown': 'Kon niet controleren of er een back-up is',
@@ -191,7 +191,7 @@ export default function (view) {
                 'restore.button': 'Originele cover herstellen', 'restore.none': 'Nog geen back-up', 'restore.available': 'Er is een back-up', 'restore.done': 'Originele cover hersteld.', 'restore.fail': 'Geen back-up gevonden om te herstellen.',
                 'restore.reset': 'Back-up resetten', 'restore.resetConfirm': 'De huidige back-up verwijderen? Resetten bewaart zelf niets. Bij de volgende keer toepassen wordt de cover die dit doel op dat moment toont bewaard als het nieuwe origineel, tenzij het een cover is die deze plug-in heeft toegepast. Zet dus eerst de cover die je wilt houden terug op dit doel (Afbeeldingen bewerken en uploaden; of verwijder de poster en ververs de metadata met "bestaande afbeeldingen vervangen"), reset daarna en pas dan toe.', 'restore.resetDone': 'Back-up verwijderd. Bij de volgende keer toepassen wordt de huidige cover bewaard als het nieuwe origineel.', 'restore.resetFail': 'Kon de back-up niet resetten: {0}',
                 'bg.source': 'Achtergrondbron', 'bg.source.image': 'Afbeelding', 'bg.source.gradient': 'Verloop', 'bg.source.solid': 'Effen kleur', 'bg.source.collage': 'Postercollage van dit doel', 'bg.collage.density': 'Collagedichtheid', 'bg.collage.sparse': 'Dun', 'bg.collage.medium': 'Gemiddeld', 'bg.collage.dense': 'Dicht', 'bg.collage.shuffle': 'Schudden', 'bg.collage.livetv': 'Live TV heeft geen posters voor een collage.',
-                'tpl.load': 'Sjabloon laden', 'tpl.delete': 'Verwijderen', 'tpl.save': 'Huidig ontwerp opslaan', 'tpl.savebtn': 'Opslaan', 'tpl.nameph': 'Sjabloonnaam', 'tpl.hint': 'Sjablonen bewaren het ontwerp maar niet de titel — elk doel houdt zijn eigen naam.', 'tpl.saved': 'Sjabloon opgeslagen.', 'tpl.named': 'Voer eerst een sjabloonnaam in.',
+                'tpl.load': 'Sjabloon laden', 'tpl.delete': 'Verwijderen', 'tpl.save': 'Huidig ontwerp opslaan', 'tpl.savebtn': 'Opslaan', 'tpl.nameph': 'Sjabloonnaam', 'tpl.hint': 'Sjablonen bewaren het ontwerp maar niet de titel, dus elk doel houdt zijn eigen naam.', 'tpl.saved': 'Sjabloon opgeslagen.', 'tpl.named': 'Voer eerst een sjabloonnaam in.',
                 'batch.hint': 'Pas het huidige ontwerp (of geladen sjabloon) in één keer toe op meerdere doelen. Elke cover krijgt de naam van zijn doel als titel.', 'batch.apply': 'Toepassen op selectie', 'batch.none': 'Selecteer minstens één doel.', 'batch.running': 'Bezig met toepassen…', 'batch.done': 'Klaar: {0} gelukt, {1} mislukt.',
                 'fmt.animated': 'Geanimeerde GIF', 'anim.kenburns': 'Ken Burns pan/zoom', 'anim.frames': 'Frames', 'anim.delay': 'Framevertraging (ms)', 'anim.dir': 'Zoomrichting', 'anim.in': 'Inzoomen', 'anim.out': 'Uitzoomen', 'anim.hint': 'Geanimeerde GIFs zijn groter en bewegen alleen in weergaven die GIFs tonen. Max. 30 frames.'
             },
@@ -208,7 +208,7 @@ export default function (view) {
                 'ctx.wide': 'Ancho', 'ctx.square': 'Cuadrado', 'ctx.poster': 'Póster',
                 'layer.addText': 'Añadir texto', 'layer.addImage': 'Añadir logotipo/icono',
                 'layer.show': 'Mostrar', 'layer.hide': 'Ocultar', 'layer.up': 'Subir', 'layer.down': 'Bajar', 'layer.dup': 'Duplicar', 'layer.del': 'Eliminar',
-                'layer.text': 'Texto', 'layer.logo': 'Logotipo', 'layer.more': 'Más acciones', 'layer.none': 'Ninguna capa seleccionada — añade una con Añadir texto o Añadir logotipo/icono, más arriba.',
+                'layer.text': 'Texto', 'layer.logo': 'Logotipo', 'layer.more': 'Más acciones', 'layer.none': 'Ninguna capa seleccionada. Añade una con Añadir texto o Añadir logotipo/icono, más arriba.',
                 'layer.opacity': 'Opacidad', 'layer.rotation': 'Rotación',
                 'hint.logo': 'PNG con transparencia · hasta 5 MB. La fila superior se dibuja la última, encima de las demás.',
                 'hint.logoSize': 'Arrastra los tiradores de las esquinas en la vista previa para redimensionar el logotipo, o el mando superior para rotarlo.',
@@ -220,8 +220,8 @@ export default function (view) {
                 'fx.softlight': 'Baño de color', 'fx.vignette': 'Viñeta', 'fx.grain': 'Grano de película', 'fx.border': 'Borde',
                 'fx.color': 'Color', 'fx.opacity': 'Intensidad', 'fx.amount': 'Intensidad', 'fx.softness': 'Suavidad',
                 'fx.thickness': 'Grosor', 'fx.radius': 'Radio de las esquinas', 'fx.double': 'Línea doble', 'fx.gap': 'Separación',
-                'fx.jellyfin': 'Estilo Jellyfin', 'fx.presetHint': 'Aplica un degradado oscuro con texto blanco nítido — editable después.',
-                'fx.autopalette': 'Paleta automática', 'fx.paletteHint': 'Haz clic en un color para aplicarlo a la parada de la superposición que tocaste por última vez, si la superposición está activa y una parada tiene el foco — si no, a la capa de texto seleccionada y después al baño de color.',
+                'fx.jellyfin': 'Estilo Jellyfin', 'fx.presetHint': 'Aplica un degradado oscuro con texto blanco. Después puedes editarlo todo.',
+                'fx.autopalette': 'Paleta automática', 'fx.paletteHint': 'Haz clic en un color para aplicarlo a la parada de la superposición que tocaste por última vez, si la superposición está activa y una parada tiene el foco. Si no, se aplica a la capa de texto seleccionada y después al baño de color.',
                 'bg.dim': 'Atenuación', 'bg.blur': 'Desenfoque', 'bg.dimcolor': 'Color de atenuación / base',
                 'bg.gtype': 'Tipo de degradado', 'g.linear': 'Lineal', 'g.radial': 'Radial',
                 'bg.angle': 'Ángulo', 'bg.colors': 'Colores', 'bg.addcolor': 'Añadir color',
@@ -230,7 +230,7 @@ export default function (view) {
                 'bg.overlay.top': 'Difuminado superior', 'bg.overlay.wash': 'Baño completo', 'bg.overlay.duotone': 'Duotono',
                 'bg.overlay.colors': 'Colores y opacidad', 'bg.overlay.angle': 'Ángulo de la superposición',
                 'bg.overlay.alpha': 'Opacidad',
-                'hint.overlay': 'Funde un color sobre el fondo, por debajo del texto — para el efecto en el que un póster se disuelve en un color sólido.',
+                'hint.overlay': 'Funde un color sobre el fondo, por debajo del texto. Sirve para que un póster se funda en un color sólido.',
                 'bg.image': 'Imagen de fondo (opcional)', 'f.chooseImage': 'Elegir imagen…', 'f.none': 'Ningún archivo seleccionado',
                 'hint.image': 'JPG, PNG, GIF, BMP o WebP · hasta 5 MB.',
                 'bg.fit': 'Ajuste de la imagen', 'fit.cover': 'Rellenar (recortar)', 'fit.contain': 'Ajustar (mostrar entera)', 'fit.stretch': 'Estirar hasta llenar',
@@ -266,7 +266,7 @@ export default function (view) {
                 'restore.button': 'Restaurar la carátula original', 'restore.none': 'Aún no hay copia de seguridad', 'restore.available': 'Existe una copia de seguridad', 'restore.done': 'Carátula original restaurada.', 'restore.fail': 'No se ha encontrado ninguna copia de seguridad que restaurar.',
                 'restore.reset': 'Restablecer copia de seguridad', 'restore.resetConfirm': '¿Eliminar la copia de seguridad actual? Restablecer no guarda nada por sí solo. La próxima vez que apliques, la carátula que muestre este destino en ese momento se guardará como el nuevo original, salvo que sea una carátula aplicada por este complemento. Por eso, primero vuelve a poner en este destino la que quieres conservar (Editar imágenes y súbela; o elimina el póster y actualiza los metadatos con "Reemplazar imágenes existentes"), después restablece y luego aplica.', 'restore.resetDone': 'Copia de seguridad eliminada. La próxima vez que apliques, la carátula actual se guardará como el nuevo original.', 'restore.resetFail': 'No se pudo restablecer la copia de seguridad: {0}',
                 'bg.source': 'Origen del fondo', 'bg.source.image': 'Imagen', 'bg.source.gradient': 'Degradado', 'bg.source.solid': 'Color sólido', 'bg.source.collage': 'Collage de pósteres de este destino', 'bg.collage.density': 'Densidad del collage', 'bg.collage.sparse': 'Baja', 'bg.collage.medium': 'Media', 'bg.collage.dense': 'Alta', 'bg.collage.shuffle': 'Barajar', 'bg.collage.livetv': 'La TV en directo no tiene pósteres para hacer un collage.',
-                'tpl.load': 'Cargar plantilla', 'tpl.delete': 'Eliminar', 'tpl.save': 'Guardar el diseño actual', 'tpl.savebtn': 'Guardar', 'tpl.nameph': 'Nombre de la plantilla', 'tpl.hint': 'Las plantillas guardan el diseño pero no el título — cada destino conserva su propio nombre.', 'tpl.saved': 'Plantilla guardada.', 'tpl.named': 'Introduce primero un nombre de plantilla.',
+                'tpl.load': 'Cargar plantilla', 'tpl.delete': 'Eliminar', 'tpl.save': 'Guardar el diseño actual', 'tpl.savebtn': 'Guardar', 'tpl.nameph': 'Nombre de la plantilla', 'tpl.hint': 'Las plantillas guardan el diseño pero no el título, así que cada destino conserva su propio nombre.', 'tpl.saved': 'Plantilla guardada.', 'tpl.named': 'Introduce primero un nombre de plantilla.',
                 'batch.hint': 'Aplica el diseño actual (o la plantilla cargada) a varios destinos a la vez. Cada carátula se titula con el nombre de su destino.', 'batch.apply': 'Aplicar a la selección', 'batch.none': 'Selecciona al menos un destino.', 'batch.running': 'Aplicando…', 'batch.done': 'Listo: {0} correctas, {1} fallidas.',
                 'fmt.animated': 'GIF animado', 'anim.kenburns': 'Paneo/zoom Ken Burns', 'anim.frames': 'Fotogramas', 'anim.delay': 'Retardo entre fotogramas (ms)', 'anim.dir': 'Dirección del zoom', 'anim.in': 'Acercar', 'anim.out': 'Alejar', 'anim.hint': 'Los GIF animados son más grandes y solo se animan en vistas que muestran GIF. Máximo 30 fotogramas.'
             }
@@ -3407,8 +3407,8 @@ export default function (view) {
                 var templates = dataOrThrow(res) || [];
                 var sel = el('ccaTemplateSelect');
                 sel.innerHTML = '';
-                state.templateValue = ''; // the rebuilt list selects "—"
-                var none = document.createElement('option'); none.value = ''; none.textContent = '—'; sel.appendChild(none);
+                state.templateValue = ''; // the rebuilt list selects the empty "-" entry
+                var none = document.createElement('option'); none.value = ''; none.textContent = '-'; sel.appendChild(none);
                 templates.forEach(function (tpl) {
                     var o = document.createElement('option');
                     o.value = pick(tpl, 'Name'); o.textContent = pick(tpl, 'Name');
