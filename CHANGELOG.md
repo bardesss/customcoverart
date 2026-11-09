@@ -5,6 +5,13 @@ and Jellyfin shows it as that version's changelog. Add a new `## <version>` sect
 bump `<Version>` in the csproj. Jellyfin renders the text as Markdown, so keep a short opening
 sentence, a blank line, and then one bullet per change.
 
+## 4.1.3.0
+A security hardening release. Nothing changes in how your covers look.
+
+- The plugin now only ever reads PNG, JPEG, GIF, BMP and WebP images, even when a file has a misleading name. Known issues in the image library's TIFF support, a format the plugin never accepted, can no longer be reached.
+- Colour profiles embedded in images are now ignored, so a known issue in the image library's colour profile parsing can't be reached either. The plugin never used these profiles, so colours stay the same.
+- A library poster in another format, such as TIFF, now leaves an empty tile in a collage, the same as a poster that can't be read.
+
 ## 4.1.2.0
 A behind-the-scenes release: the editor looks and works as it did in 4.1.1.0, apart from four small undo fixes.
 
