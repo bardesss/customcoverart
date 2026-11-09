@@ -2649,69 +2649,8 @@ export default function (view) {
         // End canvas engine
         // ==================================================================
 
-        // Build the settings object using the EXACT C# property names (PascalCase)
-        // and numeric enum values so binding works regardless of serializer config.
-        function collectSettings() {
-            var preset = el('ccaPreset').value;
-            var width, height;
-            if (preset === 'custom') {
-                width = parseInt(el('ccaWidth').value, 10) || 1400;
-                height = parseInt(el('ccaHeight').value, 10) || 1400;
-            } else {
-                width = PRESETS[preset].w;
-                height = PRESETS[preset].h;
-            }
-
-            return {
-                Title: el('ccaTitle').value,
-                TextSize: parseInt(el('ccaTextSize').value, 10),
-                TextWeight: parseInt(el('ccaTextWeight').value, 10),
-                TextColor: el('ccaTextColor').value,
-                TextAlign: parseInt(el('ccaTextAlign').value, 10),
-                TextBaseline: 1,
-                BackgroundDim: parseFloat(el('ccaDim').value),
-                BackgroundBlur: parseFloat(el('ccaBlur').value),
-                DimColor: el('ccaDimColor').value,
-                TextShadow: el('ccaShadow').checked,
-                TextOutline: el('ccaOutline').checked,
-                BackgroundGradient: {
-                    IsEnabled: doc.Background.Source === 'gradient',
-                    Type: parseInt(el('ccaGradientType').value, 10),
-                    Angle: parseFloat(el('ccaGradientAngle').value) || 0,
-                    Stops: collectGradientStops(),
-                    CenterX: 0.5, CenterY: 0.5, Radius: 0.5
-                },
-                BackgroundImagePath: state.backgroundImagePath || '',
-                BackgroundFit: el('ccaBgFit').value,
-                CustomFontPath: state.customFontPath || '',
-                ExportWidth: width,
-                ExportHeight: height,
-                ExportScale: 1.0,
-                OutputFormat: el('ccaFormat').value === 'animatedgif' ? 'gif' : el('ccaFormat').value,
-                Animation: el('ccaFormat').value === 'animatedgif' ? {
-                    Enabled: true,
-                    KenBurns: el('ccaKenBurns').checked,
-                    ZoomAmount: 0.15,
-                    Direction: el('ccaAnimDir').value,
-                    FrameCount: parseInt(el('ccaAnimFrames').value, 10),
-                    DelayMs: parseInt(el('ccaAnimDelay').value, 10),
-                    Loop: true
-                } : null,
-                DimensionPreset: preset,
-                BackgroundSource: el('ccaBgSource').value,
-                Collage: {
-                    SourceId: state.libraryId || '',
-                    SourceType: (el('ccaTargetType') ? el('ccaTargetType').value : 'library'),
-                    Density: el('ccaCollageDensity').value,
-                    Seed: state.collageSeed
-                }
-            };
-        }
-
         // --- Document <-> controls binding (Task 8) -----------------------
-        // collectSettings() (above) is RETAINED only to feed the legacy flat-Settings
-        // endpoints (batch apply + its projection); the live canvas, Apply, server
-        // render and templates are all document-native via collectDocument().
+        // Every request carries the design as a CoverDocument built by collectDocument().
 
         // Recursively deep-clone `doc`, dropping UI-only keys (any `_`-prefixed key,
         // e.g. _selectedId) so nothing internal leaks onto the wire.
@@ -3124,7 +3063,6 @@ export default function (view) {
             // The gradient is the point of the preset, so drop any background bitmap that
             // would paint over it (both the canvas copy and the path the server renders).
             doc.Background.ImagePath = '';
-            state.backgroundImagePath = '';
             requestGuard('bg');       // an upload or poster pick still in flight must not land now
             clearBackgroundBitmap();  // syncControlsFromDocument below updates the file labels
 
@@ -3425,10 +3363,6 @@ export default function (view) {
                 });
             });
             return stops;
-        }
-
-        function collectGradientStops() {
-            return collectStops('ccaGradientStops');
         }
 
         // A gradient needs two stops, so ✕ is disabled at two instead of silently ignored.
@@ -3934,7 +3868,6 @@ export default function (view) {
                 // back to Image shows the upload again without a refetch.
                 if (this.value === 'gradient' || this.value === 'solid') {
                     doc.Background.ImagePath = '';
-                    state.backgroundImagePath = '';
                     requestGuard('bg');       // an upload or poster pick still in flight must not land now
                     clearBackgroundBitmap();
                     syncFileNames();
@@ -4066,10 +3999,8 @@ export default function (view) {
                     if (!isCurrent()) { return; } // a newer pick, a preset or gradient/solid won
                     // Server path drives the authoritative render + apply; the canvas bitmap
                     // comes from the SAME client File via a blob: URL so the canvas stays
-                    // untainted (canvas-source invariant). state.backgroundImagePath is kept
-                    // for the legacy batch/collectSettings projection.
+                    // untainted (canvas-source invariant).
                     doc.Background.ImagePath = path;
-                    state.backgroundImagePath = path;
                     _fileNames[path] = { name: file.name, poster: false };
                     syncFileNames();
                     setBackgroundBitmap(file, isCurrent);
@@ -4091,7 +4022,6 @@ export default function (view) {
                     input.value = '';
                     var path = dataOrThrow(res);
                     _fileNames[path] = { name: file.name, poster: false };
-                    state.customFontPath = path;
                     var l = selectedLayer();
                     if (l) { l.FontPath = path; }
                     syncFileNames();
@@ -4185,12 +4115,10 @@ export default function (view) {
                     // Collecting runs inside the promise chain so a throw reaches the catch
                     // and the cleanup below instead of leaving the button locked.
                     return Promise.resolve().then(function () {
-                        // Send the layered document as well: the server prefers it, so batching
-                        // a multi-layer design no longer collapses to the flat single-title
-                        // model. Settings stays until plan D removes it.
+                        // The layered document is the whole design; the server retitles it per target.
                         // Batch apply neither cleans nor dirties the design.
                         var batchDoc = collectDocumentKeepingCleanState();
-                        return jsonFetch('CustomCoverArt/batchApply', 'POST', { Document: batchDoc, Settings: collectSettings(), Targets: targets });
+                        return jsonFetch('CustomCoverArt/batchApply', 'POST', { Document: batchDoc, Targets: targets });
                     })
                         .then(function (res) {
                             var data = dataOrThrow(res) || [];
@@ -4427,7 +4355,6 @@ export default function (view) {
                     // server path / ApiClient.getImageUrl).
                     if (!isCurrent()) { return; } // a newer pick won the race
                     doc.Background.ImagePath = path;
-                    state.backgroundImagePath = path;
                     _fileNames[path] = { name: name, poster: true };
                     syncFileNames();
                     setBackgroundBitmap(posterBlob, isCurrent);

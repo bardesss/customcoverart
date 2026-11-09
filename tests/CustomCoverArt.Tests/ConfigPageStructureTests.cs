@@ -934,14 +934,14 @@ public class ConfigPageStructureTests
     }
 
     /// <summary>
-    /// collectDocument()/collectSettings() ran synchronously before the request's catch,
+    /// collectDocument() ran synchronously before the request's catch,
     /// so a throw left the batch button disabled and the status on "Applying…".
     /// </summary>
     [Fact]
     public void BatchCollectionIsInsideTheErrorPath()
     {
         var handler = HandlerBody(ConfigPage(), "el('ccaBatchApply').addEventListener('click'");
-        Assert.Matches(@"Promise\.resolve\(\)\.then\(function \(\) \{[\s\S]*?collectDocumentKeepingCleanState\(\)[\s\S]*?collectSettings\(\)[\s\S]*?\.catch\(", handler);
+        Assert.Matches(@"Promise\.resolve\(\)\.then\(function \(\) \{[\s\S]*?collectDocumentKeepingCleanState\(\)[\s\S]*?\.catch\(", handler);
     }
 
     [Fact]
