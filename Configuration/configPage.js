@@ -435,15 +435,23 @@ export default function (view) {
             return function isCurrent() { return _requestSeq[channel] === n; };
         }
 
+        // How many confirmAction dialogs are open. Jellyfin's dialog is not part of the
+        // page, so onDocumentKeydown cannot tell from the focused element that one is up.
+        var _confirmsOpen = 0;
+
         // Promise<boolean>. Jellyfin's own themed confirm dialog when the dashboard exposes
         // it (Dashboard.confirm(message, title, callback)), the browser's otherwise.
         function confirmAction(message) {
+            _confirmsOpen++;
             return new Promise(function (resolve) {
                 if (window.Dashboard && typeof Dashboard.confirm === 'function') {
                     try { Dashboard.confirm(message, '', function (ok) { resolve(!!ok); }); return; }
                     catch (e) { /* fall through to the browser dialog */ }
                 }
                 resolve(window.confirm(message));
+            }).then(function (ok) {
+                _confirmsOpen--;
+                return ok;
             });
         }
 
@@ -3115,7 +3123,12 @@ export default function (view) {
                 rebuildGradientStopsUI(g.Stops);
             }
             hydrateOverlayControls();
-            if (bg.Collage) { el('ccaCollageDensity').value = bg.Collage.Density || 'medium'; }
+            if (bg.Collage) {
+                el('ccaCollageDensity').value = bg.Collage.Density || 'medium';
+                // The seed picks which posters the mosaic shows. Undo, redo and a template
+                // load replace doc, so they bring back the seed that design was made with.
+                if (typeof bg.Collage.Seed === 'number') { state.collageSeed = bg.Collage.Seed; }
+            }
 
             // Output card
             el('ccaPreset').value = doc.Canvas.DimensionPreset || 'custom';
@@ -3243,10 +3256,14 @@ export default function (view) {
             if (state.titleTouched) { return; }
             var l = titleLayer();
             if (!l) { return; }
-            // Following the target's name is not the user's edit: stay clean if we were.
+            // Following the target's name is not the user's edit: stay clean if we were,
+            // and fold it into the current undo entry instead of adding one of its own.
+            // snapshot() first, so an edit still waiting on commit's debounce keeps its entry.
             var wasClean = _cleanJson !== null && !isDirty();
+            snapshot();
             l.Content = name || t('text.defaultTitle');
             if (wasClean) { markClean(); }
+            if (history.index >= 0) { history.stack[history.index] = JSON.stringify(stripUiKeys(doc)); }
             renderLayersPanel();
             if (doc._selectedId === l.Id) { el('ccaTitle').value = l.Content; }
             scheduleRender();
@@ -4247,7 +4264,9 @@ export default function (view) {
             if (isTextEditingTarget(ev.target)) { return; }
             // Do not change the design underneath the open poster browser.
             if (el('ccaBrowserModal').style.display !== 'none') { return; }
-            var k = String(ev.key || '').toLowerCase();
+            // Nor behind an open confirmation: the question is about the design as it is.
+            if (_confirmsOpen > 0) { return; }
+            var k =String(ev.key || '').toLowerCase();
             if (k === 'z' && !ev.shiftKey) { ev.preventDefault(); undo(); }
             else if (k === 'y' || (k === 'z' && ev.shiftKey)) { ev.preventDefault(); redo(); }
         }

@@ -1002,4 +1002,60 @@ public class ConfigPageStructureTests
         Assert.Contains("bindCustomDim('ccaWidth', 'Width')", page, System.StringComparison.Ordinal);
         Assert.DoesNotContain("parseInt(this.value, 10) || doc.Canvas.Width", page, System.StringComparison.Ordinal);
     }
+
+    /// <summary>
+    /// The collage seed picks which posters the mosaic shows. It lives in
+    /// state.collageSeed, and Shuffle copies it into doc.Background.Collage.Seed, so undo
+    /// snapshots and saved templates already hold it. Undo, redo and a template load
+    /// replace doc, and they left state.collageSeed behind: the canvas and the next apply
+    /// kept the shuffled posters, not the ones the restored design was made with.
+    /// </summary>
+    [Fact]
+    public void CollageSeedFollowsTheDocument()
+    {
+        var page = ConfigPage();
+        var shuffle = HandlerBody(page, "el('ccaCollageShuffle').addEventListener('click'");
+        Assert.Contains("doc.Background.Collage.Seed = state.collageSeed;", shuffle, System.StringComparison.Ordinal);
+        Assert.Contains("Seed: state.collageSeed", FunctionBody(page, "buildCollageFromControls"), System.StringComparison.Ordinal);
+
+        var sync = FunctionBody(page, "syncControlsFromDocument");
+        Assert.Contains("if (typeof bg.Collage.Seed === 'number') { state.collageSeed = bg.Collage.Seed; }", sync, System.StringComparison.Ordinal);
+        Assert.Contains("syncControlsFromDocument();", FunctionBody(page, "restoreSnapshot"), System.StringComparison.Ordinal);
+        Assert.Contains("syncControlsFromDocument();", FunctionBody(page, "loadTemplateOption"), System.StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Jellyfin's confirm dialog is not part of the page, so the focused element cannot
+    /// tell the Ctrl+Z/Y handler that one is open: undo changed the design behind
+    /// "Replace your unapplied changes?" and the other confirmations.
+    /// </summary>
+    [Fact]
+    public void UndoShortcutWaitsForAnOpenConfirmation()
+    {
+        var page = ConfigPage();
+        var confirm = FunctionBody(page, "confirmAction");
+        Assert.Contains("_confirmsOpen++;", confirm, System.StringComparison.Ordinal);
+        Assert.Contains("_confirmsOpen--;", confirm, System.StringComparison.Ordinal);
+
+        var keys = FunctionBody(page, "onDocumentKeydown");
+        var guard = keys.IndexOf("if (_confirmsOpen > 0) { return; }", System.StringComparison.Ordinal);
+        Assert.True(guard > 0, "onDocumentKeydown must ignore Ctrl+Z/Y while a confirmation is open.");
+        Assert.True(guard < keys.IndexOf("undo();", System.StringComparison.Ordinal), "The confirmation check must come before undo().");
+    }
+
+    /// <summary>
+    /// Choosing a target retitles the design with the target's name. That is not the
+    /// user's edit, so it must not become an undo step of its own: Ctrl+Z used to bring
+    /// back the previous target's name.
+    /// </summary>
+    [Fact]
+    public void TitlePrefillAddsNoUndoStep()
+    {
+        var body = FunctionBody(ConfigPage(), "prefillTitle");
+        var flush = body.IndexOf("snapshot();", System.StringComparison.Ordinal);
+        var write = body.IndexOf("l.Content = name || t('text.defaultTitle');", System.StringComparison.Ordinal);
+        var fold = body.IndexOf("history.stack[history.index] = JSON.stringify(stripUiKeys(doc));", System.StringComparison.Ordinal);
+        Assert.True(flush > 0 && flush < write, "A pending edit must get its own undo entry before the title changes.");
+        Assert.True(fold > write, "The prefilled title must be folded into the current undo entry.");
+    }
 }
