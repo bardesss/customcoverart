@@ -9,7 +9,7 @@ namespace CustomCoverArt.Tests;
 /// <summary>
 /// The client canvas has always rendered a text shadow as a soft glow
 /// (<c>ctx.shadowBlur</c>), while the server drew a hard offset copy and ignored
-/// <see cref="TextShadowSettings.Blur"/> entirely — the most visible disagreement between
+/// <see cref="TextShadowSettings.Blur"/> entirely. That was the most visible disagreement between
 /// the live preview and the cover that actually gets applied.
 /// </summary>
 public class TextShadowBlurTests

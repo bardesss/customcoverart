@@ -7,8 +7,8 @@ namespace CustomCoverArt.Tests;
 /// <summary>
 /// Structural guards over the embedded config page. The element-id pin is the important
 /// one: regrouping ~3,000 lines of markup in place is exactly the operation that silently
-/// drops a control, and a dropped control means a dead handler with no error anywhere —
-/// <c>el('ccaFoo')</c> simply returns null and the feature quietly stops working.
+/// drops a control, and a dropped control means a dead handler with no error anywhere:
+/// <c>el('ccaFoo')</c> returns null and the feature silently stops working.
 /// </summary>
 public class ConfigPageStructureTests
 {
@@ -86,7 +86,7 @@ public class ConfigPageStructureTests
     /// <summary>
     /// Live TV has no child posters, so updateBackgroundVisibility disables the collage
     /// option and force-reverts an already-selected collage back to an image. Both are
-    /// correct and both used to happen in total silence — the user's background choice
+    /// correct and both used to happen in total silence: the user's background choice
     /// changed under them with nothing said. The explanation string existed all along and
     /// was bound to nothing, so this pins the binding rather than the string.
     /// </summary>
@@ -201,7 +201,7 @@ public class ConfigPageStructureTests
     [Fact]
     public void DeadPreviewSpinnerIsGone()
     {
-        // Unused since Phase 1 — the canvas renders synchronously, so nothing ever showed it.
+        // Unused since Phase 1: the canvas renders synchronously, so nothing ever showed it.
         Assert.DoesNotContain("ccaPreviewSpinner", ConfigPage(), System.StringComparison.Ordinal);
     }
 

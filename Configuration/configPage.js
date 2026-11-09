@@ -550,8 +550,8 @@ export default function (view) {
             return d;
         }
 
-        // Client mirror of DocumentMigration.NormalizeBackgroundSource — same rules, same
-        // order. Runs on LOAD only (init and template load), never on every change: it
+        // Client mirror of DocumentMigration.NormalizeBackgroundSource, with the same rules in
+        // the same order. Runs on LOAD only (init and template load), never on every change: it
         // derives Source from the old fields, so running it mid-edit would flip the user's
         // chosen source out from under them the moment they cleared an image.
         function normalizeBackgroundSource(d) {
@@ -571,7 +571,7 @@ export default function (view) {
         // gets truncated for no user-visible edit).
         //
         // GradientSettings.Angle is a non-nullable float server-side, defaulting to 0 (a
-        // left-to-right fade) — but every client render treats a missing Angle as 90
+        // left-to-right fade), but every client render treats a missing Angle as 90
         // (top-to-bottom, see drawGradientOverlay/hydrateOverlayControls). A document whose
         // Overlay predates this field, or was hand-built without it, would otherwise render
         // one way in the editor and another way on the server, so it's backfilled once, here,
@@ -726,7 +726,7 @@ export default function (view) {
 
         // Converts a legacy flat CoverArtSettings (templates saved before the
         // canvas engine shipped, which carry Settings but no Document) into a
-        // one-text-layer CoverDocument — the client mirror of the server's
+        // one-text-layer CoverDocument. It is the client mirror of the server's
         // Services/DocumentMigration.cs FromSettings, so old templates keep
         // working. Per template semantics ("templates store the design but not
         // the title"), the title layer's Content is stripped, same as a
@@ -747,7 +747,7 @@ export default function (view) {
             bg.Dim = pickNum(s, 'BackgroundDim', bg.Dim);
             bg.DimColor = pick(s, 'DimColor') || bg.DimColor;
             // Mirrors DocumentMigration.FromSettings: Gradient = s.BackgroundGradient,
-            // i.e. a missing gradient stays null — NOT the default purple/blue
+            // i.e. a missing gradient stays null, NOT the default purple/blue
             // gradient from defaultDocument(). Falling back to that default would
             // put a phantom gradient (IsEnabled:true) onto any legacy template
             // that never had one (a plain image, or a flat/dim-only design), and
@@ -759,7 +759,7 @@ export default function (view) {
             bg.Transform = { OffsetX: 0, OffsetY: 0, Scale: 1 }; // identity, as FromSettings does
 
             var l = d.Layers[0];
-            l.Content = ''; // template title stripped — each target keeps its own name
+            l.Content = ''; // template title stripped; each target keeps its own name
             var height = d.Canvas.Height || 1400;
             l.Size = pickNum(s, 'TextSize', 120) / height;
             l.Weight = pickNum(s, 'TextWeight', 400);
@@ -1176,7 +1176,7 @@ export default function (view) {
             // soft-light UNDER the layers, then vignette -> grain -> border on top.
             drawSoftLight(ctx, W, H);
 
-            // Over the background and soft-light, under the layers — same slot as the server.
+            // Over the background and soft-light, under the layers: the same slot as the server.
             drawGradientOverlay(ctx, W, H);
 
             // Visible layers, in array order (draw order matches the server loop).
@@ -1213,7 +1213,7 @@ export default function (view) {
             updateGifLoop();
         }
 
-        // Background only — no layers, no effects, no selection chrome. Split out of
+        // Background only: no layers, no effects, no selection chrome. Split out of
         // renderDocument so the palette sampler can paint the same background into a
         // tiny offscreen canvas without text pixels skewing the dominant colours.
         //
@@ -1236,7 +1236,7 @@ export default function (view) {
             // background only (text is drawn after). Parity with the server: dim is
             // applied ONLY on the image-background path (ApplyBackgroundLayer). The
             // gradient/flat path (CreateGradientBackground) applies NO dim, so we
-            // must not either — otherwise the default gradient view (Dim 0.25, no
+            // must not either. Otherwise the default gradient view (Dim 0.25, no
             // image) would render darker than the authoritative server render.
             if (drewImage && doc.Background.Dim > 0) {
                 ctx.save();
@@ -1248,7 +1248,7 @@ export default function (view) {
         }
 
         // --- Effects (Phase 3) --------------------------------------------
-        // Client mirrors of Services/EffectsComposer.cs. The server is authoritative —
+        // Client mirrors of Services/EffectsComposer.cs. The server is authoritative;
         // grain in particular is an approximation here (a scaled noise tile blended in
         // 'overlay', versus true per-pixel noise on the server) because a full-canvas
         // per-pixel pass every frame would stall the live preview.
@@ -1262,7 +1262,7 @@ export default function (view) {
         // SafeColor(s.Color).WithAlpha(s.Alpha), and ImageSharp's WithAlpha overwrites
         // (measured: '#ff000080' + Alpha 0.5 => A=128, not 64). The hex's own alpha is
         // therefore only used when no alpha is passed at all. NOTE: nothing in the editor
-        // currently emits 8-digit hex — <input type="color"> is always #rrggbb — so that
+        // currently emits 8-digit hex (<input type="color"> is always #rrggbb), so that
         // branch is unreachable today and exists purely so a future 8-digit source cannot
         // silently disagree with the server.
         function parseHexRgba(hex, alpha) {
@@ -1382,7 +1382,7 @@ export default function (view) {
             var t = Math.min(64, Math.max(0, b.Thickness));
             ctx.save();
             ctx.strokeStyle = b.Color || '#ffffff';
-            // A stroke straddles the path, so inset by half the width — matching
+            // A stroke straddles the path, so inset by half the width, matching
             // DrawInsetFrame, which offsets its rectangle the same way.
             ctx.lineWidth = t;
             strokeRoundRect(ctx, t / 2, t / 2, W - t, H - t, b.Radius || 0);
@@ -1402,8 +1402,8 @@ export default function (view) {
 
         // --- Preview contexts ---------------------------------------------
         // The SAME document drawn at other aspect ratios. Layer coordinates are
-        // normalized, so a design re-flows rather than being letterboxed — which is
-        // exactly what you want to check before applying it to a library.
+        // normalized, so a design re-flows rather than being letterboxed, which is
+        // what you want to check before applying it to a library.
         var PREVIEW_CONTEXTS = [
             { key: 'wide', w: 320, h: 180 },
             { key: 'square', w: 200, h: 200 },
@@ -1412,7 +1412,7 @@ export default function (view) {
 
         // Background + effects + layers into an arbitrary-sized context, reusing the very
         // functions renderDocument uses so the two cannot drift. Deliberately omits the
-        // selection chrome — this is the design, not the editor.
+        // selection chrome, because this is the design and not the editor.
         function drawDocInto(ctx, W, H) {
             ctx.clearRect(0, 0, W, H);
             paintBackgroundOnly(ctx, W, H);
@@ -1452,15 +1452,15 @@ export default function (view) {
         }, 300);
 
         // --- Colour palette -----------------------------------------------
-        // Dominant colours of the BACKGROUND, extracted entirely client-side — no new
-        // endpoint, no upload round-trip. Sampled from a tiny offscreen render (the
+        // Dominant colours of the BACKGROUND, extracted entirely client-side with no new
+        // endpoint and no upload round-trip. Sampled from a tiny offscreen render (the
         // cover's aspect ratio, 64px wide) so it costs a few thousand pixels, not
         // millions, and never blocks the UI.
         //
         // This is the feature the blob-URL canvas-source invariant has been protecting
         // since Phase 1: getImageData throws a SecurityError on a canvas tainted by a
         // cross-origin image, which is why background bitmaps only ever come from
-        // URL.createObjectURL. The read is still guarded — a tainted or CSP-blocked
+        // URL.createObjectURL. The read is still guarded: a tainted or CSP-blocked
         // canvas degrades to "no swatches" rather than an exception.
         function extractPalette() {
             var SW = 64;
@@ -1495,7 +1495,7 @@ export default function (view) {
 
         // --- Gradients, overlay and background image ----------------------
 
-        // Builds the canvas colour-stop list from gradient settings — the explicit
+        // Builds the canvas colour-stop list from gradient settings: the explicit
         // Stops (sorted, clamped) when there are 2+, else the server's StartColor/EndColor
         // fallback, mirroring DocumentRenderer.BuildColorStops. normalizeGradientStops
         // already folds those into Stops at load; this covers a document that skipped it.
@@ -1516,13 +1516,13 @@ export default function (view) {
         // No black->white fallback here: fewer than two stops means the overlay is off,
         // mirroring DocumentRenderer.ApplyGradientOverlay.
         //
-        // WHY THE SUBDIVISION BELOW EXISTS — do not "simplify" it away:
+        // WHY THE SUBDIVISION BELOW EXISTS (do not "simplify" it away):
         // the two renderers interpolate colour stops in DIFFERENT alpha spaces.
         //   * ImageSharp's LinearGradientBrush (the authoritative server render) lerps in
         //     STRAIGHT / non-premultiplied alpha: r, g, b and a are each interpolated
         //     independently, so a fully transparent stop's HUE still bleeds into the ramp.
         //     Measured: '#ff0000' a=0 -> '#0000ff' a=1 gives Rgba32(150, 0, 105, 105) at
-        //     mid-canvas — note the red channel surviving from a stop with zero alpha.
+        //     mid-canvas. Note the red channel surviving from a stop with zero alpha.
         //   * HTML Canvas 2D gradients interpolate in PREMULTIPLIED alpha, where a stop
         //     with alpha 0 contributes no colour at all.
         // The visible symptom: "Bottom fade" seeded from DimColor (three black stops) plus
@@ -1592,7 +1592,7 @@ export default function (view) {
         }
 
         // Linear (a line through the centre at Angle degrees spanning the canvas) or
-        // radial (centred at Center*, radius = Radius*min(W,H)) — geometry copied
+        // radial (centred at Center*, radius = Radius*min(W,H)), with geometry copied
         // from DocumentRenderer.ApplyGradientBackground so framing matches.
         function drawGradient(ctx, g, W, H) {
             var stops = gradientStops(g);
@@ -1619,7 +1619,7 @@ export default function (view) {
         // shrinks that window by 1/Scale and pans it across the slack.
         //
         // The slack is measured against the WHOLE source image, not just the base
-        // window — so under "cover" the strip the fit crops away is pannable at the
+        // window, so under "cover" the strip the fit crops away is pannable at the
         // default Scale=1, where zoom-derived slack alone would be zero (i.e. drag
         // would move nothing at all). Shared with the drag handler so the pointer
         // maths and the render can never disagree.
@@ -1801,7 +1801,7 @@ export default function (view) {
             var fontPx = textFontPx(layer, H);
             ctx.save();
             ctx.globalAlpha = layer.Opacity;
-            // Rotate about the layer's own anchor and draw at the local origin —
+            // Rotate about the layer's own anchor and draw at the local origin,
             // the same pivot the server uses (RenderTextLayer's SetDrawingTransform).
             ctx.translate(px, py);
             if (layer.Rotation) { ctx.rotate(layer.Rotation * Math.PI / 180); }
@@ -1812,7 +1812,7 @@ export default function (view) {
 
             // Draw order mirrors RenderTextLayer: shadow, then outline, then fill. The
             // shadow used to be switched on between the outline and the fill, which put it
-            // OVER the outline — the server has always drawn it underneath.
+            // OVER the outline. The server has always drawn it underneath.
             ctx.fillStyle = layer.Color;
             if (layer.Shadow && layer.Shadow.Enabled) {
                 drawTextShadowOnly(ctx, layer, fontPx, k, px, py);
@@ -1833,7 +1833,7 @@ export default function (view) {
 
         // One image (logo) layer, mirroring DocumentRenderer.RenderImageLayer: the
         // bitmap scaled to Width×Height of the canvas, rotated about the layer anchor,
-        // composited at Opacity. Draws nothing until the bitmap is decoded — the
+        // composited at Opacity. Draws nothing until the bitmap is decoded; the
         // authoritative server render is the one that counts either way.
         function drawImageLayer(ctx, layer, W, H) {
             var img = layer._img;
@@ -1870,7 +1870,7 @@ export default function (view) {
         }
 
         // A layer's box expressed RELATIVE TO ITS ROTATION PIVOT, which for both types
-        // is the anchor (X*W, Y*H) — the same point the server rotates about. Image
+        // is the anchor (X*W, Y*H), the same point the server rotates about. Image
         // layers are centred on it; text layers hang off it according to alignment.
         // Keeping one representation means selection, hit-testing and the handles all
         // agree no matter how the layer is rotated.
@@ -1899,8 +1899,8 @@ export default function (view) {
         }
 
         // Canvas backing-store pixels per CSS pixel. Greater than 1 whenever the canvas is
-        // displayed smaller than its export size, which is almost always — and
-        // dramatically so on a phone, where a 1400px canvas shown at ~340px scales by ~4.
+        // displayed smaller than its export size, which is almost always, and
+        // by a lot on a phone, where a 1400px canvas shown at ~340px scales by ~4.
         function canvasScale() {
             var cv = el('ccaCanvas');
             if (!cv) { return 1; }
@@ -1912,7 +1912,7 @@ export default function (view) {
         // Handle size is chosen in SCREEN pixels and converted into canvas units, so it
         // renders at a constant on-screen size however far the canvas is scaled down.
         // Deriving it from the backing store (the Phase 2 behaviour) meant the handles
-        // shrank with the display and ended up a few pixels across on a phone — the one
+        // shrank with the display and ended up a few pixels across on a phone, a
         // mobile problem that no amount of CSS could fix.
         var HANDLE_SCREEN_PX = 11;      // drawn size
         var TOUCH_TARGET_PX = 44;       // minimum comfortable touch target
@@ -2038,8 +2038,8 @@ export default function (view) {
 
         // --- Bundled canvas fonts -----------------------------------------
         // Loads the SAME bundled Noto weights the server renders with, via the
-        // authenticated font endpoint + the FontFace API (which — unlike CSS
-        // @font-face — accepts an ArrayBuffer fetched WITH the auth token). Tolerant
+        // authenticated font endpoint + the FontFace API (which, unlike CSS
+        // @font-face, accepts an ArrayBuffer fetched WITH the auth token). Tolerant
         // of per-weight failure: a missing weight falls back to the browser's
         // sans-serif for the canvas only; the applied cover is server-authoritative.
         var FONT_WEIGHTS = [300, 400, 500, 600, 700, 800];
@@ -2193,7 +2193,7 @@ export default function (view) {
         // Advanced disclosures are independent of the step accordion and of each other:
         // opening a step does not reveal its advanced controls, and the state is not
         // persisted. In the Effects step they are nested INSIDE each effect's row, because
-        // updateEffectsVisibility owns that row's display — pulling softness out to a
+        // updateEffectsVisibility owns that row's display, and pulling softness out to a
         // step-level block would show it even with the vignette switched off.
         function initAdvanced() {
             page.querySelectorAll('.ccaAdvHead').forEach(function (head) {
@@ -2206,7 +2206,7 @@ export default function (view) {
             });
         }
 
-        // Step 1 when nothing is selected yet, otherwise wherever you left off — a first
+        // Step 1 when nothing is selected yet, otherwise wherever you left off. A first
         // run starts at the beginning, a return visit lands where you were working.
         function restoreLastStep() {
             var saved = null;
@@ -2418,7 +2418,7 @@ export default function (view) {
         }
 
         // Loads the bitmap for any image layer that has a server path but no decoded
-        // image yet — i.e. layers restored from a saved template, where the upload
+        // image yet, i.e. layers restored from a saved template, where the upload
         // File is long gone. Fetched as a BLOB and turned into an object URL, never
         // assigned as a server URL directly: the canvas-source invariant (see
         // bgImageEl) applies to every canvas source, not just the background.
@@ -2589,7 +2589,7 @@ export default function (view) {
         //
         // ONE exception jumps the queue: the overlay stop wins over the selected text layer
         // when the user is demonstrably in the overlay editor (a stop row holds focus, or
-        // held it up to this click — see _overlayStopFocused). Without it the overlay branch
+        // held it up to this click; see _overlayStopFocused). Without it the overlay branch
         // is dead code in practice, because the stock document always has a selected title
         // layer and nothing ever deselects it: selectLayerById does not toggle off, and a
         // canvas click that hits no layer returns early. A user would have to DELETE their
@@ -2656,7 +2656,7 @@ export default function (view) {
         var _bgDrag = null;     // background pan drag (bgAdjustMode on, single pointer)
 
         // Two-pointer pinch tracking for background zoom (bgAdjustMode on, touch).
-        // Keyed by pointerId, client (not canvas) coordinates — only the RATIO
+        // Keyed by pointerId, client (not canvas) coordinates. Only the RATIO
         // between the start and current distance is used, so CSS scaling of the
         // canvas cancels out and client coords are fine.
         var _pointers = {};
@@ -2702,7 +2702,7 @@ export default function (view) {
             var pt = canvasPoint(ev);
 
             // Handles belong to the already-selected layer and sit OUTSIDE its box, so
-            // they must win over a plain hit-test — otherwise a corner handle that
+            // they must win over a plain hit-test. Otherwise a corner handle that
             // overlaps a layer below would select that layer instead of resizing.
             var grip = hitTestHandle(pt, ev);
             if (grip) {
@@ -2757,7 +2757,7 @@ export default function (view) {
                 //
                 // Natural "grab and slide" direction: dragging right/down should make
                 // the image follow the cursor, which means the sampled source rect
-                // shifts the OTHER way — the offset moves opposite the drag delta.
+                // shifts the OTHER way: the offset moves opposite the drag delta.
                 var g = backgroundGeometry(activeBgBitmap(), cv.width, cv.height);
                 if (g.gainX > 0) {
                     doc.Background.Transform.OffsetX = Math.max(-1, Math.min(1,
@@ -2796,7 +2796,7 @@ export default function (view) {
                     hd.layer.Width = Math.min(4, w);
                     hd.layer.Height = Math.min(4, h);
                 } else {
-                    // Text has no width/height of its own — scale its font size by how
+                    // Text has no width/height of its own, so scale its font size by how
                     // much further the corner was dragged from the pivot.
                     var dist = Math.sqrt(Math.pow(hp.x - r.px, 2) + Math.pow(hp.y - r.py, 2));
                     if (hd.startDist > 0) {
@@ -2804,7 +2804,7 @@ export default function (view) {
                         hd.layer.Size = Math.max(8 / doc.Canvas.Height, Math.min(1024 / doc.Canvas.Height, size));
                     }
                 }
-                // Only the controls this gesture actually changes — a full
+                // Only the controls this gesture actually changes. A full
                 // syncControlsFromDocument() here would rebuild the gradient-stop rows
                 // on every pointer move.
                 syncTransformControls();
@@ -2842,7 +2842,7 @@ export default function (view) {
         }
 
         // Server-only fields that depend on live UI/target state and aren't drawn on
-        // the canvas — refreshed at send time so the POSTed document is current.
+        // the canvas, refreshed at send time so the POSTed document is current.
         function buildAnimationFromControls() {
             return {
                 Enabled: true,
@@ -2967,8 +2967,8 @@ export default function (view) {
                 // Map by RELATIVE position, not raw index, so the first and last stops
                 // always keep their colours regardless of how the old and new stop counts
                 // compare. Without this, "Bottom fade" (3 stops) -> "Full wash" (2 stops)
-                // drops index 2 — the opaque end, and the one overlayStopIndex() targets by
-                // default — and switching back never recovers it.
+                // drops index 2 (the opaque end, and the one overlayStopIndex() targets by
+                // default), and switching back never recovers it.
                 var srcIndex = m ? (n > 1 ? Math.round(i * (m - 1) / (n - 1)) : 0) : -1;
                 var color = (srcIndex >= 0 && existing[srcIndex]) ? existing[srcIndex].Color : null;
                 return {
@@ -2995,7 +2995,7 @@ export default function (view) {
         // the opaque end is the one people actually recolour.
         var _overlayStopIndex = -1;
 
-        // Whether the user is CURRENTLY working in the overlay stop editor — i.e. a stop row
+        // Whether the user is CURRENTLY working in the overlay stop editor, i.e. a stop row
         // holds focus, or held it right up until the click being handled. applySwatch uses
         // this to decide whether a swatch belongs to the overlay or to the selected text
         // layer; see the precedence comment there for why that decision is needed at all.
@@ -3017,7 +3017,7 @@ export default function (view) {
             }
         }
 
-        // Focus leaving the stop editor ends the "working on the overlay" state — UNLESS it
+        // Focus leaving the stop editor ends the "working on the overlay" state, UNLESS it
         // moved to another stop row, or into the palette itself. The palette exception is the
         // whole point: clicking a swatch focuses the swatch button, so without it the state
         // would always be false by the time the click handler runs.
@@ -3039,7 +3039,7 @@ export default function (view) {
 
         // Sets every overlay control from doc.Background.Overlay. Called from
         // syncControlsFromDocument, which ALSO runs on plain selection changes (picking a
-        // different layer, deleting one, applying the Jellyfin style preset) — so this must
+        // different layer, deleting one, applying the Jellyfin style preset), so this must
         // be idempotent and side-effect-free on the document: no mutating doc, no resetting
         // the preset dropdown or the targeted-stop index. Those are LOAD-only concerns and
         // live in resetOverlayEditorState(), called separately by the genuine load paths.
@@ -3056,7 +3056,7 @@ export default function (view) {
             if (angleRow) { angleRow.style.display = on ? '' : 'none'; }
 
             // A missing Angle is backfilled onto the document by normalizeOverlay() at load
-            // time, not here — this only decides what to DISPLAY, never writes to doc.
+            // time, not here. This only decides what to DISPLAY, never writes to doc.
             var angle = (ov && ov.Angle != null) ? ov.Angle : 90;
             el('ccaOverlayAngle').value = angle;
             el('ccaOverlayAngleVal').textContent = angle + '°';
@@ -3065,7 +3065,7 @@ export default function (view) {
         }
 
         // LOAD-only: resets the parts of the overlay editor that only make sense when a
-        // whole new document has arrived (a fresh page, a template, an undo/redo snapshot) —
+        // whole new document has arrived (a fresh page, a template, an undo/redo snapshot),
         // never from a plain selection change, which shares syncControlsFromDocument but
         // must not silently flip a chosen preset name back to Custom just because the user
         // clicked a different layer. Real stop data can't be attributed to a named preset
@@ -3090,7 +3090,7 @@ export default function (view) {
             scheduleRender();
         }
 
-        // Sets EVERY control from `doc` — the inverse of the old applySettingsToForm.
+        // Sets EVERY control from `doc`; the inverse of the old applySettingsToForm.
         // The selected text layer drives the Text card; doc.Background/doc.Canvas drive
         // the rest. Call after a selection change or a template load.
         // The controls a canvas transform gesture can change (opacity, rotation, text
@@ -3124,7 +3124,7 @@ export default function (view) {
             });
             el('ccaNoLayerHint').style.display = sel ? 'none' : '';
 
-            // Opacity/Rotation/size — shared with the drag path below.
+            // Opacity/Rotation/size, shared with the drag path below.
             syncTransformControls();
 
             // Text card (selected layer)
@@ -3199,8 +3199,8 @@ export default function (view) {
 
         // The default Jellyfin library-cover look: a dark vertical gradient with clean
         // white bold centred text and no effects. It writes plain document values, so
-        // every control still edits the result afterwards — it is a starting point, not
-        // a mode. Constants are pinned by PresetTests so the docs and code agree.
+        // every control still edits the result afterwards and no preset state is kept.
+        // Constants are pinned by PresetTests so the docs and code agree.
         var JELLYFIN_PRESET = {
             gradientStart: '#0b0b10',
             gradientEnd: '#1a1a24',
@@ -3303,7 +3303,7 @@ export default function (view) {
         }
 
         // Enable/disable controls based on current selection. Deliberately does NOT touch
-        // the gradient rows — updateBackgroundVisibility owns those, and two owners of the
+        // the gradient rows. updateBackgroundVisibility owns those, and two owners of the
         // same element fight.
         function updateUI() {
             var btn = el('ccaApplyBtn');
@@ -3319,7 +3319,7 @@ export default function (view) {
 
         // Single owner of which background controls are visible: only the chosen source's
         // own controls are shown. A control belonging to an unchosen source is hidden
-        // outright rather than demoted to "advanced" — before v3.3.0.0 the gradient lived
+        // outright rather than demoted to "advanced". Before v3.3.0.0 the gradient lived
         // behind its own checkbox alongside the source dropdown, so two controls answered
         // one question.
         function updateBackgroundVisibility() {
@@ -3414,7 +3414,7 @@ export default function (view) {
                     o.value = pick(tpl, 'Name'); o.textContent = pick(tpl, 'Name');
                     o._document = pick(tpl, 'Document');
                     // Legacy templates (saved before the canvas engine) carry no
-                    // Document, only the flat Settings — kept here so the load
+                    // Document, only the flat Settings, kept here so the load
                     // handler can migrate on demand.
                     o._settings = pick(tpl, 'Settings');
                     sel.appendChild(o);
@@ -3506,7 +3506,7 @@ export default function (view) {
                 a.title = t('bg.overlay.alpha');
                 // Two identical range inputs per row: the title is hover-only, so name the
                 // second one for screen readers and automation, and mark it visually with a
-                // compact glyph (aria-hidden — the label above already says it).
+                // compact glyph (aria-hidden, since the label above already says it).
                 a.setAttribute('aria-label', t('bg.overlay.alpha'));
                 aTag = document.createElement('span');
                 aTag.className = 'ccaStopAlphaTag';
@@ -3625,7 +3625,7 @@ export default function (view) {
             var btn = el('ccaApplyBtn');
             var label = btn.querySelector('span');
             // Applying can be slow (an animated GIF renders many frames), so lock
-            // the button and show progress — otherwise it looks like nothing happens.
+            // the button and show progress. Otherwise it looks like nothing happens.
             state.applying = true;
             btn.disabled = true;
             if (label) { label.textContent = t('action.applying'); }
@@ -3703,12 +3703,12 @@ export default function (view) {
         }
 
         // Replaces the working design with a saved template. Called only once the user has
-        // confirmed, or had nothing unapplied to lose — see the dropdown's handler.
+        // confirmed, or had nothing unapplied to lose (see the dropdown's handler).
         function loadTemplateOption(opt) {
             var tplDoc = opt._document;
             if (!tplDoc) {
                 // Legacy template saved before the canvas engine: no Document,
-                // only the flat Settings — migrate on the fly so it still loads.
+                // only the flat Settings. Migrate on the fly so it still loads.
                 if (opt._settings) { tplDoc = migrateTemplateToDocument(opt._settings); }
                 else { return; }
             }
@@ -3835,7 +3835,7 @@ export default function (view) {
                         selectLayerById(l.Id);
                     };
                     img.onerror = function () {
-                        // Undecodable client-side, but the server still has the file —
+                        // Undecodable client-side, but the server still has the file, so
                         // add it anyway so the authoritative render includes it.
                         URL.revokeObjectURL(url);
                         doc.Layers.push(l);
@@ -3917,7 +3917,7 @@ export default function (view) {
                 if (on && (!doc.Background.Overlay.Stops || doc.Background.Overlay.Stops.length < 2)) {
                     // The select can legitimately read 'custom' here (e.g. hand-edited stops
                     // from a previous check of the box) or, before any preset is ever
-                    // resolved, an unrecognised/empty value — 'custom' is a no-op for
+                    // resolved, an unrecognised/empty value. 'custom' is a no-op for
                     // applyOverlayPreset, so falling back to it would leave Stops empty and
                     // the checkbox would visibly do nothing. Resolve to a REAL preset, and
                     // write it back to the select so the control and the document agree.
@@ -4138,7 +4138,7 @@ export default function (view) {
             el('ccaDownloadBtn').addEventListener('click', downloadPreview);
 
             // Canvas selection + drag of text layers (or, in bgAdjustMode, pan/zoom
-            // of the background — see onCanvasPointerDown/Move/Up).
+            // of the background; see onCanvasPointerDown/Move/Up).
             var cv = el('ccaCanvas');
             cv.addEventListener('pointerdown', onCanvasPointerDown);
             cv.addEventListener('pointermove', onCanvasPointerMove);
@@ -4147,7 +4147,7 @@ export default function (view) {
             cv.addEventListener('keydown', onCanvasKeydown);
 
             // Mouse-wheel zoom of the background, only while repositioning it and
-            // only when an image is actually loaded (activeBgBitmap) — otherwise a no-op
+            // only when an image is actually loaded (activeBgBitmap). Otherwise it is a no-op
             // so the page can still scroll normally.
             cv.addEventListener('wheel', function (ev) {
                 if (!bgAdjustMode || !activeBgBitmap()) { return; }
@@ -4168,7 +4168,7 @@ export default function (view) {
             el('ccaTemplateSelect').addEventListener('change', function () {
                 var sel = this;
                 var opt = sel.options[sel.selectedIndex];
-                // The "—" placeholder (no Document, no Settings) loads nothing.
+                // The "-" placeholder (no Document, no Settings) loads nothing.
                 if (!opt || (!opt._document && !opt._settings)) { state.templateValue = sel.value; return; }
                 var go = isDirty() ? confirmAction(t('tpl.confirmReplace')) : Promise.resolve(true);
                 go.then(function (ok) {
@@ -4528,7 +4528,7 @@ export default function (view) {
                     var path = dataOrThrow(res);
                     if (!path) { throw new Error(t('dyn.unknown')); }
                     // Server path for render/apply; canvas bitmap from the fetched
-                    // Blob via a blob: URL (canvas-source invariant — never the
+                    // Blob via a blob: URL (canvas-source invariant: never the
                     // server path / ApiClient.getImageUrl).
                     if (!isCurrent()) { return; } // a newer pick won the race
                     doc.Background.ImagePath = path;
@@ -4573,7 +4573,7 @@ export default function (view) {
             renderLayersPanel();
             syncControlsFromDocument();
             resetOverlayEditorState();
-            // The starting design is "clean" — but only on the first show: a return visit
+            // The starting design is "clean", but only on the first show: a return visit
             // keeps whatever unapplied edits the user left behind.
             if (_cleanJson === null) { markClean(); }
             // Render immediately with a sane fallback, then re-render once the

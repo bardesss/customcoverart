@@ -15,8 +15,8 @@ namespace CustomCoverArt.Services;
 ///
 /// The border is deliberately last: it is a frame around the finished cover, so grain
 /// and vignette must not sit on top of it. Every effect is a no-op when disabled, and
-/// the disabled state is the default (see <see cref="EffectSettings"/>) — a document
-/// written before these existed must render byte-for-byte as it always did.
+/// the disabled state is the default (see <see cref="EffectSettings"/>), because a
+/// document written before these existed must render byte-for-byte as it always did.
 ///
 /// Kept separate from <see cref="DocumentRenderer"/> so that file stays about
 /// background/layer compositing.
@@ -39,7 +39,7 @@ public static class EffectsComposer
         if (opacity <= 0f) { return; }
 
         var color = DocumentRenderer.SafeColor(s.Color, Color.White);
-        // DrawImage, not Fill: Fill ignores brush alpha on alpha-less pixel formats —
+        // DrawImage, not Fill: Fill ignores brush alpha on alpha-less pixel formats,
         // the same trap that once blacked out dimmed backgrounds (see ApplyBackgroundLayer).
         using var overlay = new Image<Rgba32>(canvas.Width, canvas.Height, color);
         canvas.Mutate(x => x.DrawImage(overlay, Point.Empty, opacity));
@@ -145,8 +145,8 @@ public static class EffectsComposer
     private static void DrawInsetFrame(Image<Rgba32> canvas, Color color, int inset, int thickness, int radius)
     {
         var pen = Pens.Solid(color, thickness);
-        // A stroke straddles its path, so the path runs down the middle of the line —
-        // otherwise half the border would fall outside the canvas and be clipped.
+        // A stroke straddles its path, so the path runs down the middle of the line.
+        // Otherwise half the border would fall outside the canvas and be clipped.
         float half = thickness / 2f;
         float x0 = inset + half, y0 = inset + half;
         float x1 = canvas.Width - inset - half, y1 = canvas.Height - inset - half;

@@ -13,7 +13,7 @@ public class MediaItemService : IMediaItemService
 {
     // Cover-bearing "container" kinds across every library type (movies, TV,
     // music, books, home videos, photos). Leaf items that would flood the picker
-    // (individual Episodes and Audio tracks) are intentionally excluded — album
+    // (individual Episodes and Audio tracks) are intentionally excluded; album
     // and series covers stand in for them.
     private static readonly BaseItemKind[] DefaultKinds =
     {

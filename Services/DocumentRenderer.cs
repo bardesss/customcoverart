@@ -12,7 +12,7 @@ namespace CustomCoverArt.Services;
 /// Compositor: renders a <see cref="CoverDocument"/> onto an ImageSharp canvas.
 /// Shared by the single-image and animated paths; extended by later phases
 /// (image layers, effects). This is the sole owner of background/gradient/font/
-/// text-drawing logic — moved here from <see cref="CoverArtService"/> so both
+/// text-drawing logic. It moved here from <see cref="CoverArtService"/> so both
 /// the legacy flat-settings path (via <see cref="DocumentMigration"/>) and
 /// future document-native endpoints render through the same code.
 /// </summary>
@@ -39,7 +39,7 @@ public static class DocumentRenderer
         // The overlay goes last before the layers: its colour must be authoritative (a
         // soft-light wash after it would desaturate it) and it must be the last thing
         // under the text, which is the whole legibility contract. It lives HERE rather
-        // than in ApplyBackgroundLayer so it applies to all four background sources —
+        // than in ApplyBackgroundLayer so it applies to all four background sources;
         // ApplyBackgroundLayer runs only on the image path.
         ApplyGradientOverlay(canvas, doc.Background.Overlay);
 
@@ -96,7 +96,7 @@ public static class DocumentRenderer
             logo.Mutate(x => x.Resize(w, h));
 
             // Rotation grows the bounding box, so the top-left must be derived from the
-            // ROTATED size — otherwise the layer visibly drifts off its anchor.
+            // ROTATED size. Otherwise the layer visibly drifts off its anchor.
             if (layer.Rotation != 0f)
             {
                 logo.Mutate(x => x.Rotate(layer.Rotation));
@@ -187,7 +187,7 @@ public static class DocumentRenderer
             var w = Math.Max(1, (int)Math.Round(backgroundImage.Width * scale));
             var h = Math.Max(1, (int)Math.Round(backgroundImage.Height * scale));
             backgroundImage.Mutate(x => x.Resize(w, h));
-            // Footprint is the letterboxed size, not the canvas — see ApplyBackgroundTransform.
+            // Footprint is the letterboxed size, not the canvas (see ApplyBackgroundTransform).
             ApplyBackgroundTransform(backgroundImage, w, h, bg.Transform);
             if (bg.Blur > 0)
             {
@@ -222,8 +222,8 @@ public static class DocumentRenderer
         }
 
         // Apply dimming by compositing a solid overlay at fractional opacity.
-        // IMPORTANT: do NOT use Fill() with a semi-transparent SolidBrush here —
-        // on backgrounds decoded without an alpha channel (JPEG posters load as
+        // IMPORTANT: do NOT use Fill() with a semi-transparent SolidBrush here.
+        // On backgrounds decoded without an alpha channel (JPEG posters load as
         // Rgb24) Fill ignores the brush alpha and paints fully opaque, which
         // blacked out the entire background for any non-zero dim. DrawImage with
         // an opacity blends correctly on every pixel format. Text is drawn later,
@@ -296,7 +296,7 @@ public static class DocumentRenderer
     {
         // Source is authoritative post-migration. The IsEnabled fallback keeps a document
         // that never went through Normalize (an older client POSTing directly) rendering
-        // exactly as it did before — but an explicit "solid" always wins, so choosing
+        // as it did before, but an explicit "solid" always wins, so choosing
         // Solid in the UI cannot be silently overridden by a stale flag left behind.
         var useGradient = bg.Source == BackgroundSources.Gradient
             || (bg.Source != BackgroundSources.Solid && bg.Gradient?.IsEnabled == true);
@@ -327,7 +327,7 @@ public static class DocumentRenderer
     /// the canvas corner to corner.
     ///
     /// <paramref name="forceLinear"/> exists for the background OVERLAY, which reuses this
-    /// same settings type but is deliberately linear-only — see the spec's inert-fields note.
+    /// same settings type but is deliberately linear-only (see the spec's inert-fields note).
     /// Shared with <see cref="ApplyGradientOverlay"/> so the two cannot drift apart.
     /// </summary>
     public static Brush CreateGradientBrush(GradientSettings gradient, int width, int height, bool forceLinear = false)
@@ -379,14 +379,14 @@ public static class DocumentRenderer
         // dimmed backgrounds (see ApplyBackgroundLayer): Fill ignores brush alpha on
         // alpha-less pixel formats. This buffer is explicitly Rgba32, and SrcOver onto a
         // zero-alpha destination resolves exactly to the source, so the default graphics
-        // options are already correct — no custom GraphicsOptions needed.
+        // options are already correct and no custom GraphicsOptions are needed.
         using var scrim = new Image<Rgba32>(canvas.Width, canvas.Height);
         scrim.Mutate(x => x.Fill(brush));
         canvas.Mutate(x => x.DrawImage(scrim, Point.Empty, 1f));
     }
 
     /// <summary>
-    /// Builds the colour stops from the gradient settings — the explicit Stops
+    /// Builds the colour stops from the gradient settings: the explicit Stops
     /// list if it has 2+ entries, otherwise the Start/End colours as a fallback.
     /// </summary>
     public static ColorStop[] BuildColorStops(GradientSettings gradient)
@@ -420,7 +420,7 @@ public static class DocumentRenderer
         // IMPORTANT: font size uses doc.Canvas.Height (the document's declared
         // *reference* resolution), NOT canvas.Height (the actual pixel buffer
         // passed in). doc.Canvas is the design's reference resolution; the
-        // compositor may draw onto a differently-sized buffer — e.g.
+        // compositor may draw onto a differently-sized buffer. For example,
         // CoverArtService.GenerateAnimatedAsync downscales the working buffer
         // for oversized animated GIFs via ScaleDocumentForCanvas, which points a
         // cloned document's Canvas.Width/Height at the capped working size so
@@ -436,7 +436,7 @@ public static class DocumentRenderer
         // legacy CoverArtSettings.TextSize [8,1024] clamp (removed from
         // GenerateFromDocumentAsync since the document model has no absolute
         // TextSize field to clamp pre-render). An unbounded fontPixelSize would
-        // drive unbounded glyph rasterization — a render-thread DoS — so this
+        // drive unbounded glyph rasterization (a render-thread DoS), so this
         // guards every document-native caller (including future Task 6+
         // endpoints), not just the legacy migrated path.
         var fontPixelSize = Math.Clamp(layer.Size * doc.Canvas.Height, 8f, 1024f);
@@ -636,7 +636,7 @@ public static class DocumentRenderer
         };
     }
 
-    // Bundled fonts (Noto Sans, SIL OFL-1.1 — the same family Jellyfin's web UI
+    // Bundled fonts (Noto Sans, SIL OFL-1.1, the same family Jellyfin's web UI
     // uses), embedded so text ALWAYS renders, even on Jellyfin Docker images
     // that ship no system fonts. Every UI weight has its own face so the font
     // weight control actually changes the rendered thickness.

@@ -46,7 +46,7 @@ public class DocumentRenderTests
     /// <summary>
     /// The client draws a rotated layer by rotating the canvas about the layer anchor,
     /// so the server has to pivot on the same point. A long line of text rotated 90°
-    /// stops being wide and becomes tall — if Rotation were ignored the two renders
+    /// stops being wide and becomes tall. If Rotation were ignored the two renders
     /// would be identical.
     /// </summary>
     [Fact]
@@ -79,7 +79,7 @@ public class DocumentRenderTests
 
     /// <summary>
     /// Layer Opacity is exposed as a slider for text as well as logos, so the server
-    /// must fade text too — otherwise the canvas preview and the applied cover disagree.
+    /// must fade text too. Otherwise the canvas preview and the applied cover disagree.
     /// </summary>
     [Fact]
     public void ComposeDocumentFrame_TextLayerOpacity_FadesTowardsBackground()
@@ -125,7 +125,7 @@ public class DocumentRenderTests
     /// <summary>
     /// A 100x300 background banded red/green/blue drawn into a 100x100 canvas with
     /// "cover": the fit crops away two thirds of it, and OffsetY chooses WHICH third
-    /// is shown — at the default Scale=1, with no zoom required. Panning used to be a
+    /// is shown, at the default Scale=1, with no zoom required. Panning used to be a
     /// no-op here because the slack came from zoom alone, so the render was always green.
     /// </summary>
     [Theory]
@@ -187,13 +187,13 @@ public class DocumentRenderTests
     /// can catch a doc.Canvas.Height → canvas.Height swap on that line.
     ///
     /// doc.Canvas.Height (500) and layer.Size (0.2) never change between the
-    /// two renders, so the target font size (~100px) is fixed — IF font sizing
+    /// two renders, so the target font size (~100px) is fixed, IF font sizing
     /// correctly keys off doc.Canvas.Height. Both buffers (500 and 300) are
     /// comfortably larger than that ~100px glyph, so neither render clips it;
     /// the measured absolute glyph pixel height should therefore be nearly
     /// identical across both buffers. A regression that keyed font size off
     /// the buffer's own height instead would size the second render's glyph at
-    /// ~0.2*300=60px — a ~40% shrink versus the first render's ~100px — which
+    /// ~0.2*300=60px, a ~40% shrink versus the first render's ~100px, which
     /// the ratio assertion below catches.
     /// </summary>
     [Fact]

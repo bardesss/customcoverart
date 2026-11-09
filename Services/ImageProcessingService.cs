@@ -74,7 +74,7 @@ public class ImageProcessingService : IImageProcessingService
             return result;
         }
 
-        // Content-based validation. This is NOT antivirus — it verifies the bytes are
+        // Content-based validation. This is NOT antivirus. It verifies the bytes are
         // an identifiable image (a PNG identified only by its header must also decode
         // its first frame) and rejects obvious executable content, which is what closes
         // the "wrong file with an image extension" gap that an extension check alone leaves open.

@@ -148,7 +148,7 @@
         }
 
         /* "Advanced" disclosure inside a step. Independent of the step accordion and of
-           each other, and never persisted — advanced should feel closed by default. */
+           each other, and never persisted, so advanced always starts closed. */
         #CustomCoverArtConfigPage .ccaAdv { margin-top: 1.2em; border-top: 1px solid rgba(127,127,127,.18); }
         #CustomCoverArtConfigPage .ccaAdvHead {
             display: flex; align-items: center; gap: .5em; width: 100%;

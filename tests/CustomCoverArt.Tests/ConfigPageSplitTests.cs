@@ -12,7 +12,7 @@ namespace CustomCoverArt.Tests;
 /// its stylesheet. Jellyfin Web imports the script as an ES module named by the page
 /// element's data-controller, and serves each file with a content type derived from its
 /// extension. A wrong name, a missing resource or a wrong MIME type all fail the same way
-/// on a live server — a blank, unstyled page with nothing in the plugin's log — so they
+/// on a live server (a blank, unstyled page with nothing in the plugin's log), so they
 /// are pinned here.
 /// </summary>
 public class ConfigPageSplitTests

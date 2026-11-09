@@ -7,8 +7,8 @@ namespace CustomCoverArt;
 
 /// <summary>
 /// Registers the plugin's services into Jellyfin's DI container. Jellyfin
-/// discovers this type at startup — this is the correct replacement for the
-/// old (non-functional) Plugin.RegisterServices approach.
+/// discovers this type at startup. It replaces the old, non-functional
+/// Plugin.RegisterServices approach.
 /// </summary>
 public class PluginServiceRegistrator : IPluginServiceRegistrator
 {
@@ -31,6 +31,6 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddScoped<IUserContextService, UserContextService>();
 
         // NOTE: API controllers are discovered automatically from the plugin
-        // assembly by Jellyfin's MVC pipeline — they must NOT be registered here.
+        // assembly by Jellyfin's MVC pipeline, so they must NOT be registered here.
     }
 }

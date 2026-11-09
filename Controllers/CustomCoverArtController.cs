@@ -13,7 +13,7 @@ namespace CustomCoverArt.Controllers;
 /// <summary>
 /// API controller for Custom Cover Art operations. All endpoints require an
 /// authenticated Jellyfin administrator (the "RequiresElevation" policy, which
-/// is the framework-provided policy — no custom auth filter needed).
+/// is provided by the framework, so no custom auth filter is needed).
 /// </summary>
 [ApiController]
 [Authorize(Policy = "RequiresElevation")]
@@ -455,7 +455,7 @@ public class CustomCoverArtController : ControllerBase
     /// Streams a bundled Noto Sans weight so the config-page canvas can register
     /// the SAME faces the server renders with (via the FontFace API), keeping the
     /// live client preview visually aligned with the authoritative server output.
-    /// Inherits the class-level RequiresElevation policy — no anonymous access.
+    /// Inherits the class-level RequiresElevation policy, so there is no anonymous access.
     /// </summary>
     [HttpGet("font/{weight:int}")]
     public IActionResult GetFont(int weight)
@@ -540,7 +540,7 @@ public class CustomCoverArtController : ControllerBase
     /// and both DRAW and MEASURE text with the same face the server renders with.
     ///
     /// Without this the canvas fell back to Noto Sans whenever a custom font was chosen,
-    /// so the preview showed the wrong typeface and — worse — the selection box and
+    /// so the preview showed the wrong typeface, and the selection box and
     /// hit-testing were measured from the wrong metrics.
     ///
     /// Scoped to the fonts folder alone, mirroring <see cref="GetLayerImage"/>. Inherits
@@ -625,7 +625,7 @@ public class CustomCoverArtController : ControllerBase
     /// a collage is re-pointed at that target. Prefers the layer with the well-known
     /// "title" id (what DocumentMigration and NormalizeTemplate both use); for a design
     /// built entirely from new layers there is no such id, so the bottom-most text layer
-    /// stands in — the same layer the editor treats as the title.
+    /// stands in. That is the same layer the editor treats as the title.
     /// </summary>
     public static CoverDocument BuildBatchDocument(CoverDocument baseDocument, string targetName, string targetId)
     {

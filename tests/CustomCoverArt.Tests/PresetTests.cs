@@ -41,7 +41,7 @@ public class PresetTests
 
     /// <summary>
     /// The preset's weight is written as a raw number in JS but has to land on the C#
-    /// FontWeight enum — this fails if either side moves.
+    /// FontWeight enum. This fails if either side moves.
     /// </summary>
     [Fact]
     public void JellyfinPreset_TextWeight_IsTheBoldEnumValue()
@@ -144,7 +144,7 @@ public class PresetTests
 
     /// <summary>
     /// The markup is what shows before the script runs, and applyI18n re-applies the en
-    /// block over it for English users — so the two must say the same thing, or English
+    /// block over it for English users, so the two must say the same thing, or English
     /// flickers between two texts and every translation is based on the wrong one.
     /// </summary>
     [Fact]
@@ -187,7 +187,7 @@ public class PresetTests
             used.Add(m.Groups[1].Value);
         }
 
-        // Keys reached by concatenation — t('layer.' + act) — only ever show their prefix
+        // Keys reached by concatenation, such as t('layer.' + act), only ever show their prefix
         // in the source, so everything under that prefix counts as reachable.
         var prefixes = Regex.Matches(page, @"[^A-Za-z0-9_]t\(\s*'([A-Za-z0-9_.]+\.)'\s*\+")
             .Select(m => m.Groups[1].Value)

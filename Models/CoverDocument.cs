@@ -36,7 +36,7 @@ public class BackgroundLayer
     /// Optional colour gradient composited OVER the finished background and UNDER the
     /// layers, for the "poster fading into solid colour" look. Null means no overlay.
     /// Linear only: the Type/Center/Radius fields it inherits from the reused
-    /// GradientSettings type are inert here — see ApplyGradientOverlay.
+    /// GradientSettings type are inert here (see ApplyGradientOverlay).
     /// </summary>
     public GradientSettings? Overlay { get; set; }
     public CollageSettings? Collage { get; set; }

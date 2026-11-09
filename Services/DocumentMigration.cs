@@ -139,7 +139,7 @@ public static class DocumentMigration
     ///   gradient flag decides between gradient and solid.
     ///
     /// A document saying "upload" with no image yet falls through to gradient or solid,
-    /// which is correct — that is exactly what such a document renders. Idempotent, so it
+    /// which is correct because that is what such a document renders. Idempotent, so it
     /// is safe on the already-migrated documents Normalize sees on every request.
     /// </summary>
     public static void NormalizeBackgroundSource(BackgroundLayer bg)
@@ -160,7 +160,7 @@ public static class DocumentMigration
             return;
         }
 
-        // No image, so the old gradient flag decides — exactly as the renderer used to.
+        // No image, so the old gradient flag decides, as it did in the renderer.
         bg.Source = bg.Gradient?.IsEnabled == true ? BackgroundSources.Gradient : BackgroundSources.Solid;
     }
 

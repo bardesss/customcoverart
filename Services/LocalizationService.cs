@@ -80,7 +80,7 @@ public class LocalizationService : ILocalizationService
         {
             // English is the fallback and must load first; the rest are optional.
             // Adding a language means dropping Resources/<code>.json in and listing
-            // the code here — the csproj embeds Resources\**\*.json automatically.
+            // the code here; the csproj embeds Resources\**\*.json automatically.
             foreach (var code in SupportedLanguageCodes)
             {
                 LoadLanguageFile(code);

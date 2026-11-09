@@ -56,7 +56,7 @@ public class CoverArtSettings
 
 /// <summary>String constants for CoverArtSettings.BackgroundSource.</summary>
 /// <summary>
-/// What supplies the background. One value answers the question — before v3.3.0.0 this was
+/// What supplies the background. One value answers the question. Before v3.3.0.0 this was
 /// split across Source and a separate Gradient.IsEnabled checkbox, so "what is my
 /// background?" had two overlapping answers.
 /// </summary>
