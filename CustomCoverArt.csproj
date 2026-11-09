@@ -76,6 +76,8 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Configuration\configPage.html" />
+    <EmbeddedResource Include="Configuration\configPage.css" />
+    <EmbeddedResource Include="Configuration\configPage.js" />
     <EmbeddedResource Include="Resources\**\*.json" />
     <!-- Bundled default fonts (Noto Sans, SIL OFL-1.1) so text always renders,
          even on Jellyfin Docker images that have no system fonts installed. -->

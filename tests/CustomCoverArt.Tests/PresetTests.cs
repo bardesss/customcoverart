@@ -14,19 +14,12 @@ namespace CustomCoverArt.Tests;
 /// </summary>
 public class PresetTests
 {
-    private static string ConfigPage()
-    {
-        using var stream = typeof(Plugin).Assembly
-            .GetManifestResourceStream("CustomCoverArt.Configuration.configPage.html");
-        Assert.NotNull(stream);
-        using var reader = new System.IO.StreamReader(stream!);
-        return reader.ReadToEnd();
-    }
+    private static string ConfigPage() => ConfigPageSource.Bundle();
 
     private static string PresetValue(string page, string key)
     {
         var block = Regex.Match(page, @"var JELLYFIN_PRESET = \{(.*?)\};", RegexOptions.Singleline);
-        Assert.True(block.Success, "JELLYFIN_PRESET literal not found in configPage.html.");
+        Assert.True(block.Success, "JELLYFIN_PRESET literal not found in configPage.js.");
 
         var m = Regex.Match(block.Groups[1].Value, key + @"\s*:\s*'?([^,'\r\n]+)'?");
         Assert.True(m.Success, $"JELLYFIN_PRESET.{key} not found.");
@@ -59,14 +52,14 @@ public class PresetTests
     /// <summary>
     /// Parses the I18N object out of the shipped page into one key/value map per locale.
     /// Discovers the locale blocks rather than naming them, so adding a language is a
-    /// change to configPage.html alone.
+    /// change to configPage.js alone.
     /// </summary>
     private static Dictionary<string, Dictionary<string, string>> I18nLocales()
     {
         var page = ConfigPage();
 
         var start = page.IndexOf("var I18N = {", System.StringComparison.Ordinal);
-        Assert.True(start > 0, "I18N object not found in configPage.html.");
+        Assert.True(start > 0, "I18N object not found in configPage.js.");
         var end = page.IndexOf("\n        };", start, System.StringComparison.Ordinal);
         Assert.True(end > start, "Could not locate the end of the I18N object.");
         var body = page.Substring(start, end - start);

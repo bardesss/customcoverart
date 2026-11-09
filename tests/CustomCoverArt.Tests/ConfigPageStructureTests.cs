@@ -12,28 +12,14 @@ namespace CustomCoverArt.Tests;
 /// </summary>
 public class ConfigPageStructureTests
 {
-    private static string ConfigPage()
-    {
-        using var stream = typeof(Plugin).Assembly
-            .GetManifestResourceStream("CustomCoverArt.Configuration.configPage.html");
-        Assert.NotNull(stream);
-        using var reader = new System.IO.StreamReader(stream!);
-        return reader.ReadToEnd();
-    }
+    private static string ConfigPage() => ConfigPageSource.Bundle();
 
     /// <summary>
-    /// Just the markup, stopping at the script block. Element-id assertions must not see
-    /// JS comments: the canvas engine's header comment mentions
-    /// <c>&lt;canvas id="ccaCanvas"&gt;</c>, which would both fake a duplicate and let a
-    /// genuinely deleted control pass unnoticed.
+    /// Just the markup (configPage.html). Element-id assertions must not see script
+    /// comments: the canvas engine's header comment mentions the canvas element's id,
+    /// which would both fake a duplicate and let a genuinely deleted control pass.
     /// </summary>
-    private static string Markup()
-    {
-        var page = ConfigPage();
-        var scriptAt = page.IndexOf("<script type=\"text/javascript\">", System.StringComparison.Ordinal);
-        Assert.True(scriptAt > 0, "Could not find the script block.");
-        return page.Substring(0, scriptAt);
-    }
+    private static string Markup() => ConfigPageSource.Html();
 
     // Body of a top-level `function name(` in the page script (8-space indent), up to its
     // closing brace.
@@ -56,16 +42,8 @@ public class ConfigPageStructureTests
         return page.Substring(start, end - start);
     }
 
-    /// <summary>The page's one &lt;style&gt; block.</summary>
-    private static string Styles()
-    {
-        var page = ConfigPage();
-        var start = page.IndexOf("<style>", System.StringComparison.Ordinal);
-        Assert.True(start > 0, "Could not find the style block.");
-        var end = page.IndexOf("</style>", start, System.StringComparison.Ordinal);
-        Assert.True(end > start, "Could not find the end of the style block.");
-        return page.Substring(start, end - start);
-    }
+    /// <summary>The page's stylesheet (configPage.css).</summary>
+    private static string Styles() => ConfigPageSource.Css();
 
     // Every cca* element id present at the start of the guided-editor restructure, minus
     // ccaPreviewSpinner (dead since Phase 1, removed here) and ccaGradient (replaced by the

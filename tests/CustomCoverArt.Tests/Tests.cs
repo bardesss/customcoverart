@@ -188,6 +188,8 @@ public class PluginMetadataTests
         var resources = asm.GetManifestResourceNames();
 
         Assert.Contains("CustomCoverArt.Configuration.configPage.html", resources);
+        Assert.Contains("CustomCoverArt.Configuration.configPage.css", resources);
+        Assert.Contains("CustomCoverArt.Configuration.configPage.js", resources);
         Assert.Contains("CustomCoverArt.Resources.en.json", resources);
         Assert.Contains("CustomCoverArt.Resources.fonts.NotoSans-Regular.ttf", resources);
         Assert.Contains("CustomCoverArt.Resources.fonts.NotoSans-Bold.ttf", resources);

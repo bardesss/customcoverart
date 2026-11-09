@@ -9,7 +9,7 @@ previously could not build or load. Target: **Jellyfin 10.11.x / .NET 9**.
 |------|--------|-------|
 | Entry point | `CustomCoverArtPlugin : IPlugin` (fake `Jellyfin.Plugin` API) | `Plugin : BasePlugin<PluginConfiguration>, IHasWebPages` |
 | DI registration | `plugin.RegisterServices()` (never called) | `PluginServiceRegistrator : IPluginServiceRegistrator` |
-| Config UI | MVC Razor `Configuration.cshtml` + config controller | static embedded `Configuration/configPage.html` via `GetPages()` |
+| Config UI | MVC Razor `Configuration.cshtml` + config controller | static embedded `Configuration/configPage.html` + `.css` + `.js` via `GetPages()` |
 | Auth | custom `[JellyfinAdminRequired]` filter | `[Authorize(Policy = "RequiresElevation")]` |
 | Packages | `Jellyfin.Plugin` (nonexistent) + `ImageSharp.Web` | `Jellyfin.Controller`/`Jellyfin.Model` 10.11.3 (ExcludeAssets=runtime) + `ImageSharp.Drawing` |
 | Data paths | probed env vars / hardcoded dirs / temp fallback | `IApplicationPaths` via DI (`Common/PluginPaths.cs`) |

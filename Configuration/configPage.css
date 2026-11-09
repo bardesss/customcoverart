@@ -1,0 +1,368 @@
+@charset "UTF-8";
+/* Custom Cover Art: configuration page styles.
+   Linked from configPage.html as configurationpage?name=customcoverartcss; Jellyfin
+   serves it as text/css. Rules are scoped to #CustomCoverArtConfigPage. */
+        #CustomCoverArtConfigPage .ccaHeader { margin-bottom: 1.5em; }
+        #CustomCoverArtConfigPage .ccaH1 { margin: 0 0 .2em; }
+        #CustomCoverArtConfigPage .ccaLede { margin: 0; opacity: .7; }
+
+        #CustomCoverArtConfigPage .ccaLayout {
+            display: grid;
+            grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+            gap: 1.5em;
+            align-items: start;
+        }
+        @media (max-width: 900px) {
+            #CustomCoverArtConfigPage .ccaLayout { grid-template-columns: 1fr; }
+        }
+
+        #CustomCoverArtConfigPage .ccaControls { display: flex; flex-direction: column; gap: 1.25em; }
+
+        #CustomCoverArtConfigPage .ccaCard {
+            border: 1px solid rgba(127, 127, 127, .22);
+            border-radius: 10px;
+            padding: 1.15em 1.2em;
+            background: rgba(127, 127, 127, .05);
+        }
+        #CustomCoverArtConfigPage .ccaCardHead {
+            font-size: .78em;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .09em;
+            opacity: .55;
+            margin-bottom: 1.1em;
+        }
+
+        #CustomCoverArtConfigPage .ccaGrid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 1.05em 1.25em;
+        }
+        @media (max-width: 480px) {
+            #CustomCoverArtConfigPage .ccaGrid { grid-template-columns: 1fr; }
+        }
+
+        /* Vertical rhythm inside a step. Every field-level block (an input, a two-column
+           grid, a standalone button row) leaves the same 1.05em below it, a hint sits
+           tight under the field it explains, and the last block in any container leaves
+           nothing, so a step ends on its own padding instead of Jellyfin's 1.8em
+           .inputContainer default. Scoped to .ccaStepBody: the steps stopped being .ccaCard
+           in the guided-editor redesign, which silently orphaned the old card rules. */
+        #CustomCoverArtConfigPage .ccaStepBody .inputContainer,
+        #CustomCoverArtConfigPage .ccaStepBody .ccaGrid,
+        #CustomCoverArtConfigPage .ccaStepBody .ccaFileRow { margin: 0 0 1.05em; }
+        #CustomCoverArtConfigPage .ccaGrid .inputContainer,
+        #CustomCoverArtConfigPage .inputContainer .ccaFileRow { margin-bottom: 0; }
+        #CustomCoverArtConfigPage .ccaStepBody .ccaFileRow:has(+ .fieldDescription),
+        #CustomCoverArtConfigPage .ccaStepBody .inputContainer:has(+ .fieldDescription) { margin-bottom: 0; }
+        #CustomCoverArtConfigPage .ccaStepBody > .fieldDescription,
+        #CustomCoverArtConfigPage .ccaStepGroup > .fieldDescription { margin-bottom: 1.05em; }
+        #CustomCoverArtConfigPage .ccaStepBody > :last-child,
+        #CustomCoverArtConfigPage .ccaStepGroup > :last-child,
+        #CustomCoverArtConfigPage .ccaSub > :last-child,
+        #CustomCoverArtConfigPage .ccaAdvBody > :last-child,
+        #CustomCoverArtConfigPage .ccaFxRow > :last-child,
+        #CustomCoverArtConfigPage #ccaSettings > :last-child { margin-bottom: 0; }
+
+        #CustomCoverArtConfigPage .ccaVal { float: right; opacity: .6; font-weight: 400; font-variant-numeric: tabular-nums; }
+        #CustomCoverArtConfigPage .ccaRange { width: 100%; margin: .55em 0 0; }
+
+        #CustomCoverArtConfigPage input[type="color"] {
+            width: 3.5em;
+            max-width: 100%;
+            height: 2.3em;
+            padding: 2px;
+            border: 1px solid rgba(127, 127, 127, .35);
+            border-radius: 6px;
+            background: transparent;
+            cursor: pointer;
+            vertical-align: middle;
+        }
+        #CustomCoverArtConfigPage .ccaFile { width: 100%; }
+        #CustomCoverArtConfigPage .ccaBtnWide { width: 100%; margin: 0; }
+        /* A control that shares an inline row with a compact button takes the rest. */
+        #CustomCoverArtConfigPage .ccaGrow { flex: 1 1 auto; min-width: 0; }
+        #CustomCoverArtConfigPage .ccaFileRow .ccaGrow { width: auto; }
+        /* Load template / Delete, template name / Save, density / Shuffle: the row is as
+           tall as its tallest control and both stretch to it, instead of a 46px select
+           centred beside a 55px button. */
+        #CustomCoverArtConfigPage .ccaFileRow .ccaGrow,
+        #CustomCoverArtConfigPage .ccaFileRow .ccaGrow ~ .emby-button { align-self: stretch; }
+
+        #CustomCoverArtConfigPage .ccaChecks { display: flex; flex-wrap: wrap; gap: .3em 1.25em; padding-top: .45em; }
+        #CustomCoverArtConfigPage .ccaCheck { display: inline-flex; align-items: center; gap: .5em; }
+        #CustomCoverArtConfigPage .ccaCheckBlock { display: flex; margin: .3em 0 .5em; }
+        #CustomCoverArtConfigPage .ccaBatchList { max-height: 220px; overflow-y: auto; margin: .3em 0 1em; display: flex; flex-direction: column; gap: .15em; }
+        #CustomCoverArtConfigPage .ccaBatchList:empty { display: none; }
+
+        #CustomCoverArtConfigPage .ccaSub {
+            margin: .4em 0 1.05em;
+            padding: .95em 1em;
+            border: 1px solid rgba(127, 127, 127, .2);
+            border-radius: 8px;
+            background: rgba(127, 127, 127, .04);
+        }
+
+        #CustomCoverArtConfigPage .ccaSelected { margin-top: .6em; opacity: .85; font-size: .92em; }
+
+        #CustomCoverArtConfigPage .ccaStop { display: flex; align-items: center; gap: .6em; margin-bottom: .5em; }
+        #CustomCoverArtConfigPage .ccaStop input[type="color"] { flex: 0 0 auto; }
+        #CustomCoverArtConfigPage .ccaStop .ccaStopPos { flex: 1 1 auto; min-width: 0; margin: 0; }
+        /* The alpha slider shares the row with the position slider, so it needs its own
+           rule: the generic .ccaRange (width:100%; margin:.55em 0 0) would blow the row out
+           and sit the two sliders on different baselines. Narrower than the position slider
+           and tagged with a small glyph, so the two are told apart at a glance. */
+        #CustomCoverArtConfigPage .ccaStop .ccaStopAlpha { flex: 0 1 34%; min-width: 0; margin: 0; }
+        #CustomCoverArtConfigPage .ccaStopAlphaTag { flex: 0 0 auto; opacity: .55; font-size: .85em; line-height: 1; }
+        #CustomCoverArtConfigPage .ccaStopRemove {
+            flex: 0 0 auto; width: 1.9em; height: 1.9em; line-height: 1;
+            border: 1px solid rgba(127, 127, 127, .35); border-radius: 6px;
+            background: transparent; color: inherit; cursor: pointer; opacity: .7;
+        }
+        #CustomCoverArtConfigPage .ccaStopRemove:hover { opacity: 1; }
+        #CustomCoverArtConfigPage .ccaStopRemove:disabled { opacity: .3; cursor: default; }
+
+        /* Numbered accordion steps. One open at a time; the header is the map. */
+        #CustomCoverArtConfigPage .ccaStep { margin: 0 0 .6em; border: 1px solid rgba(127,127,127,.2); border-radius: 10px; overflow: hidden; }
+        #CustomCoverArtConfigPage .ccaStepHead {
+            display: flex; align-items: center; gap: .75em; width: 100%;
+            min-height: 3em; padding: .8em 1em; box-sizing: border-box;
+            background: transparent; border: 0; color: inherit; cursor: pointer;
+            font-size: 1.05em; text-align: left;
+        }
+        #CustomCoverArtConfigPage .ccaStepHead:hover { background: rgba(127,127,127,.08); }
+        #CustomCoverArtConfigPage .ccaStepNum {
+            flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
+            width: 1.8em; height: 1.8em; border-radius: 50%;
+            background: var(--theme-primary-color, #00a4dc); color: #fff; font-size: .85em;
+        }
+        #CustomCoverArtConfigPage .ccaStepTitle { flex: 1 1 auto; }
+        #CustomCoverArtConfigPage .ccaStepChevron { flex: 0 0 auto; opacity: .6; transition: transform .18s ease; }
+        #CustomCoverArtConfigPage .ccaStepHead[aria-expanded="true"] .ccaStepChevron { transform: rotate(180deg); }
+        #CustomCoverArtConfigPage .ccaStepBody { padding: 0 1em 1.1em; }
+        #CustomCoverArtConfigPage .ccaStepBody[hidden] { display: none; }
+        #CustomCoverArtConfigPage .ccaStepGroup { margin-top: 1.3em; padding-top: 1.1em; border-top: 1px solid rgba(127,127,127,.15); }
+        #CustomCoverArtConfigPage .ccaStepGroupHead { font-size: .9em; opacity: .6; margin-bottom: .6em; }
+        @media (prefers-reduced-motion: reduce) {
+            #CustomCoverArtConfigPage .ccaStepChevron { transition: none; }
+        }
+
+        /* "Advanced" disclosure inside a step. Independent of the step accordion and of
+           each other, and never persisted — advanced should feel closed by default. */
+        #CustomCoverArtConfigPage .ccaAdv { margin-top: 1.2em; border-top: 1px solid rgba(127,127,127,.18); }
+        #CustomCoverArtConfigPage .ccaAdvHead {
+            display: flex; align-items: center; gap: .5em; width: 100%;
+            min-height: 2.75em; padding: .6em 0; box-sizing: border-box;
+            background: transparent; border: 0; color: inherit; cursor: pointer;
+            font-size: .95em; opacity: .75; text-align: left;
+        }
+        #CustomCoverArtConfigPage .ccaAdvHead:hover { opacity: 1; }
+        #CustomCoverArtConfigPage .ccaAdvHead[aria-expanded="true"] .ccaStepChevron { transform: rotate(180deg); }
+        #CustomCoverArtConfigPage .ccaAdvBody[hidden] { display: none; }
+        /* Nested inside an effect row, the divider would double up with the row's own. */
+        #CustomCoverArtConfigPage .ccaFxRow .ccaAdv { margin-top: .5em; border-top: 0; }
+
+        /* The overflow toggle only exists on narrow screens. These must come BEFORE the
+           mobile block below: its rules have the same specificity, so whichever is later
+           wins, and after it these hid the toggle and showed the actions at every width. */
+        #CustomCoverArtConfigPage .ccaLayerMore { display: none; }
+        #CustomCoverArtConfigPage .ccaLayerActions { display: flex; gap: .2em; }
+
+        /* ---- Mobile -------------------------------------------------------
+           Verified at 360x640. The rules here are about reach and hit size, not
+           just narrowness: everything interactive gets to 44x44 CSS px, the canvas
+           stays on screen while you work down the steps, and Apply stays reachable
+           without scrolling to the end of a long page. */
+        @media (max-width: 700px) {
+            /* Canvas first: it is the thing being edited. */
+            #CustomCoverArtConfigPage .ccaLayout { display: flex; flex-direction: column; }
+            #CustomCoverArtConfigPage .ccaPreviewCol {
+                order: -1; position: sticky; top: 0; z-index: 5;
+                background: var(--cca-surface, var(--theme-body-background-color, #101010));
+                padding-bottom: .5em;
+            }
+            #CustomCoverArtConfigPage .ccaCanvas { max-height: 34vh; }
+            #CustomCoverArtConfigPage .ccaPreviewWrap { min-height: 0; padding: .5em; }
+
+            /* Touch targets. */
+            #CustomCoverArtConfigPage .ccaStepHead { min-height: 3.4em; }
+            #CustomCoverArtConfigPage .ccaAdvHead { min-height: 44px; }
+            #CustomCoverArtConfigPage .emby-select,
+            #CustomCoverArtConfigPage input[is="emby-input"],
+            #CustomCoverArtConfigPage .emby-input { min-height: 44px; }
+            #CustomCoverArtConfigPage input[type="color"] { min-height: 44px; min-width: 44px; }
+            #CustomCoverArtConfigPage input[type="range"] { height: 44px; }
+            #CustomCoverArtConfigPage .ccaSwatch { width: 44px; height: 44px; }
+            #CustomCoverArtConfigPage .emby-button { min-height: 44px; }
+            #CustomCoverArtConfigPage .ccaStopRemove { width: 44px; height: 44px; }
+
+            #CustomCoverArtConfigPage .ccaStickyApply {
+                position: sticky; bottom: 0; z-index: 6;
+                padding: .6em 0;
+                background: var(--cca-surface, var(--theme-body-background-color, #101010));
+                border-top: 1px solid rgba(127,127,127,.2);
+            }
+
+            /* A layer row cannot fit a name plus five ~30px buttons. The row itself
+               becomes the tap target for selecting, and the actions move behind one
+               toggle so they are not competing for the same 40px of width. */
+            #CustomCoverArtConfigPage .ccaLayerRow { flex-wrap: wrap; min-height: 44px; }
+            #CustomCoverArtConfigPage .ccaLayerBtn { width: 44px; height: 44px; }
+            #CustomCoverArtConfigPage .ccaLayerActions { display: none; width: 100%; margin-top: .3em; }
+            #CustomCoverArtConfigPage .ccaLayerRow.ccaLayerActionsOpen .ccaLayerActions { display: flex; }
+            #CustomCoverArtConfigPage .ccaLayerMore { display: inline-flex; }
+
+            /* Full-screen poster browser: a centred dialog on a 360px viewport leaves
+               the grid a couple of tiles wide with the page scrolling behind it. */
+            #CustomCoverArtConfigPage .ccaModalBox {
+                width: 100%; max-width: none; height: 100%; max-height: none;
+                border-radius: 0; display: flex; flex-direction: column;
+            }
+            #CustomCoverArtConfigPage .ccaModalHead {
+                position: sticky; top: 0; z-index: 2;
+                background: var(--cca-surface, var(--theme-body-background-color, #101010));
+            }
+            #CustomCoverArtConfigPage .ccaModalFilters { flex-wrap: wrap; gap: .5em; }
+            #CustomCoverArtConfigPage .ccaModalClose { min-width: 44px; min-height: 44px; }
+            #CustomCoverArtConfigPage .ccaPosterGrid { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        /* Undo/redo sits beside the canvas, not inside a step, so it is reachable
+           whichever step is open. */
+        #CustomCoverArtConfigPage .ccaHistoryBar { display: flex; gap: .5em; margin-bottom: .6em; }
+        #CustomCoverArtConfigPage .ccaHistoryBar .emby-button { margin: 0; }
+
+        /* The same design drawn at other aspect ratios, so it can be judged in context
+           before applying. Scrolls sideways rather than wrapping on a phone. */
+        #CustomCoverArtConfigPage .ccaContexts { display: flex; gap: .8em; overflow-x: auto; padding: .4em 0; }
+        #CustomCoverArtConfigPage .ccaContext { flex: 0 0 auto; text-align: center; }
+        #CustomCoverArtConfigPage .ccaContext canvas {
+            display: block; max-width: 100%; border-radius: 6px;
+            border: 1px solid rgba(127,127,127,.25);
+        }
+        #CustomCoverArtConfigPage .ccaContextCap { font-size: .8em; opacity: .6; margin-top: .3em; }
+
+        /* Palette swatches extracted from the background. */
+        #CustomCoverArtConfigPage .ccaSwatches { display: flex; flex-wrap: wrap; gap: .4em; margin: .3em 0 0; }
+        #CustomCoverArtConfigPage .ccaSwatches:empty { display: none; }
+        #CustomCoverArtConfigPage .ccaSwatch {
+            width: 2em; height: 2em; padding: 0; cursor: pointer;
+            border: 1px solid rgba(127, 127, 127, .5); border-radius: 6px;
+        }
+        #CustomCoverArtConfigPage .ccaSwatch:hover { border-color: var(--theme-primary-color, #00a4dc); }
+
+        /* Layers panel: newest/topmost layer first, one row per layer. */
+        #CustomCoverArtConfigPage .ccaLayerList { display: flex; flex-direction: column; gap: .2em; max-height: 240px; overflow-y: auto; }
+        #CustomCoverArtConfigPage .ccaLayerList:empty { display: none; }
+        #CustomCoverArtConfigPage .ccaLayerRow {
+            display: flex; align-items: center; gap: .3em;
+            padding: .35em .5em;
+            border: 1px solid rgba(127, 127, 127, .2);
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        #CustomCoverArtConfigPage .ccaLayerRow:hover { background: rgba(127, 127, 127, .08); }
+        #CustomCoverArtConfigPage .ccaLayerSel {
+            border-color: var(--theme-primary-color, #00a4dc);
+            background: rgba(0, 164, 220, .12);
+        }
+        #CustomCoverArtConfigPage .ccaLayerName {
+            flex: 1 1 auto; min-width: 0;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+            /* A real <button> (keyboard selection), styled as the plain label it replaced. */
+            background: transparent; border: 0; margin: 0; padding: .25em 0;
+            color: inherit; font: inherit; text-align: left; cursor: pointer;
+        }
+        #CustomCoverArtConfigPage .ccaLayerName:focus-visible,
+        #CustomCoverArtConfigPage .ccaLayerBtn:focus-visible,
+        #CustomCoverArtConfigPage .ccaCanvas:focus-visible {
+            outline: 2px solid var(--theme-primary-color, #00a4dc); outline-offset: 2px;
+        }
+        #CustomCoverArtConfigPage .ccaLayerHidden .ccaLayerName { opacity: .45; text-decoration: line-through; }
+        #CustomCoverArtConfigPage .ccaLayerBtn {
+            flex: 0 0 auto; width: 1.9em; height: 1.9em; line-height: 1;
+            border: 1px solid rgba(127, 127, 127, .35); border-radius: 6px;
+            background: transparent; color: inherit; cursor: pointer; opacity: .7;
+            font-size: .95em; padding: 0;
+        }
+        #CustomCoverArtConfigPage .ccaLayerBtn:hover { opacity: 1; }
+
+        #CustomCoverArtConfigPage .ccaHiddenFile { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); border: 0; }
+        #CustomCoverArtConfigPage .ccaFileRow { display: flex; align-items: center; gap: .75em; flex-wrap: wrap; }
+        #CustomCoverArtConfigPage .ccaFileRow .emby-button { margin: 0; }
+        /* A disabled button must read as disabled, not clickable. */
+        #CustomCoverArtConfigPage button[disabled] { opacity: .4; cursor: not-allowed; }
+        #CustomCoverArtConfigPage .ccaFileName { opacity: .6; font-size: .9em; word-break: break-all; }
+        #CustomCoverArtConfigPage .fieldDescription { margin-top: .4em; opacity: .55; font-size: .85em; }
+        #CustomCoverArtConfigPage .ccaPreviewHint { text-align: center; margin-top: .35em; }
+
+        /* Preview column */
+        #CustomCoverArtConfigPage .ccaPreviewCol { position: sticky; top: 1em; }
+        @media (max-width: 900px) {
+            #CustomCoverArtConfigPage .ccaPreviewCol { position: static; }
+        }
+        #CustomCoverArtConfigPage .ccaPreviewWrap {
+            position: relative;
+            display: flex; align-items: center; justify-content: center;
+            min-height: 260px;
+            border: 1px dashed rgba(127, 127, 127, .4);
+            border-radius: 10px;
+            padding: 1em;
+            background: rgba(0, 0, 0, .18);
+            text-align: center;
+        }
+        #CustomCoverArtConfigPage .ccaCanvas {
+            display: block;
+            max-width: 100%;
+            max-height: 62vh;
+            height: auto;
+            border-radius: 6px;
+            box-shadow: 0 8px 28px rgba(0, 0, 0, .4);
+            transition: opacity .15s ease;
+            touch-action: none;
+        }
+        #CustomCoverArtConfigPage .ccaPreviewPlaceholder { opacity: .5; }
+        #CustomCoverArtConfigPage .ccaSpinner {
+            position: absolute; inset: 0; margin: auto;
+            width: 2.6em; height: 2.6em;
+            border: 3px solid rgba(127, 127, 127, .3);
+            border-top-color: var(--theme-primary-color, #00a4dc);
+            border-radius: 50%;
+            animation: ccaSpin .8s linear infinite;
+            pointer-events: none;
+        }
+        @keyframes ccaSpin { to { transform: rotate(360deg); } }
+        @media (prefers-reduced-motion: reduce) {
+            #CustomCoverArtConfigPage .ccaSpinner { animation-duration: 2.4s; }
+        }
+        /* Keeps an animated-GIF background in the document so the browser keeps advancing its
+           frames for the canvas to copy. 1px and nearly transparent: never actually seen. */
+        #CustomCoverArtConfigPage .ccaGifHolder { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: hidden; opacity: .01; pointer-events: none; }
+        #CustomCoverArtConfigPage .ccaGifHolder img { width: 1px; height: 1px; }
+        #CustomCoverArtConfigPage .ccaActions { display: flex; flex-direction: column; gap: .6em; margin-top: 1em; }
+        #CustomCoverArtConfigPage .ccaActions .emby-button { margin: 0; }
+
+        /* Authoritative server render overlay */
+        #CustomCoverArtConfigPage .ccaServerRender { margin-top: 1em; text-align: center; }
+        #CustomCoverArtConfigPage .ccaServerRenderLabel { font-size: .78em; font-weight: 700; text-transform: uppercase; letter-spacing: .09em; opacity: .55; margin-bottom: .5em; }
+        #CustomCoverArtConfigPage .ccaServerRenderImg { display: block; max-width: 100%; height: auto; margin: 0 auto; border-radius: 6px; box-shadow: 0 8px 28px rgba(0, 0, 0, .4); }
+
+        /* Poster picker modal */
+        #CustomCoverArtConfigPage .ccaModal { position: fixed; inset: 0; background: rgba(0, 0, 0, .65); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 1em; }
+        /* --cca-surface/--cca-text are read off the live Jellyfin theme by
+           applyThemeSurface(); the literals are only the dark-theme fallback. */
+        #CustomCoverArtConfigPage .ccaModalBox { background: var(--cca-surface, #1b1b1b); color: var(--cca-text, #f2f2f2); width: 100%; max-width: 960px; max-height: 85vh; border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; border: 1px solid rgba(127, 127, 127, .25); }
+        #CustomCoverArtConfigPage .ccaModalHead { display: flex; justify-content: space-between; align-items: center; padding: .75em 1em; border-bottom: 1px solid rgba(127, 127, 127, .2); }
+        #CustomCoverArtConfigPage .ccaModalHead h3 { margin: 0; }
+        #CustomCoverArtConfigPage .ccaModalFilters { display: flex; gap: .75em; padding: .85em 1em; border-bottom: 1px solid rgba(127, 127, 127, .2); flex-wrap: wrap; }
+        #CustomCoverArtConfigPage .ccaModalFilters input { flex: 1; min-width: 180px; }
+        #CustomCoverArtConfigPage .ccaPosterGrid { padding: 1em; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px; }
+        /* A <button> per tile (keyboard-selectable), reset to look like the old card. */
+        #CustomCoverArtConfigPage .ccaGridItem { display: block; width: 100%; margin: 0; padding: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; border: 2px solid transparent; border-radius: 8px; overflow: hidden; background: rgba(127, 127, 127, .1); transition: border-color .15s; }
+        #CustomCoverArtConfigPage .ccaGridItem:hover,
+        #CustomCoverArtConfigPage .ccaGridItem:focus-visible { border-color: var(--theme-primary-color, #00a4dc); outline: none; }
+        #CustomCoverArtConfigPage .ccaGridItem img { width: 100%; height: 190px; object-fit: cover; display: block; background: #000; }
+        #CustomCoverArtConfigPage .ccaGridItem .cap { display: block; padding: 7px 8px; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        #CustomCoverArtConfigPage .ccaModalPager { display: flex; gap: 1em; align-items: center; justify-content: center; padding: .85em; border-top: 1px solid rgba(127, 127, 127, .2); }
+        #CustomCoverArtConfigPage .ccaGridEmpty { padding: 2em; text-align: center; opacity: .7; grid-column: 1 / -1; }
+        #CustomCoverArtConfigPage .ccaModalClose { min-width: 0; }

@@ -15,7 +15,7 @@ public class LocalizationService : ILocalizationService
 {
     /// <summary>
     /// Language codes shipped as Resources/&lt;code&gt;.json. Keep in sync with the
-    /// I18N blocks in Configuration/configPage.html, which localizes the UI itself.
+    /// I18N blocks in Configuration/configPage.js, which localizes the UI itself.
     /// </summary>
     public static readonly string[] SupportedLanguageCodes = { "en", "nl", "es" };
 

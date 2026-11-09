@@ -1,0 +1,4574 @@
+// Custom Cover Art: configuration page controller.
+//
+// configPage.html carries data-controller="__plugin/customcoverartjs" on its page
+// element. Jellyfin Web imports /web/ConfigurationPage?name=customcoverartjs as an ES
+// module and calls `new` on the default export once per page view, passing the view
+// element, before the first pageshow. That is when the inline <script> this file
+// replaced used to run, so everything stays inside the function and each view gets
+// its own state, exactly as before. Keep it a plain function: Jellyfin uses `new`,
+// which an arrow function does not support.
+//
+// The body keeps its original 8-space indentation on purpose. The structure tests
+// (ConfigPageStructureTests, PresetTests, RenderParityPageTests) find the end of a
+// top-level function by "\n        }" and the I18N locale blocks by indentation.
+export default function (view) {
+        'use strict';
+
+        var page;
+
+        // --- Localization -------------------------------------------------
+        // The config page is static HTML, so it carries its own translations
+        // and applies them based on the current Jellyfin UI language.
+        var I18N = {
+            en: {
+                'lede': 'Design a cover for a library, preview it live, then apply it.',
+                'target.type': 'Type', 'target.library': 'Library', 'target.collection': 'Collection', 'target.playlist': 'Playlist', 'target.livetv': 'Live TV',
+                'lib.choose': 'Choose', 'lib.selectOption': 'Select…',
+                'step.target': 'Target & start', 'step.background': 'Background', 'step.text': 'Text & logos',
+                'step.effects': 'Effects', 'step.output': 'Output & apply',
+                'group.startFrom': 'Start from a saved design', 'group.selectedLayer': 'Selected layer',
+                'group.saveTemplate': 'Save this design', 'group.batch': 'Apply to several targets',
+                'ui.advanced': 'Advanced', 'ui.undo': 'Undo', 'ui.redo': 'Redo',
+                'ui.inContext': 'In context', 'ui.inContextHint': 'How the cover looks at other shapes. The canvas above is the real design.',
+                'ctx.wide': 'Wide', 'ctx.square': 'Square', 'ctx.poster': 'Poster',
+                'layer.addText': 'Add text', 'layer.addImage': 'Add logo/icon',
+                'layer.show': 'Show', 'layer.hide': 'Hide', 'layer.up': 'Move up', 'layer.down': 'Move down', 'layer.dup': 'Duplicate', 'layer.del': 'Delete',
+                'layer.text': 'Text', 'layer.logo': 'Logo', 'layer.more': 'More actions', 'layer.none': 'No layer selected — add one with Add text or Add logo/icon above.',
+                'layer.opacity': 'Opacity', 'layer.rotation': 'Rotation',
+                'hint.logo': 'PNG with transparency · up to 5 MB. The topmost row is drawn last, on top of the others.',
+                'hint.logoSize': 'Drag the corner handles on the preview to resize the logo, or the knob above it to rotate.',
+                'text.title': 'Title', 'text.weight': 'Font weight',
+                'w.light': 'Light', 'w.normal': 'Normal', 'w.medium': 'Medium', 'w.semibold': 'SemiBold', 'w.bold': 'Bold', 'w.extrabold': 'ExtraBold',
+                'text.align': 'Alignment', 'a.left': 'Left', 'a.center': 'Center', 'a.right': 'Right',
+                'text.size': 'Text size', 'text.color': 'Text color', 'text.effects': 'Effects', 'e.shadow': 'Shadow', 'e.outline': 'Outline',
+                'text.font': 'Custom font (optional)',
+                'fx.softlight': 'Colour wash', 'fx.vignette': 'Vignette', 'fx.grain': 'Film grain', 'fx.border': 'Border',
+                'fx.color': 'Colour', 'fx.opacity': 'Strength', 'fx.amount': 'Strength', 'fx.softness': 'Softness',
+                'fx.thickness': 'Thickness', 'fx.radius': 'Corner radius', 'fx.double': 'Double line', 'fx.gap': 'Gap',
+                'fx.jellyfin': 'Jellyfin style', 'fx.presetHint': 'Applies a dark gradient with clean white text — editable afterwards.',
+                'fx.autopalette': 'Auto palette', 'fx.paletteHint': 'Click a colour to apply it to the overlay stop you last touched, if the overlay is on and a stop is focused — otherwise to the selected text layer, then the colour wash.',
+                'bg.dim': 'Dimming', 'bg.blur': 'Blur', 'bg.dimcolor': 'Dim / base color',
+                'bg.gtype': 'Gradient type', 'g.linear': 'Linear', 'g.radial': 'Radial',
+                'bg.angle': 'Angle', 'bg.colors': 'Colours', 'bg.addcolor': 'Add colour',
+                'bg.overlay': 'Overlay gradient', 'bg.overlay.preset': 'Overlay preset',
+                'bg.overlay.custom': 'Custom', 'bg.overlay.bottom': 'Bottom fade',
+                'bg.overlay.top': 'Top fade', 'bg.overlay.wash': 'Full wash', 'bg.overlay.duotone': 'Duotone',
+                'bg.overlay.colors': 'Colours and opacity', 'bg.overlay.angle': 'Overlay angle',
+                'bg.overlay.alpha': 'Opacity',
+                'hint.overlay': 'Fades a colour over the background, under your text — for the look where a poster resolves into solid colour.',
+                'bg.image': 'Background image (optional)', 'f.chooseImage': 'Choose image…', 'f.none': 'No file chosen',
+                'hint.image': 'JPG, PNG, GIF, BMP or WebP · up to 5 MB.',
+                'bg.fit': 'Image fit', 'fit.cover': 'Fill (crop to fit)', 'fit.contain': 'Fit (show whole image)', 'fit.stretch': 'Stretch to fill',
+                'hint.fit': 'Fill crops to cover the cover; Fit keeps the whole image and pads the rest with the base colour.',
+                'bg.orposter': 'Or use an existing library poster', 'bg.browse': 'Browse library posters', 'bg.selected': 'Selected background:',
+                'out.dims': 'Dimensions',
+                'd.landscape': 'Landscape 16:9 (1280×720)', 'd.cover': 'Square (1400×1400)', 'd.poster': 'Portrait Poster (1000×1500)', 'd.banner': 'Wide Banner (1920×540)', 'd.custom': 'Custom',
+                'out.format': 'Format', 'fmt.auto': 'Auto (recommended)', 'out.width': 'Width', 'out.height': 'Height',
+                'f.chooseFont': 'Choose font…',
+                'hint.font': 'TTF, OTF, TTC, WOFF or WOFF2 · up to 5 MB. Leave empty to use the bundled Noto Sans.',
+                'card.preview': 'Preview', 'preview.placeholder': 'The preview appears here automatically.',
+                'bg.adjust': 'Reposition background (drag to pan, scroll or pinch to zoom)',
+                'action.apply': 'Apply to library', 'action.applying': 'Applying…', 'action.download': 'Download image', 'action.serverRender': 'Show server render', 'serverrender.label': 'Authoritative render (server)', 'preview.hint': 'The preview updates automatically as you adjust settings.', 'preview.collageFail': 'The collage preview could not be loaded. Use Show server render to see it.',
+                'modal.title': 'Select a poster', 'modal.search': 'Search…', 'modal.alltypes': 'All types', 'modal.close': 'Close',
+                'ty.movies': 'Movies', 'ty.series': 'Series', 'ty.seasons': 'Seasons', 'ty.albums': 'Albums', 'ty.artists': 'Artists', 'ty.books': 'Books', 'ty.musicvideos': 'Music videos', 'ty.photos': 'Photos', 'modal.prev': 'Previous', 'modal.next': 'Next',
+                'dyn.loading': 'Loading…', 'dyn.errorItems': 'Error loading items', 'dyn.noItems': 'No items found', 'dyn.page': 'Page {0} of {1}',
+                'dyn.applied': 'Cover art applied successfully.', 'dyn.error': 'Error: {0}', 'dyn.applyFail': 'Could not apply cover art: {0}',
+                'dyn.uploadFail': 'Upload failed: {0}', 'dyn.fontFail': 'Font upload failed: {0}',
+                'dyn.unknown': 'unknown error',
+                'tpl.confirmReplace': 'Loading this template replaces your current design, including changes you have not applied. Continue?',
+                'canvas.label': 'Cover design canvas. Select a layer, then use the arrow keys to move it (hold Shift for bigger steps).',
+                'layer.visible': 'Visible', 'layer.list': 'Layers',
+                'stop.color': 'Colour', 'stop.position': 'Position', 'stop.remove': 'Remove colour', 'fx.swatch': 'Apply colour {0}',
+                'restore.confirm': 'Replace the current cover of this target with its original?', 'tpl.confirmDelete': 'Delete the template “{0}”?',
+                'batch.confirm': 'Apply the current design to the selected targets ({0})? Their current covers will be replaced.', 'batch.fail': 'Batch apply failed: {0}',
+                'err.network': 'Could not reach the server.', 'err.auth': 'The server refused the request (status {0}). Your session may have expired — reload the page and sign in again.',
+                'err.tooLarge': 'The file is too large for the server to accept.', 'err.rateLimited': 'Too many requests — wait a minute and try again.',
+                'err.status': 'The server answered with status {0}.', 'err.badResponse': 'The server sent a response the page could not read.',
+                'poster.noUrl': 'That item has no poster image.', 'poster.empty': 'The poster image came back empty.', 'poster.fail': 'Could not use that poster: {0}',
+                'restore.unknown': 'Could not check for a backup',
+                'text.defaultTitle': 'My library', 'serverrender.alt': 'Cover as rendered by the server',
+                'action.applyCollection': 'Apply to collection', 'action.applyPlaylist': 'Apply to playlist', 'action.applyLivetv': 'Apply to Live TV',
+                'restore.button': 'Restore original cover', 'restore.none': 'No backup yet', 'restore.available': 'A backup exists', 'restore.done': 'Original cover restored.', 'restore.fail': 'No backup found to restore.',
+                'restore.reset': 'Reset backup', 'restore.resetConfirm': 'Delete the current backup? Reset saves nothing by itself. The next apply stores the cover this target shows at that moment as the new original, unless it is a cover this plugin applied. So first put the cover you want to keep back on this target (Edit images, then upload it; or delete the poster and refresh metadata with "Replace existing images"), then reset, then apply.', 'restore.resetDone': 'Backup deleted. The next apply saves the current cover as the new original.', 'restore.resetFail': 'Could not reset the backup: {0}',
+                'bg.source': 'Background source', 'bg.source.image': 'Image', 'bg.source.gradient': 'Gradient', 'bg.source.solid': 'Solid colour', 'bg.source.collage': 'Poster collage from this target', 'bg.collage.density': 'Collage density', 'bg.collage.sparse': 'Sparse', 'bg.collage.medium': 'Medium', 'bg.collage.dense': 'Dense', 'bg.collage.shuffle': 'Shuffle', 'bg.collage.livetv': 'Live TV has no posters to collage.',
+                'tpl.load': 'Load template', 'tpl.delete': 'Delete', 'tpl.save': 'Save current design', 'tpl.savebtn': 'Save', 'tpl.nameph': 'Template name', 'tpl.hint': 'Templates store the design but not the title — each target keeps its own name.', 'tpl.saved': 'Template saved.', 'tpl.named': 'Enter a template name first.',
+                'batch.hint': 'Apply the current design (or loaded template) to several targets at once. Each cover is titled with its target\'s name.', 'batch.apply': 'Apply to selected', 'batch.none': 'Select at least one target.', 'batch.running': 'Applying…', 'batch.done': 'Done: {0} ok, {1} failed.',
+                'fmt.animated': 'Animated GIF', 'anim.kenburns': 'Ken Burns pan/zoom', 'anim.frames': 'Frames', 'anim.delay': 'Frame delay (ms)', 'anim.dir': 'Zoom direction', 'anim.in': 'Zoom in', 'anim.out': 'Zoom out', 'anim.hint': 'Animated GIFs are larger and only animate in views that render GIFs. Capped at 30 frames.'
+            },
+            nl: {
+                'lede': 'Ontwerp een cover voor een bibliotheek, bekijk het live en pas het toe.',
+                'target.type': 'Type', 'target.library': 'Bibliotheek', 'target.collection': 'Verzameling', 'target.playlist': 'Afspeellijst', 'target.livetv': 'Live-tv',
+                'lib.choose': 'Kies', 'lib.selectOption': 'Selecteer…',
+                'step.target': 'Doel & start', 'step.background': 'Achtergrond', 'step.text': 'Tekst & logo\'s',
+                'step.effects': 'Effecten', 'step.output': 'Uitvoer & toepassen',
+                'group.startFrom': 'Beginnen met een opgeslagen ontwerp', 'group.selectedLayer': 'Geselecteerde laag',
+                'group.saveTemplate': 'Dit ontwerp opslaan', 'group.batch': 'Toepassen op meerdere doelen',
+                'ui.advanced': 'Geavanceerd', 'ui.undo': 'Ongedaan maken', 'ui.redo': 'Opnieuw',
+                'ui.inContext': 'In context', 'ui.inContextHint': 'Hoe de cover er in andere verhoudingen uitziet. Het canvas hierboven is het echte ontwerp.',
+                'ctx.wide': 'Breed', 'ctx.square': 'Vierkant', 'ctx.poster': 'Poster',
+                'layer.addText': 'Tekst toevoegen', 'layer.addImage': 'Logo/pictogram toevoegen',
+                'layer.show': 'Tonen', 'layer.hide': 'Verbergen', 'layer.up': 'Omhoog', 'layer.down': 'Omlaag', 'layer.dup': 'Dupliceren', 'layer.del': 'Verwijderen',
+                'layer.text': 'Tekst', 'layer.logo': 'Logo', 'layer.more': 'Meer acties', 'layer.none': 'Geen laag geselecteerd — voeg er een toe met Tekst toevoegen of Logo/pictogram toevoegen hierboven.',
+                'layer.opacity': 'Dekking', 'layer.rotation': 'Rotatie',
+                'hint.logo': 'PNG met transparantie · max. 5 MB. De bovenste rij wordt als laatste getekend, boven op de andere.',
+                'hint.logoSize': 'Sleep de hoekgrepen in het voorbeeld om het logo te vergroten of verkleinen, of de knop erboven om te draaien.',
+                'text.title': 'Titel', 'text.weight': 'Letterdikte',
+                'w.light': 'Licht', 'w.normal': 'Normaal', 'w.medium': 'Medium', 'w.semibold': 'Halfvet', 'w.bold': 'Vet', 'w.extrabold': 'Extra vet',
+                'text.align': 'Uitlijning', 'a.left': 'Links', 'a.center': 'Gecentreerd', 'a.right': 'Rechts',
+                'text.size': 'Tekstgrootte', 'text.color': 'Tekstkleur', 'text.effects': 'Effecten', 'e.shadow': 'Schaduw', 'e.outline': 'Omlijning',
+                'text.font': 'Aangepast lettertype (optioneel)',
+                'fx.softlight': 'Kleurwaas', 'fx.vignette': 'Vignet', 'fx.grain': 'Filmkorrel', 'fx.border': 'Rand',
+                'fx.color': 'Kleur', 'fx.opacity': 'Sterkte', 'fx.amount': 'Sterkte', 'fx.softness': 'Zachtheid',
+                'fx.thickness': 'Dikte', 'fx.radius': 'Hoekafronding', 'fx.double': 'Dubbele lijn', 'fx.gap': 'Tussenruimte',
+                'fx.jellyfin': 'Jellyfin-stijl', 'fx.presetHint': 'Past een donker verloop met strakke witte tekst toe — daarna vrij aanpasbaar.',
+                'fx.autopalette': 'Automatisch kleurenpalet', 'fx.paletteHint': 'Klik op een kleur om die toe te passen op de laatst aangeklikte overlay-kleurstop, als de overlay aan staat en een stop de focus heeft — anders op de geselecteerde tekstlaag en daarna op het kleurwaas.',
+                'bg.dim': 'Dimmen', 'bg.blur': 'Vervaging', 'bg.dimcolor': 'Dim- / basiskleur',
+                'bg.gtype': 'Verlooptype', 'g.linear': 'Lineair', 'g.radial': 'Radiaal',
+                'bg.angle': 'Hoek', 'bg.colors': 'Kleuren', 'bg.addcolor': 'Kleur toevoegen',
+                'bg.overlay': 'Verloop-overlay', 'bg.overlay.preset': 'Overlay-voorinstelling',
+                'bg.overlay.custom': 'Aangepast', 'bg.overlay.bottom': 'Vervaging onder',
+                'bg.overlay.top': 'Vervaging boven', 'bg.overlay.wash': 'Volledige waas', 'bg.overlay.duotone': 'Duotoon',
+                'bg.overlay.colors': 'Kleuren en dekking', 'bg.overlay.angle': 'Overlay-hoek',
+                'bg.overlay.alpha': 'Dekking',
+                'hint.overlay': 'Laat een kleur over de achtergrond vervagen, onder je tekst — voor de stijl waarbij een poster overgaat in een egale kleur.',
+                'bg.image': 'Achtergrondafbeelding (optioneel)', 'f.chooseImage': 'Kies afbeelding…', 'f.none': 'Geen bestand gekozen',
+                'hint.image': 'JPG, PNG, GIF, BMP of WebP · max. 5 MB.',
+                'bg.fit': 'Afbeelding passen', 'fit.cover': 'Vullen (bijsnijden)', 'fit.contain': 'Passen (volledig tonen)', 'fit.stretch': 'Uitrekken',
+                'hint.fit': 'Vullen snijdt bij om de cover te vullen; Passen toont de hele afbeelding en vult de rest met de basiskleur.',
+                'bg.orposter': 'Of gebruik een bestaande bibliotheekposter', 'bg.browse': 'Bibliotheekposters bladeren', 'bg.selected': 'Geselecteerde achtergrond:',
+                'out.dims': 'Afmetingen',
+                'd.landscape': 'Liggend 16:9 (1280×720)', 'd.cover': 'Vierkant (1400×1400)', 'd.poster': 'Staande poster (1000×1500)', 'd.banner': 'Brede banner (1920×540)', 'd.custom': 'Aangepast',
+                'out.format': 'Formaat', 'fmt.auto': 'Automatisch (aanbevolen)', 'out.width': 'Breedte', 'out.height': 'Hoogte',
+                'f.chooseFont': 'Kies lettertype…',
+                'hint.font': 'TTF, OTF, TTC, WOFF of WOFF2 · max. 5 MB. Laat leeg voor de meegeleverde Noto Sans.',
+                'card.preview': 'Voorbeeld', 'preview.placeholder': 'Het voorbeeld verschijnt hier automatisch.',
+                'bg.adjust': 'Achtergrond verplaatsen (sleep om te verschuiven, scroll of knijp om te zoomen)',
+                'action.apply': 'Toepassen op bibliotheek', 'action.applying': 'Bezig met toepassen…', 'action.download': 'Afbeelding downloaden', 'action.serverRender': 'Serverweergave tonen', 'serverrender.label': 'Gezaghebbende weergave (server)', 'preview.hint': 'Het voorbeeld wordt automatisch bijgewerkt terwijl je instellingen aanpast.', 'preview.collageFail': 'Het collagevoorbeeld kon niet worden geladen. Gebruik Serverweergave tonen om het te zien.',
+                'modal.title': 'Selecteer een poster', 'modal.search': 'Zoeken…', 'modal.alltypes': 'Alle types', 'modal.close': 'Sluiten',
+                'ty.movies': 'Films', 'ty.series': 'Series', 'ty.seasons': 'Seizoenen', 'ty.albums': 'Albums', 'ty.artists': 'Artiesten', 'ty.books': 'Boeken', 'ty.musicvideos': 'Videoclips', 'ty.photos': 'Foto\'s', 'modal.prev': 'Vorige', 'modal.next': 'Volgende',
+                'dyn.loading': 'Laden…', 'dyn.errorItems': 'Fout bij laden van items', 'dyn.noItems': 'Geen items gevonden', 'dyn.page': 'Pagina {0} van {1}',
+                'dyn.applied': 'Cover art succesvol toegepast.', 'dyn.error': 'Fout: {0}', 'dyn.applyFail': 'Kon cover art niet toepassen: {0}',
+                'dyn.uploadFail': 'Uploaden mislukt: {0}', 'dyn.fontFail': 'Lettertype uploaden mislukt: {0}',
+                'dyn.unknown': 'onbekende fout',
+                'tpl.confirmReplace': 'Dit sjabloon laden vervangt je huidige ontwerp, inclusief wijzigingen die je nog niet hebt toegepast. Doorgaan?',
+                'canvas.label': 'Canvas met het coverontwerp. Selecteer een laag en verplaats die met de pijltjestoetsen (houd Shift ingedrukt voor grotere stappen).',
+                'layer.visible': 'Zichtbaar', 'layer.list': 'Lagen',
+                'stop.color': 'Kleur', 'stop.position': 'Positie', 'stop.remove': 'Kleur verwijderen', 'fx.swatch': 'Kleur {0} toepassen',
+                'restore.confirm': 'De huidige cover van dit doel vervangen door het origineel?', 'tpl.confirmDelete': 'Het sjabloon “{0}” verwijderen?',
+                'batch.confirm': 'Het huidige ontwerp toepassen op de geselecteerde doelen ({0})? Hun huidige covers worden vervangen.', 'batch.fail': 'Toepassen op meerdere doelen mislukt: {0}',
+                'err.network': 'Kan de server niet bereiken.', 'err.auth': 'De server weigerde het verzoek (status {0}). Je sessie is mogelijk verlopen — laad de pagina opnieuw en meld je opnieuw aan.',
+                'err.tooLarge': 'Het bestand is te groot voor de server.', 'err.rateLimited': 'Te veel verzoeken — wacht een minuut en probeer het opnieuw.',
+                'err.status': 'De server antwoordde met status {0}.', 'err.badResponse': 'De server stuurde een antwoord dat de pagina niet kon lezen.',
+                'poster.noUrl': 'Dit item heeft geen posterafbeelding.', 'poster.empty': 'De posterafbeelding was leeg.', 'poster.fail': 'Kon die poster niet gebruiken: {0}',
+                'restore.unknown': 'Kon niet controleren of er een back-up is',
+                'text.defaultTitle': 'Mijn bibliotheek', 'serverrender.alt': 'Cover zoals de server die maakt',
+                'action.applyCollection': 'Toepassen op verzameling', 'action.applyPlaylist': 'Toepassen op afspeellijst', 'action.applyLivetv': 'Toepassen op live-tv',
+                'restore.button': 'Originele cover herstellen', 'restore.none': 'Nog geen back-up', 'restore.available': 'Er is een back-up', 'restore.done': 'Originele cover hersteld.', 'restore.fail': 'Geen back-up gevonden om te herstellen.',
+                'restore.reset': 'Back-up resetten', 'restore.resetConfirm': 'De huidige back-up verwijderen? Resetten bewaart zelf niets. Bij de volgende keer toepassen wordt de cover die dit doel op dat moment toont bewaard als het nieuwe origineel, tenzij het een cover is die deze plug-in heeft toegepast. Zet dus eerst de cover die je wilt houden terug op dit doel (Afbeeldingen bewerken en uploaden; of verwijder de poster en ververs de metadata met "bestaande afbeeldingen vervangen"), reset daarna en pas dan toe.', 'restore.resetDone': 'Back-up verwijderd. Bij de volgende keer toepassen wordt de huidige cover bewaard als het nieuwe origineel.', 'restore.resetFail': 'Kon de back-up niet resetten: {0}',
+                'bg.source': 'Achtergrondbron', 'bg.source.image': 'Afbeelding', 'bg.source.gradient': 'Verloop', 'bg.source.solid': 'Effen kleur', 'bg.source.collage': 'Postercollage van dit doel', 'bg.collage.density': 'Collagedichtheid', 'bg.collage.sparse': 'Dun', 'bg.collage.medium': 'Gemiddeld', 'bg.collage.dense': 'Dicht', 'bg.collage.shuffle': 'Schudden', 'bg.collage.livetv': 'Live TV heeft geen posters voor een collage.',
+                'tpl.load': 'Sjabloon laden', 'tpl.delete': 'Verwijderen', 'tpl.save': 'Huidig ontwerp opslaan', 'tpl.savebtn': 'Opslaan', 'tpl.nameph': 'Sjabloonnaam', 'tpl.hint': 'Sjablonen bewaren het ontwerp maar niet de titel — elk doel houdt zijn eigen naam.', 'tpl.saved': 'Sjabloon opgeslagen.', 'tpl.named': 'Voer eerst een sjabloonnaam in.',
+                'batch.hint': 'Pas het huidige ontwerp (of geladen sjabloon) in één keer toe op meerdere doelen. Elke cover krijgt de naam van zijn doel als titel.', 'batch.apply': 'Toepassen op selectie', 'batch.none': 'Selecteer minstens één doel.', 'batch.running': 'Bezig met toepassen…', 'batch.done': 'Klaar: {0} gelukt, {1} mislukt.',
+                'fmt.animated': 'Geanimeerde GIF', 'anim.kenburns': 'Ken Burns pan/zoom', 'anim.frames': 'Frames', 'anim.delay': 'Framevertraging (ms)', 'anim.dir': 'Zoomrichting', 'anim.in': 'Inzoomen', 'anim.out': 'Uitzoomen', 'anim.hint': 'Geanimeerde GIFs zijn groter en bewegen alleen in weergaven die GIFs tonen. Max. 30 frames.'
+            },
+            es: {
+                'lede': 'Diseña una carátula para una biblioteca, previsualízala en vivo y aplícala.',
+                'target.type': 'Tipo', 'target.library': 'Biblioteca', 'target.collection': 'Colección', 'target.playlist': 'Lista de reproducción', 'target.livetv': 'TV en directo',
+                'lib.choose': 'Elegir', 'lib.selectOption': 'Seleccionar…',
+                'step.target': 'Destino e inicio', 'step.background': 'Fondo', 'step.text': 'Texto y logotipos',
+                'step.effects': 'Efectos', 'step.output': 'Salida y aplicación',
+                'group.startFrom': 'Partir de un diseño guardado', 'group.selectedLayer': 'Capa seleccionada',
+                'group.saveTemplate': 'Guardar este diseño', 'group.batch': 'Aplicar a varios destinos',
+                'ui.advanced': 'Avanzado', 'ui.undo': 'Deshacer', 'ui.redo': 'Rehacer',
+                'ui.inContext': 'En contexto', 'ui.inContextHint': 'Cómo queda la carátula en otras proporciones. El lienzo de arriba es el diseño real.',
+                'ctx.wide': 'Ancho', 'ctx.square': 'Cuadrado', 'ctx.poster': 'Póster',
+                'layer.addText': 'Añadir texto', 'layer.addImage': 'Añadir logotipo/icono',
+                'layer.show': 'Mostrar', 'layer.hide': 'Ocultar', 'layer.up': 'Subir', 'layer.down': 'Bajar', 'layer.dup': 'Duplicar', 'layer.del': 'Eliminar',
+                'layer.text': 'Texto', 'layer.logo': 'Logotipo', 'layer.more': 'Más acciones', 'layer.none': 'Ninguna capa seleccionada — añade una con Añadir texto o Añadir logotipo/icono, más arriba.',
+                'layer.opacity': 'Opacidad', 'layer.rotation': 'Rotación',
+                'hint.logo': 'PNG con transparencia · hasta 5 MB. La fila superior se dibuja la última, encima de las demás.',
+                'hint.logoSize': 'Arrastra los tiradores de las esquinas en la vista previa para redimensionar el logotipo, o el mando superior para rotarlo.',
+                'text.title': 'Título', 'text.weight': 'Grosor de la fuente',
+                'w.light': 'Fina', 'w.normal': 'Normal', 'w.medium': 'Media', 'w.semibold': 'Seminegrita', 'w.bold': 'Negrita', 'w.extrabold': 'Extranegrita',
+                'text.align': 'Alineación', 'a.left': 'Izquierda', 'a.center': 'Centrado', 'a.right': 'Derecha',
+                'text.size': 'Tamaño del texto', 'text.color': 'Color del texto', 'text.effects': 'Efectos', 'e.shadow': 'Sombra', 'e.outline': 'Contorno',
+                'text.font': 'Fuente personalizada (opcional)',
+                'fx.softlight': 'Baño de color', 'fx.vignette': 'Viñeta', 'fx.grain': 'Grano de película', 'fx.border': 'Borde',
+                'fx.color': 'Color', 'fx.opacity': 'Intensidad', 'fx.amount': 'Intensidad', 'fx.softness': 'Suavidad',
+                'fx.thickness': 'Grosor', 'fx.radius': 'Radio de las esquinas', 'fx.double': 'Línea doble', 'fx.gap': 'Separación',
+                'fx.jellyfin': 'Estilo Jellyfin', 'fx.presetHint': 'Aplica un degradado oscuro con texto blanco nítido — editable después.',
+                'fx.autopalette': 'Paleta automática', 'fx.paletteHint': 'Haz clic en un color para aplicarlo a la parada de la superposición que tocaste por última vez, si la superposición está activa y una parada tiene el foco — si no, a la capa de texto seleccionada y después al baño de color.',
+                'bg.dim': 'Atenuación', 'bg.blur': 'Desenfoque', 'bg.dimcolor': 'Color de atenuación / base',
+                'bg.gtype': 'Tipo de degradado', 'g.linear': 'Lineal', 'g.radial': 'Radial',
+                'bg.angle': 'Ángulo', 'bg.colors': 'Colores', 'bg.addcolor': 'Añadir color',
+                'bg.overlay': 'Degradado superpuesto', 'bg.overlay.preset': 'Preajuste de superposición',
+                'bg.overlay.custom': 'Personalizado', 'bg.overlay.bottom': 'Difuminado inferior',
+                'bg.overlay.top': 'Difuminado superior', 'bg.overlay.wash': 'Baño completo', 'bg.overlay.duotone': 'Duotono',
+                'bg.overlay.colors': 'Colores y opacidad', 'bg.overlay.angle': 'Ángulo de la superposición',
+                'bg.overlay.alpha': 'Opacidad',
+                'hint.overlay': 'Funde un color sobre el fondo, por debajo del texto — para el efecto en el que un póster se disuelve en un color sólido.',
+                'bg.image': 'Imagen de fondo (opcional)', 'f.chooseImage': 'Elegir imagen…', 'f.none': 'Ningún archivo seleccionado',
+                'hint.image': 'JPG, PNG, GIF, BMP o WebP · hasta 5 MB.',
+                'bg.fit': 'Ajuste de la imagen', 'fit.cover': 'Rellenar (recortar)', 'fit.contain': 'Ajustar (mostrar entera)', 'fit.stretch': 'Estirar hasta llenar',
+                'hint.fit': 'Rellenar recorta para cubrir la carátula; Ajustar mantiene la imagen entera y rellena el resto con el color base.',
+                'bg.orposter': 'O usa un póster que ya esté en la biblioteca', 'bg.browse': 'Explorar pósteres de la biblioteca', 'bg.selected': 'Fondo seleccionado:',
+                'out.dims': 'Dimensiones',
+                'd.landscape': 'Horizontal 16:9 (1280×720)', 'd.cover': 'Cuadrado (1400×1400)', 'd.poster': 'Póster vertical (1000×1500)', 'd.banner': 'Banner ancho (1920×540)', 'd.custom': 'Personalizado',
+                'out.format': 'Formato', 'fmt.auto': 'Automático (recomendado)', 'out.width': 'Ancho', 'out.height': 'Alto',
+                'f.chooseFont': 'Elegir fuente…',
+                'hint.font': 'TTF, OTF, TTC, WOFF o WOFF2 · hasta 5 MB. Déjalo vacío para usar la Noto Sans incluida.',
+                'card.preview': 'Vista previa', 'preview.placeholder': 'La vista previa aparecerá aquí automáticamente.',
+                'bg.adjust': 'Reposicionar el fondo (arrastra para desplazar, usa la rueda o pellizca para acercar)',
+                'action.apply': 'Aplicar a la biblioteca', 'action.applying': 'Aplicando…', 'action.download': 'Descargar imagen', 'action.serverRender': 'Mostrar el render del servidor', 'serverrender.label': 'Render de referencia (servidor)', 'preview.hint': 'La vista previa se actualiza automáticamente mientras ajustas los valores.', 'preview.collageFail': 'No se pudo cargar la vista previa del collage. Usa «Mostrar el render del servidor» para verlo.',
+                'modal.title': 'Selecciona un póster', 'modal.search': 'Buscar…', 'modal.alltypes': 'Todos los tipos', 'modal.close': 'Cerrar',
+                'ty.movies': 'Películas', 'ty.series': 'Series', 'ty.seasons': 'Temporadas', 'ty.albums': 'Álbumes', 'ty.artists': 'Artistas', 'ty.books': 'Libros', 'ty.musicvideos': 'Videoclips', 'ty.photos': 'Fotos', 'modal.prev': 'Anterior', 'modal.next': 'Siguiente',
+                'dyn.loading': 'Cargando…', 'dyn.errorItems': 'Error al cargar los elementos', 'dyn.noItems': 'No se han encontrado elementos', 'dyn.page': 'Página {0} de {1}',
+                'dyn.applied': 'Carátula aplicada correctamente.', 'dyn.error': 'Error: {0}', 'dyn.applyFail': 'No se ha podido aplicar la carátula: {0}',
+                'dyn.uploadFail': 'Error al subir: {0}', 'dyn.fontFail': 'Error al subir la fuente: {0}',
+                'dyn.unknown': 'error desconocido',
+                'tpl.confirmReplace': 'Cargar esta plantilla sustituye tu diseño actual, incluidos los cambios que no has aplicado. ¿Continuar?',
+                'canvas.label': 'Lienzo con el diseño de la carátula. Selecciona una capa y muévela con las flechas del teclado (mantén Mayús para pasos más grandes).',
+                'layer.visible': 'Visible', 'layer.list': 'Capas',
+                'stop.color': 'Color', 'stop.position': 'Posición', 'stop.remove': 'Quitar color', 'fx.swatch': 'Aplicar el color {0}',
+                'restore.confirm': '¿Sustituir la carátula actual de este destino por la original?', 'tpl.confirmDelete': '¿Eliminar la plantilla «{0}»?',
+                'batch.confirm': '¿Aplicar el diseño actual a los destinos seleccionados ({0})? Sus carátulas actuales se sustituirán.', 'batch.fail': 'Error al aplicar a varios destinos: {0}',
+                'err.network': 'No se puede conectar con el servidor.', 'err.auth': 'El servidor rechazó la solicitud (estado {0}). Puede que tu sesión haya caducado: recarga la página e inicia sesión de nuevo.',
+                'err.tooLarge': 'El archivo es demasiado grande para el servidor.', 'err.rateLimited': 'Demasiadas solicitudes: espera un minuto y vuelve a intentarlo.',
+                'err.status': 'El servidor respondió con el estado {0}.', 'err.badResponse': 'El servidor envió una respuesta que la página no pudo leer.',
+                'poster.noUrl': 'Ese elemento no tiene imagen de póster.', 'poster.empty': 'La imagen del póster llegó vacía.', 'poster.fail': 'No se ha podido usar ese póster: {0}',
+                'restore.unknown': 'No se pudo comprobar si hay copia de seguridad',
+                'text.defaultTitle': 'Mi biblioteca', 'serverrender.alt': 'Carátula tal como la genera el servidor',
+                'action.applyCollection': 'Aplicar a la colección', 'action.applyPlaylist': 'Aplicar a la lista de reproducción', 'action.applyLivetv': 'Aplicar a TV en directo',
+                'restore.button': 'Restaurar la carátula original', 'restore.none': 'Aún no hay copia de seguridad', 'restore.available': 'Existe una copia de seguridad', 'restore.done': 'Carátula original restaurada.', 'restore.fail': 'No se ha encontrado ninguna copia de seguridad que restaurar.',
+                'restore.reset': 'Restablecer copia de seguridad', 'restore.resetConfirm': '¿Eliminar la copia de seguridad actual? Restablecer no guarda nada por sí solo. La próxima vez que apliques, la carátula que muestre este destino en ese momento se guardará como el nuevo original, salvo que sea una carátula aplicada por este complemento. Por eso, primero vuelve a poner en este destino la que quieres conservar (Editar imágenes y súbela; o elimina el póster y actualiza los metadatos con "Reemplazar imágenes existentes"), después restablece y luego aplica.', 'restore.resetDone': 'Copia de seguridad eliminada. La próxima vez que apliques, la carátula actual se guardará como el nuevo original.', 'restore.resetFail': 'No se pudo restablecer la copia de seguridad: {0}',
+                'bg.source': 'Origen del fondo', 'bg.source.image': 'Imagen', 'bg.source.gradient': 'Degradado', 'bg.source.solid': 'Color sólido', 'bg.source.collage': 'Collage de pósteres de este destino', 'bg.collage.density': 'Densidad del collage', 'bg.collage.sparse': 'Baja', 'bg.collage.medium': 'Media', 'bg.collage.dense': 'Alta', 'bg.collage.shuffle': 'Barajar', 'bg.collage.livetv': 'La TV en directo no tiene pósteres para hacer un collage.',
+                'tpl.load': 'Cargar plantilla', 'tpl.delete': 'Eliminar', 'tpl.save': 'Guardar el diseño actual', 'tpl.savebtn': 'Guardar', 'tpl.nameph': 'Nombre de la plantilla', 'tpl.hint': 'Las plantillas guardan el diseño pero no el título — cada destino conserva su propio nombre.', 'tpl.saved': 'Plantilla guardada.', 'tpl.named': 'Introduce primero un nombre de plantilla.',
+                'batch.hint': 'Aplica el diseño actual (o la plantilla cargada) a varios destinos a la vez. Cada carátula se titula con el nombre de su destino.', 'batch.apply': 'Aplicar a la selección', 'batch.none': 'Selecciona al menos un destino.', 'batch.running': 'Aplicando…', 'batch.done': 'Listo: {0} correctas, {1} fallidas.',
+                'fmt.animated': 'GIF animado', 'anim.kenburns': 'Paneo/zoom Ken Burns', 'anim.frames': 'Fotogramas', 'anim.delay': 'Retardo entre fotogramas (ms)', 'anim.dir': 'Dirección del zoom', 'anim.in': 'Acercar', 'anim.out': 'Alejar', 'anim.hint': 'Los GIF animados son más grandes y solo se animan en vistas que muestran GIF. Máximo 30 fotogramas.'
+            }
+        };
+
+        var LANG = 'en';
+
+        function detectLang() {
+            var candidates = [];
+            // Jellyfin stores the selected UI language in the browser (localStorage),
+            // e.g. "<userId>-language" = "nl". navigator.language is the BROWSER
+            // language, which often differs, so check the stored setting first.
+            try {
+                for (var i = 0; i < localStorage.length; i++) {
+                    var k = localStorage.key(i);
+                    if (k && /language|locale|culture/i.test(k)) {
+                        var v = localStorage.getItem(k);
+                        if (v && v.length > 0 && v.length <= 12) { candidates.push(v); }
+                    }
+                }
+            } catch (e) { /* localStorage unavailable */ }
+            try {
+                var htmlLang = document.documentElement.getAttribute('lang');
+                if (htmlLang) { candidates.push(htmlLang); }
+            } catch (e) { /* ignore */ }
+            try {
+                if (navigator.languages) { candidates = candidates.concat(navigator.languages); }
+            } catch (e) { /* ignore */ }
+            if (navigator.language) { candidates.push(navigator.language); }
+
+            for (var j = 0; j < candidates.length; j++) {
+                var lang = String(candidates[j]).toLowerCase().split('-')[0].split('_')[0];
+                if (I18N[lang]) { return lang; }
+            }
+            return 'en';
+        }
+
+        function t(key, a, b) {
+            var d = I18N[LANG] || I18N.en;
+            var s = d[key];
+            if (s === undefined) { s = I18N.en[key]; }
+            if (s === undefined) { s = key; }
+            if (a !== undefined) { s = s.replace('{0}', a); }
+            if (b !== undefined) { s = s.replace('{1}', b); }
+            return s;
+        }
+
+        // Translated attributes: [marker attribute, attribute it fills].
+        var I18N_ATTRS = [['data-i18n-ph', 'placeholder'], ['data-i18n-aria', 'aria-label'], ['data-i18n-alt', 'alt']];
+
+        // Runs for EVERY language, English included. It used to return early for 'en' on
+        // the theory that the markup already is English: true on a first load, false on a
+        // page Jellyfin reuses after the user switched from Dutch back to English, which
+        // then kept every Dutch label. MarkupDefaultText_MatchesTheEnglishDictionary keeps
+        // the markup and the en block identical, so re-applying en is a no-op otherwise.
+        function applyI18n(root) {
+            root.querySelectorAll('[data-i18n]').forEach(function (elm) {
+                var s = t(elm.getAttribute('data-i18n'));
+                if (s) { elm.textContent = s; }
+            });
+            I18N_ATTRS.forEach(function (pair) {
+                root.querySelectorAll('[' + pair[0] + ']').forEach(function (elm) {
+                    var s = t(elm.getAttribute(pair[0]));
+                    if (s) { elm.setAttribute(pair[1], s); }
+                });
+            });
+        }
+        // ------------------------------------------------------------------
+
+        // Casing-agnostic read: server may serialize PascalCase (Data) or camelCase (data).
+        function pick(obj, name) {
+            if (!obj) { return undefined; }
+            if (obj[name] !== undefined) { return obj[name]; }
+            var camel = name.charAt(0).toLowerCase() + name.slice(1);
+            return obj[camel];
+        }
+
+        function apiUrl(path) { return ApiClient.getUrl(path); }
+
+        // Jellyfin 12 no longer accepts the legacy X-Emby-Token header: a request carrying
+        // it is challenged by CustomAuthenticationHandler and returns 401 with an EMPTY
+        // body, so .json() below dies with "Unexpected end of JSON input" and nothing in
+        // the message mentions auth. The MediaBrowser scheme is what Jellyfin Web itself
+        // sends and is accepted by 10.11 and 12 alike, so it replaces the old header
+        // outright rather than being a version fork.
+        //
+        // Build it in ONE place: every authenticated request must come through here.
+        function authHeader() {
+            // The scheme has no escaping rules, so a quote inside a value would end the
+            // field early. Strip rather than escape.
+            function q(v) { return String(v === null || v === undefined ? '' : v).replace(/"/g, ''); }
+            return 'MediaBrowser Client="' + q(ApiClient.appName ? ApiClient.appName() : 'Jellyfin Web') +
+                '", Device="' + q(ApiClient.deviceName ? ApiClient.deviceName() : 'Web') +
+                '", DeviceId="' + q(ApiClient.deviceId ? ApiClient.deviceId() : '') +
+                '", Version="' + q(ApiClient.appVersion ? ApiClient.appVersion() : '') +
+                '", Token="' + q(ApiClient.accessToken()) + '"';
+        }
+
+        function authFetch(path, options) {
+            options = options || {};
+            options.headers = Object.assign({ 'Authorization': authHeader() }, options.headers || {});
+            return fetch(apiUrl(path), options);
+        }
+
+        // --- Requests & errors --------------------------------------------
+        // Every plugin call goes through readJson, so a non-2xx status or an unreadable
+        // body becomes an Error whose message is ALREADY translated and can be shown as
+        // is. Before this, a 401/413/429 (whose bodies are empty or HTML) reached .json()
+        // and surfaced as "Unexpected end of JSON input", naming neither status nor cause.
+        function requestError(status) {
+            if (status === 401 || status === 403) { return new Error(t('err.auth', status)); }
+            if (status === 413) { return new Error(t('err.tooLarge')); }
+            if (status === 429) { return new Error(t('err.rateLimited')); }
+            return new Error(t('err.status', status));
+        }
+
+        // fetch() itself rejects only when the server could not be reached at all.
+        function networkError() { return new Error(t('err.network')); }
+
+        // A failed response, as a rejected promise. The render endpoints answer a
+        // validation failure (CoverValidationException) with 400 { error: <message> }, and
+        // that message is already localized by the server, so it is shown as is; every
+        // other failure is described by its status.
+        function responseError(r) {
+            return r.text().then(function (text) {
+                var msg = '';
+                if (r.status === 400) {
+                    try { msg = pick(JSON.parse(text), 'Error') || ''; } catch (err) { msg = ''; }
+                }
+                throw msg ? new Error(msg) : requestError(r.status);
+            }, function () { throw requestError(r.status); });
+        }
+
+        function readJson(r) {
+            if (!r.ok) { return responseError(r); }
+            return r.text().then(function (text) {
+                try { return JSON.parse(text); }
+                catch (err) { throw new Error(t('err.badResponse')); }
+            });
+        }
+
+        function jsonFetch(path, method, body) {
+            return authFetch(path, {
+                method: method || 'GET',
+                headers: { 'Content-Type': 'application/json' },
+                body: body ? JSON.stringify(body) : undefined
+            }).then(readJson, function () { throw networkError(); });
+        }
+
+        // An ApiResponse envelope: its Data on Success, otherwise an Error carrying the
+        // server's own (already localized) ErrorMessage.
+        function dataOrThrow(res) {
+            if (!pick(res, 'Success')) { throw new Error(pick(res, 'ErrorMessage') || t('dyn.unknown')); }
+            return pick(res, 'Data');
+        }
+
+        // The ONE place a caught Error's message is read (pinned by a test).
+        function errorText(e) { return (e && e.message) || t('dyn.unknown'); }
+
+        // The one way a failed action is reported. Takes a finished message so every
+        // translation key stays a literal t('…') call the reachability test can see:
+        //   showError(t('dyn.uploadFail', errorText(e)))
+        function showError(message) {
+            Dashboard.hideLoadingMsg();
+            Dashboard.alert(message);
+        }
+
+        // Latest-wins request ordering. Each call supersedes every earlier call on the same
+        // channel; the returned isCurrent() is false once a newer request has been made, so
+        // a slow stale response is dropped instead of overwriting a fresh one.
+        var _requestSeq = {};
+        function requestGuard(channel) {
+            var n = (_requestSeq[channel] || 0) + 1;
+            _requestSeq[channel] = n;
+            return function isCurrent() { return _requestSeq[channel] === n; };
+        }
+
+        function el(id) { return page.querySelector('#' + id); }
+
+        // Promise<boolean>. Jellyfin's own themed confirm dialog when the dashboard exposes
+        // it (Dashboard.confirm(message, title, callback)), the browser's otherwise.
+        function confirmAction(message) {
+            return new Promise(function (resolve) {
+                if (window.Dashboard && typeof Dashboard.confirm === 'function') {
+                    try { Dashboard.confirm(message, '', function (ok) { resolve(!!ok); }); return; }
+                    catch (e) { /* fall through to the browser dialog */ }
+                }
+                resolve(window.confirm(message));
+            });
+        }
+
+        // --- Step accordion -----------------------------------------------
+        // Owns .ccaStepBody and NOTHING else. Every other visibility helper
+        // (updateBackgroundVisibility, updateEffectsVisibility, updateAnimVisibility, the
+        // .ccaTextOnly/.ccaImageOnly toggles) writes style.display on elements INSIDE a
+        // body; if this controller touched those too, the two owners would fight and a
+        // control could reappear inside a collapsed step.
+        var STEP_KEY = 'cca.lastStep';
+
+        function openStep(n) {
+            page.querySelectorAll('.ccaStep').forEach(function (section) {
+                var isTarget = section.getAttribute('data-step') === String(n);
+                var head = section.querySelector('.ccaStepHead');
+                var body = section.querySelector('.ccaStepBody');
+                head.setAttribute('aria-expanded', isTarget ? 'true' : 'false');
+                if (isTarget) { body.removeAttribute('hidden'); } else { body.setAttribute('hidden', ''); }
+            });
+            try { localStorage.setItem(STEP_KEY, String(n)); } catch (e) { /* private mode */ }
+            // Step 5 may have just become visible, and its thumbnails skip drawing
+            // while collapsed.
+            if (typeof renderPreviewContexts === 'function') { renderPreviewContexts(); }
+        }
+
+        function currentOpenStep() {
+            var open = page.querySelector('.ccaStepHead[aria-expanded="true"]');
+            return open ? open.parentNode.getAttribute('data-step') : null;
+        }
+
+        function initSteps() {
+            page.querySelectorAll('.ccaStep').forEach(function (section) {
+                var n = section.getAttribute('data-step');
+                section.querySelector('.ccaStepHead').addEventListener('click', function () {
+                    // Clicking the open step collapses it: all-closed is a valid state, and
+                    // it is how you give the canvas the whole screen on a phone.
+                    if (currentOpenStep() === n) {
+                        section.querySelector('.ccaStepBody').setAttribute('hidden', '');
+                        this.setAttribute('aria-expanded', 'false');
+                        return;
+                    }
+                    openStep(n);
+                });
+            });
+            restoreLastStep();
+        }
+
+        // Advanced disclosures are independent of the step accordion and of each other:
+        // opening a step does not reveal its advanced controls, and the state is not
+        // persisted. In the Effects step they are nested INSIDE each effect's row, because
+        // updateEffectsVisibility owns that row's display — pulling softness out to a
+        // step-level block would show it even with the vignette switched off.
+        function initAdvanced() {
+            page.querySelectorAll('.ccaAdvHead').forEach(function (head) {
+                head.addEventListener('click', function () {
+                    var body = this.parentNode.querySelector('.ccaAdvBody');
+                    var open = this.getAttribute('aria-expanded') === 'true';
+                    this.setAttribute('aria-expanded', open ? 'false' : 'true');
+                    if (open) { body.setAttribute('hidden', ''); } else { body.removeAttribute('hidden'); }
+                });
+            });
+        }
+
+        // Step 1 when nothing is selected yet, otherwise wherever you left off — a first
+        // run starts at the beginning, a return visit lands where you were working.
+        function restoreLastStep() {
+            var saved = null;
+            try { saved = localStorage.getItem(STEP_KEY); } catch (e) { /* ignore */ }
+            var exists = saved && page.querySelector('.ccaStep[data-step="' + saved + '"]');
+            openStep((state.libraryId && exists) ? saved : '1');
+        }
+
+        // titleTouched: the user has typed their own title, so picking a target no longer
+        // renames it. applying: an Apply is in flight and owns the Apply button.
+        // templateValue: the template dropdown's value before the current change, so a
+        // declined "replace unapplied changes?" can put it back.
+        var state = { libraryId: '', aspectRatio: 1, collageSeed: 1, titleTouched: false, applying: false, batchRunning: false, templateValue: '' };
+        var browser = { page: 1, pageSize: 24, totalPages: 1 };
+
+        function debounce(fn, wait) {
+            var t;
+            return function () {
+                var args = arguments, ctx = this;
+                clearTimeout(t);
+                t = setTimeout(function () { fn.apply(ctx, args); }, wait);
+            };
+        }
+
+        var PRESETS = {
+            landscape: { w: 1280, h: 720 },
+            cover: { w: 1400, h: 1400 },
+            poster: { w: 1000, h: 1500 },
+            banner: { w: 1920, h: 540 },
+            custom: { w: 1920, h: 1080 }
+        };
+
+        // The bounds the server enforces (ImageProcessingService.ValidateCoverArtDimensions).
+        var MIN_DIM = 100, MAX_DIM = 2048;
+        function clampDim(value, fallback) {
+            var v = parseInt(value, 10);
+            if (!isFinite(v)) { return fallback; }
+            return Math.max(MIN_DIM, Math.min(MAX_DIM, v));
+        }
+
+        // ==================================================================
+        // Canvas engine (Phase 1 · Task 7)
+        // Renders a client-side CoverDocument onto <canvas id="ccaCanvas">, live,
+        // to mirror the server ImageSharp compositor (Services/DocumentRenderer.cs).
+        // The server stays authoritative; this is a fast visual preview. Field
+        // names/casing on `doc` are PascalCase to match the C# CoverDocument model.
+        // ==================================================================
+
+        // The working document. PascalCase mirrors Models/CoverDocument.cs so the
+        // same object shape can later be POSTed for the authoritative server render.
+        // Mirrors Models/CoverDocument.cs EffectSettings, all disabled by default so an
+        // untouched design renders exactly as it did before effects existed.
+        function defaultEffects() {
+            return {
+                Border: { Enabled: false, Color: '#ffffff', Thickness: 8, Radius: 0, Double: false, Gap: 6 },
+                Vignette: { Enabled: false, Amount: 0.4, Softness: 0.5, Color: '#000000' },
+                Grain: { Enabled: false, Amount: 0.08, Seed: 12345 },
+                SoftLight: { Enabled: false, Color: '#ffffff', Opacity: 0.15 },
+                Preset: null
+            };
+        }
+
+        // Client mirror of DocumentMigration.Normalize's effects guard: a document saved
+        // before Phase 3 carries `Effects: { Preset: null }` with no sub-objects, and the
+        // draw functions dereference them unconditionally.
+        function normalizeEffects(d) {
+            var def = defaultEffects();
+            d.Effects = d.Effects || {};
+            ['Border', 'Vignette', 'Grain', 'SoftLight'].forEach(function (k) {
+                d.Effects[k] = Object.assign({}, def[k], d.Effects[k] || {});
+            });
+            if (d.Effects.Preset === undefined) { d.Effects.Preset = null; }
+            return d;
+        }
+
+        // Client mirror of DocumentMigration.NormalizeBackgroundSource — same rules, same
+        // order. Runs on LOAD only (init and template load), never on every change: it
+        // derives Source from the old fields, so running it mid-edit would flip the user's
+        // chosen source out from under them the moment they cleared an image.
+        function normalizeBackgroundSource(d) {
+            var bg = d.Background;
+            var source = String(bg.Source || '').trim().toLowerCase();
+            if (source === 'collage') { bg.Source = 'collage'; return d; }
+            if (bg.ImagePath) { bg.Source = 'upload'; return d; }
+            bg.Source = (bg.Gradient && bg.Gradient.IsEnabled) ? 'gradient' : 'solid';
+            return d;
+        }
+
+        // Runs on LOAD only (init, template load, restoreSnapshot), same as the two
+        // normalizers above, and for the same reason: it must never run from inside
+        // syncControlsFromDocument, which also fires on a plain selection change, or a
+        // history entry could be silently mutated outside of undo/redo (hydrate mutates doc
+        // -> scheduleRender -> commit -> snapshot sees a "changed" document -> the redo tail
+        // gets truncated for no user-visible edit).
+        //
+        // GradientSettings.Angle is a non-nullable float server-side, defaulting to 0 (a
+        // left-to-right fade) — but every client render treats a missing Angle as 90
+        // (top-to-bottom, see drawGradientOverlay/hydrateOverlayControls). A document whose
+        // Overlay predates this field, or was hand-built without it, would otherwise render
+        // one way in the editor and another way on the server, so it's backfilled once, here,
+        // at load.
+        function normalizeOverlay(d) {
+            var ov = d.Background && d.Background.Overlay;
+            if (ov && ov.Angle == null) { ov.Angle = 90; }
+            return d;
+        }
+
+        // Client mirror of DocumentRenderer.BuildColorStops' fallback. A background gradient
+        // with fewer than two Stops renders on the server as StartColor -> EndColor (Jellyfin
+        // purple -> blue by default, GradientSettings in CoverArtModels.cs). The canvas used
+        // to draw black -> white instead, and the stop editor showed the brand colours without
+        // writing them back. Legacy templates are exactly that shape. Folding Start/End into
+        // Stops makes the document say what the server draws, and the server renders the
+        // migrated document identically: two stops at 0 and 1 ARE its own fallback.
+        // Runs on LOAD only, like the normalizers above.
+        var GRADIENT_FALLBACK_START = '#aa5cc3';
+        var GRADIENT_FALLBACK_END = '#00a4dc';
+
+        // A colour the server's SafeColor would accept (Color.ParseHex: #rgb, #rgba, #rrggbb,
+        // #rrggbbaa, '#' optional), normalised with a '#'; anything else gets `fallback`,
+        // which is what SafeColor does.
+        function serverHexOr(hex, fallback) {
+            var s = String(hex == null ? '' : hex).trim();
+            if (!/^#?([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(s)) { return fallback; }
+            return s.charAt(0) === '#' ? s : '#' + s;
+        }
+
+        // The two stops the server falls back to: a MISSING Start/End takes the C# default,
+        // and an unparseable one takes SafeColor's black/white.
+        function gradientFallbackStops(g) {
+            var start = pick(g, 'StartColor'), end = pick(g, 'EndColor');
+            return [
+                { Color: serverHexOr(start === undefined ? GRADIENT_FALLBACK_START : start, '#000000'), Position: 0, Alpha: 1 },
+                { Color: serverHexOr(end === undefined ? GRADIENT_FALLBACK_END : end, '#ffffff'), Position: 1, Alpha: 1 }
+            ];
+        }
+
+        function normalizeGradientStops(d) {
+            var g = d.Background && d.Background.Gradient;
+            if (!g) { return d; }
+            // Null entries are dropped first, as DocumentMigration/BuildColorStops do.
+            g.Stops = (g.Stops || []).filter(Boolean);
+            if (g.Stops.length < 2) { g.Stops = gradientFallbackStops(g); }
+            return d;
+        }
+
+        function defaultDocument() {
+            return {
+                Version: 2,
+                Canvas: { Width: 1280, Height: 720, Format: 'auto', DimensionPreset: 'landscape' },
+                Background: {
+                    // The default design is the Jellyfin brand gradient, so the source says
+                    // so rather than claiming to be an image that was never chosen.
+                    Source: 'gradient', ImagePath: '', Fit: 'cover',
+                    Transform: { OffsetX: 0, OffsetY: 0, Scale: 1 },
+                    Blur: 0, Dim: 0.25, DimColor: '#000000',
+                    Gradient: {
+                        IsEnabled: true, Type: 0, Angle: 0,
+                        Stops: [{ Color: '#aa5cc3', Position: 0 }, { Color: '#00a4dc', Position: 1 }],
+                        CenterX: 0.5, CenterY: 0.5, Radius: 0.5
+                    },
+                    Overlay: null,
+                    Collage: null, Animation: null
+                },
+                Effects: defaultEffects(),
+                Layers: [{
+                    Id: 'title', Type: 'text', Visible: true, X: 0.5, Y: 0.5, Width: 0, Height: 0,
+                    Rotation: 0, Opacity: 1, Content: t('text.defaultTitle'), Size: 120 / 720, Weight: 400,
+                    Color: '#ffffff', Align: 1, FontPath: '',
+                    Shadow: { Enabled: false, Color: '#000000', Blur: 4, OffsetX: 2, OffsetY: 2 },
+                    Outline: { Enabled: false, Color: '#000000', Width: 2 }
+                }],
+                _selectedId: 'title'
+            };
+        }
+        var doc = defaultDocument();
+
+        // CRITICAL canvas-source invariant: bgImageEl AND collageBgEl must ONLY ever be
+        // assigned an <img> loaded from a blob: object-URL (URL.createObjectURL of a client
+        // File or a fetched Blob). A blob: URL adopts the document origin so the canvas is
+        // never tainted (Phase 3's getImageData/palette + client grain depend on it).
+        // NEVER point either at ApiClient.getImageUrl(...) or a server /upload path.
+        // bgImageEl is the user's image (upload or poster pick); collageBgEl the server-built
+        // mosaic. Which one is painted is decided by activeBgBitmap(), so switching between
+        // image and collage neither loses the uploaded bitmap nor paints a stale one.
+        var bgImageEl = null;
+
+        // The bitmap the canvas paints as the background right now, or null when nothing
+        // drawable is loaded (the gradient or flat colour renders instead).
+        function activeBgBitmap() {
+            var img = doc.Background.Source === 'collage' ? collageBgEl : bgImageEl;
+            return (img && img.complete && img.naturalWidth) ? img : null;
+        }
+
+        // --- Collage background on the live canvas ------------------------------
+        // The canvas cannot build a poster collage (the posters are server files), so it
+        // asks the server for the bare mosaic and then treats it exactly like an uploaded
+        // image: drawBackgroundImage applies Fit, Transform and Blur, paintBackgroundOnly
+        // the dim, and the overlay, effects and layers are drawn on top as usual. That is
+        // the server's own order (CollageComposer output -> ApplyBackgroundLayer), so the
+        // request strips everything the canvas adds itself, or it would be applied twice.
+        var collageBgEl = null;      // <img> from a blob: URL of the server's PNG (invariant above)
+        var _collageUrl = null;      // collageBgEl's object URL, revoked when replaced
+        var _collageWanted = '';     // collageKey() the canvas should be showing ('' = none)
+        var _collageSourceId = '';   // the target the current mosaic belongs to
+        var _collageToken = 0;      // bumped per request and per change: older answers are dropped
+
+        // Everything the server's mosaic depends on, and nothing else: text, effect and
+        // background-adjustment edits leave it alone, so they never trigger a request.
+        function collageKey() {
+            var c = buildCollageFromControls();
+            return [c.SourceId, c.SourceType, c.Density, c.Seed, doc.Canvas.Width, doc.Canvas.Height].join('|');
+        }
+
+        // The background-only document for the mosaic: the same collage at the same size,
+        // drawn untransformed with no blur, dim, gradient, overlay, effects or layers.
+        function collageRequestDocument() {
+            return {
+                Version: doc.Version,
+                Canvas: { Width: doc.Canvas.Width, Height: doc.Canvas.Height, Format: 'png', DimensionPreset: doc.Canvas.DimensionPreset },
+                Background: {
+                    Source: 'collage', ImagePath: '', Fit: 'cover',
+                    Transform: { OffsetX: 0, OffsetY: 0, Scale: 1 },
+                    Blur: 0, Dim: 0, DimColor: '#000000',
+                    Gradient: null, Overlay: null, Animation: null,
+                    Collage: buildCollageFromControls()
+                },
+                Effects: defaultEffects(),
+                Layers: []
+            };
+        }
+
+        function setCollageBusy(on) {
+            var spinner = el('ccaCollageSpinner');
+            if (spinner) { spinner.hidden = !on; }
+        }
+
+        function showCollageHint(on) {
+            var hint = el('ccaCollageHint');
+            if (hint) { hint.hidden = !on; }
+        }
+
+        function releaseCollageBitmap() {
+            if (_collageUrl) { URL.revokeObjectURL(_collageUrl); }
+            _collageUrl = null;
+            collageBgEl = null;
+            showCollageHint(false);
+        }
+
+        // Called on every render; does nothing unless the collage inputs changed.
+        function syncCollageBitmap() {
+            var wanted = (doc.Background.Source === 'collage' && state.libraryId) ? collageKey() : '';
+            if (wanted === _collageWanted) { return; }
+            _collageWanted = wanted;
+            // A different target must not keep showing the previous target's posters: drop
+            // them now (flat colour + spinner). Same-target re-rolls keep the old bitmap.
+            var sourceId = wanted ? state.libraryId : '';
+            if (sourceId !== _collageSourceId) {
+                _collageSourceId = sourceId;
+                releaseCollageBitmap();
+            }
+            _collageToken++;                 // whatever is in flight now answers an old question
+            if (!wanted) {
+                releaseCollageBitmap();
+                setCollageBusy(false);
+                return;
+            }
+            setCollageBusy(true);
+            requestCollageBitmap();
+        }
+
+        function fetchCollageBitmap() {
+            if (!_collageWanted) { return; }
+            var token = ++_collageToken;
+            authFetch('CustomCoverArt/document/preview', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(collageRequestDocument())
+            }).then(function (r) {
+                if (!r.ok) { throw new Error('collage render returned ' + r.status); }
+                return r.blob();
+            }).then(function (blob) {
+                if (token !== _collageToken) { return; }
+                var url = URL.createObjectURL(blob);
+                var img = new Image();
+                img.onload = function () {
+                    if (token !== _collageToken) { URL.revokeObjectURL(url); return; }
+                    releaseCollageBitmap();
+                    collageBgEl = img;
+                    _collageUrl = url;
+                    setCollageBusy(false);
+                    scheduleRender();
+                };
+                img.onerror = function () {
+                    URL.revokeObjectURL(url);
+                    collageFailed(token);
+                };
+                img.src = url;
+            }).catch(function () { collageFailed(token); });
+        }
+        var requestCollageBitmap = debounce(fetchCollageBitmap, 400);
+
+        // Keeps whatever was showing (an older mosaic, or the flat base colour) and says why
+        // the collage is missing. The same inputs are not retried; changing one is.
+        function collageFailed(token) {
+            if (token !== _collageToken) { return; }
+            setCollageBusy(false);
+            showCollageHint(true);
+        }
+
+        // --- Animated GIF background on the live canvas ----------------------------
+        // The canvas only repaints on edits, so an animated GIF background looked frozen.
+        // While the background bitmap is an animated GIF, repaint ~15 times a second, and
+        // only while the editor is on screen and the user has not asked for reduced motion.
+        // The flag lives on the <img> itself, so replacing or clearing bgImageEl anywhere
+        // ends the loop with no extra bookkeeping.
+        var GIF_FRAME_MS = 1000 / 15;
+        var _gifLoopId = 0;           // the ONE rAF handle; 0 = no loop running
+        var _gifLastPaint = 0;
+        var _reducedMotion = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
+
+        // Flags img once its bytes prove a multi-frame GIF (a still GIF never loops).
+        // Firefox keeps handing drawImage() the same frame of an animated <img>, so where
+        // WebCodecs' ImageDecoder exists the frames are also decoded explicitly (see
+        // stepGifDecoder). The flag is set first: without a decoder, or if it fails, the
+        // loop repaints from the <img> as before (which animates in Chromium).
+        function watchForAnimatedGif(img, blob) {
+            if (!blob || !blob.arrayBuffer) { return; }
+            if (blob.type !== 'image/gif' && !/\.gif$/i.test(blob.name || '')) { return; }
+            blob.arrayBuffer().then(function (buf) {
+                if (!isAnimatedGif(buf)) { return; }
+                img._ccaAnimatedGif = true;
+                updateGifLoop();
+                if (typeof ImageDecoder === 'function') { attachGifDecoder(img, buf); }
+            }).catch(function () { /* detection is best-effort: the canvas just stays still */ });
+        }
+
+        // Gives THIS img a frame decoder: { decoder, canvas, index, nextAt, pending, drawn,
+        // frameCount, delays, lastDelay, resync }. Only the current frame is kept, painted
+        // into canvas (the GIF's own size); delays holds just the frame delays seen so far
+        // (numbers). The frames come from the uploaded Blob's bytes, so the canvas stays clean.
+        function attachGifDecoder(img, buf) {
+            var decoder;
+            try {
+                decoder = new ImageDecoder({ data: buf, type: 'image/gif' });
+            } catch (e) { return; }
+            // frameCount may still grow until every byte is parsed (Firefox reports it
+            // late), so it is read only once decoder.completed has resolved too.
+            Promise.all([decoder.tracks.ready, decoder.completed]).then(function () {
+                var track = decoder.tracks.selectedTrack;
+                var count = track ? track.frameCount : 0;
+                // Replaced or dropped while the decoder was starting, or nothing to animate.
+                if (img._ccaGifClosed || !(count > 1)) { decoder.close(); return; }
+                img._ccaGifDecoder = {
+                    decoder: decoder, canvas: document.createElement('canvas'),
+                    index: 0, nextAt: 0, pending: false, drawn: false, frameCount: count,
+                    delays: [], lastDelay: 100, resync: true
+                };
+            }).catch(function () {
+                try { decoder.close(); } catch (e) { /* already closed */ }
+            });
+        }
+
+        // Closes img's decoder (if any) and keeps one from being attached later. The
+        // <img> path takes over, which is all a dropped or replaced bitmap needs.
+        function closeGifDecoder(img) {
+            if (!img) { return; }
+            img._ccaGifClosed = true;
+            var gif = img._ccaGifDecoder;
+            img._ccaGifDecoder = null;
+            if (gif) {
+                gif.closed = true;
+                try { gif.decoder.close(); } catch (e) { /* already closed */ }
+            }
+        }
+
+        // A GIF frame's delay in ms. VideoFrame.duration is in microseconds; like browsers,
+        // a missing delay or one of 10 ms or less plays at 100 ms.
+        function gifFrameDelay(frame) {
+            var ms = frame && frame.duration ? frame.duration / 1000 : 0;
+            return ms <= 10 ? 100 : ms;
+        }
+
+        // A frame's delay once it has been decoded; until then the last delay seen.
+        function gifDelayAt(gif, i) {
+            return gif.delays[i] || gif.lastDelay;
+        }
+
+        // One full pass through the GIF, with the same estimate for frames not yet seen.
+        function gifLoopLength(gif) {
+            var total = 0;
+            for (var i = 0; i < gif.frameCount; i++) { total += gifDelayAt(gif, i); }
+            return total;
+        }
+
+        // Called by gifTick (the one loop) for the background's decoder. Playback keeps a
+        // schedule: gif.nextAt is when frame gif.index is due. Frames whose time is already
+        // over are skipped (decode() returns a fully composited frame, so any index can be
+        // decoded directly), which keeps fast GIFs in real time under the 15 fps render
+        // cap. Decodes the due frame, paints it into the decoder's canvas, closes it and
+        // renders. Never re-arms itself: once the loop stops, decoding stops.
+        function stepGifDecoder(img, gif, now) {
+            if (gif.pending) { return; }
+            var track = gif.decoder.tracks.selectedTrack;
+            if (track && track.frameCount > gif.frameCount) { gif.frameCount = track.frameCount; }
+            // (Re)starting, or more than a whole loop behind: restart the clock here rather
+            // than fast-forwarding through everything that was missed.
+            if (gif.resync || now - gif.nextAt > gifLoopLength(gif)) {
+                gif.resync = false;
+                gif.nextAt = now;
+            }
+            while (now >= gif.nextAt + gifDelayAt(gif, gif.index)) {
+                gif.nextAt += gifDelayAt(gif, gif.index);
+                gif.index = (gif.index + 1) % gif.frameCount;
+            }
+            if (now < gif.nextAt) { return; }
+            var index = gif.index;
+            gif.pending = true;
+            gif.decoder.decode({ frameIndex: index }).then(function (result) {
+                gif.pending = false;
+                var frame = result.image;
+                // The background was replaced or cleared, or the loop stopped (page hidden,
+                // reduced motion) while decoding: drop the frame, keep the index, and
+                // restart the clock when it plays again.
+                if (gif.closed || img !== bgImageEl || !_gifLoopId) {
+                    frame.close();
+                    gif.resync = true;
+                    return;
+                }
+                var cv = gif.canvas;
+                var w = img.naturalWidth || frame.displayWidth, h = img.naturalHeight || frame.displayHeight;
+                var delay = gifFrameDelay(frame);
+                try {
+                    if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+                    var cx = cv.getContext('2d');
+                    cx.clearRect(0, 0, w, h);
+                    cx.drawImage(frame, 0, 0, w, h);
+                } finally {
+                    frame.close();
+                }
+                gif.delays[index] = delay;
+                gif.lastDelay = delay;
+                gif.drawn = true;
+                // Due one delay after this frame was due, not after the (late) tick.
+                if (gif.index === index) {
+                    gif.nextAt += delay;
+                    gif.index = (index + 1) % gif.frameCount;
+                }
+                _gifLastPaint = now;
+                renderDocument(true);
+            }).catch(function (err) {
+                gif.pending = false;
+                // The decoder failed (not just closed by us): fall back to the <img> path.
+                if (!gif.closed && img._ccaGifDecoder === gif) {
+                    if (window.console && console.debug) { console.debug('CustomCoverArt: GIF frame decoding failed, falling back to the <img>', err); }
+                    gif.closed = true;
+                    img._ccaGifDecoder = null;
+                    try { gif.decoder.close(); } catch (e) { /* already closed */ }
+                }
+            });
+        }
+
+        // The canvas is laid out (its step and the page are shown) and the tab is visible.
+        function isEditorOnScreen() {
+            var cv = el('ccaCanvas');
+            return !document.hidden && !!cv && cv.offsetParent !== null;
+        }
+
+        function gifLoopWanted() {
+            return !!(bgImageEl && bgImageEl._ccaAnimatedGif)
+                && activeBgBitmap() === bgImageEl
+                && isEditorOnScreen()
+                && !(_reducedMotion && _reducedMotion.matches);
+        }
+
+        function gifTick(now) {
+            _gifLoopId = 0;
+            if (!gifLoopWanted()) { return; }
+            // Re-arm first: the render below calls updateGifLoop, which must see a live loop
+            // and not start a second one.
+            _gifLoopId = requestAnimationFrame(gifTick);
+            // 15 fps is the upper bound for both paths.
+            if (now - _gifLastPaint < GIF_FRAME_MS) { return; }
+            // Decoded frames: render when the next one is due, at the GIF's own pace.
+            var gif = bgImageEl._ccaGifDecoder;
+            if (gif) { stepGifDecoder(bgImageEl, gif, now); return; }
+            _gifLastPaint = now;
+            renderDocument(true);
+        }
+
+        function stopGifLoop() {
+            if (_gifLoopId) { cancelAnimationFrame(_gifLoopId); }
+            _gifLoopId = 0;
+        }
+
+        // Starts or stops the loop to match the current state; cheap, so it runs after every
+        // render and on every visibility or reduced-motion change.
+        function updateGifLoop() {
+            var gif = (bgImageEl && bgImageEl._ccaAnimatedGif) ? bgImageEl : null;
+            var holder = el('ccaGifHolder');
+            if (holder && holder.firstChild !== gif) {
+                holder.innerHTML = '';
+                if (gif) { holder.appendChild(gif); }
+            }
+            if (gifLoopWanted()) {
+                if (!_gifLoopId) {
+                    // Starting or resuming: decoded playback restarts its clock (no catch-up).
+                    if (gif._ccaGifDecoder) { gif._ccaGifDecoder.resync = true; }
+                    _gifLoopId = requestAnimationFrame(gifTick);
+                }
+            } else {
+                stopGifLoop();
+            }
+        }
+
+        // Re-evaluates the loop when the reduced-motion preference changes. Switched on
+        // and off with the page (bindPageListeners / unbindPageListeners); older engines
+        // only have addListener/removeListener on a MediaQueryList.
+        function watchReducedMotion(on) {
+            if (!_reducedMotion) { return; }
+            if (_reducedMotion.addEventListener) {
+                if (on) { _reducedMotion.addEventListener('change', updateGifLoop); }
+                else { _reducedMotion.removeEventListener('change', updateGifLoop); }
+            } else if (_reducedMotion.addListener) {
+                if (on) { _reducedMotion.addListener(updateGifLoop); }
+                else { _reducedMotion.removeListener(updateGifLoop); }
+            }
+        }
+
+        // Background pan/zoom mode (Task 9): when true, canvas drag/wheel/pinch
+        // mutate doc.Background.Transform instead of selecting/dragging a text
+        // layer. Toggled by the #ccaBgAdjust checkbox.
+        var bgAdjustMode = false;
+
+        // Coordinate contract: canvas backing store is doc.Canvas.Width×Height;
+        // normalized layer coordinates map 1:1 across that dimension.
+        function normToPx(n, dim) { return n * dim; }
+        function pxToNorm(px, dim) { return dim ? px / dim : 0; }
+
+        function selectedLayer() {
+            for (var i = 0; i < doc.Layers.length; i++) {
+                if (doc.Layers[i].Id === doc._selectedId) { return doc.Layers[i]; }
+            }
+            return null;
+        }
+
+        // --- Layer management (Phase 2) ------------------------------------
+        // doc.Layers[0] is the BOTTOM layer (drawn first); the panel lists the array
+        // reversed so the top-most layer sits at the top of the list, like every other
+        // layers panel. Server-side the count is capped at 40 (CoverArtService), so the
+        // client refuses to add past that rather than letting layers vanish on apply.
+        var MAX_LAYERS = 40;
+
+        function newLayerId() { return 'l' + Date.now().toString(36) + Math.floor(Math.random() * 1e4).toString(36); }
+
+        function layerIndex(id) {
+            for (var i = 0; i < doc.Layers.length; i++) { if (doc.Layers[i].Id === id) { return i; } }
+            return -1;
+        }
+
+        function layerLabel(layer) {
+            if (layer.Type === 'text') { return (layer.Content || '').trim() || t('layer.text'); }
+            return layer._name || t('layer.logo');
+        }
+
+        function selectLayerById(id) {
+            doc._selectedId = id;
+            renderLayersPanel();
+            syncControlsFromDocument();
+            // The starting document is the base history entry.
+            snapshot();
+            scheduleRender();
+        }
+
+        // The panel is rebuilt on every select/move/show-hide, which used to drop keyboard
+        // focus to <body> after each action. Remember which control of which row had it...
+        function focusedLayerControl() {
+            var a = document.activeElement;
+            var box = el('ccaLayerList');
+            if (!a || !box || !box.contains(a)) { return null; }
+            var row = a.closest('.ccaLayerRow');
+            return row ? { id: row.getAttribute('data-layer-id'), act: a.getAttribute('data-act') } : null;
+        }
+
+        // ...and put it back on the same control after the rebuild. A deleted layer's
+        // focus moves to the newly selected layer's name.
+        function restoreLayerFocus(box, prev) {
+            if (!prev) { return; }
+            var rows = box.querySelectorAll('.ccaLayerRow');
+            var target = null;
+            for (var i = 0; i < rows.length; i++) {
+                if (rows[i].getAttribute('data-layer-id') === prev.id) {
+                    target = rows[i].querySelector('[data-act="' + prev.act + '"]') || rows[i].querySelector('[data-act="pick"]');
+                    break;
+                }
+            }
+            if (!target) { target = box.querySelector('.ccaLayerSel [data-act="pick"]') || box.querySelector('[data-act="pick"]'); }
+            if (target) { target.focus(); }
+        }
+
+        function renderLayersPanel() {
+            var box = el('ccaLayerList');
+            if (!box) { return; }
+            var prevFocus = focusedLayerControl();
+            box.innerHTML = '';
+            for (var i = doc.Layers.length - 1; i >= 0; i--) {
+                (function (layer) {
+                    var row = document.createElement('div');
+                    row.className = 'ccaLayerRow'
+                        + (layer.Id === doc._selectedId ? ' ccaLayerSel' : '')
+                        + (layer.Visible ? '' : ' ccaLayerHidden');
+                    row.setAttribute('role', 'listitem');
+                    row.setAttribute('data-layer-id', layer.Id);
+
+                    var vis = document.createElement('button');
+                    vis.type = 'button'; vis.className = 'ccaLayerBtn';
+                    vis.setAttribute('data-act', 'vis');
+                    vis.textContent = layer.Visible ? '👁' : '∅';
+                    vis.title = layer.Visible ? t('layer.hide') : t('layer.show');
+                    vis.setAttribute('aria-label', t('layer.visible'));
+                    vis.setAttribute('aria-pressed', layer.Visible ? 'true' : 'false');
+                    vis.addEventListener('click', function (e) {
+                        e.stopPropagation();
+                        layer.Visible = !layer.Visible;
+                        renderLayersPanel();
+                        scheduleRender();
+                    });
+
+                    // The name is a real button, so a layer can be selected from the
+                    // keyboard (Tab to it, Enter or Space). It has no handler of its own:
+                    // its click bubbles to the row's, which is what selects, so a mouse
+                    // click anywhere on the row still works.
+                    var name = document.createElement('button');
+                    name.type = 'button';
+                    name.className = 'ccaLayerName';
+                    name.setAttribute('data-act', 'pick');
+                    name.setAttribute('aria-pressed', layer.Id === doc._selectedId ? 'true' : 'false');
+                    name.textContent = layerLabel(layer);
+
+                    row.appendChild(vis);
+                    row.appendChild(name);
+
+                    // Actions live in their own container so a narrow screen can collapse
+                    // them behind one toggle, leaving the whole row as the tap target for
+                    // the action people actually want most: selecting the layer.
+                    var actions = document.createElement('div');
+                    actions.className = 'ccaLayerActions';
+                    ['up', 'down', 'dup', 'del'].forEach(function (act) {
+                        var b = document.createElement('button');
+                        b.type = 'button'; b.className = 'ccaLayerBtn';
+                        b.setAttribute('data-act', act);
+                        b.textContent = act === 'up' ? '▲' : act === 'down' ? '▼' : act === 'dup' ? '⧉' : '✕';
+                        b.title = t('layer.' + act);
+                        b.setAttribute('aria-label', t('layer.' + act));
+                        b.addEventListener('click', function (e) {
+                            e.stopPropagation();
+                            // "Up" in the panel means later in the array = drawn on top.
+                            if (act === 'up') { moveLayer(layer.Id, 1); }
+                            else if (act === 'down') { moveLayer(layer.Id, -1); }
+                            else if (act === 'dup') { duplicateLayer(layer.Id); }
+                            else { deleteLayer(layer.Id); }
+                        });
+                        actions.appendChild(b);
+                    });
+
+                    var more = document.createElement('button');
+                    more.type = 'button';
+                    more.className = 'ccaLayerBtn ccaLayerMore';
+                    more.setAttribute('data-act', 'more');
+                    more.textContent = '⋯';
+                    more.title = t('layer.more');
+                    more.setAttribute('aria-label', t('layer.more'));
+                    more.setAttribute('aria-expanded', 'false');
+                    more.addEventListener('click', function (e) {
+                        e.stopPropagation();
+                        var open = row.classList.toggle('ccaLayerActionsOpen');
+                        more.setAttribute('aria-expanded', open ? 'true' : 'false');
+                    });
+
+                    row.appendChild(actions);
+                    row.appendChild(more);
+
+                    row.addEventListener('click', function () { selectLayerById(layer.Id); });
+                    box.appendChild(row);
+                })(doc.Layers[i]);
+            }
+            restoreLayerFocus(box, prevFocus);
+            var atCap = doc.Layers.length >= MAX_LAYERS;
+            if (el('ccaAddText')) { el('ccaAddText').disabled = atCap; }
+            if (el('ccaAddImage')) { el('ccaAddImage').disabled = atCap; }
+        }
+
+        function addTextLayer() {
+            if (doc.Layers.length >= MAX_LAYERS) { return; }
+            var l = JSON.parse(JSON.stringify(defaultDocument().Layers[0]));
+            l.Id = newLayerId();
+            l.Content = t('layer.text');
+            // Offset from the existing title so a new layer doesn't land exactly on
+            // top of it and look like nothing happened.
+            l.Y = Math.min(0.95, l.Y + 0.15);
+            doc.Layers.push(l);
+            selectLayerById(l.Id);
+        }
+
+        // A logo layer carries the FULL CoverLayer field set (PascalCase) so it
+        // round-trips through the C# model; `_`-prefixed keys are UI-only and are
+        // stripped by stripUiKeys() before anything is POSTed.
+        function newImageLayer(path, name) {
+            return {
+                Id: newLayerId(), Type: 'image', Visible: true,
+                X: 0.5, Y: 0.5, Width: 0.25, Height: 0.25, Rotation: 0, Opacity: 1,
+                ImagePath: path, _name: name,
+                Content: '', Size: 0, Weight: 400, Color: '#ffffff', Align: 1, FontPath: '',
+                Shadow: { Enabled: false, Color: '#000000', Blur: 4, OffsetX: 2, OffsetY: 2 },
+                Outline: { Enabled: false, Color: '#000000', Width: 2 }
+            };
+        }
+
+        function duplicateLayer(id) {
+            if (doc.Layers.length >= MAX_LAYERS) { return; }
+            var i = layerIndex(id);
+            if (i < 0) { return; }
+            var src = doc.Layers[i];
+            var copy = stripUiKeys(src); // deep clone, minus the UI-only keys
+            copy.Id = newLayerId();
+            copy.X = Math.min(1, copy.X + 0.03);
+            copy.Y = Math.min(1, copy.Y + 0.03);
+            // JSON can't carry the decoded bitmap or the display name, so re-attach
+            // them instead of re-downloading what we already have.
+            if (src._img) { copy._img = src._img; }
+            if (src._name) { copy._name = src._name; }
+            doc.Layers.splice(i + 1, 0, copy);
+            selectLayerById(copy.Id);
+        }
+
+        function deleteLayer(id) {
+            doc.Layers = doc.Layers.filter(function (l) { return l.Id !== id; });
+            if (doc._selectedId === id) {
+                doc._selectedId = doc.Layers.length ? doc.Layers[doc.Layers.length - 1].Id : null;
+            }
+            renderLayersPanel();
+            syncControlsFromDocument();
+            scheduleRender();
+        }
+
+        function moveLayer(id, dir) {
+            var i = layerIndex(id);
+            var j = i + dir;
+            if (i < 0 || j < 0 || j >= doc.Layers.length) { return; }
+            var tmp = doc.Layers[i]; doc.Layers[i] = doc.Layers[j]; doc.Layers[j] = tmp;
+            renderLayersPanel();
+            scheduleRender();
+        }
+
+        // Loads the bitmap for any image layer that has a server path but no decoded
+        // image yet — i.e. layers restored from a saved template, where the upload
+        // File is long gone. Fetched as a BLOB and turned into an object URL, never
+        // assigned as a server URL directly: the canvas-source invariant (see
+        // bgImageEl) applies to every canvas source, not just the background.
+        function hydrateLayerImages() {
+            doc.Layers.forEach(function (layer) {
+                if (layer.Type !== 'image' || layer._img || layer._imgPending || !layer.ImagePath) { return; }
+                layer._imgPending = true;
+                authFetch('CustomCoverArt/layerImage?path=' + encodeURIComponent(layer.ImagePath))
+                    .then(function (r) {
+                        if (!r.ok) { throw new Error('layer image returned ' + r.status); }
+                        return r.blob();
+                    })
+                    .then(function (blob) {
+                        var url = URL.createObjectURL(blob);
+                        var img = new Image();
+                        img.onload = function () {
+                            URL.revokeObjectURL(url);
+                            layer._img = img;
+                            layer._imgPending = false;
+                            scheduleRender();
+                        };
+                        img.onerror = function () { URL.revokeObjectURL(url); layer._imgPending = false; };
+                        img.src = url;
+                    })
+                    .catch(function () {
+                        // Best-effort: the layer still renders in the authoritative
+                        // server output, it just can't be previewed on the canvas.
+                        layer._imgPending = false;
+                    });
+            });
+        }
+        // ------------------------------------------------------------------
+
+        // --- Background bitmap & file names -------------------------------
+        // bgImageEl (the uploaded or poster-picked image) has exactly two writers:
+        // setBackgroundBitmap and clearBackgroundBitmap. collageBgEl has its own
+        // (fetchCollageBitmap / releaseCollageBitmap) and is never touched here;
+        // activeBgBitmap() decides which of the two the canvas paints.
+        //
+        // _bgImageUrl is bgImageEl's object URL. It lives exactly as long as its bitmap is
+        // the background and is revoked when the bitmap is replaced or dropped, like
+        // _collageUrl: an animated GIF keeps decoding frames from it while it plays, and an
+        // unrevoked URL per pick pinned a full-size copy of every image ever chosen.
+        var _bgImageUrl = null;
+
+        function clearBackgroundBitmap() {
+            closeGifDecoder(bgImageEl);
+            if (_bgImageUrl) { URL.revokeObjectURL(_bgImageUrl); }
+            _bgImageUrl = null;
+            bgImageEl = null;
+        }
+
+        // `isCurrent` comes from requestGuard('bg'), taken when the user acted, so two quick
+        // picks cannot land out of order: the older pick's bitmap is simply dropped.
+        function setBackgroundBitmap(blob, isCurrent) {
+            var url = URL.createObjectURL(blob);
+            var img = new Image();
+            img.onload = function () {
+                if (!isCurrent()) { URL.revokeObjectURL(url); closeGifDecoder(img); return; }
+                clearBackgroundBitmap();
+                bgImageEl = img;
+                _bgImageUrl = url;
+                scheduleRender();
+            };
+            img.onerror = function () { URL.revokeObjectURL(url); closeGifDecoder(img); };
+            img.src = url;
+            // Flags the <img> if the bytes are a multi-frame GIF, so the repaint loop runs.
+            watchForAnimatedGif(img, blob);
+        }
+
+        // Makes bgImageEl agree with doc.Background.ImagePath after the document was
+        // replaced (undo, redo, template load). Keeps the bitmap when the path is
+        // unchanged; otherwise fetches the path back as a Blob through the uploads-only
+        // layerImage endpoint (where background uploads and poster picks both live), never
+        // as an <img src> on the server (canvas-source invariant). The source is not
+        // consulted: a collage keeps the uploaded bitmap in reserve, and activeBgBitmap()
+        // decides what is painted.
+        function hydrateBackgroundImage(previousPath) {
+            var path = doc.Background.ImagePath || '';
+            // Nothing changed for the background: keep the bitmap, and do NOT take a new
+            // 'bg' token, or undoing an unrelated edit would cancel a pick still in flight.
+            if (path === (previousPath || '') && (bgImageEl || !path)) { return; }
+            var isCurrent = requestGuard('bg');
+            clearBackgroundBitmap();
+            if (!path) { return; }
+            authFetch('CustomCoverArt/layerImage?path=' + encodeURIComponent(path))
+                .then(function (r) {
+                    if (!r.ok) { throw requestError(r.status); }
+                    return r.blob();
+                })
+                .then(function (blob) {
+                    if (isCurrent() && doc.Background.ImagePath === path) { setBackgroundBitmap(blob, isCurrent); }
+                })
+                .catch(function () {
+                    // Best-effort, like hydrateLayerImages: the authoritative server
+                    // render still has the image, only the canvas preview lacks it.
+                });
+        }
+
+        // JSON cannot carry a decoded <img> or a display name. After undo/redo or a
+        // template load, a logo whose server path is unchanged keeps both instead of being
+        // downloaded again (and blinking out of the preview meanwhile).
+        function reuseLayerClientState(previousLayers) {
+            var known = {};
+            (previousLayers || []).forEach(function (l) {
+                if (l.ImagePath && (l._img || l._name)) { known[l.ImagePath] = { img: l._img, name: l._name }; }
+            });
+            doc.Layers.forEach(function (l) {
+                var k = l.ImagePath ? known[l.ImagePath] : null;
+                if (!k) { return; }
+                if (!l._img && k.img) { l._img = k.img; }
+                if (!l._name && k.name) { l._name = k.name; }
+            });
+        }
+
+        // Original file names by server path. Uploads are stored under randomised names,
+        // so the path alone cannot tell the user which file they picked; a path missing
+        // from this map (a template from an earlier session) falls back to its own name.
+        var _fileNames = {};
+
+        function displayNameFor(path) {
+            if (!path) { return ''; }
+            var known = _fileNames[path];
+            return known ? known.name : String(path).split(/[\\/]/).pop();
+        }
+
+        // Owns the "which file is in use" labels. Called from syncControlsFromDocument, so
+        // a layer switch, template load or undo can never leave a stale name behind.
+        function syncFileNames() {
+            var bgPath = doc.Background.ImagePath || '';
+            var known = bgPath ? _fileNames[bgPath] : null;
+            var isPoster = !!(known && known.poster);
+            el('ccaBgImageName').textContent = (bgPath && !isPoster) ? displayNameFor(bgPath) : t('f.none');
+            el('ccaSelectedBgName').textContent = isPoster ? known.name : '';
+            el('ccaSelectedBg').style.display = isPoster ? '' : 'none';
+            var l = selectedLayer();
+            var fontPath = (l && l.Type === 'text') ? (l.FontPath || '') : '';
+            el('ccaFontName').textContent = fontPath ? displayNameFor(fontPath) : t('f.none');
+        }
+
+        var _rafPending = false;
+        function scheduleRender() {
+            if (_rafPending) { return; }
+            _rafPending = true;
+            requestAnimationFrame(function () { _rafPending = false; renderDocument(); });
+            // Every mutation of `doc` funnels through here, so this is the one place undo
+            // history can be captured without hunting down thirty individual handlers and
+            // missing one. It is safe for the non-edits that also re-render (selection
+            // changes, hydration, resize): snapshot() compares against the current entry
+            // and ignores an identical document, which is also what preserves the redo
+            // tail when restoreSnapshot re-renders after an undo.
+            if (typeof commit === 'function') { commit(); }
+        }
+
+        // animFrame: true when called by the animated-GIF loop (a repaint, not an edit).
+        function renderDocument(animFrame) {
+            var cv = el('ccaCanvas');
+            if (!cv) { return; }
+            if (cv.width !== doc.Canvas.Width || cv.height !== doc.Canvas.Height) {
+                cv.width = doc.Canvas.Width;
+                cv.height = doc.Canvas.Height;
+            }
+            var ctx = cv.getContext('2d');
+            var W = cv.width, H = cv.height;
+            ctx.clearRect(0, 0, W, H);
+
+            // Fetches a new server mosaic only when a collage input changed.
+            syncCollageBitmap();
+            paintBackgroundOnly(ctx, W, H);
+
+            // Effects order is a contract shared with the server (EffectsComposer):
+            // soft-light UNDER the layers, then vignette -> grain -> border on top.
+            drawSoftLight(ctx, W, H);
+
+            // Over the background and soft-light, under the layers — same slot as the server.
+            drawGradientOverlay(ctx, W, H);
+
+            // Visible layers, in array order (draw order matches the server loop).
+            doc.Layers.forEach(function (layer) {
+                if (!layer.Visible) { return; }
+                if (layer.Type === 'text') { drawTextLayer(ctx, layer, W, H); }
+                else if (layer.Type === 'image') { drawImageLayer(ctx, layer, W, H); }
+            });
+
+            drawVignette(ctx, W, H);
+            drawGrain(ctx, W, H);
+            drawBorder(ctx, W, H);
+
+            // Selection UI last of all: it is editor chrome, not part of the design, and
+            // downloadPreview() clears the selection before exporting so it never bakes in.
+            drawSelectionHandles(ctx, W, H);
+
+            // An animation frame only repaints. The swatches, thumbnails and buttons were
+            // brought up to date by the edit-driven render, and both refreshers are 300 ms
+            // debounces that 15 calls a second would starve.
+            if (!animFrame) {
+                // Keep the swatches and the in-context thumbnails in step with the design.
+                refreshPalette();
+                renderPreviewContexts();
+
+                var ph = el('ccaPreviewPlaceholder');
+                if (ph) { ph.style.display = 'none'; }
+                // The canvas always renders, so the export target is always available.
+                var dl = el('ccaDownloadBtn');
+                if (dl) { dl.disabled = false; }
+            }
+
+            // Starts or stops the animated-GIF repaint loop to match what is now on the canvas.
+            updateGifLoop();
+        }
+
+        // Background only — no layers, no effects, no selection chrome. Split out of
+        // renderDocument so the palette sampler can paint the same background into a
+        // tiny offscreen canvas without text pixels skewing the dominant colours.
+        //
+        // Precedence mirrors ComposeDocumentFrame / CreateGradientBackground: a
+        // blob-loaded image if one is ready, else the gradient, else a flat fill.
+        function paintBackgroundOnly(ctx, W, H) {
+            var drewImage = false;
+            var bitmap = activeBgBitmap();
+            if (bitmap) {
+                drawBackgroundImage(ctx, bitmap, W, H);
+                drewImage = true;
+            } else if (doc.Background.Gradient && doc.Background.Gradient.IsEnabled) {
+                drawGradient(ctx, doc.Background.Gradient, W, H);
+            } else {
+                ctx.fillStyle = doc.Background.DimColor || '#000';
+                ctx.fillRect(0, 0, W, H);
+            }
+
+            // Dim overlay: a solid base-colour layer at fractional opacity over the
+            // background only (text is drawn after). Parity with the server: dim is
+            // applied ONLY on the image-background path (ApplyBackgroundLayer). The
+            // gradient/flat path (CreateGradientBackground) applies NO dim, so we
+            // must not either — otherwise the default gradient view (Dim 0.25, no
+            // image) would render darker than the authoritative server render.
+            if (drewImage && doc.Background.Dim > 0) {
+                ctx.save();
+                ctx.globalAlpha = Math.min(1, doc.Background.Dim);
+                ctx.fillStyle = doc.Background.DimColor || '#000';
+                ctx.fillRect(0, 0, W, H);
+                ctx.restore();
+            }
+        }
+
+        // --- Effects (Phase 3) --------------------------------------------
+        // Client mirrors of Services/EffectsComposer.cs. The server is authoritative —
+        // grain in particular is an approximation here (a scaled noise tile blended in
+        // 'overlay', versus true per-pixel noise on the server) because a full-canvas
+        // per-pixel pass every frame would stall the live preview.
+
+        // Accepts #rgb, #rrggbb and #rrggbbaa, and returns the channels as numbers so
+        // callers that need to interpolate (overlayStopsCss) do not have to re-parse an
+        // rgba() string.
+        //
+        // A passed alpha REPLACES an 8-digit hex's own alpha rather than multiplying with
+        // it, matching the server: DocumentRenderer.BuildColorStops does
+        // SafeColor(s.Color).WithAlpha(s.Alpha), and ImageSharp's WithAlpha overwrites
+        // (measured: '#ff000080' + Alpha 0.5 => A=128, not 64). The hex's own alpha is
+        // therefore only used when no alpha is passed at all. NOTE: nothing in the editor
+        // currently emits 8-digit hex — <input type="color"> is always #rrggbb — so that
+        // branch is unreachable today and exists purely so a future 8-digit source cannot
+        // silently disagree with the server.
+        function parseHexRgba(hex, alpha) {
+            var h = String(hex || '#000000').replace('#', '');
+            if (h.length === 3) { h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2]; }
+            var baseAlpha = 1;
+            if (h.length === 8) {
+                baseAlpha = parseInt(h.slice(6, 8), 16) / 255;
+                if (isNaN(baseAlpha)) { baseAlpha = 1; }
+                h = h.slice(0, 6);
+            }
+            var n = parseInt(h, 16);
+            if (isNaN(n)) { n = 0; }
+            return {
+                r: (n >> 16) & 255,
+                g: (n >> 8) & 255,
+                b: n & 255,
+                a: Math.max(0, Math.min(1, alpha == null ? baseAlpha : alpha))
+            };
+        }
+
+        function rgbaCss(c) {
+            return 'rgba(' + Math.round(c.r) + ',' + Math.round(c.g) + ',' + Math.round(c.b) + ',' + c.a + ')';
+        }
+
+        function hexToRgba(hex, alpha) {
+            return rgbaCss(parseHexRgba(hex, alpha));
+        }
+
+        function strokeRoundRect(ctx, x, y, w, h, r) {
+            if (w <= 0 || h <= 0) { return; }
+            r = Math.max(0, Math.min(r, Math.min(w, h) / 2));
+            ctx.beginPath();
+            if (r > 0 && ctx.roundRect) { ctx.roundRect(x, y, w, h, r); }
+            else if (r > 0) {
+                ctx.moveTo(x + r, y);
+                ctx.arcTo(x + w, y, x + w, y + h, r);
+                ctx.arcTo(x + w, y + h, x, y + h, r);
+                ctx.arcTo(x, y + h, x, y, r);
+                ctx.arcTo(x, y, x + w, y, r);
+                ctx.closePath();
+            } else { ctx.rect(x, y, w, h); }
+            ctx.stroke();
+        }
+
+        function drawSoftLight(ctx, W, H) {
+            var s = doc.Effects && doc.Effects.SoftLight;
+            if (!s || !s.Enabled || s.Opacity <= 0) { return; }
+            ctx.save();
+            ctx.globalAlpha = Math.min(1, Math.max(0, s.Opacity));
+            ctx.fillStyle = s.Color || '#ffffff';
+            ctx.fillRect(0, 0, W, H);
+            ctx.restore();
+        }
+
+        function drawVignette(ctx, W, H) {
+            var v = doc.Effects && doc.Effects.Vignette;
+            if (!v || !v.Enabled || v.Amount <= 0) { return; }
+            var softness = Math.min(1, Math.max(0.01, v.Softness));
+            // Same geometry as ApplyVignette: distance is normalized against the CORNER
+            // distance, and the ramp starts `softness` of the way in from there. Using
+            // min(W,H)/2 for the inner radius instead would put the ramp in a visibly
+            // different place from the server render on any non-square cover.
+            var maxD = Math.sqrt((W / 2) * (W / 2) + (H / 2) * (H / 2));
+            var g = ctx.createRadialGradient(W / 2, H / 2, maxD * (1 - softness), W / 2, H / 2, maxD);
+            g.addColorStop(0, hexToRgba(v.Color, 0));
+            g.addColorStop(1, hexToRgba(v.Color, Math.min(1, Math.max(0, v.Amount))));
+            ctx.save();
+            ctx.fillStyle = g;
+            ctx.fillRect(0, 0, W, H);
+            ctx.restore();
+        }
+
+        var _grainTile = null, _grainKey = '';
+        function grainTile(seed) {
+            // Build a small seeded monochrome-noise tile ONCE per seed, then scale it over
+            // the whole canvas. This is genuinely downscaled work (128x128), not a
+            // full-canvas per-pixel pass every frame, so it stays cheap on large canvases.
+            var key = String(seed);
+            if (_grainKey === key && _grainTile) { return _grainTile; }
+            var S = 128, tile = document.createElement('canvas');
+            tile.width = S; tile.height = S;
+            var tctx = tile.getContext('2d');
+            var id = tctx.createImageData(S, S), d = id.data, s = seed >>> 0;
+            function rnd() { s = (s * 1664525 + 1013904223) >>> 0; return (s >>> 24); }
+            for (var i = 0; i < d.length; i += 4) {
+                var v = rnd();
+                d[i] = d[i + 1] = d[i + 2] = v;
+                d[i + 3] = 255;
+            }
+            tctx.putImageData(id, 0, 0);
+            _grainTile = tile; _grainKey = key;
+            return tile;
+        }
+
+        function drawGrain(ctx, W, H) {
+            var g = doc.Effects && doc.Effects.Grain;
+            if (!g || !g.Enabled || g.Amount <= 0) { return; }
+            // 'overlay' blends the mid-grey noise as light/dark grain without a
+            // getImageData read, so it can't throw on a tainted or CSP-restricted canvas.
+            try {
+                ctx.save();
+                ctx.globalAlpha = Math.min(1, g.Amount);
+                ctx.globalCompositeOperation = 'overlay';
+                ctx.imageSmoothingEnabled = true;
+                ctx.drawImage(grainTile(g.Seed), 0, 0, W, H);
+                ctx.restore();
+            } catch (e) {
+                // Blend mode unsupported: skip client grain; the server render still applies it.
+                try { ctx.restore(); } catch (e2) { /* ignore */ }
+            }
+        }
+
+        function drawBorder(ctx, W, H) {
+            var b = doc.Effects && doc.Effects.Border;
+            if (!b || !b.Enabled || b.Thickness <= 0) { return; }
+            var t = Math.min(64, Math.max(0, b.Thickness));
+            ctx.save();
+            ctx.strokeStyle = b.Color || '#ffffff';
+            // A stroke straddles the path, so inset by half the width — matching
+            // DrawInsetFrame, which offsets its rectangle the same way.
+            ctx.lineWidth = t;
+            strokeRoundRect(ctx, t / 2, t / 2, W - t, H - t, b.Radius || 0);
+            if (b.Double) {
+                var gap = Math.min(32, Math.max(0, b.Gap || 0));
+                var inset = t + gap;
+                if (inset * 2 < Math.min(W, H)) {
+                    var inner = Math.max(1, Math.floor(t / 2));
+                    ctx.lineWidth = inner;
+                    strokeRoundRect(ctx, inset + inner / 2, inset + inner / 2,
+                        W - (inset + inner / 2) * 2, H - (inset + inner / 2) * 2,
+                        Math.max(0, (b.Radius || 0) - inset));
+                }
+            }
+            ctx.restore();
+        }
+
+        // --- Preview contexts ---------------------------------------------
+        // The SAME document drawn at other aspect ratios. Layer coordinates are
+        // normalized, so a design re-flows rather than being letterboxed — which is
+        // exactly what you want to check before applying it to a library.
+        var PREVIEW_CONTEXTS = [
+            { key: 'wide', w: 320, h: 180 },
+            { key: 'square', w: 200, h: 200 },
+            { key: 'poster', w: 150, h: 225 }
+        ];
+
+        // Background + effects + layers into an arbitrary-sized context, reusing the very
+        // functions renderDocument uses so the two cannot drift. Deliberately omits the
+        // selection chrome — this is the design, not the editor.
+        function drawDocInto(ctx, W, H) {
+            ctx.clearRect(0, 0, W, H);
+            paintBackgroundOnly(ctx, W, H);
+            drawSoftLight(ctx, W, H);
+            // Same slot as renderDocument (and the server): over the background and
+            // soft-light, under the layers. Omitting it here made the in-context previews
+            // the one place the overlay was invisible.
+            drawGradientOverlay(ctx, W, H);
+            doc.Layers.forEach(function (layer) {
+                if (!layer.Visible) { return; }
+                if (layer.Type === 'text') { drawTextLayer(ctx, layer, W, H); }
+                else if (layer.Type === 'image') { drawImageLayer(ctx, layer, W, H); }
+            });
+            drawVignette(ctx, W, H);
+            drawGrain(ctx, W, H);
+            drawBorder(ctx, W, H);
+        }
+
+        var renderPreviewContexts = debounce(function () {
+            var box = el('ccaContexts');
+            // offsetParent is null while step 5 is collapsed: no point drawing three
+            // canvases nobody can see on every edit.
+            if (!box || box.offsetParent === null) { return; }
+            box.innerHTML = '';
+            PREVIEW_CONTEXTS.forEach(function (c) {
+                var wrap = document.createElement('div');
+                wrap.className = 'ccaContext';
+                var cv = document.createElement('canvas');
+                cv.width = c.w; cv.height = c.h;
+                drawDocInto(cv.getContext('2d'), c.w, c.h);
+                var cap = document.createElement('div');
+                cap.className = 'ccaContextCap';
+                cap.textContent = t('ctx.' + c.key);
+                wrap.appendChild(cv); wrap.appendChild(cap);
+                box.appendChild(wrap);
+            });
+        }, 300);
+        // ------------------------------------------------------------------
+
+        // --- Undo/redo ----------------------------------------------------
+        // A snapshot stack of the serialized document. UI-only keys are stripped, so a
+        // snapshot can never capture a decoded <img> or the transient selection.
+        var HISTORY_CAP = 50;
+        var history = { stack: [], index: -1 };
+
+        function snapshot() {
+            var json = JSON.stringify(stripUiKeys(doc));
+            if (history.index >= 0 && history.stack[history.index] === json) { return; }
+            // Any new edit truncates the redo tail.
+            history.stack = history.stack.slice(0, history.index + 1);
+            history.stack.push(json);
+            if (history.stack.length > HISTORY_CAP) { history.stack.shift(); }
+            history.index = history.stack.length - 1;
+            updateHistoryButtons();
+        }
+
+        // Bursts of slider input collapse into ONE entry; discrete actions call snapshot()
+        // directly so they land immediately.
+        var commit = debounce(snapshot, 400);
+
+        function restoreSnapshot(json) {
+            var selected = doc._selectedId;
+            var previousImagePath = doc.Background.ImagePath;
+            var previousLayers = doc.Layers;
+            doc = JSON.parse(json);
+            // A snapshot is a plain serialized document, so it needs the same normalization
+            // a template load gets before anything dereferences it.
+            normalizeEffects(doc);
+            normalizeBackgroundSource(doc);
+            normalizeOverlay(doc);
+            normalizeGradientStops(doc);
+            doc._selectedId = selected;
+            // It carries server paths but no decoded bitmaps: reuse the ones we already
+            // have for unchanged paths, fetch the rest.
+            reuseLayerClientState(previousLayers);
+            hydrateBackgroundImage(previousImagePath);
+            hydrateLayerImages();
+            renderLayersPanel();
+            syncControlsFromDocument();
+            resetOverlayEditorState();
+            scheduleRender();
+        }
+
+        function undo() {
+            if (history.index <= 0) { return; }
+            history.index--;
+            restoreSnapshot(history.stack[history.index]);
+            updateHistoryButtons();
+        }
+
+        function redo() {
+            if (history.index >= history.stack.length - 1) { return; }
+            history.index++;
+            restoreSnapshot(history.stack[history.index]);
+            updateHistoryButtons();
+        }
+
+        function updateHistoryButtons() {
+            var u = el('ccaUndo'), r = el('ccaRedo');
+            if (u) { u.disabled = history.index <= 0; }
+            if (r) { r.disabled = history.index >= history.stack.length - 1; }
+        }
+        // ------------------------------------------------------------------
+
+        // --- Colour palette (Phase 3) -------------------------------------
+        // Dominant colours of the BACKGROUND, extracted entirely client-side — no new
+        // endpoint, no upload round-trip. Sampled from a tiny offscreen render (the
+        // cover's aspect ratio, 64px wide) so it costs a few thousand pixels, not
+        // millions, and never blocks the UI.
+        //
+        // This is the feature the blob-URL canvas-source invariant has been protecting
+        // since Phase 1: getImageData throws a SecurityError on a canvas tainted by a
+        // cross-origin image, which is why background bitmaps only ever come from
+        // URL.createObjectURL. The read is still guarded — a tainted or CSP-blocked
+        // canvas degrades to "no swatches" rather than an exception.
+        function extractPalette() {
+            var SW = 64;
+            var SH = Math.max(1, Math.round(SW * (doc.Canvas.Height || 1) / (doc.Canvas.Width || 1)));
+            var tmp = document.createElement('canvas');
+            tmp.width = SW; tmp.height = SH;
+            var tctx = tmp.getContext('2d');
+            paintBackgroundOnly(tctx, SW, SH);
+
+            var data;
+            try { data = tctx.getImageData(0, 0, SW, SH).data; }
+            catch (e) { return []; }
+
+            // Quantize each channel to 4 bits so near-identical shades collapse into one
+            // bucket; the most populated buckets are the colours a viewer actually sees.
+            var counts = {};
+            for (var i = 0; i < data.length; i += 4) {
+                if (data[i + 3] < 128) { continue; }
+                var key = (data[i] >> 4) + ',' + (data[i + 1] >> 4) + ',' + (data[i + 2] >> 4);
+                counts[key] = (counts[key] || 0) + 1;
+            }
+
+            return Object.keys(counts)
+                .sort(function (a, b) { return counts[b] - counts[a]; })
+                .slice(0, 8)
+                .map(function (k) {
+                    // Back to 8-bit, biased to the middle of the bucket.
+                    var p = k.split(',').map(function (n) { return (parseInt(n, 10) << 4) | 8; });
+                    return '#' + p.map(function (n) { return ('0' + n.toString(16)).slice(-2); }).join('');
+                });
+        }
+
+        function renderSwatches(colors) {
+            var box = el('ccaSwatches');
+            if (!box) { return; }
+            box.innerHTML = '';
+            colors.forEach(function (hex) {
+                var s = document.createElement('button');
+                s.type = 'button';
+                s.className = 'ccaSwatch';
+                s.style.background = hex;
+                s.title = hex;
+                s.setAttribute('aria-label', t('fx.swatch', hex));
+                // Read the focus state one event EARLIER than the click: pressing the mouse
+                // on a button moves focus to it (Chrome/Edge/Firefox on Windows) before
+                // 'click' fires, and some browsers (Safari) do not focus buttons on click at
+                // all, so document.activeElement here is the only reading that is true in
+                // both. The focusout handler covers the keyboard path, where no mousedown
+                // ever happens.
+                s.addEventListener('mousedown', function () {
+                    _overlayStopFocused = isInOverlayStops(document.activeElement);
+                });
+                s.addEventListener('click', function () { applySwatch(hex); });
+                box.appendChild(s);
+            });
+        }
+
+        // Where a clicked swatch lands, in order: the selected text layer, then the selected
+        // overlay stop when the overlay is on, then the colour wash when it is on. Each
+        // updates its own control so the card and the canvas never disagree.
+        //
+        // ONE exception jumps the queue: the overlay stop wins over the selected text layer
+        // when the user is demonstrably in the overlay editor (a stop row holds focus, or
+        // held it up to this click — see _overlayStopFocused). Without it the overlay branch
+        // is dead code in practice, because the stock document always has a selected title
+        // layer and nothing ever deselects it: selectLayerById does not toggle off, and a
+        // canvas click that hits no layer returns early. A user would have to DELETE their
+        // title layer before a swatch could tint an overlay stop, which flatly contradicts
+        // the documented "click a palette swatch to tint your overlay". Users who are not
+        // touching the overlay never set the flag, so their text-layer behaviour is unchanged.
+        function applySwatch(hex) {
+            var overlayOn = doc.Background.Overlay && doc.Background.Overlay.IsEnabled;
+            var idx = overlayOn ? overlayStopIndex() : -1;
+
+            var l = selectedLayer();
+            if (l && l.Type === 'text' && !(idx >= 0 && _overlayStopFocused)) {
+                l.Color = hex;
+                el('ccaTextColor').value = hex;
+                scheduleRender();
+                return;
+            }
+            if (idx >= 0) {
+                doc.Background.Overlay.Stops[idx].Color = hex;
+                var container = el('ccaOverlayStops');
+                var rows = container ? container.querySelectorAll('.ccaStop') : null;
+                if (rows && rows[idx]) { rows[idx].querySelector('input[type="color"]').value = hex; }
+            } else if (doc.Effects.SoftLight.Enabled) {
+                doc.Effects.SoftLight.Color = hex;
+                el('ccaFxSoftLightColor').value = hex;
+            } else {
+                return; // nothing sensible to apply it to; leave the design alone
+            }
+            scheduleRender();
+        }
+
+        // Re-extract after the canvas settles rather than wiring every background
+        // trigger (upload, poster pick, gradient stop edit, collage shuffle, preset).
+        // Debounced, and only while the toggle is on, so it costs nothing when unused.
+        var refreshPalette = debounce(function () {
+            var toggle = el('ccaAutoPalette');
+            if (!toggle || !toggle.checked) { return; }
+            renderSwatches(extractPalette());
+        }, 300);
+        // ------------------------------------------------------------------
+
+        // Builds the canvas colour-stop list from gradient settings — the explicit
+        // Stops (sorted, clamped) when there are 2+, else the server's StartColor/EndColor
+        // fallback, mirroring DocumentRenderer.BuildColorStops. normalizeGradientStops
+        // already folds those into Stops at load; this covers a document that skipped it.
+        function gradientStops(g) {
+            var stops = (g.Stops || []).filter(Boolean).sort(function (a, b) { return a.Position - b.Position; });
+            if (stops.length < 2) { stops = gradientFallbackStops(g); }
+            return stops.map(function (s) {
+                return { pos: Math.max(0, Math.min(1, s.Position)), color: s.Color || '#808080' };
+            });
+        }
+
+        // How many sub-segments each adjacent pair of overlay stops is split into. 8 is
+        // enough to make the two ramps described below visually indistinguishable while
+        // keeping the stop list small (3 stops -> 17 canvas stops).
+        var OVERLAY_RAMP_STEPS = 8;
+
+        // Like gradientStops, but each stop's colour is an rgba() string carrying its Alpha.
+        // No black->white fallback here: fewer than two stops means the overlay is off,
+        // mirroring DocumentRenderer.ApplyGradientOverlay.
+        //
+        // WHY THE SUBDIVISION BELOW EXISTS — do not "simplify" it away:
+        // the two renderers interpolate colour stops in DIFFERENT alpha spaces.
+        //   * ImageSharp's LinearGradientBrush (the authoritative server render) lerps in
+        //     STRAIGHT / non-premultiplied alpha: r, g, b and a are each interpolated
+        //     independently, so a fully transparent stop's HUE still bleeds into the ramp.
+        //     Measured: '#ff0000' a=0 -> '#0000ff' a=1 gives Rgba32(150, 0, 105, 105) at
+        //     mid-canvas — note the red channel surviving from a stop with zero alpha.
+        //   * HTML Canvas 2D gradients interpolate in PREMULTIPLIED alpha, where a stop
+        //     with alpha 0 contributes no colour at all.
+        // The visible symptom: "Bottom fade" seeded from DimColor (three black stops) plus
+        // a palette swatch on the last stop gives black a0 · black a0 @0.45 · purple a0.9.
+        // The server muddies that ramp with the black it lerps through; the canvas showed
+        // clean purple. Roughly (178,161,184) server vs (216,181,228) canvas over white at
+        // the segment midpoint. Duotone had the same divergence.
+        // The fix: keep the original endpoints exactly, and insert intermediate stops whose
+        // r/g/b/a are lerped in STRAIGHT space (i.e. the way the server does it). Each
+        // sub-segment is then short enough that the canvas's own premultiplied lerp across
+        // it cannot visibly diverge from the straight-alpha line it is approximating.
+        function overlayStopsCss(g) {
+            var sorted = (g.Stops || []).slice().sort(function (a, b) { return a.Position - b.Position; });
+            if (sorted.length < 2) { return null; }
+
+            var pts = sorted.map(function (s) {
+                var a = (s.Alpha === undefined || s.Alpha === null) ? 1 : s.Alpha;
+                var c = parseHexRgba(s.Color || '#808080', Math.max(0, Math.min(1, a)));
+                c.pos = Math.max(0, Math.min(1, s.Position));
+                return c;
+            });
+
+            var out = [{ pos: pts[0].pos, color: rgbaCss(pts[0]) }];
+            for (var i = 1; i < pts.length; i++) {
+                var p = pts[i - 1], q = pts[i];
+                // Coincident stops are a deliberate hard edge; subdividing them would emit
+                // several stops at one offset and let insertion order decide the colour.
+                if (q.pos > p.pos) {
+                    for (var k = 1; k < OVERLAY_RAMP_STEPS; k++) {
+                        var t = k / OVERLAY_RAMP_STEPS;
+                        out.push({
+                            pos: p.pos + (q.pos - p.pos) * t,
+                            color: rgbaCss({
+                                r: p.r + (q.r - p.r) * t,
+                                g: p.g + (q.g - p.g) * t,
+                                b: p.b + (q.b - p.b) * t,
+                                a: p.a + (q.a - p.a) * t
+                            })
+                        });
+                    }
+                }
+                out.push({ pos: q.pos, color: rgbaCss(q) });
+            }
+            return out;
+        }
+
+        // Mirrors DocumentRenderer.ApplyGradientOverlay: linear only, geometry identical to
+        // drawGradient's linear branch. Called from renderDocument between drawSoftLight and
+        // the layer loop, which is the same slot the server uses.
+        function drawGradientOverlay(ctx, W, H) {
+            var g = doc.Background && doc.Background.Overlay;
+            if (!g || !g.IsEnabled) { return; }
+            var stops = overlayStopsCss(g);
+            if (!stops) { return; }
+
+            var rad = (g.Angle == null ? 90 : g.Angle) * Math.PI / 180;
+            var dx = Math.cos(rad), dy = Math.sin(rad);
+            var mx = W / 2, my = H / 2;
+            var half = (Math.abs(dx) * W + Math.abs(dy) * H) / 2;
+            var grad = ctx.createLinearGradient(mx - dx * half, my - dy * half, mx + dx * half, my + dy * half);
+            stops.forEach(function (s) { grad.addColorStop(s.pos, s.color); });
+
+            ctx.save();
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, W, H);
+            ctx.restore();
+        }
+
+        // Linear (a line through the centre at Angle degrees spanning the canvas) or
+        // radial (centred at Center*, radius = Radius*min(W,H)) — geometry copied
+        // from DocumentRenderer.ApplyGradientBackground so framing matches.
+        function drawGradient(ctx, g, W, H) {
+            var stops = gradientStops(g);
+            var grad;
+            if (g.Type === 1) { // radial
+                var cx = g.CenterX * W, cy = g.CenterY * H;
+                var radius = Math.max(1, g.Radius * Math.min(W, H));
+                grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+            } else { // linear
+                var rad = (g.Angle || 0) * Math.PI / 180;
+                var dx = Math.cos(rad), dy = Math.sin(rad);
+                var mx = W / 2, my = H / 2;
+                var half = (Math.abs(dx) * W + Math.abs(dy) * H) / 2;
+                grad = ctx.createLinearGradient(mx - dx * half, my - dy * half, mx + dx * half, my + dy * half);
+            }
+            stops.forEach(function (s) { grad.addColorStop(s.pos, s.color); });
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, W, H);
+        }
+
+        // Source/destination geometry for the background image, mirroring
+        // ApplyBackgroundLayer + ApplyBackgroundTransform + TransformedSourceRect:
+        // the fit maps a base window onto a destination footprint, then the transform
+        // shrinks that window by 1/Scale and pans it across the slack.
+        //
+        // The slack is measured against the WHOLE source image, not just the base
+        // window — so under "cover" the strip the fit crops away is pannable at the
+        // default Scale=1, where zoom-derived slack alone would be zero (i.e. drag
+        // would move nothing at all). Shared with the drag handler so the pointer
+        // maths and the render can never disagree.
+        function backgroundGeometry(img, W, H) {
+            var iw = img.naturalWidth, ih = img.naturalHeight;
+            var fit = (doc.Background.Fit || 'cover').toLowerCase();
+
+            var baseW, baseH;                // unzoomed window (image pixels)
+            var dstX, dstY, dstW, dstH;      // destination footprint (canvas pixels)
+
+            if (fit === 'stretch') {
+                baseW = iw; baseH = ih;
+                dstX = 0; dstY = 0; dstW = W; dstH = H;
+            } else if (fit === 'contain') {
+                var cs = Math.min(W / iw, H / ih);
+                baseW = iw; baseH = ih;
+                dstW = iw * cs; dstH = ih * cs;
+                dstX = (W - dstW) / 2; dstY = (H - dstH) / 2;
+            } else { // cover
+                var vs = Math.max(W / iw, H / ih);
+                baseW = W / vs; baseH = H / vs;
+                dstX = 0; dstY = 0; dstW = W; dstH = H;
+            }
+
+            var t = doc.Background.Transform || { OffsetX: 0, OffsetY: 0, Scale: 1 };
+            var sc = Math.max(1, t.Scale || 1);
+            // Clamp like the server: never sample outside the source ("contain" can
+            // otherwise ask for a window bigger than the image).
+            var srcW = Math.min(iw, baseW / sc), srcH = Math.min(ih, baseH / sc);
+            var slackX = Math.max(0, iw - srcW), slackY = Math.max(0, ih - srcH);
+            var ox = Math.max(-1, Math.min(1, t.OffsetX || 0));
+            var oy = Math.max(-1, Math.min(1, t.OffsetY || 0));
+
+            return {
+                fit: fit,
+                srcX: slackX / 2 + ox * slackX / 2,
+                srcY: slackY / 2 + oy * slackY / 2,
+                srcW: srcW, srcH: srcH,
+                dstX: dstX, dstY: dstY, dstW: dstW, dstH: dstH,
+                // Canvas pixels the poster travels per 1.0 of Offset change. Zero means
+                // the axis has nothing hidden to reveal, so it cannot be panned.
+                gainX: srcW ? slackX / 2 * (dstW / srcW) : 0,
+                gainY: srcH ? slackY / 2 * (dstH / srcH) : 0
+            };
+        }
+
+        // Draws the background image using that geometry.
+        // NOTE: only ever called with a blob-loaded (untainted) image (see bgImageEl).
+        // An animated GIF with a frame decoder is drawn from the decoder's canvas once it
+        // holds a frame (same size as the <img>, so the geometry is unchanged).
+        function drawBackgroundImage(ctx, img, W, H) {
+            var g = backgroundGeometry(img, W, H);
+            var gif = img._ccaGifDecoder;
+            var source = (gif && gif.drawn) ? gif.canvas : img;
+            if (g.fit === 'contain') {
+                // Letterbox the remainder with the base colour, like the server.
+                ctx.fillStyle = doc.Background.DimColor || '#000';
+                ctx.fillRect(0, 0, W, H);
+            }
+            ctx.save();
+            if (doc.Background.Blur > 0) { ctx.filter = 'blur(' + doc.Background.Blur + 'px)'; }
+            ctx.drawImage(source, g.srcX, g.srcY, g.srcW, g.srcH, g.dstX, g.dstY, g.dstW, g.dstH);
+            ctx.restore();
+        }
+
+        // The font a layer should be drawn AND measured with. Both callers must agree:
+        // drawing with one face and measuring with another puts the selection box and the
+        // hit-test somewhere the glyphs are not. Custom uploads are registered lazily by
+        // ensureLayerFont(); until one arrives we fall back to the bundled Noto Sans, which
+        // is also what the server does when a font fails to load.
+        var _customFonts = {};   // server path -> { family: string, state: 'loading'|'ready'|'failed' }
+
+        function customFontFamily(path) {
+            return 'ccaFont' + String(path).replace(/[^a-zA-Z0-9]/g, '').slice(-24);
+        }
+
+        function fontFamilyFor(layer) {
+            var path = layer && layer.FontPath;
+            var entry = path && _customFonts[path];
+            if (entry && entry.state === 'ready') {
+                return '"' + entry.family + '", "Noto Sans", sans-serif';
+            }
+            return '"Noto Sans", sans-serif';
+        }
+
+        // An uploaded font is registered (ensureLayerFont) as one FontFace with no weight
+        // descriptor, i.e. a single 400 face, and the server renders custom fonts at their own
+        // weight: DocumentRenderer.CreateFont ignores Weight for them. Asking the canvas for
+        // 700 of a 400-only family makes the browser fake a bold the cover will never have,
+        // so a ready custom font is requested at 400. While it is loading or failed,
+        // fontFamilyFor draws Noto Sans instead, which the server's fallback also renders at
+        // layer.Weight, so the weight is kept then (same 'ready' test as fontFamilyFor).
+        function canvasFont(layer, fontPx) {
+            var entry = layer.FontPath && _customFonts[layer.FontPath];
+            var weight = entry && entry.state === 'ready' ? 400 : layer.Weight;
+            return weight + ' ' + fontPx + 'px ' + fontFamilyFor(layer);
+        }
+
+        // Fetches an uploaded font through the authenticated endpoint and registers it with
+        // the FontFace API, then re-renders so the canvas picks it up. Best-effort: on
+        // failure the canvas keeps Noto Sans while the server still renders the real face.
+        function ensureLayerFont(layer) {
+            var path = layer && layer.FontPath;
+            if (!path || _customFonts[path]) { return; }
+            var family = customFontFamily(path);
+            _customFonts[path] = { family: family, state: 'loading' };
+            authFetch('CustomCoverArt/customFont?path=' + encodeURIComponent(path))
+                .then(function (r) {
+                    if (!r.ok) { throw new Error('custom font returned ' + r.status); }
+                    return r.arrayBuffer();
+                })
+                .then(function (buf) {
+                    var ff = new FontFace(family, buf);
+                    return ff.load().then(function (loaded) {
+                        document.fonts.add(loaded);
+                        _customFonts[path].state = 'ready';
+                        scheduleRender();
+                    });
+                })
+                .catch(function () { _customFonts[path].state = 'failed'; });
+        }
+
+        // Every text value authored in pixels (font size, shadow blur and offset, outline
+        // width) is relative to the design's reference resolution, doc.Canvas.Height. The
+        // main canvas IS that size (factor 1). The in-context thumbnails are not, and they
+        // used to draw full-size text into a 180px-tall box. This is the server's own rule
+        // (CoverArtService.ScaleDocumentForCanvas): positions are already normalized, and pixel
+        // values scale by targetHeight / referenceHeight.
+        function textScale(H) {
+            return doc.Canvas.Height > 0 ? H / doc.Canvas.Height : 1;
+        }
+
+        // Font px for a text layer drawn into a canvas H pixels tall. The server points
+        // Canvas.Height at the scaled size and then clamps Size * Height to [8, 1024], so the
+        // clamp comes AFTER scaling (identical on the main canvas, where H is the reference).
+        function textFontPx(layer, H) {
+            return Math.max(8, Math.min(1024, layer.Size * H));
+        }
+
+        // Paints ONLY the shadow of a text layer's glyphs. ctx is already translated and
+        // rotated to the layer anchor, with font, alignment and fill set. A plain shadowed
+        // fillText also paints the glyphs, which drawTextLayer's real fill then paints again.
+        // At Opacity < 1 that double coat came out denser than the server, which fills once.
+        // So the glyphs are pushed far off the bitmap in DEVICE space and the shadow is pulled
+        // back by the same distance. The HTML canvas spec says shadow offsets and blur "are
+        // not affected by the current transformation matrix", so the shadow lands exactly
+        // where a plain shadowed fill would have put it (screen-space offset, which the
+        // server now matches), and the glyphs land nowhere. Clamps match RenderTextLayer.
+        //
+        // The device matrix is built directly from the anchor (px, py) and the rotation:
+        // both callers (renderDocument, drawDocInto) reach drawTextLayer with an identity
+        // CTM, so the layer's matrix is exactly translate(px, py) * rotate. Reading the
+        // current matrix back needs a matrix API older engines (Chromium < 68, Firefox < 70)
+        // lack, and a throw here aborted the whole render with this layer's save() still on
+        // the stack.
+        function drawTextShadowOnly(ctx, layer, fontPx, k, px, py) {
+            var content = layer.Content || '';
+            var r = (layer.Rotation || 0) * Math.PI / 180, c = Math.cos(r), s = Math.sin(r);
+            // Far enough that no glyph, at any rotation, can still touch the bitmap: the
+            // anchor's device x plus the text's longest possible reach from it.
+            var shift = Math.ceil(Math.abs(px) + ctx.measureText(content).width + fontPx) + 64;
+            ctx.save();
+            ctx.setTransform(c, s, -s, c, px - shift, py);
+            ctx.shadowColor = layer.Shadow.Color;
+            ctx.shadowBlur = Math.max(0, Math.min(50, layer.Shadow.Blur)) * k;
+            ctx.shadowOffsetX = Math.max(-50, Math.min(50, layer.Shadow.OffsetX)) * k + shift;
+            ctx.shadowOffsetY = Math.max(-50, Math.min(50, layer.Shadow.OffsetY)) * k;
+            ctx.fillText(content, 0, 0);
+            ctx.restore();
+        }
+
+        // One text layer: shadow, then outline, then fill, mirroring RenderTextLayer.
+        // Pixel values are scaled for the target canvas (textScale).
+        function drawTextLayer(ctx, layer, W, H) {
+            var px = normToPx(layer.X, W), py = normToPx(layer.Y, H);
+            var k = textScale(H);
+            var fontPx = textFontPx(layer, H);
+            ctx.save();
+            ctx.globalAlpha = layer.Opacity;
+            // Rotate about the layer's own anchor and draw at the local origin —
+            // the same pivot the server uses (RenderTextLayer's SetDrawingTransform).
+            ctx.translate(px, py);
+            if (layer.Rotation) { ctx.rotate(layer.Rotation * Math.PI / 180); }
+            ensureLayerFont(layer);
+            ctx.font = canvasFont(layer, fontPx);
+            ctx.textAlign = layer.Align === 0 ? 'left' : (layer.Align === 2 ? 'right' : 'center');
+            ctx.textBaseline = 'middle';
+
+            // Draw order mirrors RenderTextLayer: shadow, then outline, then fill. The
+            // shadow used to be switched on between the outline and the fill, which put it
+            // OVER the outline — the server has always drawn it underneath.
+            ctx.fillStyle = layer.Color;
+            if (layer.Shadow && layer.Shadow.Enabled) {
+                drawTextShadowOnly(ctx, layer, fontPx, k, px, py);
+            }
+            // Server order: ScaleDocumentForCanvas rounds the scaled width to an int, then
+            // RenderTextLayer clamps it to [0, 10]. A zero lineWidth is ignored by canvas
+            // (the previous width would be kept), hence the guard.
+            var outlineWidth = Math.min(10, Math.max(0, Math.round(((layer.Outline && layer.Outline.Width) || 0) * k)));
+            if (layer.Outline && layer.Outline.Enabled && outlineWidth > 0) {
+                ctx.lineWidth = outlineWidth * 2;
+                ctx.strokeStyle = layer.Outline.Color;
+                ctx.lineJoin = 'round';
+                ctx.strokeText(layer.Content, 0, 0);
+            }
+            ctx.fillText(layer.Content, 0, 0);
+            ctx.restore();
+        }
+
+        // One image (logo) layer, mirroring DocumentRenderer.RenderImageLayer: the
+        // bitmap scaled to Width×Height of the canvas, rotated about the layer anchor,
+        // composited at Opacity. Draws nothing until the bitmap is decoded — the
+        // authoritative server render is the one that counts either way.
+        function drawImageLayer(ctx, layer, W, H) {
+            var img = layer._img;
+            if (!img || !img.complete || !img.naturalWidth) { return; }
+            var w = Math.max(1, (layer.Width || 0) * W);
+            var h = Math.max(1, (layer.Height || 0) * H);
+            ctx.save();
+            ctx.globalAlpha = Math.max(0, Math.min(1, layer.Opacity == null ? 1 : layer.Opacity));
+            ctx.translate(normToPx(layer.X, W), normToPx(layer.Y, H));
+            if (layer.Rotation) { ctx.rotate(layer.Rotation * Math.PI / 180); }
+            ctx.drawImage(img, -w / 2, -h / 2, w, h);
+            ctx.restore();
+        }
+
+        // Measured bounding box (canvas px) of a text layer, honouring alignment and
+        // the middle baseline used by drawTextLayer. Used for hit-testing and the
+        // selection outline so the box tracks the rendered glyphs.
+        function textLayerBounds(ctx, layer, W, H) {
+            var fontPx = textFontPx(layer, H);
+            ctx.save();
+            ctx.font = canvasFont(layer, fontPx);
+            var m = ctx.measureText(layer.Content || '');
+            ctx.restore();
+            var tw = m.width;
+            var th = fontPx;                 // approx line box height
+            var cx = normToPx(layer.X, W), cy = normToPx(layer.Y, H);
+            var left;
+            if (layer.Align === 0) { left = cx; }          // left edge
+            else if (layer.Align === 2) { left = cx - tw; } // right edge
+            else { left = cx - tw / 2; }                    // centred
+            return { x: left, y: cy - th / 2, w: tw, h: th };
+        }
+
+        // A layer's box expressed RELATIVE TO ITS ROTATION PIVOT, which for both types
+        // is the anchor (X*W, Y*H) — the same point the server rotates about. Image
+        // layers are centred on it; text layers hang off it according to alignment.
+        // Keeping one representation means selection, hit-testing and the handles all
+        // agree no matter how the layer is rotated.
+        function layerRect(ctx, layer, W, H) {
+            var px = normToPx(layer.X, W), py = normToPx(layer.Y, H);
+            var rot = layer.Rotation || 0;
+            if (layer.Type === 'image') {
+                var w = Math.max(1, (layer.Width || 0) * W);
+                var h = Math.max(1, (layer.Height || 0) * H);
+                return { px: px, py: py, rot: rot, lx: -w / 2, ly: -h / 2, w: w, h: h };
+            }
+            var b = textLayerBounds(ctx, layer, W, H);
+            return { px: px, py: py, rot: rot, lx: b.x - px, ly: b.y - py, w: b.w, h: b.h };
+        }
+
+        // Layer space -> canvas space.
+        function rectToCanvas(r, lx, ly) {
+            var a = r.rot * Math.PI / 180, c = Math.cos(a), s = Math.sin(a);
+            return { x: r.px + lx * c - ly * s, y: r.py + lx * s + ly * c };
+        }
+        // Canvas space -> layer space (inverse rotation about the pivot).
+        function canvasToRect(r, pt) {
+            var a = -r.rot * Math.PI / 180, c = Math.cos(a), s = Math.sin(a);
+            var dx = pt.x - r.px, dy = pt.y - r.py;
+            return { x: dx * c - dy * s, y: dx * s + dy * c };
+        }
+
+        // Canvas backing-store pixels per CSS pixel. Greater than 1 whenever the canvas is
+        // displayed smaller than its export size, which is almost always — and
+        // dramatically so on a phone, where a 1400px canvas shown at ~340px scales by ~4.
+        function canvasScale() {
+            var cv = el('ccaCanvas');
+            if (!cv) { return 1; }
+            var rect = cv.getBoundingClientRect();
+            if (!rect.width || !cv.width) { return 1; }
+            return cv.width / rect.width;
+        }
+
+        // Handle size is chosen in SCREEN pixels and converted into canvas units, so it
+        // renders at a constant on-screen size however far the canvas is scaled down.
+        // Deriving it from the backing store (the Phase 2 behaviour) meant the handles
+        // shrank with the display and ended up a few pixels across on a phone — the one
+        // mobile problem that no amount of CSS could fix.
+        var HANDLE_SCREEN_PX = 11;      // drawn size
+        var TOUCH_TARGET_PX = 44;       // minimum comfortable touch target
+        function handleSize(H) {
+            var byScreen = HANDLE_SCREEN_PX * canvasScale();
+            // Never so large on a tiny canvas that the handles swamp the layer itself.
+            return Math.max(6, Math.min(byScreen, H / 8));
+        }
+
+        // Grab radius. Touch gets the full 44px target; a mouse is precise, so it uses the
+        // drawn handle size rather than a sloppy oversized hit area.
+        function hitTolerance(ev) {
+            var scale = canvasScale();
+            var isTouch = ev && (ev.pointerType === 'touch' || ev.pointerType === 'pen');
+            return isTouch ? (TOUCH_TARGET_PX / 2) * scale : HANDLE_SCREEN_PX * scale;
+        }
+
+        function rotateKnobGap(H) { return Math.max(18, H / 16); }
+
+        // The four corner handles plus the rotate knob, in canvas coordinates, tagged
+        // with their layer-space corner so a drag knows which way it is resizing.
+        function layerHandles(r, H) {
+            var pts = [
+                { id: 'nw', lx: r.lx, ly: r.ly },
+                { id: 'ne', lx: r.lx + r.w, ly: r.ly },
+                { id: 'sw', lx: r.lx, ly: r.ly + r.h },
+                { id: 'se', lx: r.lx + r.w, ly: r.ly + r.h }
+            ].map(function (p) {
+                var c = rectToCanvas(r, p.lx, p.ly);
+                return { id: p.id, lx: p.lx, ly: p.ly, x: c.x, y: c.y };
+            });
+            var knobLocal = { lx: r.lx + r.w / 2, ly: r.ly - rotateKnobGap(H) };
+            var k = rectToCanvas(r, knobLocal.lx, knobLocal.ly);
+            pts.push({ id: 'rot', lx: knobLocal.lx, ly: knobLocal.ly, x: k.x, y: k.y });
+            return pts;
+        }
+
+        // Selection overlay: a dashed outline around the selected layer, following its
+        // rotation, plus corner-resize handles and a rotate knob.
+        function drawSelectionHandles(ctx, W, H) {
+            var layer = selectedLayer();
+            if (!layer || !layer.Visible) { return; }
+            var r = layerRect(ctx, layer, W, H);
+            var pad = Math.max(6, r.h * 0.12);
+            var hs = handleSize(H);
+
+            ctx.save();
+            ctx.translate(r.px, r.py);
+            ctx.rotate(r.rot * Math.PI / 180);
+            ctx.strokeStyle = 'rgba(0, 164, 220, 0.95)';
+            ctx.lineWidth = Math.max(1.5, H / 500);
+            ctx.setLineDash([Math.max(6, H / 120), Math.max(4, H / 200)]);
+            ctx.strokeRect(r.lx - pad, r.ly - pad, r.w + pad * 2, r.h + pad * 2);
+
+            // Stem from the top edge to the rotate knob.
+            ctx.setLineDash([]);
+            ctx.beginPath();
+            ctx.moveTo(r.lx + r.w / 2, r.ly - pad);
+            ctx.lineTo(r.lx + r.w / 2, r.ly - rotateKnobGap(H));
+            ctx.stroke();
+            ctx.restore();
+
+            ctx.save();
+            ctx.fillStyle = 'rgba(0, 164, 220, 0.95)';
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+            ctx.lineWidth = Math.max(1, H / 700);
+            layerHandles(r, H).forEach(function (p) {
+                ctx.beginPath();
+                if (p.id === 'rot') { ctx.arc(p.x, p.y, hs * 0.6, 0, Math.PI * 2); }
+                else { ctx.rect(p.x - hs / 2, p.y - hs / 2, hs, hs); }
+                ctx.fill();
+                ctx.stroke();
+            });
+            ctx.restore();
+        }
+
+        // The handle under the pointer, if any, for the currently selected layer.
+        function hitTestHandle(pt, ev) {
+            var layer = selectedLayer();
+            var cv = el('ccaCanvas');
+            if (!layer || !layer.Visible || !cv) { return null; }
+            var ctx = cv.getContext('2d');
+            var r = layerRect(ctx, layer, cv.width, cv.height);
+            var tol = hitTolerance(ev);
+            var found = null;
+            layerHandles(r, cv.height).forEach(function (p) {
+                var dx = pt.x - p.x, dy = pt.y - p.y;
+                if (!found && Math.sqrt(dx * dx + dy * dy) <= tol) { found = p; }
+            });
+            return found ? { handle: found, rect: r, layer: layer } : null;
+        }
+
+        // Client → canvas-pixel mapping (accounts for the CSS-scaled canvas).
+        function canvasPoint(ev) {
+            var cv = el('ccaCanvas'), r = cv.getBoundingClientRect();
+            return {
+                x: r.width ? (ev.clientX - r.left) / r.width * cv.width : 0,
+                y: r.height ? (ev.clientY - r.top) / r.height * cv.height : 0
+            };
+        }
+
+        // Topmost (last-drawn) visible layer whose padded box contains the point. The
+        // point is mapped into each layer's own rotated space, so a turned layer is
+        // grabbed where it actually appears rather than by its upright footprint.
+        function hitTestLayer(pt, ev) {
+            var cv = el('ccaCanvas'); if (!cv) { return null; }
+            var ctx = cv.getContext('2d');
+            // A finger is much blunter than a cursor, so widen the grab area for touch.
+            var touchPad = hitTolerance(ev) * 0.5;
+            for (var i = doc.Layers.length - 1; i >= 0; i--) {
+                var layer = doc.Layers[i];
+                if (!layer.Visible) { continue; }
+                var r = layerRect(ctx, layer, cv.width, cv.height);
+                var local = canvasToRect(r, pt);
+                var pad = layer.Type === 'text' ? Math.max(touchPad, r.h * 0.3) : touchPad;
+                if (local.x >= r.lx - pad && local.x <= r.lx + r.w + pad &&
+                    local.y >= r.ly - pad && local.y <= r.ly + r.h + pad) {
+                    return layer;
+                }
+            }
+            return null;
+        }
+
+        // Keyboard move for the selected layer: arrows nudge 1 canvas pixel, Shift+arrow
+        // 10, clamped like a pointer drag. Off while repositioning the background, where
+        // the canvas belongs to the background gesture instead.
+        function onCanvasKeydown(ev) {
+            // Modified arrows belong to the browser/OS (Alt+Left is Back, etc.).
+            if (ev.altKey || ev.ctrlKey || ev.metaKey) { return; }
+            var dx = 0, dy = 0;
+            if (ev.key === 'ArrowLeft') { dx = -1; }
+            else if (ev.key === 'ArrowRight') { dx = 1; }
+            else if (ev.key === 'ArrowUp') { dy = -1; }
+            else if (ev.key === 'ArrowDown') { dy = 1; }
+            else { return; }
+            var layer = selectedLayer();
+            if (!layer || bgAdjustMode) { return; }
+            var step = ev.shiftKey ? 10 : 1;
+            layer.X = Math.max(0, Math.min(1, layer.X + dx * step / doc.Canvas.Width));
+            layer.Y = Math.max(0, Math.min(1, layer.Y + dy * step / doc.Canvas.Height));
+            ev.preventDefault();
+            scheduleRender();
+        }
+
+        var _drag = null;       // layer move drag (bgAdjustMode off)
+        var _handleDrag = null; // corner-resize / rotate-knob drag on the selected layer
+        var _bgDrag = null;     // background pan drag (bgAdjustMode on, single pointer)
+
+        // Two-pointer pinch tracking for background zoom (bgAdjustMode on, touch).
+        // Keyed by pointerId, client (not canvas) coordinates — only the RATIO
+        // between the start and current distance is used, so CSS scaling of the
+        // canvas cancels out and client coords are fine.
+        var _pointers = {};
+        var _pinchStartDist = 0;
+        var _pinchStartScale = 1;
+        function pointerDistance() {
+            var ids = Object.keys(_pointers);
+            if (ids.length < 2) { return 0; }
+            var a = _pointers[ids[0]], b = _pointers[ids[1]];
+            var dx = b.x - a.x, dy = b.y - a.y;
+            return Math.sqrt(dx * dx + dy * dy);
+        }
+
+        function onCanvasPointerDown(ev) {
+            // preventDefault below suppresses the mouse events that would normally focus
+            // the canvas, so focus it explicitly: click a layer, then nudge with arrows.
+            var cvEl = el('ccaCanvas');
+            if (cvEl && document.activeElement !== cvEl) {
+                try { cvEl.focus({ preventScroll: true }); } catch (err) { /* ignore */ }
+            }
+            _pointers[ev.pointerId] = { x: ev.clientX, y: ev.clientY };
+
+            if (bgAdjustMode) {
+                if (!activeBgBitmap()) { return; } // nothing to reposition without a loaded image
+                if (Object.keys(_pointers).length >= 2) {
+                    // Second finger down: switch to pinch-zoom, cancel any pan in flight.
+                    _bgDrag = null;
+                    _pinchStartDist = pointerDistance();
+                    _pinchStartScale = doc.Background.Transform.Scale;
+                } else {
+                    var bgPt = canvasPoint(ev);
+                    _bgDrag = {
+                        startX: bgPt.x, startY: bgPt.y,
+                        origOffsetX: doc.Background.Transform.OffsetX,
+                        origOffsetY: doc.Background.Transform.OffsetY
+                    };
+                }
+                try { el('ccaCanvas').setPointerCapture(ev.pointerId); } catch (e) { /* ignore */ }
+                ev.preventDefault();
+                return;
+            }
+
+            var pt = canvasPoint(ev);
+
+            // Handles belong to the already-selected layer and sit OUTSIDE its box, so
+            // they must win over a plain hit-test — otherwise a corner handle that
+            // overlaps a layer below would select that layer instead of resizing.
+            var grip = hitTestHandle(pt, ev);
+            if (grip) {
+                _handleDrag = {
+                    kind: grip.handle.id === 'rot' ? 'rotate' : 'resize',
+                    layer: grip.layer,
+                    origWidth: grip.layer.Width, origHeight: grip.layer.Height,
+                    origSize: grip.layer.Size, origRotation: grip.layer.Rotation || 0,
+                    // Distance from the pivot at grab time: text resizes by ratio, so
+                    // it needs the starting reach, not an absolute corner.
+                    startDist: Math.sqrt(Math.pow(pt.x - grip.rect.px, 2) + Math.pow(pt.y - grip.rect.py, 2)),
+                    rect: grip.rect
+                };
+                try { el('ccaCanvas').setPointerCapture(ev.pointerId); } catch (e) { /* ignore */ }
+                ev.preventDefault();
+                return;
+            }
+
+            var hit = hitTestLayer(pt, ev);
+            if (!hit) { return; }
+            if (doc._selectedId !== hit.Id) {
+                doc._selectedId = hit.Id;
+                renderLayersPanel();
+                syncControlsFromDocument();
+            }
+            _drag = { startX: pt.x, startY: pt.y, origX: hit.X, origY: hit.Y };
+            try { el('ccaCanvas').setPointerCapture(ev.pointerId); } catch (e) { /* ignore */ }
+            renderDocument();
+            ev.preventDefault();
+        }
+        function onCanvasPointerMove(ev) {
+            if (_pointers[ev.pointerId]) { _pointers[ev.pointerId] = { x: ev.clientX, y: ev.clientY }; }
+
+            if (bgAdjustMode) {
+                if (!activeBgBitmap()) { return; }
+                if (Object.keys(_pointers).length >= 2 && _pinchStartDist > 0) {
+                    var dist = pointerDistance();
+                    var scale = _pinchStartScale * (dist / _pinchStartDist);
+                    doc.Background.Transform.Scale = Math.min(4, Math.max(1, scale));
+                    scheduleRender();
+                    ev.preventDefault();
+                    return;
+                }
+                if (!_bgDrag) { return; }
+                var cv = el('ccaCanvas');
+                var bgPt = canvasPoint(ev);
+                // Convert the drag in CANVAS pixels into an Offset delta using the
+                // geometry's own gain (canvas px travelled per 1.0 of Offset). A fixed
+                // divisor cannot work: the gain depends on how much slack the fit and
+                // the zoom leave, so the poster would lag or outrun the cursor at every
+                // zoom but one. gain 0 = nothing hidden on that axis, so leave it be.
+                //
+                // Natural "grab and slide" direction: dragging right/down should make
+                // the image follow the cursor, which means the sampled source rect
+                // shifts the OTHER way — the offset moves opposite the drag delta.
+                var g = backgroundGeometry(activeBgBitmap(), cv.width, cv.height);
+                if (g.gainX > 0) {
+                    doc.Background.Transform.OffsetX = Math.max(-1, Math.min(1,
+                        _bgDrag.origOffsetX - (bgPt.x - _bgDrag.startX) / g.gainX));
+                }
+                if (g.gainY > 0) {
+                    doc.Background.Transform.OffsetY = Math.max(-1, Math.min(1,
+                        _bgDrag.origOffsetY - (bgPt.y - _bgDrag.startY) / g.gainY));
+                }
+                scheduleRender();
+                ev.preventDefault();
+                return;
+            }
+
+            if (_handleDrag) {
+                var hd = _handleDrag;
+                var r = hd.rect;
+                var hp = canvasPoint(ev);
+                if (hd.kind === 'rotate') {
+                    // The knob sits above the layer, so the pointer's bearing from the
+                    // pivot is 90° ahead of the layer's own rotation.
+                    var deg = Math.atan2(hp.y - r.py, hp.x - r.px) * 180 / Math.PI + 90;
+                    while (deg > 180) { deg -= 360; }
+                    while (deg < -180) { deg += 360; }
+                    if (ev.shiftKey) { deg = Math.round(deg / 15) * 15; }
+                    hd.layer.Rotation = Math.round(deg);
+                } else if (hd.layer.Type === 'image') {
+                    // An image layer is centred on its pivot, so the grabbed corner's
+                    // distance from the centre IS the half-width/half-height.
+                    var local = canvasToRect(r, hp);
+                    var w = Math.max(0.01, Math.abs(local.x) * 2 / el('ccaCanvas').width);
+                    var h = Math.max(0.01, Math.abs(local.y) * 2 / el('ccaCanvas').height);
+                    if (ev.shiftKey && hd.origWidth > 0) {
+                        h = w * (hd.origHeight / hd.origWidth); // keep the aspect ratio
+                    }
+                    hd.layer.Width = Math.min(4, w);
+                    hd.layer.Height = Math.min(4, h);
+                } else {
+                    // Text has no width/height of its own — scale its font size by how
+                    // much further the corner was dragged from the pivot.
+                    var dist = Math.sqrt(Math.pow(hp.x - r.px, 2) + Math.pow(hp.y - r.py, 2));
+                    if (hd.startDist > 0) {
+                        var size = hd.origSize * (dist / hd.startDist);
+                        hd.layer.Size = Math.max(8 / doc.Canvas.Height, Math.min(1024 / doc.Canvas.Height, size));
+                    }
+                }
+                // Only the controls this gesture actually changes — a full
+                // syncControlsFromDocument() here would rebuild the gradient-stop rows
+                // on every pointer move.
+                syncTransformControls();
+                scheduleRender();
+                ev.preventDefault();
+                return;
+            }
+
+            if (!_drag) { return; }
+            var layer = selectedLayer(); if (!layer) { return; }
+            var cv = el('ccaCanvas');
+            var pt = canvasPoint(ev);
+            layer.X = Math.max(0, Math.min(1, _drag.origX + (pt.x - _drag.startX) / cv.width));
+            layer.Y = Math.max(0, Math.min(1, _drag.origY + (pt.y - _drag.startY) / cv.height));
+            scheduleRender();
+            ev.preventDefault();
+        }
+        function onCanvasPointerUp(ev) {
+            delete _pointers[ev.pointerId];
+            if (Object.keys(_pointers).length < 2) { _pinchStartDist = 0; }
+
+            if (bgAdjustMode) {
+                try { el('ccaCanvas').releasePointerCapture(ev.pointerId); } catch (e) { /* ignore */ }
+                _bgDrag = null;
+                return;
+            }
+            if (_handleDrag) {
+                try { el('ccaCanvas').releasePointerCapture(ev.pointerId); } catch (e) { /* ignore */ }
+                _handleDrag = null;
+                return;
+            }
+            if (!_drag) { return; }
+            try { el('ccaCanvas').releasePointerCapture(ev.pointerId); } catch (e) { /* ignore */ }
+            _drag = null;
+        }
+
+        // Loads the SAME bundled Noto weights the server renders with, via the
+        // authenticated font endpoint + the FontFace API (which — unlike CSS
+        // @font-face — accepts an ArrayBuffer fetched WITH the auth token). Tolerant
+        // of per-weight failure: a missing weight falls back to the browser's
+        // sans-serif for the canvas only; the applied cover is server-authoritative.
+        var FONT_WEIGHTS = [300, 400, 500, 600, 700, 800];
+        function loadCanvasFonts() {
+            return Promise.all(FONT_WEIGHTS.map(function (w) {
+                return authFetch('CustomCoverArt/font/' + w)
+                    .then(function (r) { return r.arrayBuffer(); })
+                    .then(function (buf) {
+                        var ff = new FontFace('Noto Sans', buf, { weight: String(w) });
+                        return ff.load().then(function (loaded) { document.fonts.add(loaded); });
+                    })
+                    .catch(function () { /* fall back to sans-serif for this weight */ });
+            }));
+        }
+        // ==================================================================
+        // End canvas engine
+        // ==================================================================
+
+        // Build the settings object using the EXACT C# property names (PascalCase)
+        // and numeric enum values so binding works regardless of serializer config.
+        function collectSettings() {
+            var preset = el('ccaPreset').value;
+            var width, height;
+            if (preset === 'custom') {
+                width = parseInt(el('ccaWidth').value, 10) || 1400;
+                height = parseInt(el('ccaHeight').value, 10) || 1400;
+            } else {
+                width = PRESETS[preset].w;
+                height = PRESETS[preset].h;
+            }
+
+            return {
+                Title: el('ccaTitle').value,
+                TextSize: parseInt(el('ccaTextSize').value, 10),
+                TextWeight: parseInt(el('ccaTextWeight').value, 10),
+                TextColor: el('ccaTextColor').value,
+                TextAlign: parseInt(el('ccaTextAlign').value, 10),
+                TextBaseline: 1,
+                BackgroundDim: parseFloat(el('ccaDim').value),
+                BackgroundBlur: parseFloat(el('ccaBlur').value),
+                DimColor: el('ccaDimColor').value,
+                TextShadow: el('ccaShadow').checked,
+                TextOutline: el('ccaOutline').checked,
+                BackgroundGradient: {
+                    IsEnabled: doc.Background.Source === 'gradient',
+                    Type: parseInt(el('ccaGradientType').value, 10),
+                    Angle: parseFloat(el('ccaGradientAngle').value) || 0,
+                    Stops: collectGradientStops(),
+                    CenterX: 0.5, CenterY: 0.5, Radius: 0.5
+                },
+                BackgroundImagePath: state.backgroundImagePath || '',
+                BackgroundFit: el('ccaBgFit').value,
+                CustomFontPath: state.customFontPath || '',
+                ExportWidth: width,
+                ExportHeight: height,
+                ExportScale: 1.0,
+                OutputFormat: el('ccaFormat').value === 'animatedgif' ? 'gif' : el('ccaFormat').value,
+                Animation: el('ccaFormat').value === 'animatedgif' ? {
+                    Enabled: true,
+                    KenBurns: el('ccaKenBurns').checked,
+                    ZoomAmount: 0.15,
+                    Direction: el('ccaAnimDir').value,
+                    FrameCount: parseInt(el('ccaAnimFrames').value, 10),
+                    DelayMs: parseInt(el('ccaAnimDelay').value, 10),
+                    Loop: true
+                } : null,
+                DimensionPreset: preset,
+                BackgroundSource: el('ccaBgSource').value,
+                Collage: {
+                    SourceId: state.libraryId || '',
+                    SourceType: (el('ccaTargetType') ? el('ccaTargetType').value : 'library'),
+                    Density: el('ccaCollageDensity').value,
+                    Seed: state.collageSeed
+                }
+            };
+        }
+
+        // --- Document <-> controls binding (Task 8) -----------------------
+        // collectSettings() (above) is RETAINED only to feed the legacy flat-Settings
+        // endpoints (batch apply + its projection); the live canvas, Apply, server
+        // render and templates are all document-native via collectDocument().
+
+        // Recursively deep-clone `doc`, dropping UI-only keys (any `_`-prefixed key,
+        // e.g. _selectedId) so nothing internal leaks onto the wire.
+        function stripUiKeys(v) {
+            if (Array.isArray(v)) { return v.map(stripUiKeys); }
+            if (v && typeof v === 'object') {
+                var out = {};
+                Object.keys(v).forEach(function (k) {
+                    if (k.charAt(0) === '_') { return; }
+                    out[k] = stripUiKeys(v[k]);
+                });
+                return out;
+            }
+            return v;
+        }
+
+        // Server-only fields that depend on live UI/target state and aren't drawn on
+        // the canvas — refreshed at send time so the POSTed document is current.
+        function buildAnimationFromControls() {
+            return {
+                Enabled: true,
+                KenBurns: el('ccaKenBurns').checked,
+                ZoomAmount: 0.15,
+                Direction: el('ccaAnimDir').value,
+                FrameCount: parseInt(el('ccaAnimFrames').value, 10),
+                DelayMs: parseInt(el('ccaAnimDelay').value, 10),
+                Loop: true
+            };
+        }
+        function buildCollageFromControls() {
+            return {
+                SourceId: state.libraryId || '',
+                SourceType: (el('ccaTargetType') ? el('ccaTargetType').value : 'library'),
+                Density: el('ccaCollageDensity').value,
+                Seed: state.collageSeed
+            };
+        }
+
+        // The document to POST: `doc` with derived server-only fields refreshed and
+        // UI-only keys stripped.
+        function collectDocument() {
+            if (doc.Background.Source === 'collage') {
+                doc.Background.Collage = buildCollageFromControls();
+            }
+            if (el('ccaFormat').value === 'animatedgif') {
+                doc.Canvas.Format = 'gif';
+                doc.Background.Animation = buildAnimationFromControls();
+            }
+            return stripUiKeys(doc);
+        }
+
+        // Reads stop DOM rows into a document object that owns a Stops array. Parameterised
+        // by container so the background gradient and the background OVERLAY can each have
+        // their own editor without the two forking into near-duplicate copies.
+        function syncStopsToDoc(containerId, target) {
+            if (!target) { return; }
+            target.Stops = collectStops(containerId);
+        }
+
+        function syncGradientStopsToDoc() {
+            syncStopsToDoc('ccaGradientStops', doc.Background.Gradient);
+        }
+
+        // Rebuilds stop DOM rows from a document stop list. `withAlpha` adds the per-stop
+        // alpha slider (overlay only); `defaults` seeds two stops when there are fewer than two.
+        function rebuildStopsUI(containerId, stops, withAlpha, defaults) {
+            var container = el(containerId);
+            if (!container) { return; }
+            container.innerHTML = '';
+            (stops || []).forEach(function (st) {
+                var a = pick(st, 'Alpha');
+                addStopRow(containerId,
+                    pick(st, 'Color') || '#888888',
+                    Math.round((pick(st, 'Position') || 0) * 100),
+                    Math.round((a === undefined || a === null ? 1 : a) * 100),
+                    withAlpha);
+            });
+            if (container.querySelectorAll('.ccaStop').length < 2) {
+                addStopRow(containerId, defaults[0].color, defaults[0].pos, defaults[0].alpha, withAlpha);
+                addStopRow(containerId, defaults[1].color, defaults[1].pos, defaults[1].alpha, withAlpha);
+            }
+        }
+
+        function rebuildGradientStopsUI(stops) {
+            rebuildStopsUI('ccaGradientStops', stops, false, [
+                { color: '#aa5cc3', pos: 0, alpha: 100 },
+                { color: '#00a4dc', pos: 100, alpha: 100 }
+            ]);
+        }
+
+        // Presets set POSITIONS AND ALPHAS ONLY, never colours: applying one keeps the
+        // existing stops' colours, matched by RELATIVE POSITION (see applyOverlayPreset), so
+        // a user can try every preset without losing the colour they picked. Stops with no
+        // source colour take the last existing colour.
+        var OVERLAY_PRESETS = {
+            bottom:  [{ pos: 0, alpha: 0 }, { pos: 0.45, alpha: 0 }, { pos: 1, alpha: 0.9 }],
+            top:     [{ pos: 0, alpha: 0.9 }, { pos: 0.55, alpha: 0 }, { pos: 1, alpha: 0 }],
+            wash:    [{ pos: 0, alpha: 0.35 }, { pos: 1, alpha: 0.85 }],
+            duotone: [{ pos: 0, alpha: 0.7 }, { pos: 1, alpha: 0.9 }]
+        };
+
+        function ensureOverlay() {
+            if (!doc.Background.Overlay) {
+                doc.Background.Overlay = { IsEnabled: false, Type: 0, Angle: 90, Stops: [] };
+            }
+            return doc.Background.Overlay;
+        }
+
+        // Writes an angle to the document AND to the Advanced angle control. Anything that
+        // changes the angle behind the user's back (applying a preset) must go through here,
+        // otherwise the slider keeps showing the old value while the render uses the new one.
+        function setOverlayAngle(ov, angle) {
+            ov.Angle = angle;
+            var slider = el('ccaOverlayAngle');
+            if (slider) { slider.value = angle; }
+            var out = el('ccaOverlayAngleVal');
+            if (out) { out.textContent = angle + '°'; }
+        }
+
+        // The two seed stops a brand-new overlay editor shows: a transparent-to-90% ramp in
+        // the current base colour. One definition, used by both rebuild paths, so the seeded
+        // rows can never drift apart.
+        function defaultOverlayStopRows() {
+            var c = doc.Background.DimColor || '#000000';
+            return [
+                { color: c, pos: 0, alpha: 0 },
+                { color: c, pos: 100, alpha: 90 }
+            ];
+        }
+
+        function applyOverlayPreset(name) {
+            var preset = OVERLAY_PRESETS[name];
+            if (!preset) { return; }   // 'custom' keeps whatever is there
+            var ov = ensureOverlay();
+            var existing = ov.Stops || [];
+            var n = preset.length, m = existing.length;
+            var fallback = (m ? existing[m - 1].Color : null) || doc.Background.DimColor || '#000000';
+            setOverlayAngle(ov, 90);
+            ov.Stops = preset.map(function (p, i) {
+                // Map by RELATIVE position, not raw index, so the first and last stops
+                // always keep their colours regardless of how the old and new stop counts
+                // compare. Without this, "Bottom fade" (3 stops) -> "Full wash" (2 stops)
+                // drops index 2 — the opaque end, and the one overlayStopIndex() targets by
+                // default — and switching back never recovers it.
+                var srcIndex = m ? (n > 1 ? Math.round(i * (m - 1) / (n - 1)) : 0) : -1;
+                var color = (srcIndex >= 0 && existing[srcIndex]) ? existing[srcIndex].Color : null;
+                return {
+                    Color: color || fallback,
+                    Position: p.pos,
+                    Alpha: p.alpha
+                };
+            });
+            rebuildOverlayStopsUI();
+        }
+
+        function rebuildOverlayStopsUI() {
+            var ov = ensureOverlay();
+            rebuildStopsUI('ccaOverlayStops', ov.Stops, true, defaultOverlayStopRows());
+            // rebuildStopsUI may have seeded defaults; read them back so doc and DOM agree.
+            syncOverlayStopsToDoc();
+        }
+
+        function syncOverlayStopsToDoc() {
+            syncStopsToDoc('ccaOverlayStops', ensureOverlay());
+        }
+
+        // Which overlay stop a clicked palette swatch recolours. Defaults to the LAST stop:
+        // the opaque end is the one people actually recolour.
+        var _overlayStopIndex = -1;
+
+        // Whether the user is CURRENTLY working in the overlay stop editor — i.e. a stop row
+        // holds focus, or held it right up until the click being handled. applySwatch uses
+        // this to decide whether a swatch belongs to the overlay or to the selected text
+        // layer; see the precedence comment there for why that decision is needed at all.
+        var _overlayStopFocused = false;
+
+        function isInOverlayStops(node) {
+            return !!(node && node.closest && node.closest('#ccaOverlayStops'));
+        }
+
+        function selectOverlayStopFrom(target) {
+            var row = target.closest ? target.closest('.ccaStop') : null;
+            var container = el('ccaOverlayStops');
+            if (!row || !container) { return; }
+            var rows = Array.prototype.slice.call(container.querySelectorAll('.ccaStop'));
+            var i = rows.indexOf(row);
+            if (i >= 0) {
+                _overlayStopIndex = i;
+                _overlayStopFocused = true;
+            }
+        }
+
+        // Focus leaving the stop editor ends the "working on the overlay" state — UNLESS it
+        // moved to another stop row, or into the palette itself. The palette exception is the
+        // whole point: clicking a swatch focuses the swatch button, so without it the state
+        // would always be false by the time the click handler runs.
+        function onOverlayStopsFocusOut(e) {
+            var to = e.relatedTarget;
+            if (isInOverlayStops(to)) { return; }
+            if (to && to.closest && to.closest('#ccaSwatches')) { return; }
+            _overlayStopFocused = false;
+        }
+
+        function overlayStopIndex() {
+            var ov = doc.Background.Overlay;
+            if (!ov || !ov.Stops || !ov.Stops.length) { return -1; }
+            if (_overlayStopIndex < 0 || _overlayStopIndex >= ov.Stops.length) {
+                return ov.Stops.length - 1;
+            }
+            return _overlayStopIndex;
+        }
+
+        // Sets every overlay control from doc.Background.Overlay. Called from
+        // syncControlsFromDocument, which ALSO runs on plain selection changes (picking a
+        // different layer, deleting one, applying the Jellyfin style preset) — so this must
+        // be idempotent and side-effect-free on the document: no mutating doc, no resetting
+        // the preset dropdown or the targeted-stop index. Those are LOAD-only concerns and
+        // live in resetOverlayEditorState(), called separately by the genuine load paths.
+        //
+        // Stop rows are rebuilt from the document EVERY time, on or off, so switching to a
+        // document with a different (or no) overlay never leaves a previous document's rows
+        // sitting in the (hidden, when off) container.
+        function hydrateOverlayControls() {
+            var ov = doc.Background.Overlay;
+            var on = !!(ov && ov.IsEnabled);
+            el('ccaOverlay').checked = on;
+            el('ccaOverlayOpts').style.display = on ? '' : 'none';
+            var angleRow = el('ccaOverlayAngleRow');
+            if (angleRow) { angleRow.style.display = on ? '' : 'none'; }
+
+            // A missing Angle is backfilled onto the document by normalizeOverlay() at load
+            // time, not here — this only decides what to DISPLAY, never writes to doc.
+            var angle = (ov && ov.Angle != null) ? ov.Angle : 90;
+            el('ccaOverlayAngle').value = angle;
+            el('ccaOverlayAngleVal').textContent = angle + '°';
+
+            rebuildStopsUI('ccaOverlayStops', (ov && ov.Stops) || [], true, defaultOverlayStopRows());
+        }
+
+        // LOAD-only: resets the parts of the overlay editor that only make sense when a
+        // whole new document has arrived (a fresh page, a template, an undo/redo snapshot) —
+        // never from a plain selection change, which shares syncControlsFromDocument but
+        // must not silently flip a chosen preset name back to Custom just because the user
+        // clicked a different layer. Real stop data can't be attributed to a named preset
+        // (naming one would be a guess), so it resets to Custom; no data resets to the
+        // markup's own default, Bottom fade, rather than carrying over whatever the previous
+        // document happened to have selected.
+        function resetOverlayEditorState() {
+            var ov = doc.Background.Overlay;
+            var sel = el('ccaOverlayPreset');
+            if (sel) { sel.value = (ov && ov.Stops && ov.Stops.length) ? 'custom' : 'bottom'; }
+            _overlayStopIndex = -1;
+            _overlayStopFocused = false;
+        }
+
+        // Applies the Format control to the document (auto|png|gif, or animatedgif =>
+        // gif + an Animation object). Shared by the change handler and GIF autodetect.
+        function applyFormatFromControl() {
+            var v = el('ccaFormat').value;
+            doc.Canvas.Format = (v === 'animatedgif') ? 'gif' : v;
+            doc.Background.Animation = (v === 'animatedgif') ? buildAnimationFromControls() : null;
+            updateAnimVisibility();
+            scheduleRender();
+        }
+
+        // Sets EVERY control from `doc` — the inverse of the old applySettingsToForm.
+        // The selected text layer drives the Text card; doc.Background/doc.Canvas drive
+        // the rest. Call after a selection change or a template load.
+        // The controls a canvas transform gesture can change (opacity, rotation, text
+        // size). Split out of syncControlsFromDocument so a drag can refresh just these
+        // at pointer rate instead of re-running the whole card, which rebuilds DOM.
+        function syncTransformControls() {
+            var l = selectedLayer() || {};
+            var opacityPct = Math.round((l.Opacity == null ? 1 : l.Opacity) * 100);
+            el('ccaLayerOpacity').value = opacityPct;
+            el('ccaLayerOpacityVal').textContent = opacityPct;
+            el('ccaLayerRotation').value = l.Rotation || 0;
+            el('ccaLayerRotationVal').textContent = (l.Rotation || 0) + '°';
+            var sizePx = Math.round((l.Size || 0) * doc.Canvas.Height);
+            el('ccaTextSize').value = sizePx;
+            el('ccaTextSizeVal').textContent = sizePx;
+        }
+
+        function syncControlsFromDocument() {
+            var sel = selectedLayer();
+            var l = sel || {};
+            var isText = !!sel && sel.Type === 'text';
+            var isImage = !!sel && sel.Type === 'image';
+
+            // Selected-layer card: text-only controls hide for a logo, and the
+            // resize/rotate hint only makes sense for one.
+            page.querySelectorAll('#ccaSettings .ccaTextOnly').forEach(function (n) {
+                n.style.display = isText ? '' : 'none';
+            });
+            page.querySelectorAll('#ccaSettings .ccaImageOnly').forEach(function (n) {
+                n.style.display = isImage ? '' : 'none';
+            });
+            el('ccaNoLayerHint').style.display = sel ? 'none' : '';
+
+            // Opacity/Rotation/size — shared with the drag path below.
+            syncTransformControls();
+
+            // Text card (selected layer)
+            el('ccaTitle').value = (l.Content != null) ? l.Content : '';
+            el('ccaTextWeight').value = String(l.Weight != null ? l.Weight : 400);
+            el('ccaTextColor').value = l.Color || '#ffffff';
+            el('ccaTextAlign').value = String(l.Align != null ? l.Align : 1);
+            el('ccaShadow').checked = !!(l.Shadow && l.Shadow.Enabled);
+            el('ccaOutline').checked = !!(l.Outline && l.Outline.Enabled);
+
+            // Background card
+            var bg = doc.Background;
+            el('ccaDim').value = bg.Dim; el('ccaDimVal').textContent = bg.Dim;
+            el('ccaBlur').value = bg.Blur; el('ccaBlurVal').textContent = bg.Blur;
+            el('ccaDimColor').value = bg.DimColor || '#000000';
+            el('ccaBgFit').value = bg.Fit || 'cover';
+            el('ccaBgSource').value = bg.Source || 'upload';
+            var g = bg.Gradient;
+            if (g) {
+                el('ccaGradientType').value = String(g.Type || 0);
+                el('ccaGradientAngle').value = g.Angle || 0;
+                el('ccaGradientAngleVal').textContent = (g.Angle || 0) + '°';
+                rebuildGradientStopsUI(g.Stops);
+            }
+            hydrateOverlayControls();
+            if (bg.Collage) { el('ccaCollageDensity').value = bg.Collage.Density || 'medium'; }
+
+            // Output card
+            el('ccaPreset').value = doc.Canvas.DimensionPreset || 'custom';
+            el('ccaWidth').value = doc.Canvas.Width;
+            el('ccaHeight').value = doc.Canvas.Height;
+            var anim = bg.Animation;
+            if (doc.Canvas.Format === 'gif' && anim && anim.Enabled) {
+                el('ccaFormat').value = 'animatedgif';
+                el('ccaKenBurns').checked = !!anim.KenBurns;
+                if (anim.FrameCount != null) { el('ccaAnimFrames').value = anim.FrameCount; el('ccaAnimFramesVal').textContent = anim.FrameCount; }
+                if (anim.DelayMs != null) { el('ccaAnimDelay').value = anim.DelayMs; el('ccaAnimDelayVal').textContent = anim.DelayMs; }
+                el('ccaAnimDir').value = anim.Direction || 'in';
+            } else {
+                el('ccaFormat').value = doc.Canvas.Format || 'auto';
+            }
+
+            // Effects card
+            var fx = doc.Effects;
+            el('ccaFxSoftLight').checked = !!fx.SoftLight.Enabled;
+            el('ccaFxSoftLightColor').value = fx.SoftLight.Color || '#ffffff';
+            setRange('ccaFxSoftLightOpacity', Math.round(fx.SoftLight.Opacity * 100));
+            el('ccaFxVignette').checked = !!fx.Vignette.Enabled;
+            setRange('ccaFxVignetteAmount', Math.round(fx.Vignette.Amount * 100));
+            setRange('ccaFxVignetteSoftness', Math.round(fx.Vignette.Softness * 100));
+            el('ccaFxGrain').checked = !!fx.Grain.Enabled;
+            setRange('ccaFxGrainAmount', Math.round(fx.Grain.Amount * 100));
+            el('ccaFxBorder').checked = !!fx.Border.Enabled;
+            el('ccaFxBorderColor').value = fx.Border.Color || '#ffffff';
+            setRange('ccaFxBorderThickness', fx.Border.Thickness);
+            setRange('ccaFxBorderRadius', fx.Border.Radius);
+            el('ccaFxBorderDouble').checked = !!fx.Border.Double;
+            setRange('ccaFxBorderGap', fx.Border.Gap);
+
+            // Re-sync dependent visibility + labels.
+            syncFileNames();
+            updateUI();
+            updateBackgroundVisibility();
+            updateAnimVisibility();
+            updateEffectsVisibility();
+        }
+
+        // The default Jellyfin library-cover look: a dark vertical gradient with clean
+        // white bold centred text and no effects. It writes plain document values, so
+        // every control still edits the result afterwards — it is a starting point, not
+        // a mode. Constants are pinned by PresetTests so the docs and code agree.
+        var JELLYFIN_PRESET = {
+            gradientStart: '#0b0b10',
+            gradientEnd: '#1a1a24',
+            gradientAngle: 90,
+            dim: 0.1,
+            textColor: '#ffffff',
+            textWeight: 700,
+            textSize: 0.11
+        };
+
+        function applyJellyfinPreset() {
+            var p = JELLYFIN_PRESET;
+            doc.Background.Source = 'gradient';
+            doc.Background.Gradient = {
+                IsEnabled: true, Type: 0, Angle: p.gradientAngle,
+                Stops: [{ Color: p.gradientStart, Position: 0 }, { Color: p.gradientEnd, Position: 1 }],
+                CenterX: 0.5, CenterY: 0.5, Radius: 0.5
+            };
+            doc.Background.Dim = p.dim;
+
+            // Restyle the title layer, leaving any other layers the user added alone.
+            var l = selectedLayer();
+            if (!l || l.Type !== 'text') {
+                l = null;
+                for (var i = 0; i < doc.Layers.length; i++) {
+                    if (doc.Layers[i].Type === 'text') { l = doc.Layers[i]; break; }
+                }
+            }
+            if (l) {
+                l.Color = p.textColor; l.Weight = p.textWeight; l.Align = 1;
+                l.X = 0.5; l.Y = 0.5; l.Size = p.textSize; l.Rotation = 0; l.Opacity = 1;
+                l.Shadow = { Enabled: false, Color: '#000000', Blur: 4, OffsetX: 2, OffsetY: 2 };
+                l.Outline = { Enabled: false, Color: '#000000', Width: 2 };
+            }
+
+            doc.Effects = defaultEffects();
+            doc.Effects.Preset = 'jellyfin';
+
+            // The gradient is the point of the preset, so drop any background bitmap that
+            // would paint over it (both the canvas copy and the path the server renders).
+            doc.Background.ImagePath = '';
+            state.backgroundImagePath = '';
+            requestGuard('bg');       // an upload or poster pick still in flight must not land now
+            clearBackgroundBitmap();  // syncControlsFromDocument below updates the file labels
+
+            renderLayersPanel();
+            syncControlsFromDocument();
+            scheduleRender();
+        }
+
+        // Sets a range input and the little value label that shadows it.
+        function setRange(id, value) {
+            var input = el(id);
+            if (!input) { return; }
+            input.value = value;
+            var label = el(id + 'Val');
+            if (label) { label.textContent = value; }
+        }
+
+        // Each effect's controls only appear once it is switched on.
+        function updateEffectsVisibility() {
+            el('ccaFxSoftLightRow').style.display = el('ccaFxSoftLight').checked ? '' : 'none';
+            el('ccaFxVignetteRow').style.display = el('ccaFxVignette').checked ? '' : 'none';
+            el('ccaFxGrainRow').style.display = el('ccaFxGrain').checked ? '' : 'none';
+            el('ccaFxBorderRow').style.display = el('ccaFxBorder').checked ? '' : 'none';
+            el('ccaFxBorderGapRow').style.display = el('ccaFxBorderDouble').checked ? '' : 'none';
+        }
+        // ------------------------------------------------------------------
+
+        // The primary button names what it is about to change. One literal t() call per
+        // type, so the translation reachability test can see every key.
+        function applyLabelFor(type) {
+            if (type === 'collection') { return t('action.applyCollection'); }
+            if (type === 'playlist') { return t('action.applyPlaylist'); }
+            if (type === 'livetv') { return t('action.applyLivetv'); }
+            return t('action.apply');
+        }
+
+        // The stock title layer (Id 'title'), if the design still has one.
+        function titleLayer() {
+            for (var i = 0; i < doc.Layers.length; i++) {
+                if (doc.Layers[i].Id === 'title' && doc.Layers[i].Type === 'text') { return doc.Layers[i]; }
+            }
+            return null;
+        }
+
+        // The title follows the chosen target's name (or a translated placeholder when no
+        // target is chosen) until the user types their own; after that it is theirs.
+        function prefillTitle(name) {
+            if (state.titleTouched) { return; }
+            var l = titleLayer();
+            if (!l) { return; }
+            // Following the target's name is not the user's edit: stay clean if we were.
+            var wasClean = _cleanJson !== null && !isDirty();
+            l.Content = name || t('text.defaultTitle');
+            if (wasClean) { markClean(); }
+            renderLayersPanel();
+            if (doc._selectedId === l.Id) { el('ccaTitle').value = l.Content; }
+            scheduleRender();
+        }
+
+        // Enable/disable controls based on current selection. Deliberately does NOT touch
+        // the gradient rows — updateBackgroundVisibility owns those, and two owners of the
+        // same element fight.
+        function updateUI() {
+            var btn = el('ccaApplyBtn');
+            // While an apply runs, applyCoverArt owns the button ("Applying…", disabled)
+            // and calls updateUI() itself when it is done.
+            if (!state.applying) {
+                btn.disabled = !state.libraryId;
+                var label = btn.querySelector('span');
+                if (label) { label.textContent = applyLabelFor(el('ccaTargetType') ? el('ccaTargetType').value : 'library'); }
+            }
+            el('ccaCustomDims').style.display = el('ccaPreset').value === 'custom' ? '' : 'none';
+        }
+
+        // Single owner of which background controls are visible: only the chosen source's
+        // own controls are shown. A control belonging to an unchosen source is hidden
+        // outright rather than demoted to "advanced" — before v3.3.0.0 the gradient lived
+        // behind its own checkbox alongside the source dropdown, so two controls answered
+        // one question.
+        function updateBackgroundVisibility() {
+            var source = el('ccaBgSource').value;
+            var type = el('ccaTargetType') ? el('ccaTargetType').value : 'library';
+
+            // Live TV has no child posters to build a mosaic from. Disabling the option is
+            // not enough on its own: switching the target to Live TV while a collage is
+            // already chosen has to revert the source, which silently discarded the user's
+            // choice until the hint below explained it.
+            var isLiveTv = (type === 'livetv');
+            var collageOpt = el('ccaBgSource').querySelector('option[value="collage"]');
+            if (collageOpt) { collageOpt.disabled = isLiveTv; }
+            el('ccaCollageLiveTvHint').style.display = isLiveTv ? '' : 'none';
+            if (isLiveTv && source === 'collage') {
+                el('ccaBgSource').value = 'upload';
+                doc.Background.Source = 'upload';
+                source = 'upload';
+            }
+
+            el('ccaUploadControls').style.display = source === 'upload' ? '' : 'none';
+            el('ccaCollageRow').style.display = source === 'collage' ? '' : 'none';
+            el('ccaGradientOpts').style.display = source === 'gradient' ? '' : 'none';
+            el('ccaGradientAngleRow').style.display =
+                (source === 'gradient' && el('ccaGradientType').value === '0') ? '' : 'none';
+            updateUI();
+        }
+
+        // Shows/hides the animated-GIF controls when that output format is chosen.
+        function updateAnimVisibility() {
+            var on = el('ccaFormat').value === 'animatedgif';
+            el('ccaAnimRow').style.display = on ? '' : 'none';
+            el('ccaAnimHint').style.display = on ? '' : 'none';
+        }
+
+        // Refreshes the Restore button state for the currently selected target.
+        function refreshRestoreState() {
+            var btn = el('ccaRestoreBtn');
+            var reset = el('ccaResetBackupBtn');
+            var hint = el('ccaRestoreHint');
+            if (!btn) { return; }
+            if (!state.libraryId) { btn.disabled = true; reset.disabled = true; hint.textContent = t('restore.none'); return; }
+            var requestedId = state.libraryId;
+            jsonFetch('CustomCoverArt/targets/' + encodeURIComponent(requestedId) + '/backup').then(function (res) {
+                // The target may have changed while this was in flight.
+                if (requestedId !== state.libraryId) { return; }
+                var has = pick(res, 'Success') && pick(res, 'Data');
+                // Reset is only meaningful when there is a backup to throw away.
+                btn.disabled = !has;
+                reset.disabled = !has;
+                hint.textContent = has ? t('restore.available') : t('restore.none');
+            }).catch(function () {
+                if (requestedId !== state.libraryId) { return; }
+                btn.disabled = true;
+                reset.disabled = true;
+                hint.textContent = t('restore.unknown');
+            });
+        }
+
+        // Loads the targets (libraries / collections / playlists) for the selected type.
+        function loadLibraries() {
+            var type = el('ccaTargetType') ? el('ccaTargetType').value : 'library';
+            state.libraryId = '';
+            var isCurrent = requestGuard('targets');
+            return jsonFetch('CustomCoverArt/targets/' + type).then(function (res) {
+                if (!isCurrent()) { return; }
+                var select = el('ccaLibrarySelect');
+                select.innerHTML = '';
+                var placeholder = document.createElement('option');
+                placeholder.value = '';
+                placeholder.textContent = t('lib.selectOption');
+                select.appendChild(placeholder);
+                (dataOrThrow(res) || []).forEach(function (lib) {
+                    var opt = document.createElement('option');
+                    opt.value = pick(lib, 'Id');
+                    opt.textContent = pick(lib, 'Name');
+                    select.appendChild(opt);
+                });
+                updateUI();
+            });
+        }
+
+        // --- Templates ----------------------------------------------------
+
+        // Pick helper for legacy CoverArtSettings that treats 0/false as present
+        // (unlike a plain `||` fallback, which would replace a real 0 dim/blur).
+        function pickNum(s, name, fallback) {
+            var v = pick(s, name);
+            return (v === undefined || v === null) ? fallback : v;
+        }
+
+        // Converts a legacy flat CoverArtSettings (templates saved before the
+        // canvas engine shipped, which carry Settings but no Document) into a
+        // one-text-layer CoverDocument — the client mirror of the server's
+        // Services/DocumentMigration.cs FromSettings, so old templates keep
+        // working. Per template semantics ("templates store the design but not
+        // the title"), the title layer's Content is stripped, same as a
+        // freshly-saved document-native template would have.
+        function migrateTemplateToDocument(s) {
+            var d = defaultDocument();
+
+            d.Canvas.Width = pickNum(s, 'ExportWidth', d.Canvas.Width);
+            d.Canvas.Height = pickNum(s, 'ExportHeight', d.Canvas.Height);
+            d.Canvas.Format = pick(s, 'OutputFormat') || d.Canvas.Format;
+            d.Canvas.DimensionPreset = pick(s, 'DimensionPreset') || d.Canvas.DimensionPreset;
+
+            var bg = d.Background;
+            bg.Source = pick(s, 'BackgroundSource') || bg.Source;
+            bg.ImagePath = pick(s, 'BackgroundImagePath') || '';
+            bg.Fit = pick(s, 'BackgroundFit') || 'cover';
+            bg.Blur = pickNum(s, 'BackgroundBlur', bg.Blur);
+            bg.Dim = pickNum(s, 'BackgroundDim', bg.Dim);
+            bg.DimColor = pick(s, 'DimColor') || bg.DimColor;
+            // Mirrors DocumentMigration.FromSettings: Gradient = s.BackgroundGradient,
+            // i.e. a missing gradient stays null — NOT the default purple/blue
+            // gradient from defaultDocument(). Falling back to that default would
+            // put a phantom gradient (IsEnabled:true) onto any legacy template
+            // that never had one (a plain image, or a flat/dim-only design), and
+            // that phantom gradient would then get baked onto the real applied
+            // cover by the server's CreateGradientBackground.
+            bg.Gradient = pick(s, 'BackgroundGradient') || null;
+            bg.Collage = pick(s, 'Collage') || null;
+            bg.Animation = pick(s, 'Animation') || null;
+            bg.Transform = { OffsetX: 0, OffsetY: 0, Scale: 1 }; // identity, as FromSettings does
+
+            var l = d.Layers[0];
+            l.Content = ''; // template title stripped — each target keeps its own name
+            var height = d.Canvas.Height || 1400;
+            l.Size = pickNum(s, 'TextSize', 120) / height;
+            l.Weight = pickNum(s, 'TextWeight', 400);
+            l.Color = pick(s, 'TextColor') || '#ffffff';
+            l.Align = pickNum(s, 'TextAlign', 1);
+            l.FontPath = pick(s, 'CustomFontPath') || '';
+
+            // Anchor position from align/baseline/padding, mirroring
+            // DocumentMigration.AnchorFor (TextAlign/TextBaseline: 0=start/top,
+            // 1=center/middle, 2=end/bottom).
+            var baseline = pickNum(s, 'TextBaseline', 1);
+            var padding = pickNum(s, 'TextPadding', 0.05);
+            l.X = l.Align === 0 ? padding : (l.Align === 2 ? 1 - padding : 0.5);
+            l.Y = baseline === 0 ? padding : (baseline === 2 ? 1 - padding : 0.5);
+
+            l.Shadow = {
+                Enabled: !!pick(s, 'TextShadow'),
+                Color: pick(s, 'TextShadowColor') || '#000000',
+                Blur: pickNum(s, 'TextShadowBlur', 4),
+                OffsetX: pickNum(s, 'TextShadowOffsetX', 2),
+                OffsetY: pickNum(s, 'TextShadowOffsetY', 2)
+            };
+            l.Outline = {
+                Enabled: !!pick(s, 'TextOutline'),
+                Color: pick(s, 'TextOutlineColor') || '#000000',
+                Width: pickNum(s, 'TextOutlineWidth', 2)
+            };
+
+            return d;
+        }
+
+        function loadTemplates() {
+            return jsonFetch('CustomCoverArt/templates').then(function (res) {
+                var templates = dataOrThrow(res) || [];
+                var sel = el('ccaTemplateSelect');
+                sel.innerHTML = '';
+                state.templateValue = ''; // the rebuilt list selects "—"
+                var none = document.createElement('option'); none.value = ''; none.textContent = '—'; sel.appendChild(none);
+                templates.forEach(function (tpl) {
+                    var o = document.createElement('option');
+                    o.value = pick(tpl, 'Name'); o.textContent = pick(tpl, 'Name');
+                    o._document = pick(tpl, 'Document');
+                    // Legacy templates (saved before the canvas engine) carry no
+                    // Document, only the flat Settings — kept here so the load
+                    // handler can migrate on demand.
+                    o._settings = pick(tpl, 'Settings');
+                    sel.appendChild(o);
+                });
+            }).catch(function (e) {
+                // Shown in the dropdown itself: this runs on every page show, next to the
+                // target list, and a dead server should not stack three alerts.
+                var sel = el('ccaTemplateSelect');
+                sel.innerHTML = '';
+                state.templateValue = '';
+                var none = document.createElement('option'); none.value = ''; none.textContent = t('dyn.error', errorText(e)); sel.appendChild(none);
+            });
+        }
+
+        // --- Batch apply --------------------------------------------------
+        function loadBatchList() {
+            var type = el('ccaTargetType') ? el('ccaTargetType').value : 'library';
+            var isCurrent = requestGuard('batchTargets');
+            return jsonFetch('CustomCoverArt/targets/' + type).then(function (res) {
+                if (!isCurrent()) { return; }
+                var targets = dataOrThrow(res) || [];
+                var box = el('ccaBatchList'); box.innerHTML = '';
+                targets.forEach(function (lib) {
+                    var id = pick(lib, 'Id'), name = pick(lib, 'Name');
+                    var row = document.createElement('label'); row.className = 'ccaCheck ccaCheckBlock';
+                    var cb = document.createElement('input'); cb.type = 'checkbox'; cb.setAttribute('is', 'emby-checkbox');
+                    cb.value = id; cb.dataset.type = type;
+                    var span = document.createElement('span'); span.textContent = name;
+                    row.appendChild(cb); row.appendChild(span); box.appendChild(row);
+                });
+            }).catch(function (e) {
+                if (!isCurrent()) { return; }
+                el('ccaBatchList').innerHTML = '';
+                el('ccaBatchStatus').textContent = t('dyn.error', errorText(e));
+            });
+        }
+
+        // NOTE the .ccaStopPos selector. Overlay rows carry a SECOND range input for alpha,
+        // so the old input[type="range"] lookup would silently read whichever came first.
+        function collectStops(containerId) {
+            var stops = [];
+            var container = el(containerId);
+            if (!container) { return stops; }
+            container.querySelectorAll('.ccaStop').forEach(function (row) {
+                var alphaEl = row.querySelector('.ccaStopAlpha');
+                stops.push({
+                    Color: row.querySelector('input[type="color"]').value,
+                    Position: (parseFloat(row.querySelector('.ccaStopPos').value) || 0) / 100,
+                    Alpha: alphaEl ? (parseFloat(alphaEl.value) || 0) / 100 : 1
+                });
+            });
+            return stops;
+        }
+
+        function collectGradientStops() {
+            return collectStops('ccaGradientStops');
+        }
+
+        // A gradient needs two stops, so ✕ is disabled at two instead of silently ignored.
+        function updateStopRemoveButtons(container) {
+            var rows = container.querySelectorAll('.ccaStop');
+            rows.forEach(function (row) {
+                var rm = row.querySelector('.ccaStopRemove');
+                if (rm) { rm.disabled = rows.length <= 2; }
+            });
+        }
+
+        function addStopRow(containerId, color, posPercent, alphaPercent, withAlpha) {
+            var container = el(containerId);
+            if (!container) { return; }
+            var row = document.createElement('div');
+            row.className = 'ccaStop';
+
+            var c = document.createElement('input');
+            c.type = 'color';
+            c.value = color || '#888888';
+            c.setAttribute('aria-label', t('stop.color'));
+
+            var p = document.createElement('input');
+            p.type = 'range';
+            p.min = '0'; p.max = '100'; p.step = '1';
+            p.value = (posPercent == null ? 50 : posPercent);
+            p.className = 'ccaRange ccaStopPos';
+            p.setAttribute('aria-label', t('stop.position'));
+
+            var a = null, aTag = null;
+            if (withAlpha) {
+                a = document.createElement('input');
+                a.type = 'range';
+                a.min = '0'; a.max = '100'; a.step = '1';
+                a.value = (alphaPercent == null ? 100 : alphaPercent);
+                a.className = 'ccaRange ccaStopAlpha';
+                a.title = t('bg.overlay.alpha');
+                // Two identical range inputs per row: the title is hover-only, so name the
+                // second one for screen readers and automation, and mark it visually with a
+                // compact glyph (aria-hidden — the label above already says it).
+                a.setAttribute('aria-label', t('bg.overlay.alpha'));
+                aTag = document.createElement('span');
+                aTag.className = 'ccaStopAlphaTag';
+                aTag.setAttribute('aria-hidden', 'true');
+                aTag.textContent = 'α';
+            }
+
+            var rm = document.createElement('button');
+            rm.type = 'button';
+            rm.className = 'ccaStopRemove';
+            rm.textContent = '✕';
+            rm.title = t('stop.remove');
+            rm.setAttribute('aria-label', t('stop.remove'));
+            rm.addEventListener('click', function () {
+                if (container.querySelectorAll('.ccaStop').length > 2) {
+                    container.removeChild(row);
+                    updateStopRemoveButtons(container);
+                    onStopsEdited(containerId);
+                    scheduleRender();
+                }
+            });
+
+            row.appendChild(c);
+            row.appendChild(p);
+            if (aTag) { row.appendChild(aTag); }
+            if (a) { row.appendChild(a); }
+            row.appendChild(rm);
+            if (containerId === 'ccaOverlayStops') {
+                row.addEventListener('focusin', function () { selectOverlayStopFrom(row); });
+            }
+            container.appendChild(row);
+            updateStopRemoveButtons(container);
+        }
+
+        function addGradientStop(color, posPercent) {
+            addStopRow('ccaGradientStops', color, posPercent, 100, false);
+        }
+
+        // One place that knows which document object a given stop container edits.
+        function onStopsEdited(containerId) {
+            if (containerId === 'ccaGradientStops') { syncGradientStopsToDoc(); }
+            else if (containerId === 'ccaOverlayStops') {
+                syncOverlayStopsToDoc();
+                // A hand-edit means the design no longer matches the named preset.
+                var sel = el('ccaOverlayPreset');
+                if (sel) { sel.value = 'custom'; }
+            }
+        }
+
+        function uploadFile(endpoint, file) {
+            var fd = new FormData();
+            fd.append('file', file);
+            return authFetch('CustomCoverArt/' + endpoint, { method: 'POST', body: fd })
+                .then(readJson, function () { throw networkError(); });
+        }
+
+        // Heuristic animated-GIF detection: an animated GIF has more than one
+        // Graphic Control Extension block (21 F9 04 … 00, then an image/ext marker).
+        function isAnimatedGif(buffer) {
+            var arr = new Uint8Array(buffer);
+            var frames = 0;
+            for (var i = 0, len = arr.length - 9; i < len; i++) {
+                if (arr[i] === 0x00 && arr[i + 1] === 0x21 && arr[i + 2] === 0xF9 && arr[i + 3] === 0x04 &&
+                    arr[i + 8] === 0x00 && (arr[i + 9] === 0x2C || arr[i + 9] === 0x21)) {
+                    frames++;
+                    if (frames > 1) { return true; }
+                }
+            }
+            return false;
+        }
+
+        // If the uploaded background is an animated GIF, switch the output to
+        // Animated GIF so its motion passes through into the preview and export.
+        function maybeSwitchToAnimated(file) {
+            if (!file || !file.arrayBuffer || !/\.gif$/i.test(file.name || '')) { return; }
+            file.arrayBuffer().then(function (buf) {
+                if (isAnimatedGif(buf) && el('ccaFormat').value !== 'animatedgif') {
+                    el('ccaFormat').value = 'animatedgif';
+                    applyFormatFromControl();
+                }
+            }).catch(function () { /* detection is best-effort */ });
+        }
+
+        // Delegated fallback: the static controls each have an explicit handler that
+        // mutates `doc`; this catches the DYNAMIC gradient-stop rows (added at runtime)
+        // so editing a stop's colour/position flows into the document and re-renders.
+        function onControlChange(e) {
+            var target = e.target;
+            if (!target || !target.closest) { return; }
+            if (target.closest('#ccaGradientStops')) {
+                onStopsEdited('ccaGradientStops');
+                scheduleRender();
+            } else if (target.closest('#ccaOverlayStops')) {
+                selectOverlayStopFrom(target);
+                onStopsEdited('ccaOverlayStops');
+                scheduleRender();
+            }
+        }
+
+        function downloadPreview() {
+            // Download the client-rendered canvas directly. #ccaPreview is gone, so
+            // guard against a missing canvas and export the current backing store.
+            var cv = el('ccaCanvas');
+            if (!cv) { return; }
+            // Render one clean frame WITHOUT the selection overlay so the dashed box
+            // isn't baked into the exported PNG, then restore the on-screen selection.
+            var savedSel = doc._selectedId;
+            doc._selectedId = null;
+            renderDocument();
+            var dataUrl = cv.toDataURL('image/png');
+            doc._selectedId = savedSel;
+            renderDocument();
+            var a = document.createElement('a');
+            a.href = dataUrl;
+            a.download = 'cover.png';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+
+        function applyCoverArt() {
+            if (!state.libraryId || state.applying) { return; }
+            var btn = el('ccaApplyBtn');
+            var label = btn.querySelector('span');
+            // Applying can be slow (an animated GIF renders many frames), so lock
+            // the button and show progress — otherwise it looks like nothing happens.
+            state.applying = true;
+            btn.disabled = true;
+            if (label) { label.textContent = t('action.applying'); }
+            Dashboard.showLoadingMsg();
+            // collectDocument() normalizes doc (collage source, GIF animation), so the clean
+            // snapshot must come from what it returned, not from doc beforehand.
+            var sent = collectDocument();
+            var appliedJson = JSON.stringify(sent);
+            jsonFetch('CustomCoverArt/document/apply', 'POST', {
+                LibraryId: state.libraryId,
+                Document: sent
+            }).then(function (res) {
+                Dashboard.hideLoadingMsg();
+                if (pick(res, 'Success')) {
+                    markClean(appliedJson);
+                    Dashboard.alert(t('dyn.applied'));
+                    // Applying backs the previous cover up, so Restore and Reset may have just
+                    // become available.
+                    refreshRestoreState();
+                } else {
+                    Dashboard.alert(t('dyn.error', pick(res, 'ErrorMessage') || t('dyn.unknown')));
+                }
+            }).catch(function (e) {
+                showError(t('dyn.applyFail', errorText(e)));
+            }).then(function () {
+                state.applying = false;
+                updateUI(); // restores the per-target label and the enabled state
+            });
+        }
+
+        // On-demand authoritative render: POST the document to the server preview
+        // endpoint and show the returned PNG/GIF in a labelled overlay, so the user
+        // can compare the exact server output against the live canvas before applying.
+        var _serverRenderUrl = null;
+
+        // collectDocument() normalizes doc (collage source, GIF animation), which would flip
+        // a clean design to dirty. Callers that only read the document (server render, batch
+        // apply) use this so a clean design stays clean.
+        function collectDocumentKeepingCleanState() {
+            var wasClean = _cleanJson !== null && !isDirty();
+            var sent = collectDocument();
+            if (wasClean) { markClean(); }
+            return sent;
+        }
+
+        function showServerRender() {
+            var btn = el('ccaServerRender');
+            if (btn.disabled) { return; }
+            var label = btn.querySelector('span');
+            var original = label ? label.textContent : '';
+            btn.disabled = true;
+            Dashboard.showLoadingMsg();
+            authFetch('CustomCoverArt/document/preview', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(collectDocumentKeepingCleanState())
+            }).catch(function () {
+                throw networkError();
+            }).then(function (r) {
+                // A 400 here carries the server's validation message (e.g. a size it refuses).
+                if (!r.ok) { return responseError(r); }
+                return r.blob();
+            }).then(function (blob) {
+                if (_serverRenderUrl) { URL.revokeObjectURL(_serverRenderUrl); }
+                _serverRenderUrl = URL.createObjectURL(blob);
+                el('ccaServerRenderImg').src = _serverRenderUrl;
+                el('ccaServerRenderWrap').style.display = '';
+                Dashboard.hideLoadingMsg();
+            }).catch(function (e) {
+                showError(t('dyn.error', errorText(e)));
+            }).then(function () {
+                btn.disabled = false;
+                if (label) { label.textContent = original; }
+            });
+        }
+
+        // Replaces the working design with a saved template. Called only once the user has
+        // confirmed, or had nothing unapplied to lose — see the dropdown's handler.
+        function loadTemplateOption(opt) {
+            var tplDoc = opt._document;
+            if (!tplDoc) {
+                // Legacy template saved before the canvas engine: no Document,
+                // only the flat Settings — migrate on the fly so it still loads.
+                if (opt._settings) { tplDoc = migrateTemplateToDocument(opt._settings); }
+                else { return; }
+            }
+            // Preserve THIS target's title if the template's title layer is blank
+            // (templates intentionally store the design, not the name).
+            var curLayer = selectedLayer();
+            var currentTitle = curLayer ? curLayer.Content : '';
+            var previousImagePath = doc.Background.ImagePath;
+            var previousLayers = doc.Layers;
+            doc = JSON.parse(JSON.stringify(tplDoc));
+            if (!doc.Layers) { doc.Layers = []; }
+            reuseLayerClientState(previousLayers);
+            // Templates saved before Phase 3 have no effect sub-objects; the draw
+            // functions dereference them, so fill them in like the server does.
+            normalizeEffects(doc);
+            normalizeBackgroundSource(doc);
+            normalizeOverlay(doc);
+            normalizeGradientStops(doc);
+            var title = titleLayer();
+            if (title && (!title.Content || !title.Content.trim()) && currentTitle) {
+                title.Content = currentTitle;
+            }
+            doc._selectedId = title ? title.Id : (doc.Layers[0] ? doc.Layers[0].Id : null);
+            // A template carries only a server ImagePath, never a client blob: fetch
+            // it back as one (or keep the bitmap we have when it is the same image).
+            hydrateBackgroundImage(previousImagePath);
+            renderLayersPanel();
+            // Logo layers arrive as server paths only (a template can't carry the
+            // bitmap), so pull them back as blobs to preview them on the canvas.
+            hydrateLayerImages();
+            syncControlsFromDocument();
+            resetOverlayEditorState();
+            scheduleRender();
+            markClean();
+        }
+
+        function bindEvents() {
+            // Global listeners (resize, Ctrl+Z/Y, the GIF loop's visibility and reduced-
+            // motion watchers) are page-scoped instead: see bindPageListeners.
+            el('ccaLibrarySelect').addEventListener('change', function () {
+                state.libraryId = this.value;
+                var opt = this.options[this.selectedIndex];
+                prefillTitle(this.value && opt ? opt.textContent : '');
+                updateUI();
+                refreshRestoreState();
+                scheduleRender(); // a collage background follows the target
+            });
+
+            el('ccaRestoreBtn').addEventListener('click', function () {
+                if (!state.libraryId) { return; }
+                var type = el('ccaTargetType') ? el('ccaTargetType').value : 'library';
+                var id = state.libraryId;
+                confirmAction(t('restore.confirm')).then(function (ok) {
+                    if (!ok) { return; }
+                    Dashboard.showLoadingMsg();
+                    return jsonFetch('CustomCoverArt/targets/' + type + '/' + encodeURIComponent(id) + '/restore', 'POST')
+                        .then(function (res) {
+                            Dashboard.hideLoadingMsg();
+                            Dashboard.alert(pick(res, 'Success')
+                                ? t('restore.done')
+                                : pick(res, 'ErrorMessage') || t('restore.fail'));
+                        })
+                        .catch(function (e) { showError(t('dyn.error', errorText(e))); })
+                        .then(refreshRestoreState);
+                });
+            });
+
+            el('ccaResetBackupBtn').addEventListener('click', function () {
+                if (!state.libraryId) { return; }
+                var id = state.libraryId;
+                confirmAction(t('restore.resetConfirm')).then(function (ok) {
+                    if (!ok) { return; }
+                    return jsonFetch('CustomCoverArt/targets/' + encodeURIComponent(id) + '/backup', 'DELETE')
+                        .then(function (res) {
+                            Dashboard.alert(pick(res, 'Success')
+                                ? t('restore.resetDone')
+                                : t('restore.resetFail', pick(res, 'ErrorMessage') || t('dyn.unknown')));
+                        })
+                        .catch(function (e) { showError(t('restore.resetFail', errorText(e))); })
+                        .then(refreshRestoreState);
+                });
+            });
+            // --- Text card: drives the SELECTED text layer ----------------
+            el('ccaTitle').addEventListener('input', function () {
+                var l = selectedLayer();
+                if (l) {
+                    l.Content = this.value;
+                    if (l.Id === 'title') { state.titleTouched = true; }
+                    renderLayersPanel(); // the panel labels a text layer with its content
+                    scheduleRender();
+                }
+            });
+
+            // --- Layers card ----------------------------------------------
+            el('ccaAddText').addEventListener('click', addTextLayer);
+            el('ccaAddImage').addEventListener('click', function () { el('ccaLayerImage').click(); });
+
+            el('ccaLayerImage').addEventListener('change', function () {
+                if (!this.files || !this.files[0]) { return; }
+                var file = this.files[0];
+                var input = this;
+                Dashboard.showLoadingMsg();
+                uploadFile('upload', file).then(function (res) {
+                    Dashboard.hideLoadingMsg();
+                    // Let the same file be picked again later (change won't fire twice
+                    // for an unchanged value).
+                    input.value = '';
+                    if (!pick(res, 'Success')) {
+                        Dashboard.alert(t('dyn.uploadFail', pick(res, 'ErrorMessage') || t('dyn.unknown')));
+                        return;
+                    }
+                    var l = newImageLayer(pick(res, 'Data'), file.name);
+                    var img = new Image();
+                    var url = URL.createObjectURL(file);
+                    img.onload = function () {
+                        URL.revokeObjectURL(url);
+                        // Start at the logo's natural aspect ratio. Width/Height are
+                        // fractions of DIFFERENT canvas axes, so converting a pixel
+                        // ratio into them needs the canvas ratio folded in.
+                        var ar = img.naturalWidth ? (img.naturalHeight / img.naturalWidth) : 1;
+                        l.Height = Math.min(1, l.Width * ar * (doc.Canvas.Width / doc.Canvas.Height));
+                        l._img = img;
+                        doc.Layers.push(l);
+                        selectLayerById(l.Id);
+                    };
+                    img.onerror = function () {
+                        // Undecodable client-side, but the server still has the file —
+                        // add it anyway so the authoritative render includes it.
+                        URL.revokeObjectURL(url);
+                        doc.Layers.push(l);
+                        selectLayerById(l.Id);
+                    };
+                    // Canvas-source invariant: the bitmap comes from the client File as
+                    // a blob: URL, never from the server path we just received.
+                    img.src = url;
+                }).catch(function (e) {
+                    input.value = '';
+                    showError(t('dyn.uploadFail', errorText(e)));
+                });
+            });
+
+            el('ccaLayerOpacity').addEventListener('input', function () {
+                el('ccaLayerOpacityVal').textContent = this.value;
+                var l = selectedLayer();
+                if (l) { l.Opacity = (parseInt(this.value, 10) || 0) / 100; scheduleRender(); }
+            });
+            el('ccaLayerRotation').addEventListener('input', function () {
+                el('ccaLayerRotationVal').textContent = this.value + '°';
+                var l = selectedLayer();
+                if (l) { l.Rotation = parseInt(this.value, 10) || 0; scheduleRender(); }
+            });
+            el('ccaTextSize').addEventListener('input', function () {
+                el('ccaTextSizeVal').textContent = this.value;
+                var l = selectedLayer();
+                if (l) { l.Size = (parseInt(this.value, 10) || 0) / doc.Canvas.Height; scheduleRender(); }
+            });
+            el('ccaTextWeight').addEventListener('change', function () {
+                var l = selectedLayer(); if (l) { l.Weight = parseInt(this.value, 10); scheduleRender(); }
+            });
+            el('ccaTextAlign').addEventListener('change', function () {
+                var l = selectedLayer(); if (l) { l.Align = parseInt(this.value, 10); scheduleRender(); }
+            });
+            el('ccaTextColor').addEventListener('input', function () {
+                var l = selectedLayer(); if (l) { l.Color = this.value; scheduleRender(); }
+            });
+            el('ccaShadow').addEventListener('change', function () {
+                var l = selectedLayer(); if (l) { l.Shadow.Enabled = this.checked; scheduleRender(); }
+            });
+            el('ccaOutline').addEventListener('change', function () {
+                var l = selectedLayer(); if (l) { l.Outline.Enabled = this.checked; scheduleRender(); }
+            });
+
+            // --- Background card ------------------------------------------
+            el('ccaDim').addEventListener('input', function () {
+                el('ccaDimVal').textContent = this.value;
+                doc.Background.Dim = parseFloat(this.value); scheduleRender();
+            });
+            el('ccaBlur').addEventListener('input', function () {
+                el('ccaBlurVal').textContent = this.value;
+                doc.Background.Blur = parseFloat(this.value); scheduleRender();
+            });
+            el('ccaDimColor').addEventListener('input', function () {
+                doc.Background.DimColor = this.value; scheduleRender();
+            });
+            el('ccaBgFit').addEventListener('change', function () {
+                doc.Background.Fit = this.value; scheduleRender();
+            });
+            el('ccaGradientType').addEventListener('change', function () {
+                if (doc.Background.Gradient) { doc.Background.Gradient.Type = parseInt(this.value, 10); }
+                updateBackgroundVisibility(); scheduleRender();
+            });
+            el('ccaGradientAngle').addEventListener('input', function () {
+                el('ccaGradientAngleVal').textContent = this.value + '°';
+                if (doc.Background.Gradient) { doc.Background.Gradient.Angle = parseFloat(this.value) || 0; }
+                scheduleRender();
+            });
+            el('ccaAddStop').addEventListener('click', function () {
+                addGradientStop('#888888', 50); syncGradientStopsToDoc(); scheduleRender();
+            });
+            el('ccaOverlay').addEventListener('change', function () {
+                var on = this.checked;
+                ensureOverlay().IsEnabled = on;
+                el('ccaOverlayOpts').style.display = on ? '' : 'none';
+                var angleRow = el('ccaOverlayAngleRow');
+                if (angleRow) { angleRow.style.display = on ? '' : 'none'; }
+                if (on && (!doc.Background.Overlay.Stops || doc.Background.Overlay.Stops.length < 2)) {
+                    // The select can legitimately read 'custom' here (e.g. hand-edited stops
+                    // from a previous check of the box) or, before any preset is ever
+                    // resolved, an unrecognised/empty value — 'custom' is a no-op for
+                    // applyOverlayPreset, so falling back to it would leave Stops empty and
+                    // the checkbox would visibly do nothing. Resolve to a REAL preset, and
+                    // write it back to the select so the control and the document agree.
+                    var presetSel = el('ccaOverlayPreset');
+                    var name = (presetSel && OVERLAY_PRESETS[presetSel.value]) ? presetSel.value : 'bottom';
+                    if (presetSel) { presetSel.value = name; }
+                    applyOverlayPreset(name);
+                }
+                scheduleRender();
+            });
+
+            el('ccaOverlayPreset').addEventListener('change', function () {
+                applyOverlayPreset(this.value);
+                scheduleRender();
+            });
+
+            el('ccaOverlayAddStop').addEventListener('click', function () {
+                var ov = ensureOverlay();
+                var last = ov.Stops && ov.Stops.length ? ov.Stops[ov.Stops.length - 1] : null;
+                addStopRow('ccaOverlayStops', (last && last.Color) || doc.Background.DimColor || '#000000', 50, 50, true);
+                onStopsEdited('ccaOverlayStops');
+                scheduleRender();
+            });
+
+            el('ccaOverlayAngle').addEventListener('input', function () {
+                ensureOverlay().Angle = parseFloat(this.value) || 0;
+                el('ccaOverlayAngleVal').textContent = this.value + '°';
+                scheduleRender();
+            });
+
+            // The container is static markup (only its rows are rebuilt), so one listener
+            // here outlives every rebuild. focusout bubbles, unlike blur.
+            var overlayStopsBox = el('ccaOverlayStops');
+            if (overlayStopsBox) { overlayStopsBox.addEventListener('focusout', onOverlayStopsFocusOut); }
+            el('ccaBgSource').addEventListener('change', function () {
+                doc.Background.Source = this.value;
+                if (this.value === 'collage') { doc.Background.Collage = buildCollageFromControls(); }
+                // Two-way compatibility: an older server reading this document decides on
+                // IsEnabled, so keep it in step with Source.
+                if (doc.Background.Gradient) {
+                    doc.Background.Gradient.IsEnabled = (this.value === 'gradient');
+                }
+                // A gradient or solid background forgets the image entirely. A collage keeps
+                // it in reserve: activeBgBitmap() paints the mosaic instead, and switching
+                // back to Image shows the upload again without a refetch.
+                if (this.value === 'gradient' || this.value === 'solid') {
+                    doc.Background.ImagePath = '';
+                    state.backgroundImagePath = '';
+                    requestGuard('bg');       // an upload or poster pick still in flight must not land now
+                    clearBackgroundBitmap();
+                    syncFileNames();
+                }
+                updateBackgroundVisibility(); scheduleRender();
+            });
+            el('ccaCollageDensity').addEventListener('change', function () {
+                if (doc.Background.Collage) { doc.Background.Collage.Density = this.value; } scheduleRender();
+            });
+            el('ccaCollageShuffle').addEventListener('click', function () {
+                state.collageSeed = (state.collageSeed + 1) & 0x7fffffff;
+                if (doc.Background.Collage) { doc.Background.Collage.Seed = state.collageSeed; }
+                scheduleRender();
+            });
+
+            // --- Effects card ---------------------------------------------
+            // Checkboxes toggle the effect and reveal its controls; sliders write the
+            // 0..1 model value (the UI works in whole percent) and re-render.
+            [['ccaFxSoftLight', 'SoftLight'], ['ccaFxVignette', 'Vignette'],
+             ['ccaFxGrain', 'Grain'], ['ccaFxBorder', 'Border']].forEach(function (pair) {
+                el(pair[0]).addEventListener('change', function () {
+                    doc.Effects[pair[1]].Enabled = this.checked;
+                    updateEffectsVisibility();
+                    scheduleRender();
+                });
+            });
+
+            function bindFxRange(id, apply) {
+                el(id).addEventListener('input', function () {
+                    var label = el(id + 'Val');
+                    if (label) { label.textContent = this.value; }
+                    apply(parseInt(this.value, 10) || 0);
+                    scheduleRender();
+                });
+            }
+            function bindFxColor(id, apply) {
+                el(id).addEventListener('input', function () { apply(this.value); scheduleRender(); });
+            }
+
+            bindFxColor('ccaFxSoftLightColor', function (v) { doc.Effects.SoftLight.Color = v; });
+            bindFxRange('ccaFxSoftLightOpacity', function (v) { doc.Effects.SoftLight.Opacity = v / 100; });
+            bindFxRange('ccaFxVignetteAmount', function (v) { doc.Effects.Vignette.Amount = v / 100; });
+            bindFxRange('ccaFxVignetteSoftness', function (v) { doc.Effects.Vignette.Softness = v / 100; });
+            bindFxRange('ccaFxGrainAmount', function (v) { doc.Effects.Grain.Amount = v / 100; });
+            bindFxColor('ccaFxBorderColor', function (v) { doc.Effects.Border.Color = v; });
+            bindFxRange('ccaFxBorderThickness', function (v) { doc.Effects.Border.Thickness = v; });
+            bindFxRange('ccaFxBorderRadius', function (v) { doc.Effects.Border.Radius = v; });
+            bindFxRange('ccaFxBorderGap', function (v) { doc.Effects.Border.Gap = v; });
+            el('ccaFxBorderDouble').addEventListener('change', function () {
+                doc.Effects.Border.Double = this.checked;
+                updateEffectsVisibility();
+                scheduleRender();
+            });
+
+            el('ccaPresetJf').addEventListener('click', applyJellyfinPreset);
+
+            el('ccaAutoPalette').addEventListener('change', function () {
+                if (this.checked) { renderSwatches(extractPalette()); }
+                else { el('ccaSwatches').innerHTML = ''; }
+            });
+
+            // --- Output card ----------------------------------------------
+            el('ccaPreset').addEventListener('change', function () {
+                if (this.value !== 'custom' && PRESETS[this.value]) {
+                    doc.Canvas.Width = PRESETS[this.value].w;
+                    doc.Canvas.Height = PRESETS[this.value].h;
+                }
+                doc.Canvas.DimensionPreset = this.value;
+                updateUI(); scheduleRender();
+            });
+            // While typing, only an in-range value reaches the canvas: "9" on the way to
+            // "900" must not shrink it to 9px, and 9000 must never resize the live canvas
+            // (or ask the server for a 9000px collage). On change (blur/Enter) the field
+            // itself is clamped, so it shows what is used.
+            function bindCustomDim(id, prop) {
+                el(id).addEventListener('input', function () {
+                    var v = parseInt(this.value, 10);
+                    if (el('ccaPreset').value !== 'custom' || !(v >= MIN_DIM && v <= MAX_DIM)) { return; }
+                    doc.Canvas[prop] = v;
+                    scheduleRender();
+                });
+                el(id).addEventListener('change', function () {
+                    var v = clampDim(this.value, doc.Canvas[prop]);
+                    this.value = v;
+                    if (el('ccaPreset').value === 'custom' && doc.Canvas[prop] !== v) {
+                        doc.Canvas[prop] = v;
+                        scheduleRender();
+                    }
+                });
+            }
+            bindCustomDim('ccaWidth', 'Width');
+            bindCustomDim('ccaHeight', 'Height');
+            el('ccaFormat').addEventListener('change', applyFormatFromControl);
+            el('ccaKenBurns').addEventListener('change', function () {
+                if (doc.Background.Animation) { doc.Background.Animation.KenBurns = this.checked; }
+            });
+            el('ccaAnimFrames').addEventListener('input', function () {
+                el('ccaAnimFramesVal').textContent = this.value;
+                if (doc.Background.Animation) { doc.Background.Animation.FrameCount = parseInt(this.value, 10); }
+            });
+            el('ccaAnimDelay').addEventListener('input', function () {
+                el('ccaAnimDelayVal').textContent = this.value;
+                if (doc.Background.Animation) { doc.Background.Animation.DelayMs = parseInt(this.value, 10); }
+            });
+            el('ccaAnimDir').addEventListener('change', function () {
+                if (doc.Background.Animation) { doc.Background.Animation.Direction = this.value; }
+            });
+
+            el('ccaTargetType').addEventListener('change', function () {
+                Dashboard.showLoadingMsg();
+                loadLibraries()
+                    .then(function () { prefillTitle(''); updateUI(); updateBackgroundVisibility(); refreshRestoreState(); loadBatchList(); Dashboard.hideLoadingMsg(); scheduleRender(); })
+                    .catch(function (e) { showError(t('dyn.error', errorText(e))); });
+            });
+
+            el('ccaBgImageBtn').addEventListener('click', function () { el('ccaBgImage').click(); });
+            el('ccaFontBtn').addEventListener('click', function () { el('ccaFont').click(); });
+
+            el('ccaBgImage').addEventListener('change', function () {
+                if (!this.files || !this.files[0]) { return; }
+                var file = this.files[0];
+                var input = this;
+                var isCurrent = requestGuard('bg');
+                Dashboard.showLoadingMsg();
+                uploadFile('upload', file).then(function (res) {
+                    Dashboard.hideLoadingMsg();
+                    input.value = ''; // let the same file be picked again later
+                    var path = dataOrThrow(res);
+                    if (!isCurrent()) { return; } // a newer pick, a preset or gradient/solid won
+                    // Server path drives the authoritative render + apply; the canvas bitmap
+                    // comes from the SAME client File via a blob: URL so the canvas stays
+                    // untainted (canvas-source invariant). state.backgroundImagePath is kept
+                    // for the legacy batch/collectSettings projection.
+                    doc.Background.ImagePath = path;
+                    state.backgroundImagePath = path;
+                    _fileNames[path] = { name: file.name, poster: false };
+                    syncFileNames();
+                    setBackgroundBitmap(file, isCurrent);
+                    maybeSwitchToAnimated(file);
+                    scheduleRender();
+                }).catch(function (e) {
+                    input.value = '';
+                    showError(t('dyn.uploadFail', errorText(e)));
+                });
+            });
+
+            el('ccaFont').addEventListener('change', function () {
+                if (!this.files || !this.files[0]) { return; }
+                var file = this.files[0];
+                var input = this;
+                Dashboard.showLoadingMsg();
+                uploadFile('uploadFont', file).then(function (res) {
+                    Dashboard.hideLoadingMsg();
+                    input.value = '';
+                    var path = dataOrThrow(res);
+                    _fileNames[path] = { name: file.name, poster: false };
+                    state.customFontPath = path;
+                    var l = selectedLayer();
+                    if (l) { l.FontPath = path; }
+                    syncFileNames();
+                    scheduleRender();
+                }).catch(function (e) {
+                    input.value = '';
+                    showError(t('dyn.fontFail', errorText(e)));
+                });
+            });
+
+            el('ccaUndo').addEventListener('click', undo);
+            el('ccaRedo').addEventListener('click', redo);
+
+            el('ccaApplyBtn').addEventListener('click', applyCoverArt);
+            el('ccaServerRender').addEventListener('click', showServerRender);
+            el('ccaDownloadBtn').addEventListener('click', downloadPreview);
+
+            // Canvas selection + drag of text layers (or, in bgAdjustMode, pan/zoom
+            // of the background — see onCanvasPointerDown/Move/Up).
+            var cv = el('ccaCanvas');
+            cv.addEventListener('pointerdown', onCanvasPointerDown);
+            cv.addEventListener('pointermove', onCanvasPointerMove);
+            cv.addEventListener('pointerup', onCanvasPointerUp);
+            cv.addEventListener('pointercancel', onCanvasPointerUp);
+            cv.addEventListener('keydown', onCanvasKeydown);
+
+            // Mouse-wheel zoom of the background, only while repositioning it and
+            // only when an image is actually loaded (activeBgBitmap) — otherwise a no-op
+            // so the page can still scroll normally.
+            cv.addEventListener('wheel', function (ev) {
+                if (!bgAdjustMode || !activeBgBitmap()) { return; }
+                ev.preventDefault();
+                var s = doc.Background.Transform.Scale * (ev.deltaY < 0 ? 1.05 : 0.95);
+                doc.Background.Transform.Scale = Math.min(4, Math.max(1, s));
+                scheduleRender();
+            }, { passive: false });
+
+            el('ccaBgAdjust').addEventListener('change', function () {
+                bgAdjustMode = this.checked;
+                // Toggling mid-gesture would otherwise leave a stale drag/pinch
+                // state around; clear it so the next pointer event starts clean.
+                _drag = null; _handleDrag = null; _bgDrag = null; _pointers = {}; _pinchStartDist = 0;
+                cv.style.cursor = bgAdjustMode ? 'grab' : '';
+            });
+
+            el('ccaTemplateSelect').addEventListener('change', function () {
+                var sel = this;
+                var opt = sel.options[sel.selectedIndex];
+                // The "—" placeholder (no Document, no Settings) loads nothing.
+                if (!opt || (!opt._document && !opt._settings)) { state.templateValue = sel.value; return; }
+                var go = isDirty() ? confirmAction(t('tpl.confirmReplace')) : Promise.resolve(true);
+                go.then(function (ok) {
+                    if (!ok) { sel.value = state.templateValue || ''; return; }
+                    state.templateValue = sel.value;
+                    loadTemplateOption(opt);
+                });
+            });
+            el('ccaTemplateSave').addEventListener('click', function () {
+                var name = el('ccaTemplateName').value.trim();
+                if (!name) { Dashboard.alert(t('tpl.named')); return; }
+                var sentDoc = collectDocument();
+                var savedJson = JSON.stringify(sentDoc);
+                jsonFetch('CustomCoverArt/templates', 'POST', { Name: name, Document: sentDoc })
+                    .then(function (res) { dataOrThrow(res); markClean(savedJson); Dashboard.alert(t('tpl.saved')); return loadTemplates(); })
+                    .catch(function (e) { showError(t('dyn.error', errorText(e))); });
+            });
+            el('ccaTemplateDelete').addEventListener('click', function () {
+                var name = el('ccaTemplateSelect').value;
+                if (!name) { return; }
+                confirmAction(t('tpl.confirmDelete', name)).then(function (ok) {
+                    if (!ok) { return; }
+                    return jsonFetch('CustomCoverArt/templates/' + encodeURIComponent(name), 'DELETE')
+                        .then(function (res) { dataOrThrow(res); return loadTemplates(); })
+                        .catch(function (e) { showError(t('dyn.error', errorText(e))); });
+                });
+            });
+
+            el('ccaBatchApply').addEventListener('click', function () {
+                var btn = this;
+                // Set before the confirm dialog, not after: a double click must not open two.
+                if (state.batchRunning) { return; }
+                var checks = el('ccaBatchList').querySelectorAll('input[type=checkbox]:checked');
+                if (!checks.length) { Dashboard.alert(t('batch.none')); return; }
+                var targets = Array.prototype.map.call(checks, function (c) { return { Id: c.value, Type: c.dataset.type }; });
+                var status = el('ccaBatchStatus');
+                state.batchRunning = true;
+                confirmAction(t('batch.confirm', targets.length)).then(function (ok) {
+                    if (!ok) { state.batchRunning = false; return; }
+                    btn.disabled = true;
+                    status.textContent = t('batch.running');
+                    // Collecting runs inside the promise chain so a throw reaches the catch
+                    // and the cleanup below instead of leaving the button locked.
+                    return Promise.resolve().then(function () {
+                        // Send the layered document as well: the server prefers it, so batching
+                        // a multi-layer design no longer collapses to the flat single-title
+                        // model. Settings stays until plan D removes it.
+                        // Batch apply neither cleans nor dirties the design.
+                        var batchDoc = collectDocumentKeepingCleanState();
+                        return jsonFetch('CustomCoverArt/batchApply', 'POST', { Document: batchDoc, Settings: collectSettings(), Targets: targets });
+                    })
+                        .then(function (res) {
+                            var data = dataOrThrow(res) || [];
+                            var okCount = data.filter(function (r) { return pick(r, 'Success'); }).length;
+                            status.textContent = t('batch.done', okCount, data.length - okCount);
+                        })
+                        .catch(function (e) { status.textContent = t('batch.fail', errorText(e)); })
+                        .then(function () {
+                            state.batchRunning = false;
+                            btn.disabled = false;
+                            // The selected target may have been part of the batch.
+                            refreshRestoreState();
+                        });
+                });
+            });
+
+            // Delegated handler for the dynamically-added gradient-stop rows (the
+            // static controls each bind their own doc-mutating handler above).
+            var controls = page.querySelector('.ccaControls');
+            controls.addEventListener('input', onControlChange);
+            controls.addEventListener('change', onControlChange);
+
+            el('ccaBrowseBtn').addEventListener('click', openBrowser);
+            el('ccaBrowserClose').addEventListener('click', closeBrowser);
+            el('ccaBrowserModal').addEventListener('keydown', onBrowserKeydown);
+            el('ccaBrowserModal').addEventListener('click', function (e) {
+                if (e.target === this) { closeBrowser(); }
+            });
+            el('ccaBrowserSearch').addEventListener('input', debounce(function () {
+                browser.page = 1; loadBrowserItems();
+            }, 350));
+            el('ccaBrowserType').addEventListener('change', function () {
+                browser.page = 1; loadBrowserItems();
+            });
+            el('ccaBrowserPrev').addEventListener('click', function () {
+                _browserLastPager = 'ccaBrowserPrev';
+                if (browser.page > 1) { browser.page--; loadBrowserItems(); }
+            });
+            el('ccaBrowserNext').addEventListener('click', function () {
+                _browserLastPager = 'ccaBrowserNext';
+                if (browser.page < browser.totalPages) { browser.page++; loadBrowserItems(); }
+            });
+        }
+
+        // The modal and the mobile sticky bars need an OPAQUE surface in the current
+        // Jellyfin theme, which not every Jellyfin version exposes as a CSS variable. Read
+        // it off the nearest ancestor that actually paints a background, and the text
+        // colour off the page; fall back to the dark theme's pair.
+        // True for a fully opaque CSS colour string as getComputedStyle reports it:
+        // not 'transparent', no alpha below 1 in rgba(r,g,b,a), rgb(r g b / a) or color(... / a).
+        function isOpaqueColor(c) {
+            if (!c || c === 'transparent') { return false; }
+            var a = null, m = /\/\s*([\d.]+)(%?)\s*\)\s*$/.exec(c);
+            if (m) { a = parseFloat(m[1]) / (m[2] ? 100 : 1); }
+            else if (/^rgba\(/.test(c)) {
+                var parts = c.replace(/^rgba\(|\)\s*$/g, '').split(',');
+                if (parts.length === 4) { a = parseFloat(parts[3]); }
+            }
+            return a === null || isNaN(a) || a >= 1;
+        }
+
+        function applyThemeSurface() {
+            var bg = '';
+            // Prefer the theme's own variable when this Jellyfin exposes it.
+            var themed = (getComputedStyle(document.documentElement).getPropertyValue('--theme-body-background-color') || '').trim();
+            if (!themed) { themed = (getComputedStyle(document.body).getPropertyValue('--theme-body-background-color') || '').trim(); }
+            if (themed && isOpaqueColor(themed)) { bg = themed; }
+            for (var n = page; !bg && n && n.nodeType === 1; n = n.parentElement) {
+                var c = getComputedStyle(n).backgroundColor;
+                if (isOpaqueColor(c)) { bg = c; }
+            }
+            page.style.setProperty('--cca-surface', bg || '#1b1b1b');
+            page.style.setProperty('--cca-text', bg ? getComputedStyle(page).color : '#f2f2f2');
+        }
+
+        var _browserReturnFocus = null;
+        var _browserLastPager = 'ccaBrowserNext'; // the pager button the user pressed last
+
+        function openBrowser() {
+            _browserReturnFocus = document.activeElement;
+            el('ccaBrowserModal').style.display = 'flex';
+            browser.page = 1;
+            loadBrowserItems();
+            el('ccaBrowserSearch').focus();
+        }
+
+        // Safe to call when already closed (pagehide calls it unconditionally).
+        function closeBrowser() {
+            var modal = el('ccaBrowserModal');
+            if (!modal || modal.style.display === 'none') { return; }
+            modal.style.display = 'none';
+            var back = _browserReturnFocus || el('ccaBrowseBtn');
+            _browserReturnFocus = null;
+            if (back && back.focus) { back.focus(); }
+        }
+
+        // A pager button that disables itself while focused (Next on the last step, Prev on
+        // page 1) or a re-rendered grid drops focus to <body>, where the dialog's keydown
+        // handler (Esc, Tab trap) never hears it. Called after every grid/pager update: if
+        // the dialog is open and focus escaped it, put focus back on a live control.
+        function keepFocusInBrowser() {
+            var modal = el('ccaBrowserModal');
+            if (!modal || modal.style.display === 'none') { return; }
+            var box = modal.querySelector('.ccaModalBox');
+            // A button disabled a moment ago still reports as activeElement (and as inside
+            // the box) until the browser's later focus fixup, so a disabled, null or body
+            // activeElement counts as escaped.
+            var ae = document.activeElement;
+            if (ae && ae !== document.body && box.contains(ae) && !ae.disabled) { return; }
+            var last = el(_browserLastPager), other = el(_browserLastPager === 'ccaBrowserPrev' ? 'ccaBrowserNext' : 'ccaBrowserPrev');
+            var target = !last.disabled ? last : (!other.disabled ? other : el('ccaBrowserSearch'));
+            target.focus();
+        }
+
+        // Esc closes; Tab and Shift+Tab cycle inside the dialog instead of walking out
+        // into the page behind it (aria-modal informs assistive tech, not the browser).
+        function onBrowserKeydown(ev) {
+            if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); closeBrowser(); return; }
+            if (ev.key !== 'Tab') { return; }
+            var box = el('ccaBrowserModal').querySelector('.ccaModalBox');
+            var focusable = Array.prototype.filter.call(
+                box.querySelectorAll('button, input, select, [tabindex]:not([tabindex="-1"])'),
+                function (n) { return !n.disabled && n.getClientRects().length > 0; });
+            if (!focusable.length) { return; }
+            var first = focusable[0], last = focusable[focusable.length - 1];
+            if (ev.shiftKey && document.activeElement === first) { ev.preventDefault(); last.focus(); }
+            else if (!ev.shiftKey && document.activeElement === last) { ev.preventDefault(); first.focus(); }
+        }
+
+        function gridMessage(grid, text) {
+            grid.innerHTML = '';
+            var div = document.createElement('div');
+            div.className = 'ccaGridEmpty';
+            div.textContent = text;
+            grid.appendChild(div);
+        }
+
+        function loadBrowserItems() {
+            var grid = el('ccaBrowserGrid');
+            var isCurrent = requestGuard('posters');
+            gridMessage(grid, t('dyn.loading'));
+            var typeVal = el('ccaBrowserType').value;
+            jsonFetch('CustomCoverArt/search/items', 'POST', {
+                Query: el('ccaBrowserSearch').value,
+                ItemTypes: typeVal ? [typeVal] : null,
+                Page: browser.page,
+                PageSize: browser.pageSize
+            }).then(function (res) {
+                if (!isCurrent()) { return; }
+                if (!pick(res, 'Success')) {
+                    gridMessage(grid, t('dyn.errorItems'));
+                    keepFocusInBrowser();
+                    return;
+                }
+                var data = pick(res, 'Data') || {};
+                browser.totalPages = pick(data, 'TotalPages') || 1;
+                renderBrowserItems(pick(data, 'Items') || []);
+                el('ccaBrowserPage').textContent = t('dyn.page', browser.page, browser.totalPages);
+                el('ccaBrowserPrev').disabled = browser.page <= 1;
+                el('ccaBrowserNext').disabled = browser.page >= browser.totalPages;
+                keepFocusInBrowser();
+            }).catch(function (e) {
+                if (!isCurrent()) { return; }
+                gridMessage(grid, t('dyn.error', errorText(e)));
+                keepFocusInBrowser();
+            });
+        }
+
+        function renderBrowserItems(items) {
+            var grid = el('ccaBrowserGrid');
+            if (!items.length) {
+                gridMessage(grid, t('dyn.noItems'));
+                return;
+            }
+            grid.innerHTML = '';
+            items.forEach(function (item) {
+                var id = pick(item, 'Id');
+                var name = pick(item, 'Name') || '';
+                var year = pick(item, 'Year');
+
+                var tile = document.createElement('button');
+                tile.type = 'button';
+                tile.className = 'ccaGridItem';
+
+                var img = document.createElement('img');
+                // Decorative: the caption below already names the tile.
+                img.alt = '';
+                // Use Jellyfin's own image endpoint (token in query string) so the
+                // <img> loads without needing a custom auth header.
+                try { img.src = ApiClient.getImageUrl(id, { type: 'Primary', fillHeight: 220 }); } catch (e) { /* ignore */ }
+                img.addEventListener('error', function () { img.style.visibility = 'hidden'; });
+
+                var cap = document.createElement('span');
+                cap.className = 'cap';
+                cap.textContent = name + (year ? ' (' + year + ')' : '');
+
+                tile.appendChild(img);
+                tile.appendChild(cap);
+                tile.addEventListener('click', function () { selectBrowserItem(id, name); });
+                grid.appendChild(tile);
+            });
+        }
+
+        function selectBrowserItem(itemId, name) {
+            var imgUrl;
+            try { imgUrl = ApiClient.getImageUrl(itemId, { type: 'Primary', maxHeight: 2000 }); } catch (err) { imgUrl = null; }
+            if (!imgUrl) { Dashboard.alert(t('poster.noUrl')); return; }
+
+            var isCurrent = requestGuard('bg');
+            Dashboard.showLoadingMsg();
+            // Fetch the poster through Jellyfin's own image endpoint (authenticated,
+            // since some servers require a token even for images) and upload it as a
+            // normal background. Using FormData.append(blob, filename) avoids the
+            // File constructor, which isn't reliable in every webview.
+            var posterBlob = null;
+            fetch(imgUrl, { headers: { 'Authorization': authHeader() }, credentials: 'include' })
+                .catch(function () { throw networkError(); })
+                .then(function (r) { if (!r.ok) { throw requestError(r.status); } return r.blob(); })
+                .then(function (blob) {
+                    if (!blob || blob.size === 0) { throw new Error(t('poster.empty')); }
+                    posterBlob = blob;
+                    var ext = blob.type === 'image/png' ? 'png' : (blob.type === 'image/webp' ? 'webp' : 'jpg');
+                    var fd = new FormData();
+                    fd.append('file', blob, 'poster.' + ext);
+                    return authFetch('CustomCoverArt/upload', { method: 'POST', body: fd })
+                        .then(readJson, function () { throw networkError(); });
+                })
+                .then(function (res) {
+                    Dashboard.hideLoadingMsg();
+                    var path = dataOrThrow(res);
+                    if (!path) { throw new Error(t('dyn.unknown')); }
+                    // Server path for render/apply; canvas bitmap from the fetched
+                    // Blob via a blob: URL (canvas-source invariant — never the
+                    // server path / ApiClient.getImageUrl).
+                    if (!isCurrent()) { return; } // a newer pick won the race
+                    doc.Background.ImagePath = path;
+                    state.backgroundImagePath = path;
+                    _fileNames[path] = { name: name, poster: true };
+                    syncFileNames();
+                    setBackgroundBitmap(posterBlob, isCurrent);
+                    scheduleRender();
+                    closeBrowser();
+                })
+                .catch(function (e) {
+                    showError(t('poster.fail', errorText(e)));
+                });
+        }
+
+        // --- Page-level listeners -----------------------------------------
+        // window/document listeners outlive this page: Jellyfin keeps it in the DOM while
+        // you browse the rest of the dashboard, and a leftover Ctrl+Z handler would
+        // preventDefault the undo of every other settings page. They are added on pageshow
+        // and removed on pagehide/viewhide, and the keyboard and resize handlers also check
+        // that the page is on screen in case a hide event is ever missed.
+        var TEXT_INPUT_TYPES = { text: 1, search: 1, number: 1, email: 1, url: 1, tel: 1, password: 1 };
+
+        function isTextEditingTarget(n) {
+            if (!n) { return false; }
+            if (n.isContentEditable || n.tagName === 'TEXTAREA') { return true; }
+            if (n.tagName === 'INPUT') { return !!TEXT_INPUT_TYPES[String(n.type || 'text').toLowerCase()]; }
+            return false;
+        }
+
+        // The page is attached and displayed. Unlike isEditorOnScreen (the GIF loop's
+        // test) this ignores document.hidden: closing a background tab must still be able
+        // to ask about unapplied work.
+        function isPageVisible() {
+            return !!(page && page.isConnected && page.getClientRects().length > 0);
+        }
+
+        // Handle sizes and hit tolerances are derived from the canvas's CSS display size,
+        // so a viewport change (rotating a phone, resizing a window) must redraw or the
+        // handles keep the size they had at the old width.
+        var onWindowResize = debounce(function () {
+            if (isPageVisible()) { scheduleRender(); }
+        }, 150);
+
+        function onDocumentKeydown(ev) {
+            if (!(ev.ctrlKey || ev.metaKey) || !isPageVisible()) { return; }
+            // Never hijack text editing: in a text field the browser's own undo is the one
+            // the user means. Sliders, colour pickers and checkboxes are not text, so
+            // Ctrl+Z there undoes the design like anywhere else on the page.
+            if (isTextEditingTarget(ev.target)) { return; }
+            // Do not change the design underneath the open poster browser.
+            if (el('ccaBrowserModal').style.display !== 'none') { return; }
+            var k = String(ev.key || '').toLowerCase();
+            if (k === 'z' && !ev.shiftKey) { ev.preventDefault(); undo(); }
+            else if (k === 'y' || (k === 'z' && ev.shiftKey)) { ev.preventDefault(); redo(); }
+        }
+
+        // --- Unsaved work --------------------------------------------------
+        // The design as of the last page load, apply, template load or template save,
+        // serialized the same way undo history compares documents. Apply and template
+        // save pass the JSON they actually sent, so an edit made while the request was in
+        // flight still counts as unapplied.
+        var _cleanJson = null;
+        function markClean(json) { _cleanJson = json || JSON.stringify(stripUiKeys(doc)); }
+        function isDirty() { return _cleanJson !== null && JSON.stringify(stripUiKeys(doc)) !== _cleanJson; }
+
+        // Closing or reloading the tab with unapplied changes asks first. In-dashboard
+        // navigation needs no prompt: the page and its design stay in memory.
+        function onBeforeUnload(ev) {
+            if (!isPageVisible() || !isDirty()) { return; }
+            ev.preventDefault();
+            ev.returnValue = ''; // required by Chromium to show the prompt
+        }
+
+        function bindPageListeners() {
+            unbindPageListeners(); // pageshow can fire again without a hide in between
+            window.addEventListener('resize', onWindowResize);
+            document.addEventListener('keydown', onDocumentKeydown);
+            // The GIF loop re-evaluates when the tab hides/shows or reduced motion changes.
+            document.addEventListener('visibilitychange', updateGifLoop);
+            watchReducedMotion(true);
+            window.addEventListener('beforeunload', onBeforeUnload);
+        }
+
+        function unbindPageListeners() {
+            window.removeEventListener('resize', onWindowResize);
+            document.removeEventListener('keydown', onDocumentKeydown);
+            document.removeEventListener('visibilitychange', updateGifLoop);
+            watchReducedMotion(false);
+            window.removeEventListener('beforeunload', onBeforeUnload);
+        }
+
+        // Leaving the page: drop the global listeners, stop the GIF loop at once (pageshow's
+        // scheduleRender() restarts it) and close the poster browser.
+        function onPageHide() {
+            unbindPageListeners();
+            stopGifLoop();
+            if (page) { closeBrowser(); }
+        }
+
+        // The bundled Noto faces are document-wide: register them once per page load, not
+        // once per visit (every pageshow used to add six more FontFace objects).
+        var _canvasFontsLoaded = null;
+
+        view.addEventListener('pagehide', onPageHide);
+        view.addEventListener('viewhide', onPageHide);
+
+        view.addEventListener('pageshow', function () {
+            page = this;
+            LANG = detectLang();
+            applyI18n(page);
+            applyThemeSurface(); // every show: the user may have switched theme meanwhile
+            if (!page.dataset.ccaInit) {
+                bindEvents();
+                initSteps();
+                initAdvanced();
+                page.dataset.ccaInit = 'true';
+            }
+            bindPageListeners();
+            Dashboard.showLoadingMsg();
+            // Seed every control (incl. the brand gradient stops) from the default
+            // document, so the UI and the live canvas start in agreement.
+            normalizeOverlay(doc);
+            normalizeGradientStops(doc);
+            // The default document was built before the language was known.
+            prefillTitle('');
+            renderLayersPanel();
+            syncControlsFromDocument();
+            resetOverlayEditorState();
+            // The starting design is "clean" — but only on the first show: a return visit
+            // keeps whatever unapplied edits the user left behind.
+            if (_cleanJson === null) { markClean(); }
+            // Render immediately with a sane fallback, then re-render once the
+            // bundled Noto weights register so canvas text metrics match the server.
+            scheduleRender();
+            if (!_canvasFontsLoaded) { _canvasFontsLoaded = loadCanvasFonts(); }
+            _canvasFontsLoaded.then(scheduleRender);
+            loadTemplates();
+            loadBatchList();
+            loadLibraries().then(function () {
+                updateUI();
+                updateBackgroundVisibility();
+                refreshRestoreState();
+                Dashboard.hideLoadingMsg();
+                scheduleRender();
+            }).catch(function (e) { showError(t('dyn.error', errorText(e))); });
+        });
+}
