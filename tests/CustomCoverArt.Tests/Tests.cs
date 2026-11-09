@@ -147,7 +147,7 @@ public class CoverArtGenerationTests
             }
         };
 
-        var outputPath = await service.GenerateCoverArtAsync(settings);
+        var outputPath = await service.GenerateFromDocumentAsync(CustomCoverArt.Services.DocumentMigration.FromSettings(settings));
 
         Assert.True(File.Exists(outputPath), "output file should exist");
         using var produced = Image.Load(outputPath);
@@ -174,7 +174,7 @@ public class CoverArtGenerationTests
             TextColor = "#zzzzzz"
         };
 
-        var outputPath = await service.GenerateCoverArtAsync(settings);
+        var outputPath = await service.GenerateFromDocumentAsync(CustomCoverArt.Services.DocumentMigration.FromSettings(settings));
         Assert.True(File.Exists(outputPath));
     }
 }

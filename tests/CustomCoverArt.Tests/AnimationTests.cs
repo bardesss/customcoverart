@@ -72,7 +72,7 @@ public class AnimationTests
         };
 
         var svc = AnimationTestHost.NewCoverArtService();
-        var path = await svc.GenerateCoverArtAsync(settings);
+        var path = await svc.GenerateFromDocumentAsync(CustomCoverArt.Services.DocumentMigration.FromSettings(settings));
 
         Assert.True(System.IO.File.Exists(path));
         using var img = SixLabors.ImageSharp.Image.Load(path);
@@ -116,7 +116,7 @@ public class AnimationTests
             }
         };
 
-        var path = await svc.GenerateCoverArtAsync(settings);
+        var path = await svc.GenerateFromDocumentAsync(CustomCoverArt.Services.DocumentMigration.FromSettings(settings));
 
         Assert.True(System.IO.File.Exists(path));
         using var outImg = SixLabors.ImageSharp.Image.Load(path);
@@ -142,7 +142,7 @@ public class AnimationTests
             }
         };
 
-        var path = await AnimationTestHost.NewCoverArtService().GenerateCoverArtAsync(settings);
+        var path = await AnimationTestHost.NewCoverArtService().GenerateFromDocumentAsync(CustomCoverArt.Services.DocumentMigration.FromSettings(settings));
 
         Assert.True(System.IO.File.Exists(path));
         using var img = SixLabors.ImageSharp.Image.Load(path);
@@ -196,7 +196,7 @@ public class AnimationTests
             ExportHeight = 1000,
             OutputFormat = "png",
         };
-        var staticPath = await AnimationTestHost.NewCoverArtService().GenerateCoverArtAsync(staticSettings);
+        var staticPath = await AnimationTestHost.NewCoverArtService().GenerateFromDocumentAsync(CustomCoverArt.Services.DocumentMigration.FromSettings(staticSettings));
         var staticFraction = MeasureGlyphHeightFraction(staticPath);
 
         // Same title/TextSize/ExportWidth/ExportHeight, but as an animated GIF —
@@ -217,7 +217,7 @@ public class AnimationTests
                 Enabled = true, KenBurns = false, FrameCount = 2, DelayMs = 80
             }
         };
-        var animatedPath = await AnimationTestHost.NewCoverArtService().GenerateCoverArtAsync(animatedSettings);
+        var animatedPath = await AnimationTestHost.NewCoverArtService().GenerateFromDocumentAsync(CustomCoverArt.Services.DocumentMigration.FromSettings(animatedSettings));
         var animatedFraction = MeasureGlyphHeightFraction(animatedPath);
 
         // Allow generous tolerance for font rendering/antialiasing noise, but a
@@ -342,7 +342,7 @@ public class AnimationTests
             Animation = new CustomCoverArt.Models.AnimationSettings { Enabled = true, KenBurns = false, FrameCount = 5, DelayMs = 80 }
         };
 
-        var path = await AnimationTestHost.NewCoverArtService().GenerateCoverArtAsync(settings);
+        var path = await AnimationTestHost.NewCoverArtService().GenerateFromDocumentAsync(CustomCoverArt.Services.DocumentMigration.FromSettings(settings));
         using var gif = SixLabors.ImageSharp.Image.Load<SixLabors.ImageSharp.PixelFormats.Rgba32>(path);
 
         Assert.Equal(5, gif.Frames.Count);

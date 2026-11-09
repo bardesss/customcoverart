@@ -36,9 +36,6 @@ public class CoverArtService : ICoverArtService
         Directory.CreateDirectory(_outputDirectory);
     }
 
-    public Task<string> GenerateCoverArtAsync(CoverArtSettings settings)
-        => GenerateFromDocumentAsync(DocumentMigration.FromSettings(settings));
-
     public async Task<string> GenerateFromDocumentAsync(CoverDocument document)
     {
         try

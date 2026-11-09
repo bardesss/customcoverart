@@ -118,17 +118,11 @@ public class BatchTargetRef
 /// <summary>Request to apply one design to many targets at once.</summary>
 public class BatchApplyRequest
 {
-    /// <summary>Name of a saved template to use; if null, <see cref="Document"/> or <see cref="Settings"/> is used.</summary>
+    /// <summary>Name of a saved template to use; if null, <see cref="Document"/> is used.</summary>
     public string? TemplateName { get; set; }
 
-    /// <summary>
-    /// The layered design to apply. Takes precedence over <see cref="Settings"/>, which
-    /// can only express a single title layer — batching a multi-layer design through
-    /// the flat model would silently drop every extra text layer and logo.
-    /// </summary>
+    /// <summary>The layered design to apply; each target gets its own title.</summary>
     public CoverDocument? Document { get; set; }
-
-    public CoverArtSettings? Settings { get; set; }
     public List<BatchTargetRef> Targets { get; set; } = new();
 }
 
@@ -204,12 +198,6 @@ public class ApiResponse<T>
     public bool Success { get; set; }
     public string? ErrorMessage { get; set; }
     public T? Data { get; set; }
-}
-
-public class ApplyCoverArtRequest
-{
-    public string LibraryId { get; set; } = string.Empty;
-    public CoverArtSettings Settings { get; set; } = new();
 }
 
 /// <summary>Request to render and apply a document-native design to a library.</summary>

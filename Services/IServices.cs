@@ -63,8 +63,6 @@ public enum BackupResetOutcome
 
 public interface ICoverArtService
 {
-    Task<string> GenerateCoverArtAsync(CoverArtSettings settings);
-
     /// <summary>Renders a CoverDocument to a file and returns its path.</summary>
     Task<string> GenerateFromDocumentAsync(CoverDocument document);
 
