@@ -3277,6 +3277,21 @@ export default function (view) {
             return t('action.apply');
         }
 
+        // A serialized snapshot with its title layer renamed from one automatic title to the
+        // next. Any other title (one the user typed) comes back untouched.
+        function retitleSnapshot(json, from, to) {
+            var d = JSON.parse(json);
+            var layers = d.Layers || [];
+            for (var i = 0; i < layers.length; i++) {
+                if (layers[i].Id === 'title' && layers[i].Type === 'text') {
+                    if (layers[i].Content !== from) { return json; }
+                    layers[i].Content = to;
+                    return JSON.stringify(d);
+                }
+            }
+            return json;
+        }
+
         // The title follows the chosen target's name (or a translated placeholder when no
         // target is chosen) until the user types their own; after that it is theirs.
         function prefillTitle(name) {
@@ -3288,7 +3303,17 @@ export default function (view) {
             // snapshot() first, so an edit still waiting on commit's debounce keeps its entry.
             var wasClean = _cleanJson !== null && !isDirty();
             snapshot();
+            var previous = l.Content;
             l.Content = name || t('text.defaultTitle');
+            // Older entries still carry the previous target's name. Undoing past the target
+            // switch must not put it back onto this target, so every entry (and the clean
+            // baseline) that still shows the old automatic title follows the new one.
+            if (previous !== l.Content) {
+                for (var i = 0; i < history.stack.length; i++) {
+                    history.stack[i] = retitleSnapshot(history.stack[i], previous, l.Content);
+                }
+                if (_cleanJson !== null) { _cleanJson = retitleSnapshot(_cleanJson, previous, l.Content); }
+            }
             if (wasClean) { markClean(); }
             if (history.index >= 0) {
                 history.stack[history.index] = JSON.stringify(stripUiKeys(doc));

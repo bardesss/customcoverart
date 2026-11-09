@@ -6,13 +6,14 @@ bump `<Version>` in the csproj. Jellyfin renders the text as Markdown, so keep a
 sentence, a blank line, and then one bullet per change.
 
 ## 4.1.2.0
-A behind-the-scenes release: the editor looks and works as it did in 4.1.1.0, apart from three small undo fixes.
+A behind-the-scenes release: the editor looks and works as it did in 4.1.1.0, apart from four small undo fixes.
 
 - The configuration page had grown into a single file of more than five thousand lines. It is now three files: the page itself, its styles and its script.
 - The script is laid out in separate parts (translations, server requests, the design, the live preview, undo, the controls and the poster browser), so future fixes are smaller and safer.
 - **Undo fix:** undo, redo and loading a template now bring back the poster collage that design was made with, instead of keeping your latest Shuffle.
 - **Undo fix:** Ctrl+Z and Ctrl+Y no longer change the design while a confirmation question is open.
 - **Undo fix:** picking a target, which puts its name in the title, is no longer a step of its own that Ctrl+Z takes back.
+- **Undo fix:** after switching to another target, Ctrl+Z no longer puts the previous target's name back in the title. A title you typed yourself still undoes as before.
 - Batch apply now sends your design once instead of twice. It also used to send an older, flat copy that the server had been ignoring for several releases.
 - Templates saved before the canvas editor still load, and still work with batch apply.
 - **For your own scripts:** the two old server endpoints that only understood the flat format (`preview` and `apply`), which the plugin itself no longer used, have been removed, and `batchApply` no longer accepts a flat body with only `Settings`. Use `document/preview` and `document/apply` instead, and send batch apply a `Document` or a `TemplateName`.

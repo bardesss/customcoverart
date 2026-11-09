@@ -1066,4 +1066,30 @@ public class ConfigPageStructureTests
         Assert.True(body.IndexOf("updateHistoryButtons();", trim, System.StringComparison.Ordinal) > trim,
             "The redo button must be refreshed after the redo tail is dropped.");
     }
+
+    /// <summary>
+    /// Folding the new title into the current entry alone left older entries with the
+    /// previous target's name: pick Series, change Dim, pick Movies, Ctrl+Z reverted Dim and
+    /// also put "Series" back while Movies was the target. The prefill must rewrite every
+    /// history entry (and the clean baseline) that still carries the old automatic title.
+    /// </summary>
+    [Fact]
+    public void TitlePrefillRetitlesOlderHistoryEntries()
+    {
+        var page = ConfigPage();
+        var body = FunctionBody(page, "prefillTitle");
+        var previous = body.IndexOf("var previous = l.Content;", System.StringComparison.Ordinal);
+        var write = body.IndexOf("l.Content = name || t('text.defaultTitle');", System.StringComparison.Ordinal);
+        var rewrite = body.IndexOf("history.stack[i] = retitleSnapshot(history.stack[i], previous, l.Content);", System.StringComparison.Ordinal);
+        var baseline = body.IndexOf("_cleanJson = retitleSnapshot(_cleanJson, previous, l.Content);", System.StringComparison.Ordinal);
+        var fold = body.IndexOf("history.stack[history.index] = JSON.stringify(stripUiKeys(doc));", System.StringComparison.Ordinal);
+        Assert.True(previous >= 0 && previous < write, "The old automatic title must be remembered before it is replaced.");
+        Assert.True(rewrite > write && rewrite < fold, "Older history entries must follow the new automatic title.");
+        Assert.True(baseline > write, "The clean baseline must follow the new automatic title too.");
+
+        // Only an entry whose title still equals the old automatic one changes, so a title
+        // the user typed keeps undoing normally.
+        var helper = FunctionBody(page, "retitleSnapshot");
+        Assert.Contains("if (layers[i].Content !== from) { return json; }", helper, System.StringComparison.Ordinal);
+    }
 }
