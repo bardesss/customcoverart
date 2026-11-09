@@ -43,7 +43,7 @@ jobs:
         run: |
           if gh release view "${{ steps.ver.outputs.tag }}" >/dev/null 2>&1; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
-            echo "Release ${{ steps.ver.outputs.tag }} already exists — nothing to do."
+            echo "Release ${{ steps.ver.outputs.tag }} already exists; nothing to do."
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
@@ -94,8 +94,8 @@ jobs:
 
       # Opens a PR rather than pushing to main. The branch ruleset on main requires
       # changes to go through a pull request and a passing "test" check, so the old
-      # direct `git push origin HEAD:main` is rejected with GH013 — which fails the
-      # workflow AFTER the release is already published, leaving the release live but
+      # direct `git push origin HEAD:main` is rejected with GH013. That failed the
+      # workflow AFTER the release was already published, leaving the release live but
       # invisible to Jellyfin (which reads manifest.json). Merging the PR this opens
       # is the last step of a release.
       - name: Open manifest.json PR
@@ -106,7 +106,15 @@ jobs:
           VER="${{ steps.ver.outputs.ver }}"
           URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${{ steps.ver.outputs.tag }}/${{ steps.pkg.outputs.zip }}"
           # Changelog for this version comes from the matching CHANGELOG.md section.
-          CHANGELOG=$(awk -v ver="$VER" '$0=="## "ver{f=1;next} /^## /{f=0} f{print}' CHANGELOG.md | sed '/^[[:space:]]*$/d')
+          # Jellyfin renders it as Markdown, so blank lines inside the section are kept
+          # (they separate paragraphs and lists); only leading and trailing blank lines go.
+          CHANGELOG=$(awk -v ver="$VER" '
+            { sub(/\r$/, "") }
+            $0 == "## " ver { f = 1; next }
+            /^## / { f = 0 }
+            f && /[^[:space:]]/ { while (blank > 0) { print ""; blank-- } print; seen = 1; next }
+            f && seen { blank++ }
+          ' CHANGELOG.md)
           NEW=$(jq -n \
             --arg v "$VER" \
             --arg cl "$CHANGELOG" \
@@ -135,7 +143,7 @@ jobs:
           git push --force-with-lease origin "$BRANCH"
 
           if gh pr view "$BRANCH" --json number >/dev/null 2>&1; then
-            echo "PR for $BRANCH already open — the push above updated it."
+            echo "PR for $BRANCH already open; the push above updated it."
             exit 0
           fi
 
@@ -147,7 +155,7 @@ jobs:
 
           Generated automatically by the Release workflow after publishing [\`$TAG\`](https://github.com/${GITHUB_REPOSITORY}/releases/tag/$TAG). The checksum is the MD5 of the published asset.
 
-          **Merging this is the final step of the release** — until it lands, the release exists on GitHub but no Jellyfin server will offer it.
+          **Merging this is the final step of the release.** Until it lands, the release exists on GitHub but no Jellyfin server will offer it.
           EOF
 
           gh pr create --base main --head "$BRANCH" \
