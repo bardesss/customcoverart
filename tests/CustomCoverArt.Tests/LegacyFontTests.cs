@@ -9,8 +9,7 @@ using CustomCoverArt.Services;
 using CustomCoverArt.Services.Rendering;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
+using SkiaSharp;
 using Xunit;
 
 namespace CustomCoverArt.Tests;
@@ -48,13 +47,13 @@ public class LegacyFontTests
         var doc = new CoverDocument { Canvas = new CanvasSettings { Width = 200, Height = 100 } };
         doc.Background.DimColor = "#000000";
         doc.Layers.Add(layer);
-        using var canvas = new Image<Rgba32>(200, 100, Color.Black);
+        using var canvas = RenderSurface.New(200, 100, SKColors.Black);
 
         var ex = Record.Exception(() => DocumentRenderer.ComposeDocumentFrame(canvas, null, doc));
 
         Assert.Null(ex);
         Assert.Single(log.Entries, e => e.Message.Contains("old" + extension));
-        Assert.Contains(Enumerable.Range(0, 100).SelectMany(y => Enumerable.Range(0, 200).Select(x => canvas[x, y])), p => p.R > 128);
+        Assert.Contains(Enumerable.Range(0, 100).SelectMany(y => Enumerable.Range(0, 200).Select(x => TestPixels.Px(canvas, x, y))), p => p.R > 128);
     }
 
     [Fact]

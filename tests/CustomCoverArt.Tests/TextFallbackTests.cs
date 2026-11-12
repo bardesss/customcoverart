@@ -1,7 +1,7 @@
 using CustomCoverArt.Models;
 using CustomCoverArt.Services;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
+using CustomCoverArt.Services.Rendering;
+using SkiaSharp;
 using Xunit;
 
 namespace CustomCoverArt.Tests;
@@ -16,17 +16,17 @@ public class TextFallbackTests
     [Fact]
     public void LayerThatCannotRenderAtAll_LeavesTheCanvasUntouched()
     {
-        using var canvas = new Image<Rgba32>(80, 80, Color.Green);
+        using var canvas = RenderSurface.New(80, 80, new SKColor(0, 128, 0));
         var doc = new CoverDocument { Canvas = new CanvasSettings { Width = 80, Height = 80 } };
         doc.Background.DimColor = "#ff0000";
         // Null Shadow breaks the full render; null Content breaks the plain DrawText fallback.
         var layer = new CoverLayer { Type = "text", Content = null!, Shadow = null! };
 
-        var ex = Record.Exception(() => DocumentRenderer.RenderTextLayerWithFallback(canvas, layer, doc));
+        var ex = Record.Exception(() => TextRenderer.RenderTextLayerWithFallback(canvas, layer, doc));
 
         Assert.Null(ex);
-        Assert.Equal(new Rgba32(0, 128, 0, 255), canvas[40, 40]);
-        Assert.Equal(new Rgba32(0, 128, 0, 255), canvas[2, 2]);
+        Assert.Equal(new Rgba(0, 128, 0, 255), TestPixels.Px(canvas, 40, 40));
+        Assert.Equal(new Rgba(0, 128, 0, 255), TestPixels.Px(canvas, 2, 2));
     }
 
     [Theory]

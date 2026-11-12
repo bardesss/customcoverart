@@ -35,8 +35,17 @@ public static class EffectsComposer
         var opacity = Math.Clamp(s.Opacity, 0f, 1f);
         if (opacity <= 0f) { return; }
 
+        Wash(canvas, SkiaColors.Parse(s.Color, SKColors.White), opacity);
+    }
+
+    /// <summary>
+    /// SrcOver of a flat <paramref name="color"/> (its own alpha times <paramref name="opacity"/>) over
+    /// the whole canvas, with ImageSharp's float arithmetic. Shared by soft light and the background dim,
+    /// both of which are Exact over a solid colour (spec 7.1).
+    /// </summary>
+    internal static void Wash(SKBitmap canvas, SKColor color, float opacity)
+    {
         RequirePremulRgba(canvas);
-        var color = SkiaColors.Parse(s.Color, SKColors.White);
 
         // A flat SrcOver wash, blended per pixel rather than with DrawRect: Skia's SrcOver of the colour at
         // alpha = round(opacity * 255) was one level off ImageSharp's float blend on many pixels, and soft

@@ -1,7 +1,6 @@
 using CustomCoverArt.Models;
 using CustomCoverArt.Services;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
+using CustomCoverArt.Services.Rendering;
 using Xunit;
 
 namespace CustomCoverArt.Tests;
@@ -79,10 +78,11 @@ public class BackgroundSourceTests
                             new GradientStop { Color = "#0000ff", Position = 1 } }
         };
 
-        using var canvas = new Image<Rgba32>(40, 40);
+        using var canvas = RenderSurface.New(40, 40);
         DocumentRenderer.ComposeDocumentFrame(canvas, null, doc);
 
-        Assert.True(canvas[20, 20].R > 200 && canvas[20, 20].B < 60, "Solid must win over a stale gradient flag.");
+        var p = TestPixels.Px(canvas, 20, 20);
+        Assert.True(p.R > 200 && p.B < 60, "Solid must win over a stale gradient flag.");
     }
 
     /// <summary>Back-compat: a document that never migrated still renders its gradient.</summary>
@@ -99,10 +99,10 @@ public class BackgroundSourceTests
                             new GradientStop { Color = "#00ff00", Position = 1 } }
         };
 
-        using var canvas = new Image<Rgba32>(40, 40);
+        using var canvas = RenderSurface.New(40, 40);
         DocumentRenderer.ComposeDocumentFrame(canvas, null, doc);
 
-        Assert.True(canvas[20, 20].G > 200, "A pre-migration document must keep rendering its gradient.");
+        Assert.True(TestPixels.Px(canvas, 20, 20).G > 200, "A pre-migration document must keep rendering its gradient.");
     }
 
     /// <summary>Source "gradient" draws the gradient even if IsEnabled was never set.</summary>
@@ -119,9 +119,9 @@ public class BackgroundSourceTests
                             new GradientStop { Color = "#00ff00", Position = 1 } }
         };
 
-        using var canvas = new Image<Rgba32>(40, 40);
+        using var canvas = RenderSurface.New(40, 40);
         DocumentRenderer.ComposeDocumentFrame(canvas, null, doc);
 
-        Assert.True(canvas[20, 20].G > 200, "Source is authoritative once migrated.");
+        Assert.True(TestPixels.Px(canvas, 20, 20).G > 200, "Source is authoritative once migrated.");
     }
 }

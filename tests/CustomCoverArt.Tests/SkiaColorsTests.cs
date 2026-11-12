@@ -15,10 +15,17 @@ public class SkiaColorsTests
     [InlineData("#gg0000")] [InlineData("#1234567")]
     public void Parse_MatchesImageSharpParseHex(string hex)
     {
-        var expected = DocumentRenderer.SafeColor(hex, SixLabors.ImageSharp.Color.Gray).ToPixel<Rgba32>();
+        // ImageSharp's own parser is the oracle (the rules SafeColor followed before the port).
+        var expected = (SixLabors.ImageSharp.Color.TryParseHex(hex, out var parsed) ? parsed : SixLabors.ImageSharp.Color.Gray).ToPixel<Rgba32>();
         var actual = SkiaColors.Parse(hex, new SKColor(128, 128, 128));
         Assert.Equal((expected.R, expected.G, expected.B, expected.A), (actual.Red, actual.Green, actual.Blue, actual.Alpha));
     }
+
+    /// <summary>DocumentRenderer.SafeColor is SkiaColors.Parse: same values, same fallback.</summary>
+    [Theory]
+    [InlineData("#ff000080")] [InlineData("abc")] [InlineData("nonsense")] [InlineData(null)]
+    public void SafeColor_DelegatesToParse(string? hex)
+        => Assert.Equal(SkiaColors.Parse(hex, new SKColor(9, 8, 7)), DocumentRenderer.SafeColor(hex, new SKColor(9, 8, 7)));
 
     [Theory] [InlineData(null)] [InlineData("")] [InlineData("   ")] [InlineData("red")]
     public void Parse_NullEmptyOrNamed_ReturnsFallback(string? hex)

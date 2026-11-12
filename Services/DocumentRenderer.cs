@@ -1,26 +1,38 @@
 using CustomCoverArt.Models;
 using CustomCoverArt.Services.Rendering;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Drawing.Processing;
-using SixLabors.ImageSharp.PixelFormats;
-using SixLabors.ImageSharp.Processing;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using SkiaSharp;
 
 namespace CustomCoverArt.Services;
 
+/// <summary>Colour stops of a gradient, sorted by position, as Skia's gradient shaders take them.</summary>
+internal sealed record GradientStops(SKColor[] Colors, float[] Positions);
+
 /// <summary>
-/// Compositor: renders a <see cref="CoverDocument"/> onto an ImageSharp canvas.
-/// Shared by the single-image and animated paths; extended by later phases
-/// (image layers, effects). This is the sole owner of background/gradient/font/
-/// text-drawing logic. It moved here from <see cref="CoverArtService"/> so both
-/// the legacy flat-settings path (via <see cref="DocumentMigration"/>) and
-/// future document-native endpoints render through the same code.
+/// Compositor: renders a <see cref="CoverDocument"/> onto a SkiaSharp canvas
+/// (RGBA8888, premultiplied, no colour space; see <see cref="RenderSurface"/>).
+/// Shared by the single-image and animated paths. This is the sole owner of
+/// background/gradient/overlay/image-layer drawing; text goes through
+/// <see cref="TextRenderer"/> and the effects through <see cref="EffectsComposer"/>.
+/// Both the legacy flat-settings path (via <see cref="DocumentMigration"/>) and the
+/// document-native endpoints render through this same code.
 /// </summary>
 public static class DocumentRenderer
 {
+    private static readonly AsyncLocal<ILogger?> TestLog = new();
+
+    /// <summary>Where skipped-layer warnings go; set by <c>CoverArtService</c>.</summary>
+    public static ILogger Log { get; set; } = NullLogger.Instance;
+
+    private static ILogger Logger => TestLog.Value ?? Log;
+
     /// <summary>
-    /// Composites one frame (background + visible layers) onto the supplied canvas.
+    /// Composites one frame (background + visible layers + effects) onto the supplied canvas.
+    /// <paramref name="background"/> is one decoded frame; it is only read, never mutated, so the
+    /// caller may reuse it.
     /// </summary>
-    public static void ComposeDocumentFrame(Image<Rgba32> canvas, Image? background, CoverDocument doc)
+    public static void ComposeDocumentFrame(SKBitmap canvas, SKBitmap? background, CoverDocument doc)
     {
         if (background is not null)
         {
@@ -33,13 +45,7 @@ public static class DocumentRenderer
 
         // Soft-light washes the background BEFORE the layers, so text and logos sit on
         // top of the tint rather than under it. The client mirrors this order exactly.
-        // The canvas is still ImageSharp until the compositing port, so effects run through the
-        // bridge; skipped when nothing is on, so a disabled effect costs no premultiply round trip.
-        var softLight = doc.Effects.SoftLight;
-        if (softLight.Enabled && softLight.Opacity > 0f)
-        {
-            ImageSharpBridge.DrawOnto(canvas, c => EffectsComposer.ApplySoftLight(c, softLight));
-        }
+        EffectsComposer.ApplySoftLight(canvas, doc.Effects.SoftLight);
 
         // The overlay goes last before the layers: its colour must be authoritative (a
         // soft-light wash after it would desaturate it) and it must be the last thing
@@ -54,7 +60,7 @@ public static class DocumentRenderer
 
             if (layer.Type == "text")
             {
-                RenderTextLayerWithFallback(canvas, layer, doc);
+                TextRenderer.RenderTextLayerWithFallback(canvas, layer, doc);
             }
             else if (layer.Type == "image")
             {
@@ -63,83 +69,88 @@ public static class DocumentRenderer
         }
 
         // Vignette → grain → border, the border outermost and last.
-        var fx = doc.Effects;
-        if (fx.Vignette.Enabled || fx.Grain.Enabled || fx.Border.Enabled)
-        {
-            ImageSharpBridge.DrawOnto(canvas, c => EffectsComposer.Apply(c, fx));
-        }
+        EffectsComposer.Apply(canvas, doc.Effects);
     }
 
     /// <summary>
-    /// Draws an image (logo/icon) layer: the PNG at <see cref="CoverLayer.ImagePath"/>,
-    /// resized to the layer's normalized <c>Width</c>/<c>Height</c> fraction of the canvas,
-    /// optionally rotated, composited centred on <c>(X, Y)</c> at <c>Opacity</c>.
+    /// Draws an image (logo/icon) layer: the image at <see cref="CoverLayer.ImagePath"/>,
+    /// sized to the layer's normalized <c>Width</c>/<c>Height</c> fraction of the canvas,
+    /// rotated about its centre and drawn centred on <c>(X, Y)</c> at <c>Opacity</c>, exactly as
+    /// the client canvas does (translate, rotate, draw centred).
     ///
     /// The path is expected to have been sandbox-filtered upstream
     /// (<see cref="CoverArtService.GenerateFromDocumentAsync"/>); this method never
     /// resolves relative paths of its own. It is also deliberately total: a missing,
-    /// corrupt or oversized file skips the layer instead of failing the whole render,
-    /// mirroring <see cref="RenderTextLayerWithFallback"/>.
+    /// corrupt or oversized file skips the layer with a warning instead of failing the
+    /// whole render, mirroring <see cref="TextRenderer.RenderTextLayerWithFallback"/>.
+    /// A layer wholly or partly off the canvas is simply clipped.
     /// </summary>
-    public static void RenderImageLayer(Image<Rgba32> canvas, CoverLayer layer)
+    public static void RenderImageLayer(SKBitmap canvas, CoverLayer layer)
     {
-        if (string.IsNullOrEmpty(layer.ImagePath) || !File.Exists(layer.ImagePath))
+        if (string.IsNullOrEmpty(layer.ImagePath))
         {
             return;
         }
 
-        var size = ImageLayerPixelSize(layer, canvas.Width, canvas.Height);
-        var w = size.Width;
-        var h = size.Height;
+        var opacity = Math.Clamp(layer.Opacity, 0f, 1f);
+        if (opacity <= 0f)
+        {
+            return;
+        }
 
         try
         {
             // Shared decompression-bomb guard; a logo is always drawn as a still, so only
             // its first frame is ever decoded.
-            using var logo = ImageSharpBridge.TryLoadStill(layer.ImagePath);
-            if (logo is null)
+            using var decoded = SafeImageLoader.TryDecode(layer.ImagePath, maxFrames: 1);
+            if (decoded is null)
             {
+                Logger.LogWarning("Image layer skipped (missing, undecodable or too large): {Path}", layer.ImagePath);
                 return;
             }
 
-            logo.Mutate(x => x.Resize(w, h));
+            var size = ImageLayerPixelSize(layer, canvas.Width, canvas.Height);
+            var source = decoded.RootFrame;
+            using var pixmap = source.PeekPixels();
+            using var image = SKImage.FromPixels(pixmap);
 
-            // Rotation grows the bounding box, so the top-left must be derived from the
-            // ROTATED size. Otherwise the layer visibly drifts off its anchor.
+            using var target = new SKCanvas(canvas);
+            target.Translate((int)Math.Round(layer.X * canvas.Width), (int)Math.Round(layer.Y * canvas.Height));
             if (layer.Rotation != 0f)
             {
-                logo.Mutate(x => x.Rotate(layer.Rotation));
+                target.RotateDegrees(layer.Rotation);
             }
 
-            var cx = (int)Math.Round(layer.X * canvas.Width);
-            var cy = (int)Math.Round(layer.Y * canvas.Height);
-            var px = cx - logo.Width / 2;
-            var py = cy - logo.Height / 2;
-
-            // DrawImage needs the two rectangles to overlap; a layer dragged fully off
-            // the canvas is a legitimate state, so treat it as a no-op rather than
-            // letting the processor throw.
-            if (px + logo.Width <= 0 || py + logo.Height <= 0 || px >= canvas.Width || py >= canvas.Height)
+            // Integer halves, so an unrotated layer lands on whole pixels (crisp edges) at the same
+            // place the ImageSharp renderer put it: top-left = centre - size / 2.
+            var dst = SKRect.Create(-(size.Width / 2), -(size.Height / 2), size.Width, size.Height);
+            using var paint = new SKPaint
             {
-                return;
-            }
-
-            var opacity = Math.Clamp(layer.Opacity, 0f, 1f);
-            canvas.Mutate(x => x.DrawImage(logo, new Point(px, py), opacity));
+                IsAntialias = true,
+                Color = SKColors.White.WithAlpha((byte)Math.Round(opacity * 255f)),
+            };
+            target.DrawImage(image, dst, Resampling.For(source.Width, source.Height, size.Width, size.Height), paint);
         }
-        catch
+        catch (Exception ex)
         {
-            // Unreadable/undecodable logo: skip it, never break the whole render.
+            // Never break the whole render for one logo.
+            Logger.LogWarning(ex, "Image layer skipped (could not be drawn): {Path}", layer.ImagePath);
         }
+    }
+
+    /// <summary>Routes this renderer's warnings to <paramref name="logger"/> on the calling flow only, until disposed.</summary>
+    internal static IDisposable CaptureLogForTests(ILogger logger)
+    {
+        TestLog.Value = logger;
+        return new RestoreLog();
     }
 
     /// <summary>Largest an image layer may be, as a multiple of the canvas on each axis.</summary>
     internal const float MaxImageLayerScale = 1.5f;
 
     /// <summary>
-    /// Pixel size an image layer is resized to. Width/Height are client-supplied fractions,
-    /// so they are clamped before they become an allocation: a layer bigger than 1.5× the
-    /// canvas is mostly off-canvas anyway, and Rotate grows the buffer further still.
+    /// Pixel size an image layer is drawn at. Width/Height are client-supplied fractions,
+    /// so they are clamped: a layer bigger than 1.5× the canvas is mostly off-canvas anyway.
     /// </summary>
     internal static PixelSize ImageLayerPixelSize(CoverLayer layer, int canvasWidth, int canvasHeight)
     {
@@ -150,138 +161,124 @@ public static class DocumentRenderer
             Math.Max(1, (int)Math.Round(normH * canvasHeight)));
     }
 
-    // Parses a #rrggbb colour, falling back to a default instead of throwing so
-    // a malformed colour in the request body cannot abort the whole render.
-    internal static Color SafeColor(string? hex, Color fallback)
-    {
-        if (string.IsNullOrWhiteSpace(hex))
-        {
-            return fallback;
-        }
+    /// <summary>
+    /// Parses a colour (<c>#rgb</c>, <c>#rgba</c>, <c>#rrggbb</c>, <c>#rrggbbaa</c>), falling back to a
+    /// default instead of throwing so a malformed colour in the request body cannot abort the whole render.
+    /// </summary>
+    internal static SKColor SafeColor(string? hex, SKColor fallback) => SkiaColors.Parse(hex, fallback);
 
-        try
-        {
-            return Color.ParseHex(hex);
-        }
-        catch
-        {
-            return fallback;
-        }
-    }
-
-    internal static void ApplyBackgroundLayer(Image<Rgba32> image, Image backgroundImage, BackgroundLayer bg)
+    /// <summary>
+    /// Draws a background image under the document's fit, pan/zoom, blur and dim. The fit decides the
+    /// footprint (the whole canvas for cover and stretch, the letterboxed rectangle for contain) and the
+    /// virtual size the image is scaled to; the transform picks the window of that scaled image to show
+    /// (<see cref="TransformedSourceRect"/>). That window is mapped back to source pixels and drawn
+    /// straight into the footprint, so the image is resampled once. <paramref name="source"/> is only read.
+    /// </summary>
+    internal static void ApplyBackgroundLayer(SKBitmap canvas, SKBitmap source, BackgroundLayer bg)
     {
         var fit = (bg.Fit ?? "cover").Trim().ToLowerInvariant();
-        var baseColor = SafeColor(bg.DimColor, Color.Black);
+        var baseColor = SafeColor(bg.DimColor, SKColors.Black);
+        int canvasW = canvas.Width, canvasH = canvas.Height;
 
+        PixelRect footprint;
+        int fittedW, fittedH;
         if (fit == "stretch")
         {
             // Distort to fill the whole canvas exactly.
-            backgroundImage.Mutate(x => x.Resize(image.Width, image.Height));
-            ApplyBackgroundTransform(backgroundImage, image.Width, image.Height, bg.Transform);
-            if (bg.Blur > 0)
-            {
-                backgroundImage.Mutate(x => x.GaussianBlur(bg.Blur));
-            }
-            image.Mutate(x => x.DrawImage(backgroundImage, Point.Empty, 1f));
+            footprint = new PixelRect(0, 0, canvasW, canvasH);
+            (fittedW, fittedH) = (canvasW, canvasH);
         }
         else if (fit == "contain")
         {
-            // Fit the whole image inside the canvas (like background-size: contain),
-            // letterboxing the remainder with the base colour.
-            image.Mutate(x => x.Fill(baseColor));
-
-            var scale = Math.Min((float)image.Width / backgroundImage.Width,
-                                 (float)image.Height / backgroundImage.Height);
-            var w = Math.Max(1, (int)Math.Round(backgroundImage.Width * scale));
-            var h = Math.Max(1, (int)Math.Round(backgroundImage.Height * scale));
-            backgroundImage.Mutate(x => x.Resize(w, h));
-            // Footprint is the letterboxed size, not the canvas (see ApplyBackgroundTransform).
-            ApplyBackgroundTransform(backgroundImage, w, h, bg.Transform);
-            if (bg.Blur > 0)
-            {
-                backgroundImage.Mutate(x => x.GaussianBlur(bg.Blur));
-            }
-
-            var px = (image.Width - w) / 2;
-            var py = (image.Height - h) / 2;
-            image.Mutate(x => x.DrawImage(backgroundImage, new Point(px, py), 1f));
+            // The whole image inside the canvas (background-size: contain), letterboxed with the
+            // base colour. Pan/zoom works inside that smaller footprint and never turns contain
+            // into stretch.
+            var scale = Math.Min((float)canvasW / source.Width, (float)canvasH / source.Height);
+            var w = Math.Max(1, (int)Math.Round(source.Width * scale));
+            var h = Math.Max(1, (int)Math.Round(source.Height * scale));
+            footprint = new PixelRect((canvasW - w) / 2, (canvasH - h) / 2, w, h);
+            (fittedW, fittedH) = (w, h);
+            using var fill = new SKCanvas(canvas);
+            fill.DrawColor(baseColor, SKBlendMode.SrcOver);
         }
         else
         {
-            // "cover" (default): scale to fill the canvas keeping the source aspect
-            // ratio, then centre-crop (like CSS background-size: cover).
-            var scale = Math.Max((float)image.Width / backgroundImage.Width,
-                                 (float)image.Height / backgroundImage.Height);
-            var newWidth = Math.Max(image.Width, (int)Math.Ceiling(backgroundImage.Width * scale));
-            var newHeight = Math.Max(image.Height, (int)Math.Ceiling(backgroundImage.Height * scale));
-
-            backgroundImage.Mutate(x => x.Resize(newWidth, newHeight));
-
-            // The centre-crop is NOT done here: ApplyBackgroundTransform performs it,
-            // so the part "cover" would discard stays pannable. With an identity
-            // transform it crops dead-centre, exactly as the plain centre-crop did.
-            ApplyBackgroundTransform(backgroundImage, image.Width, image.Height, bg.Transform);
-
-            if (bg.Blur > 0)
-            {
-                backgroundImage.Mutate(x => x.GaussianBlur(bg.Blur));
-            }
-            image.Mutate(x => x.DrawImage(backgroundImage, Point.Empty, 1f));
+            // "cover" (default): scale to fill the canvas keeping the aspect ratio; what does not
+            // fit is the slack the transform pans across (centred when the transform is identity).
+            var scale = Math.Max((float)canvasW / source.Width, (float)canvasH / source.Height);
+            footprint = new PixelRect(0, 0, canvasW, canvasH);
+            fittedW = Math.Max(canvasW, (int)Math.Ceiling(source.Width * scale));
+            fittedH = Math.Max(canvasH, (int)Math.Ceiling(source.Height * scale));
         }
 
-        // Apply dimming by compositing a solid overlay at fractional opacity.
-        // IMPORTANT: do NOT use Fill() with a semi-transparent SolidBrush here.
-        // On backgrounds decoded without an alpha channel (JPEG posters load as
-        // Rgb24) Fill ignores the brush alpha and paints fully opaque, which
-        // blacked out the entire background for any non-zero dim. DrawImage with
-        // an opacity blends correctly on every pixel format. Text is drawn later,
-        // so only the background is dimmed.
+        var window = TransformedSourceRect(fittedW, fittedH, footprint.Width, footprint.Height, bg.Transform);
+        var toSourceX = (float)source.Width / fittedW;
+        var toSourceY = (float)source.Height / fittedH;
+        var sourceRect = new SKRect(window.X * toSourceX, window.Y * toSourceY, window.Right * toSourceX, window.Bottom * toSourceY);
+        var sampling = Resampling.For(
+            Math.Max(1, (int)Math.Round(sourceRect.Width)),
+            Math.Max(1, (int)Math.Round(sourceRect.Height)),
+            footprint.Width,
+            footprint.Height);
+
+        using (var pixmap = source.PeekPixels())
+        using (var image = SKImage.FromPixels(pixmap))
+        {
+            if (bg.Blur > 0)
+            {
+                DrawBlurred(canvas, image, sourceRect, footprint, sampling, bg.Blur);
+            }
+            else
+            {
+                using var target = new SKCanvas(canvas);
+                target.DrawImage(image, sourceRect, ToSkRect(footprint), sampling);
+            }
+        }
+
+        // Dim: a flat wash of the base colour at fractional opacity over the background only (the
+        // layers come later). Blended per pixel with ImageSharp's float arithmetic, because dim over a
+        // solid colour is an Exact case (spec 7.1).
         if (bg.Dim > 0)
         {
-            using var dimOverlay = new Image<Rgba32>(image.Width, image.Height, baseColor);
-            image.Mutate(x => x.DrawImage(dimOverlay, Point.Empty, bg.Dim));
+            EffectsComposer.Wash(canvas, baseColor, Math.Min(bg.Dim, 1f));
         }
     }
 
     /// <summary>
-    /// Applies the user's pan/zoom to a background that has been SCALED for the
-    /// current <c>Fit</c> mode but not yet cropped, so client canvas and server
-    /// render frame it identically. This also performs the fit's own crop: under
-    /// "cover" the scaled image is larger than the footprint, and that leftover is
-    /// exactly what the user expects to pan across. Deriving the pannable slack from
-    /// zoom alone made repositioning a silent no-op at the default Scale=1.
-    ///
-    /// <paramref name="footprintW"/>/<paramref name="footprintH"/> are the destination
-    /// the background occupies, NOT necessarily the canvas: for cover/stretch it is
-    /// the whole canvas, but for contain it's the smaller letterboxed footprint.
-    /// Resizing a contain-fitted image out to full canvas would silently turn
-    /// "contain" into "stretch", which the transform feature must not do.
-    ///
-    /// Skips the crop and the resample whenever either would be a no-op, so an
-    /// identity transform still reproduces the plain centered render EXACTLY.
+    /// The scaled window, blurred in destination space (sigma = <paramref name="sigma"/>) with its edges
+    /// clamped to the footprint, as ImageSharp blurred the fitted image before drawing it: the scaled
+    /// image is drawn into a footprint-sized bitmap first, so the blur's clamp sees the footprint's
+    /// edges and nothing of the letterbox bars, and the result is clipped back to the footprint.
     /// </summary>
-    private static void ApplyBackgroundTransform(Image backgroundImage, int footprintW, int footprintH, BackgroundTransform transform)
+    private static void DrawBlurred(SKBitmap canvas, SKImage image, SKRect sourceRect, PixelRect footprint, SKSamplingOptions sampling, float sigma)
     {
-        var rect = TransformedSourceRect(backgroundImage.Width, backgroundImage.Height, footprintW, footprintH, transform);
-
-        if (rect.X != 0 || rect.Y != 0 || rect.Width != backgroundImage.Width || rect.Height != backgroundImage.Height)
+        using var scaled = RenderSurface.New(footprint.Width, footprint.Height);
+        using (var scaledCanvas = new SKCanvas(scaled))
         {
-            backgroundImage.Mutate(x => x.Crop(new Rectangle(rect.X, rect.Y, rect.Width, rect.Height)));
+            scaledCanvas.DrawImage(image, sourceRect, SKRect.Create(footprint.Width, footprint.Height), sampling);
         }
 
-        // Only a zoomed window needs resampling back up: an unzoomed crop already IS
-        // footprint-sized, so cropping alone reproduces the old centre-crop bit for bit.
-        if (backgroundImage.Width != footprintW || backgroundImage.Height != footprintH)
-        {
-            backgroundImage.Mutate(x => x.Resize(footprintW, footprintH));
-        }
+        using var scaledPixmap = scaled.PeekPixels();
+        using var scaledImage = SKImage.FromPixels(scaledPixmap);
+        using var blur = SKImageFilter.CreateBlur(sigma, sigma, SKShaderTileMode.Clamp);
+        using var paint = new SKPaint { ImageFilter = blur };
+        using var target = new SKCanvas(canvas);
+        target.ClipRect(ToSkRect(footprint));
+        target.DrawImage(scaledImage, footprint.X, footprint.Y, paint);
     }
+
+    private static SKRect ToSkRect(PixelRect r) => SKRect.Create(r.X, r.Y, r.Width, r.Height);
 
     /// <summary>
     /// Sub-rectangle of the fit-scaled background to draw, given pan/zoom: the
     /// destination footprint shrunk by the zoom, panned across everything the
     /// fit-scaled image has to spare. Clamped in-bounds.
+    ///
+    /// <paramref name="footprintW"/>/<paramref name="footprintH"/> are the destination
+    /// the background occupies, NOT necessarily the canvas: for cover/stretch it is
+    /// the whole canvas, but for contain it's the smaller letterboxed footprint.
+    /// Under "cover" the scaled image is larger than the footprint, and that leftover is
+    /// exactly what the user expects to pan across, even at the default Scale=1.
     /// </summary>
     public static PixelRect TransformedSourceRect(int fittedW, int fittedH, int footprintW, int footprintH, BackgroundTransform t)
     {
@@ -301,7 +298,7 @@ public static class DocumentRenderer
         return new PixelRect(x, y, w, h);
     }
 
-    internal static void CreateGradientBackground(Image<Rgba32> image, BackgroundLayer bg)
+    internal static void CreateGradientBackground(SKBitmap canvas, BackgroundLayer bg)
     {
         // Source is authoritative post-migration. The IsEnabled fallback keeps a document
         // that never went through Normalize (an older client POSTing directly) rendering
@@ -310,46 +307,38 @@ public static class DocumentRenderer
         var useGradient = bg.Source == BackgroundSources.Gradient
             || (bg.Source != BackgroundSources.Solid && bg.Gradient?.IsEnabled == true);
 
+        using var target = new SKCanvas(canvas);
         if (useGradient && bg.Gradient is not null)
         {
-            ApplyGradientBackground(image, bg.Gradient);
+            using var shader = CreateGradientShader(bg.Gradient, canvas.Width, canvas.Height);
+            using var paint = new SKPaint { Shader = shader };
+            target.DrawRect(SKRect.Create(canvas.Width, canvas.Height), paint);
         }
         else
         {
-            var backgroundColor = SafeColor(bg.DimColor, Color.Black);
-            image.Mutate(x => x.Fill(backgroundColor));
+            target.DrawColor(SafeColor(bg.DimColor, SKColors.Black), SKBlendMode.SrcOver);
         }
     }
 
     /// <summary>
-    /// Applies a multi-stop gradient background (linear at a given angle, or radial).
-    /// </summary>
-    internal static void ApplyGradientBackground(Image<Rgba32> image, GradientSettings gradient)
-    {
-        var brush = CreateGradientBrush(gradient, image.Width, image.Height);
-        image.Mutate(x => x.Fill(brush));
-    }
-
-    /// <summary>
-    /// Builds the gradient brush: radial when the settings ask for it, otherwise a linear
+    /// Builds the gradient shader: radial when the settings ask for it, otherwise a linear
     /// ramp along a line through the centre at <c>Angle</c> degrees, long enough to span
-    /// the canvas corner to corner.
+    /// the canvas corner to corner. Beyond the first and last stop the end colours are held
+    /// (clamp), with no dithering and unpremultiplied interpolation (Skia's defaults).
     ///
     /// <paramref name="forceLinear"/> exists for the background OVERLAY, which reuses this
     /// same settings type but is deliberately linear-only (see the spec's inert-fields note).
     /// Shared with <see cref="ApplyGradientOverlay"/> so the two cannot drift apart.
     /// </summary>
-    public static Brush CreateGradientBrush(GradientSettings gradient, int width, int height, bool forceLinear = false)
+    internal static SKShader CreateGradientShader(GradientSettings gradient, int width, int height, bool forceLinear = false)
     {
-        var stops = BuildColorStops(gradient);
+        var stops = BuildGradientStops(gradient);
 
         if (!forceLinear && gradient.Type == GradientType.Radial)
         {
-            var centerX = gradient.CenterX * width;
-            var centerY = gradient.CenterY * height;
+            var centre = new SKPoint(gradient.CenterX * width, gradient.CenterY * height);
             var radius = Math.Max(1f, gradient.Radius * Math.Min(width, height));
-
-            return new RadialGradientBrush(new PointF(centerX, centerY), radius, GradientRepetitionMode.None, stops);
+            return SKShader.CreateRadialGradient(centre, radius, stops.Colors, stops.Positions, SKShaderTileMode.Clamp);
         }
 
         var rad = gradient.Angle * Math.PI / 180.0;
@@ -359,71 +348,58 @@ public static class DocumentRenderer
         var cy = height / 2f;
         var half = (Math.Abs(dx) * width + Math.Abs(dy) * height) / 2f;
 
-        var p0 = new PointF(cx - dx * half, cy - dy * half);
-        var p1 = new PointF(cx + dx * half, cy + dy * half);
+        var p0 = new SKPoint(cx - dx * half, cy - dy * half);
+        var p1 = new SKPoint(cx + dx * half, cy + dy * half);
 
-        return new LinearGradientBrush(p0, p1, GradientRepetitionMode.None, stops);
+        return SKShader.CreateLinearGradient(p0, p1, stops.Colors, stops.Positions, SKShaderTileMode.Clamp);
     }
 
     /// <summary>
     /// Composites the background overlay: a linear multi-stop gradient whose stops carry
-    /// their own alpha, drawn over the finished background and under the layers.
+    /// their own alpha, drawn SrcOver over the finished background and under the layers.
     ///
-    /// Deliberately does NOT use BuildColorStops' Start/End fallback. That fallback yields
+    /// Deliberately does NOT use BuildGradientStops' Start/End fallback. That fallback yields
     /// an OPAQUE ramp between StartColor/EndColor (Jellyfin brand purple/blue by default,
     /// falling back further to black/white only if those hex values fail to parse), fully
     /// covering the canvas edge to edge. That is a reasonable default for a background
     /// gradient, but for an overlay it would obliterate the poster regardless of which
-    /// colours it resolves to. Fewer than two stops = off.
+    /// colours it resolves to. Fewer than two (non-null) stops = off.
     /// </summary>
-    internal static void ApplyGradientOverlay(Image<Rgba32> canvas, GradientSettings? overlay)
+    internal static void ApplyGradientOverlay(SKBitmap canvas, GradientSettings? overlay)
     {
         if (overlay is null || !overlay.IsEnabled) { return; }
-        if (overlay.Stops is not { Count: >= 2 }) { return; }
+        if (overlay.Stops is null || overlay.Stops.Count(s => s is not null) < 2) { return; }
 
-        var brush = CreateGradientBrush(overlay, canvas.Width, canvas.Height, forceLinear: true);
-
-        // Rendered into its OWN transparent Rgba32 buffer, then composited. Filling the
-        // canvas directly with a semi-transparent brush is the trap that once blacked out
-        // dimmed backgrounds (see ApplyBackgroundLayer): Fill ignores brush alpha on
-        // alpha-less pixel formats. This buffer is explicitly Rgba32, and SrcOver onto a
-        // zero-alpha destination resolves exactly to the source, so the default graphics
-        // options are already correct and no custom GraphicsOptions are needed.
-        using var scrim = new Image<Rgba32>(canvas.Width, canvas.Height);
-        scrim.Mutate(x => x.Fill(brush));
-        canvas.Mutate(x => x.DrawImage(scrim, Point.Empty, 1f));
+        using var shader = CreateGradientShader(overlay, canvas.Width, canvas.Height, forceLinear: true);
+        using var paint = new SKPaint { Shader = shader };
+        using var target = new SKCanvas(canvas);
+        target.DrawRect(SKRect.Create(canvas.Width, canvas.Height), paint);
     }
 
     /// <summary>
-    /// Builds the colour stops from the gradient settings: the explicit Stops
-    /// list if it has 2+ entries, otherwise the Start/End colours as a fallback.
+    /// Builds the colour stops from the gradient settings: the explicit Stops list
+    /// (sorted by position, positions and alphas clamped to 0..1) if it has 2+ entries,
+    /// otherwise the Start/End colours as a fallback.
     /// </summary>
-    public static ColorStop[] BuildColorStops(GradientSettings gradient)
+    internal static GradientStops BuildGradientStops(GradientSettings gradient)
     {
         // Null entries are skipped even on paths that never ran Normalize.
         var explicitStops = gradient.Stops?.Where(s => s is not null).ToList();
         if (explicitStops is { Count: >= 2 })
         {
-            return explicitStops
-                .OrderBy(s => s.Position)
-                .Select(s => new ColorStop(
-                    Math.Clamp(s.Position, 0f, 1f),
-                    SafeColor(s.Color, Color.Gray).WithAlpha(Math.Clamp(s.Alpha, 0f, 1f))))
-                .ToArray();
+            var ordered = explicitStops.OrderBy(s => s.Position).ToList();
+            return new GradientStops(
+                ordered.Select(s => SkiaColors.WithAlpha(SafeColor(s.Color, new SKColor(128, 128, 128)), s.Alpha)).ToArray(),
+                ordered.Select(s => Math.Clamp(s.Position, 0f, 1f)).ToArray());
         }
 
-        return new[]
-        {
-            new ColorStop(0f, SafeColor(gradient.StartColor, Color.Black)),
-            new ColorStop(1f, SafeColor(gradient.EndColor, Color.White))
-        };
+        return new GradientStops(
+            new[] { SafeColor(gradient.StartColor, SKColors.Black), SafeColor(gradient.EndColor, SKColors.White) },
+            new[] { 0f, 1f });
     }
 
-    /// <summary>
-    /// Renders a text layer through <see cref="TextRenderer.RenderTextLayerWithFallback"/>, which
-    /// never throws: one bad layer must never cost the rest of the cover. The ImageSharp canvas is
-    /// bridged until the compositor itself moves to SkiaSharp.
-    /// </summary>
-    internal static void RenderTextLayerWithFallback(Image<Rgba32> canvas, CoverLayer layer, CoverDocument doc)
-        => ImageSharpBridge.DrawOnto(canvas, c => TextRenderer.RenderTextLayerWithFallback(c, layer, doc));
+    private sealed class RestoreLog : IDisposable
+    {
+        public void Dispose() => TestLog.Value = null;
+    }
 }

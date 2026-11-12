@@ -1,8 +1,8 @@
 using CustomCoverArt.Common;
 using CustomCoverArt.Models;
 using NSubstitute;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
+using CustomCoverArt.Services.Rendering;
+using SkiaSharp;
 using Xunit;
 
 namespace CustomCoverArt.Tests;
@@ -27,8 +27,8 @@ public class LayerModelTests
     {
         System.IO.Directory.CreateDirectory(dir);
         var p = System.IO.Path.Combine(dir, $"logo_{System.Guid.NewGuid():N}.png");
-        using var img = new Image<Rgba32>(40, 40, Color.Red);
-        img.SaveAsPng(p);
+        using var img = RenderSurface.New(40, 40, SKColors.Red);
+        TestPixels.SavePng(img, p);
         return p;
     }
 
@@ -60,8 +60,8 @@ public class LayerModelTests
             doc.Layers.Add(new CoverLayer { Type = "image", ImagePath = outside, X = 0.5f, Y = 0.5f, Width = 0.8f, Height = 0.8f });
 
             var path = await svc.GenerateFromDocumentAsync(doc);
-            using var result = Image.Load<Rgba32>(path);
-            Assert.True(result[60, 60].R < 20, "Out-of-sandbox logo must not be composited.");
+            using var result = TestPixels.Load(path);
+            Assert.True(TestPixels.Px(result, 60, 60).R < 20, "Out-of-sandbox logo must not be composited.");
             try { System.IO.File.Delete(path); } catch { }
         }
         finally
@@ -85,8 +85,8 @@ public class LayerModelTests
             doc.Layers.Add(new CoverLayer { Type = "image", ImagePath = inside, X = 0.5f, Y = 0.5f, Width = 0.8f, Height = 0.8f });
 
             var path = await svc.GenerateFromDocumentAsync(doc);
-            using var result = Image.Load<Rgba32>(path);
-            Assert.True(result[60, 60].R > 200, "In-sandbox logo should be composited.");
+            using var result = TestPixels.Load(path);
+            Assert.True(TestPixels.Px(result, 60, 60).R > 200, "In-sandbox logo should be composited.");
             try { System.IO.File.Delete(path); } catch { }
         }
         finally

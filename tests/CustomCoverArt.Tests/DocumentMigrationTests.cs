@@ -143,15 +143,16 @@ public class DocumentMigrationTests
     }
 
     [Fact]
-    public void BuildColorStops_IgnoresNullStops()
+    public void BuildGradientStops_IgnoresNullStops()
     {
         var g = new GradientSettings { Stops = new System.Collections.Generic.List<GradientStop>
         {
             null!, new GradientStop { Color = "#000000", Position = 0f }, new GradientStop { Color = "#ffffff", Position = 1f }
         } };
 
-        var stops = DocumentRenderer.BuildColorStops(g);
+        var stops = DocumentRenderer.BuildGradientStops(g);
 
-        Assert.Equal(2, stops.Length);
+        Assert.Equal(2, stops.Colors.Length);
+        Assert.Equal(2, stops.Positions.Length);
     }
 }

@@ -31,6 +31,7 @@ public class CoverArtService : ICoverArtService
         _logger = logger;
         _mediaItemService = mediaItemService;
         FontStore.Log = logger;
+        DocumentRenderer.Log = logger;
 
         // Data location comes from Jellyfin's application paths (via DI), so there
         // is no guessing at filesystem locations or falling back to temp.
@@ -165,9 +166,8 @@ public class CoverArtService : ICoverArtService
                     return await GenerateAnimatedAsync(document, backgroundImage).ConfigureAwait(false);
                 }
 
-                // Create new image with specified dimensions and composite one frame.
-                using var image = new Image<Rgba32>(document.Canvas.Width, document.Canvas.Height);
-                ComposeFrame(image, backgroundImage, document);
+                // Composite one frame at the document's dimensions.
+                using var image = ComposeFrame(document.Canvas.Width, document.Canvas.Height, backgroundImage, document);
 
                 // Save image with retry mechanism
                 await SaveImageWithRetryAsync(image, outputPath, outputFormat);
@@ -390,13 +390,18 @@ public class CoverArtService : ICoverArtService
     }
 
     /// <summary>
-    /// Composites one frame (background + layers) onto the supplied canvas. Shared
-    /// by the single-image path and the animated-GIF path (which calls it per frame).
-    /// Delegates directly to the shared <see cref="DocumentRenderer"/> compositor.
+    /// Composites one frame (background + layers) at <paramref name="width"/> x <paramref name="height"/>
+    /// through the shared <see cref="DocumentRenderer"/> compositor. Shared by the single-image path and
+    /// the animated-GIF path (which calls it per frame). The compositor works on SkiaSharp bitmaps while
+    /// decoding and encoding here are still ImageSharp, so the first frame of <paramref name="background"/>
+    /// is copied in and the result copied out (until the encoders move, plan Tasks 10 and 11).
     /// </summary>
-    private static void ComposeFrame(Image<Rgba32> canvas, Image? background, CoverDocument document)
+    private static Image<Rgba32> ComposeFrame(int width, int height, Image? background, CoverDocument document)
     {
-        DocumentRenderer.ComposeDocumentFrame(canvas, background, document);
+        using var skiaBackground = background is null ? null : ImageSharpBridge.ToSkia(background);
+        using var canvas = RenderSurface.New(width, height);
+        DocumentRenderer.ComposeDocumentFrame(canvas, skiaBackground, document);
+        return ImageSharpBridge.ToImageSharp(canvas);
     }
 
     /// <summary>
@@ -436,17 +441,15 @@ public class CoverArtService : ICoverArtService
         var delayCentis = System.Math.Max(2, document.Background.Animation!.DelayMs / 10); // GIF delay is 1/100s
 
         // A still background without Ken Burns gives the same picture on every frame:
-        // compose it once and repeat it, instead of cloning the full-size source and
-        // re-running the whole compositor for each frame. ApplyBackgroundLayer mutates the
-        // background it is given, which is fine here because it is used exactly once.
+        // compose it once and repeat it, instead of re-running the whole compositor for
+        // each frame.
         Image<Rgba32>? staticFrame = null;
         Image<Rgba32>? output = null;
         try
         {
             if (!animatedSource && !kenBurns)
             {
-                staticFrame = new Image<Rgba32>(w, h);
-                ComposeFrame(staticFrame, background, composeDocument);
+                staticFrame = ComposeFrame(w, h, background, composeDocument);
             }
 
             for (int i = 0; i < frameCount; i++)
@@ -454,8 +457,12 @@ public class CoverArtService : ICoverArtService
                 var t = frameCount == 1 ? 0f : i / (float)(frameCount - 1);
                 var frameDelay = delayCentis;
 
-                using var frameCanvas = staticFrame is not null ? staticFrame.Clone() : new Image<Rgba32>(w, h);
-                if (staticFrame is null)
+                Image<Rgba32> frameCanvas;
+                if (staticFrame is not null)
+                {
+                    frameCanvas = staticFrame.Clone();
+                }
+                else
                 {
                     Image? frameBg = null;
                     try
@@ -477,13 +484,15 @@ public class CoverArtService : ICoverArtService
                             frameBg = background.Clone(x => x.Crop(new Rectangle(crop.X, crop.Y, crop.Width, crop.Height)).Resize(w, h));
                         }
 
-                        ComposeFrame(frameCanvas, frameBg, composeDocument);
+                        frameCanvas = ComposeFrame(w, h, frameBg, composeDocument);
                     }
                     finally
                     {
                         frameBg?.Dispose();
                     }
                 }
+
+                using var ownedFrame = frameCanvas;
 
                 if (output is null)
                 {

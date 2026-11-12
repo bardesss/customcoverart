@@ -120,14 +120,6 @@ internal static class ImageSharpBridge
         }
     }
 
-    /// <summary>Copies <paramref name="canvas"/> into a bitmap, runs <paramref name="draw"/> on it, and copies the result back.</summary>
-    public static void DrawOnto(Image<Rgba32> canvas, Action<SKBitmap> draw)
-    {
-        using var bitmap = ToSkia(canvas);
-        draw(bitmap);
-        CopyOut(bitmap, canvas);
-    }
-
     private static void CopyIn(Image<Rgba32> src, SKBitmap dst)
     {
         var w = src.Width;

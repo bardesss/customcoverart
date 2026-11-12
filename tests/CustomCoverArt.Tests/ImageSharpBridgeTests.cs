@@ -128,22 +128,6 @@ public class ImageSharpBridgeTests
     }
 
     [Fact]
-    public void DrawOnto_CopiesInRunsAndCopiesBack()
-    {
-        using var canvas = new Image<Rgba32>(4, 4, new Rgba32(0, 0, 255, 255));
-        ImageSharpBridge.DrawOnto(canvas, bmp =>
-        {
-            Assert.Equal(new SKColor(0, 0, 255), bmp.GetPixel(0, 0));
-            using var c = new SKCanvas(bmp);
-            using var p = new SKPaint { Color = new SKColor(255, 0, 0) };
-            c.DrawRect(0, 0, 2, 2, p);
-        });
-
-        Assert.Equal(new Rgba32(255, 0, 0, 255), canvas[1, 1]);
-        Assert.Equal(new Rgba32(0, 0, 255, 255), canvas[3, 3]);
-    }
-
-    [Fact]
     public void RenderSurface_New_IsTransparentOrFilled()
     {
         using var clear = RenderSurface.New(3, 2);

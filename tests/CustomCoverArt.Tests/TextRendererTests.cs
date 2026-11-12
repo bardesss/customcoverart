@@ -5,8 +5,6 @@ using System.Numerics;
 using CustomCoverArt.Models;
 using CustomCoverArt.Services;
 using CustomCoverArt.Services.Rendering;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
 using SkiaSharp;
 using Xunit;
 
@@ -709,26 +707,22 @@ public class TextRendererTests
         Assert.All(same, Assert.True);
     }
 
-    /// <summary>The ImageSharp entry point (until Task 9) draws exactly what the Skia one does on an opaque canvas.</summary>
+    /// <summary>The compositor draws a text layer exactly as TextRenderer does on its own (no copy or conversion in between).</summary>
     [Fact]
-    public void DocumentRendererBridge_DrawsTheSameAsTextRenderer()
+    public void ComposeDocumentFrame_DrawsTextExactlyAsTextRenderer()
     {
         var layer = Layer(l => l.Shadow = new TextShadowSettings { Enabled = true, Color = "#ff0000", Blur = 4, OffsetX = 3, OffsetY = 3 });
-        using var skia = RenderSurface.New(Px, Px, SKColors.Black);
-        TextRenderer.RenderTextLayerWithFallback(skia, layer, Doc());
-        using var sharp = new Image<Rgba32>(Px, Px, SixLabors.ImageSharp.Color.Black);
+        using var direct = RenderSurface.New(Px, Px, SKColors.Black);
+        TextRenderer.RenderTextLayerWithFallback(direct, layer, Doc());
 
-        DocumentRenderer.RenderTextLayerWithFallback(sharp, layer, Doc());
+        var doc = Doc();
+        doc.Background.Source = BackgroundSources.Solid;
+        doc.Background.DimColor = "#000000";
+        doc.Layers.Add(layer);
+        using var composed = RenderSurface.New(Px, Px);
+        DocumentRenderer.ComposeDocumentFrame(composed, null, doc);
 
-        for (var y = 0; y < Px; y += 3)
-        {
-            for (var x = 0; x < Px; x++)
-            {
-                var s = TestPixels.Px(skia, x, y);
-                var i = sharp[x, y];
-                Assert.Equal(new Rgba(s.R, s.G, s.B, s.A), new Rgba(i.R, i.G, i.B, i.A));
-            }
-        }
+        Assert.Equal(direct.GetPixelSpan().ToArray(), composed.GetPixelSpan().ToArray());
     }
 
     // ---- Matrices ----

@@ -1,7 +1,7 @@
 using CustomCoverArt.Models;
 using CustomCoverArt.Services;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
+using CustomCoverArt.Services.Rendering;
+using SkiaSharp;
 using Xunit;
 
 namespace CustomCoverArt.Tests;
@@ -29,13 +29,13 @@ public class TextShadowBlurTests
 
     // Red-DOMINANT pixels: the shadow colour, not the white glyphs and not the grey
     // antialiasing along their edges (which is red-equals-green-equals-blue).
-    private static int ShadowPixels(Image<Rgba32> img)
+    private static int ShadowPixels(SKBitmap img)
     {
         var n = 0;
         for (var y = 0; y < img.Height; y++)
             for (var x = 0; x < img.Width; x++)
             {
-                var p = img[x, y];
+                var p = TestPixels.Px(img, x, y);
                 if (p.R > 40 && p.R > p.G + 30 && p.R > p.B + 30) { n++; }
             }
         return n;
@@ -48,9 +48,9 @@ public class TextShadowBlurTests
     [Fact]
     public void BlurredShadow_CoversMoreArea_ThanHardShadow()
     {
-        using var hard = new Image<Rgba32>(200, 200);
+        using var hard = RenderSurface.New(200, 200);
         DocumentRenderer.ComposeDocumentFrame(hard, null, Doc(true, 0));
-        using var soft = new Image<Rgba32>(200, 200);
+        using var soft = RenderSurface.New(200, 200);
         DocumentRenderer.ComposeDocumentFrame(soft, null, Doc(true, 8));
 
         var hardArea = ShadowPixels(hard);
@@ -65,28 +65,26 @@ public class TextShadowBlurTests
     [Fact]
     public void ZeroBlur_IsUnchanged()
     {
-        using var a = new Image<Rgba32>(200, 200);
+        using var a = RenderSurface.New(200, 200);
         DocumentRenderer.ComposeDocumentFrame(a, null, Doc(true, 0));
-        using var b = new Image<Rgba32>(200, 200);
+        using var b = RenderSurface.New(200, 200);
         DocumentRenderer.ComposeDocumentFrame(b, null, Doc(true, 0));
 
-        for (var y = 0; y < 200; y++)
-            for (var x = 0; x < 200; x++)
-                Assert.Equal(a[x, y], b[x, y]);
+        Assert.Equal(TestPixels.Bytes(a), TestPixels.Bytes(b));
     }
 
     /// <summary>The shadow goes UNDER the glyphs, not over them.</summary>
     [Fact]
     public void Shadow_DoesNotCoverTheGlyphs()
     {
-        using var img = new Image<Rgba32>(200, 200);
+        using var img = RenderSurface.New(200, 200);
         DocumentRenderer.ComposeDocumentFrame(img, null, Doc(true, 6));
 
         var white = 0;
         for (var y = 0; y < 200; y++)
             for (var x = 0; x < 200; x++)
             {
-                var p = img[x, y];
+                var p = TestPixels.Px(img, x, y);
                 if (p.R > 200 && p.G > 200 && p.B > 200) { white++; }
             }
         Assert.True(white > 0, "The text itself must still be drawn on top of its shadow.");
@@ -96,7 +94,7 @@ public class TextShadowBlurTests
     [Fact]
     public void DisabledShadow_DrawsNothing()
     {
-        using var img = new Image<Rgba32>(200, 200);
+        using var img = RenderSurface.New(200, 200);
         DocumentRenderer.ComposeDocumentFrame(img, null, Doc(false, 20));
         Assert.Equal(0, ShadowPixels(img));
     }

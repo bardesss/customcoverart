@@ -2,8 +2,6 @@ using CustomCoverArt.Models;
 using CustomCoverArt.Services;
 using CustomCoverArt.Services.Rendering;
 using System;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
 using SkiaSharp;
 using Xunit;
 
@@ -509,17 +507,18 @@ public class EffectsRenderTests
         doc.Effects.Border = new BorderSettings { Enabled = true, Color = "#00ff00", Thickness = 10, Radius = 0 };
         doc.Layers.Add(new CoverLayer { Type = "text", Content = "HHHH", Color = "#ffffff", Size = 0.5f, X = 0.5f, Y = 0.5f });
 
-        using var canvas = new Image<Rgba32>(120, 120);
+        using var canvas = RenderSurface.New(120, 120);
         DocumentRenderer.ComposeDocumentFrame(canvas, null, doc);
 
         // Border wins at the edge.
-        Assert.True(canvas[3, 60].G > 200 && canvas[3, 60].R < 60, "Border must be drawn over the soft-light wash.");
+        var edge = TestPixels.Px(canvas, 3, 60);
+        Assert.True(edge.G > 200 && edge.R < 60, "Border must be drawn over the soft-light wash.");
 
         // Text is visible on top of an opaque red wash somewhere in the middle band.
         var whiteFound = false;
         for (var y = 40; y < 80 && !whiteFound; y++)
             for (var x = 20; x < 100; x++)
-                if (canvas[x, y].R > 200 && canvas[x, y].G > 200 && canvas[x, y].B > 200) { whiteFound = true; break; }
+                if (TestPixels.Px(canvas, x, y) is { R: > 200, G: > 200, B: > 200 }) { whiteFound = true; break; }
         Assert.True(whiteFound, "Layers must be drawn over the soft-light wash.");
     }
 
@@ -535,13 +534,13 @@ public class EffectsRenderTests
         doc.Effects.Vignette = new VignetteSettings { Enabled = true, Amount = 1f, Softness = 1f, Color = "#000000" };
         doc.Effects.Border = new BorderSettings { Enabled = true, Color = "#ffffff", Thickness = 8 };
 
-        using var canvas = new Image<Rgba32>(100, 100);
+        using var canvas = RenderSurface.New(100, 100);
         DocumentRenderer.ComposeDocumentFrame(canvas, null, doc);
 
-        Assert.Equal(new Rgba32(255, 255, 255, 255), canvas[0, 0]); // border over the vignetted corner
-        Assert.Equal(new Rgba32(255, 255, 255, 255), canvas[4, 50]);
+        Assert.Equal(new Rgba(255, 255, 255, 255), TestPixels.Px(canvas, 0, 0)); // border over the vignetted corner
+        Assert.Equal(new Rgba(255, 255, 255, 255), TestPixels.Px(canvas, 4, 50));
         // Just inside the border the vignette has darkened the white background.
-        Assert.True(canvas[8, 50].R < 255 - 40, $"vignette expected under the border's inner edge, got {canvas[8, 50].R}");
+        Assert.True(TestPixels.Px(canvas, 8, 50).R < 255 - 40, $"vignette expected under the border's inner edge, got {TestPixels.Px(canvas, 8, 50).R}");
     }
 
     /// <summary>
@@ -561,7 +560,7 @@ public class EffectsRenderTests
             return d;
         }
 
-        using var baseline = new Image<Rgba32>(80, 80);
+        using var baseline = RenderSurface.New(80, 80);
         DocumentRenderer.ComposeDocumentFrame(baseline, null, Doc());
 
         var zeroed = Doc();
@@ -572,11 +571,9 @@ public class EffectsRenderTests
             Grain = new GrainSettings { Enabled = true, Amount = 0f },
             SoftLight = new SoftLightSettings { Enabled = true, Opacity = 0f }
         };
-        using var again = new Image<Rgba32>(80, 80);
+        using var again = RenderSurface.New(80, 80);
         DocumentRenderer.ComposeDocumentFrame(again, null, zeroed);
 
-        for (var y = 0; y < 80; y++)
-            for (var x = 0; x < 80; x++)
-                Assert.Equal(baseline[x, y], again[x, y]);
+        Assert.Equal(Bytes(baseline), Bytes(again));
     }
 }
