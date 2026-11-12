@@ -141,8 +141,9 @@ public static class DocumentRenderer
     /// <summary>Routes this renderer's warnings to <paramref name="logger"/> on the calling flow only, until disposed.</summary>
     internal static IDisposable CaptureLogForTests(ILogger logger)
     {
+        var previous = TestLog.Value;
         TestLog.Value = logger;
-        return new RestoreLog();
+        return new RestoreLog(previous);
     }
 
     /// <summary>Largest an image layer may be, as a multiple of the canvas on each axis.</summary>
@@ -400,6 +401,20 @@ public static class DocumentRenderer
 
     private sealed class RestoreLog : IDisposable
     {
-        public void Dispose() => TestLog.Value = null;
+        private readonly ILogger? _previous;
+        private bool _disposed;
+
+        public RestoreLog(ILogger? previous) => _previous = previous;
+
+        public void Dispose()
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
+            TestLog.Value = _previous;
+        }
     }
 }

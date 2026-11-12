@@ -7,6 +7,7 @@ using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats.Gif;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
+using SkiaSharp;
 // ImageSharp.Drawing also defines a `Path` type; this file only uses System.IO.Path.
 using Path = System.IO.Path;
 
@@ -99,6 +100,18 @@ public class CoverArtService : ICoverArtService
                     }
                     layer.ImagePath = string.Empty;
                 }
+
+                // A logo that cannot be decoded is dropped here, once, so the per-frame
+                // renderer (an animated export draws it on every frame) never retries it.
+                if (layer.Type == "image" && !string.IsNullOrEmpty(layer.ImagePath))
+                {
+                    using var probe = SafeImageLoader.TryDecode(layer.ImagePath, maxFrames: 1);
+                    if (probe is null)
+                    {
+                        _logger.LogWarning("Layer image ignored (missing, undecodable or too large): {Path}", layer.ImagePath);
+                        layer.ImagePath = string.Empty;
+                    }
+                }
             }
 
             // Clamp client-controlled background effect sizes (guards against
@@ -131,7 +144,8 @@ public class CoverArtService : ICoverArtService
             var outputPath = Path.Combine(_outputDirectory, fileName);
 
             // Load background image if provided (path already sandboxed above).
-            Image? backgroundImage = null;
+            SKBitmap? collage = null;
+            DecodedImage? decoded = null;
             try
             {
                 if (document.Background.Source == BackgroundSources.Collage && document.Background.Collage is not null
@@ -142,7 +156,7 @@ public class CoverArtService : ICoverArtService
                         .GetPosterPathsAsync(document.Background.Collage.SourceId, 60)
                         .ConfigureAwait(false);
 
-                    backgroundImage = CollageComposer.BuildCollage(
+                    collage = CollageComposer.BuildCollage(
                         posters, document.Canvas.Width, document.Canvas.Height,
                         document.Background.Collage.Density, document.Background.Collage.Seed);
                 }
@@ -153,8 +167,8 @@ public class CoverArtService : ICoverArtService
                     // this render uses. A still cover takes ONE frame of an animated source,
                     // so the resize/blur in ApplyBackgroundLayer no longer runs on frames that
                     // are never drawn.
-                    backgroundImage = ImageSharpBridge.TryLoad(document.Background.ImagePath, BackgroundMaxFrames(document));
-                    if (backgroundImage is null)
+                    decoded = SafeImageLoader.TryDecode(document.Background.ImagePath, BackgroundMaxFrames(document));
+                    if (decoded is null)
                     {
                         _logger.LogWarning("Background image ignored (missing, undecodable or too large): {Path}", document.Background.ImagePath);
                     }
@@ -163,21 +177,32 @@ public class CoverArtService : ICoverArtService
                 // Animated GIF export: build multiple frames instead of one image.
                 if (document.Background.Animation?.Enabled == true)
                 {
-                    return await GenerateAnimatedAsync(document, backgroundImage).ConfigureAwait(false);
+                    // Until the animated path moves to Skia (plan Task 11) it works on ImageSharp.
+                    using var animatedBackground = collage is not null
+                        ? ImageSharpBridge.ToImageSharp(collage)
+                        : decoded is not null ? ImageSharpBridge.ToImageSharp(decoded) : null;
+                    return await GenerateAnimatedAsync(document, animatedBackground).ConfigureAwait(false);
                 }
 
-                // Composite one frame at the document's dimensions.
-                using var image = ComposeFrame(document.Canvas.Width, document.Canvas.Height, backgroundImage, document);
+                // Composite one frame at the document's dimensions, straight from the decoded
+                // pixels (no copy of the background).
+                byte[] encoded;
+                using (var canvas = RenderSurface.New(document.Canvas.Width, document.Canvas.Height))
+                {
+                    DocumentRenderer.ComposeDocumentFrame(canvas, collage ?? decoded?.RootFrame, document);
+                    encoded = Encode(canvas, outputFormat);
+                }
 
                 // Save image with retry mechanism
-                await SaveImageWithRetryAsync(image, outputPath, outputFormat);
+                await SaveImageWithRetryAsync(encoded, outputPath);
 
                 return outputPath;
             }
             finally
             {
                 // Always release the decoded background image.
-                backgroundImage?.Dispose();
+                collage?.Dispose();
+                decoded?.Dispose();
             }
         }
         catch (CoverValidationException)
@@ -393,8 +418,8 @@ public class CoverArtService : ICoverArtService
     /// Composites one frame (background + layers) at <paramref name="width"/> x <paramref name="height"/>
     /// through the shared <see cref="DocumentRenderer"/> compositor. Shared by the single-image path and
     /// the animated-GIF path (which calls it per frame). The compositor works on SkiaSharp bitmaps while
-    /// decoding and encoding here are still ImageSharp, so the first frame of <paramref name="background"/>
-    /// is copied in and the result copied out (until the encoders move, plan Tasks 10 and 11).
+    /// the animated path is still ImageSharp, so the first frame of <paramref name="background"/>
+    /// is copied in and the result copied out (until plan Task 11).
     /// </summary>
     private static Image<Rgba32> ComposeFrame(int width, int height, Image? background, CoverDocument document)
     {
@@ -521,9 +546,27 @@ public class CoverArtService : ICoverArtService
     }
 
     /// <summary>
-    /// Saves image with retry mechanism for transient failures
+    /// Encodes a finished cover: PNG through Skia (zlib level 6, all filters), or a one-frame GIF.
     /// </summary>
-    private static async Task SaveImageWithRetryAsync(Image<Rgba32> image, string outputPath, string outputFormat)
+    internal static byte[] Encode(SKBitmap canvas, string outputFormat)
+    {
+        if (string.Equals(outputFormat, "gif", StringComparison.OrdinalIgnoreCase))
+        {
+            using var gif = new MemoryStream();
+            GifWriter.Write(gif, new[] { new GifFrame(canvas, 0) }, loop: false);
+            return gif.ToArray();
+        }
+
+        using var pixmap = canvas.PeekPixels();
+        using var data = pixmap.Encode(new SKPngEncoderOptions(SKPngEncoderFilterFlags.AllFilters, 6))
+            ?? throw new InvalidOperationException("PNG encoding failed");
+        return data.ToArray();
+    }
+
+    /// <summary>
+    /// Writes encoded bytes with a retry for transient failures (file locked, permissions).
+    /// </summary>
+    internal static async Task SaveImageWithRetryAsync(byte[] encoded, string outputPath)
     {
         const int maxRetries = 3;
         const int delayMs = 100;
@@ -532,14 +575,7 @@ public class CoverArtService : ICoverArtService
         {
             try
             {
-                if (outputFormat?.ToLowerInvariant() == "gif")
-                {
-                    await image.SaveAsync(outputPath, new SixLabors.ImageSharp.Formats.Gif.GifEncoder());
-                }
-                else
-                {
-                    await image.SaveAsync(outputPath, new SixLabors.ImageSharp.Formats.Png.PngEncoder());
-                }
+                await File.WriteAllBytesAsync(outputPath, encoded);
                 return;
             }
             catch (IOException) when (attempt < maxRetries - 1)

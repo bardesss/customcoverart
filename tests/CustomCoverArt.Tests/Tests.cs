@@ -150,9 +150,14 @@ public class CoverArtGenerationTests
         var outputPath = await service.GenerateFromDocumentAsync(CustomCoverArt.Services.DocumentMigration.FromSettings(settings));
 
         Assert.True(File.Exists(outputPath), "output file should exist");
-        using var produced = Image.Load(outputPath);
+        using var produced = TestPixels.Load(outputPath);
         Assert.Equal(400, produced.Width);
         Assert.Equal(300, produced.Height);
+        // Opaque, and the #112233 -> #aabbcc gradient spans the cover (opposite corners differ a lot).
+        Assert.Equal(255, TestPixels.Px(produced, 200, 2).A);
+        var a = TestPixels.Px(produced, 2, 2);
+        var b = TestPixels.Px(produced, 397, 297);
+        Assert.True(Math.Abs(a.R - b.R) > 60, $"gradient corners {a} vs {b}");
     }
 
     [Fact]

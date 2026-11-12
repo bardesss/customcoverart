@@ -277,6 +277,37 @@ public sealed class ImageLayerRenderTests : IDisposable
         Assert.Equal(LogLevel.Warning, warning.Level);
     }
 
+    /// <summary>Nested log captures restore the OUTER capture when the inner one ends, not nothing.</summary>
+    [Fact]
+    public void CaptureLogForTests_NestedScopes_RestoreTheOuterCapture()
+    {
+        var bad = Path.Combine(Path.GetTempPath(), $"logo_{Guid.NewGuid():N}.png");
+        File.WriteAllBytes(bad, new byte[] { 1, 2, 3 });
+        _files.Add(bad);
+        var outer = new CapturingLogger<ImageLayerRenderTests>();
+        var inner = new CapturingLogger<ImageLayerRenderTests>();
+        using var canvas = RenderSurface.New(20, 20);
+
+        using (var outerScope = DocumentRenderer.CaptureLogForTests(outer))
+        {
+            using (var innerScope = DocumentRenderer.CaptureLogForTests(inner))
+            {
+                DocumentRenderer.RenderImageLayer(canvas, Layer(bad, 0.5f, 0.5f));
+                Assert.Single(inner.Entries);
+                Assert.Empty(outer.Entries);
+                innerScope.Dispose(); // idempotent: a second dispose must not clobber the outer capture
+            }
+
+            DocumentRenderer.RenderImageLayer(canvas, Layer(bad, 0.5f, 0.5f));
+            Assert.Single(inner.Entries);
+            Assert.Single(outer.Entries);
+        }
+
+        DocumentRenderer.RenderImageLayer(canvas, Layer(bad, 0.5f, 0.5f));
+        Assert.Single(inner.Entries);
+        Assert.Single(outer.Entries);
+    }
+
     /// <summary>
     /// A layer is clamped to 1.5× the canvas before it becomes a draw. 4× (the old cap) on a 2048²
     /// canvas was an 8192² buffer that Rotate then grew further, ~0.5-1 GB per layer.
