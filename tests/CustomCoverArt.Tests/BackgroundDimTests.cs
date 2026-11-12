@@ -12,7 +12,7 @@ namespace CustomCoverArt.Tests;
 /// Regression guard for the background-dim black-out bug, and the dim arithmetic itself.
 ///
 /// JPEG library posters decode without an alpha channel. A naive fill of such an
-/// image with a semi-transparent brush can ignore the brush alpha and painted fully opaque, so ANY
+/// image with a semi-transparent brush can ignore the brush alpha and paint fully opaque, so ANY
 /// non-zero dim turned the whole background black. The dim is a flat wash at fractional opacity,
 /// which blends correctly whatever the source was.
 /// </summary>

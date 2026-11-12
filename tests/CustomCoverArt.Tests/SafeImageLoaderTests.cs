@@ -63,8 +63,17 @@ public class SafeImageLoaderTests
         var apng = TestImages.Fixture("apng-2frames.png");
         var still = TestImages.TempPath(".png");
         TestImages.SaveMultiFrameApng(still, 16, 16, frames: 1);
+        var generated = TestImages.TempPath(".png");
+        TestImages.SaveMultiFrameApng(generated, 16, 16, frames: 3);
         try
         {
+            // The generated 3-frame APNG is a valid PNG to Skia and decodes as a one-frame still (red first).
+            Assert.Equal(1, SafeImageLoader.TryProbe(generated)!.FrameCount);
+            using var generatedStill = SafeImageLoader.TryDecode(generated, maxFrames: 60);
+            Assert.NotNull(generatedStill);
+            Assert.Single(generatedStill!.Frames);
+            Assert.True(TestPixels.Px(generatedStill.RootFrame, 8, 8).R > 200);
+
             var probe = SafeImageLoader.TryProbe(apng);
             Assert.NotNull(probe);
             Assert.Equal(ImageKind.Png, probe!.Kind);
@@ -79,7 +88,7 @@ public class SafeImageLoaderTests
             Assert.NotNull(plain);
             Assert.Single(plain!.Frames);
         }
-        finally { File.Delete(still); }
+        finally { File.Delete(still); File.Delete(generated); }
     }
 
     /// <summary>A frame that alone exceeds the budget is still refused.</summary>
