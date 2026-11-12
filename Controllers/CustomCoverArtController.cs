@@ -451,13 +451,12 @@ public class CustomCoverArtController : ControllerBase
         try
         {
             var ready = await _startupValidationService.IsPluginReadyAsync().ConfigureAwait(false);
-            var renderer = SkiaRuntime.IsAvailable;
             return Success<object>(new
             {
                 PluginReady = ready,
                 Version = Plugin.Instance?.Version.ToString(),
-                RendererAvailable = renderer,
-                RendererVersion = renderer ? SkiaRuntime.NativeVersion : null,
+                RendererAvailable = SkiaRuntime.IsAvailable,
+                RendererVersion = SkiaRuntime.NativeVersion, // null when unavailable
             });
         }
         catch (Exception ex)

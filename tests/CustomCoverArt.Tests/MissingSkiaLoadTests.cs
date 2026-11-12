@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using MediaBrowser.Common.Configuration;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using Xunit;
 
@@ -33,6 +34,8 @@ public sealed class MissingSkiaLoadTests : IDisposable
 
     public void Dispose()
     {
+        // Each test gets its own context (and so its own SkiaRuntime state); let it go when done.
+        _context.Unload();
         try { Directory.Delete(_dataDir, true); } catch { }
     }
 
@@ -47,7 +50,7 @@ public sealed class MissingSkiaLoadTests : IDisposable
     private sealed class NoSkiaContext : AssemblyLoadContext
     {
         public NoSkiaContext()
-            : base("no-skia", isCollectible: false)
+            : base("no-skia", isCollectible: true)
         {
         }
 
@@ -135,16 +138,42 @@ public sealed class MissingSkiaLoadTests : IDisposable
     {
         var controllerType = PluginType("CustomCoverArt.Controllers.CustomCoverArtController");
         var ctor = controllerType.GetConstructors().Single();
-        var args = ctor.GetParameters().Select(p => p.ParameterType.IsValueType ? Activator.CreateInstance(p.ParameterType) : null).ToArray();
+        var paths = Substitute.For<IApplicationPaths>();
+        paths.DataPath.Returns(_dataDir);
+        var startupType = PluginType("CustomCoverArt.Services.StartupValidationService");
+        var startup = Activator.CreateInstance(startupType, Activator.CreateInstance(typeof(NullLogger<>).MakeGenericType(startupType)), paths)!;
+        var args = ctor.GetParameters().Select(p => p.ParameterType.Name switch
+        {
+            "IStartupValidationService" => startup,
+            "IApplicationPaths" => paths,
+            _ => null,
+        }).ToArray();
         var controller = ctor.Invoke(args);
+
+        // Health keeps answering and reports the engine as unavailable.
+        var health = (Task)controllerType.GetMethod("HealthCheck")!.Invoke(controller, null)!;
+        await health;
+        var healthResponse = health.GetType().GetProperty("Result")!.GetValue(health)!;
+        Assert.True((bool)healthResponse.GetType().GetProperty("Success")!.GetValue(healthResponse)!);
+        using (var json = System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(healthResponse.GetType().GetProperty("Data")!.GetValue(healthResponse))))
+        {
+            Assert.False(json.RootElement.GetProperty("RendererAvailable").GetBoolean());
+            Assert.Equal(System.Text.Json.JsonValueKind.Null, json.RootElement.GetProperty("RendererVersion").ValueKind);
+        }
 
         var preview = await (Task<IActionResult>)controllerType.GetMethod("GeneratePreviewDocument")!.Invoke(controller, new[] { NewDocument(400, 600) })!;
         var bad = Assert.IsType<BadRequestObjectResult>(preview);
         Assert.Contains(Unavailable, System.Text.Json.JsonSerializer.Serialize(bad.Value).Replace("\\u0027", "'"));
 
-        foreach (var action in new[] { "UploadImage", "UploadFont" })
+        var apply = Activator.CreateInstance(PluginType("CustomCoverArt.Models.ApplyDocumentRequest"))!;
+        apply.GetType().GetProperty("LibraryId")!.SetValue(apply, Guid.NewGuid().ToString());
+        apply.GetType().GetProperty("Document")!.SetValue(apply, NewDocument(400, 600));
+        var batch = Activator.CreateInstance(PluginType("CustomCoverArt.Models.BatchApplyRequest"))!;
+        batch.GetType().GetProperty("Document")!.SetValue(batch, NewDocument(400, 600));
+
+        foreach (var (action, argument) in new (string, object?)[] { ("ApplyDocument", apply), ("BatchApply", batch), ("UploadImage", null), ("UploadFont", null) })
         {
-            var task = (Task)controllerType.GetMethod(action)!.Invoke(controller, new object?[] { null })!;
+            var task = (Task)controllerType.GetMethod(action)!.Invoke(controller, new[] { argument })!;
             await task;
             var response = task.GetType().GetProperty("Result")!.GetValue(task)!;
             Assert.Equal(Unavailable, response.GetType().GetProperty("ErrorMessage")!.GetValue(response));

@@ -111,6 +111,41 @@ public class WorkflowGuardTests
         Assert.Equal("3.119.4", pinned.Value);
     }
 
+    [Fact]
+    public void Compat_HarfBuzzPinPattern_ReadsTheCsprojVersion()
+    {
+        var pattern = Regex.Match(Compat, @"HB_PINNED=\$\(grep -oPm1 '([^']*HarfBuzzSharpVersion[^']*)' CustomCoverArt\.csproj");
+        Assert.True(pattern.Success, "skia-pin job does not read HB_PINNED from CustomCoverArt.csproj");
+
+        Assert.Equal("8.3.1.5", Regex.Match(RepoFiles.Read("CustomCoverArt.csproj"), pattern.Groups[1].Value).Value);
+    }
+
+    /// <summary>A Jellyfin release that moves only HarfBuzzSharp is reported too, under its own title.</summary>
+    [Fact]
+    public void Compat_ReportsHarfBuzzDrift()
+    {
+        var text = Compat;
+        Assert.Contains("[ \"$HB_HOST\" = \"$HB_PINNED\" ]", text);
+        Assert.Contains("Jellyfin $TAG ships HarfBuzzSharp $HB_HOST (plugin pins $HB_PINNED)", text);
+
+        var pattern = Regex.Match(text, @"grep -oP '(\(\?<=Include=""HarfBuzzSharp""[^']+)'");
+        Assert.True(pattern.Success, "skia-pin job does not read HB_HOST from Directory.Packages.props");
+        const string props = """
+            <PackageVersion Include="HarfBuzzSharp.NativeAssets.Linux" Version="9.9.9" />
+            <PackageVersion Include="HarfBuzzSharp" Version="8.3.1.5" />
+            """;
+        Assert.Equal(new[] { "8.3.1.5" }, Regex.Matches(props, pattern.Groups[1].Value).Select(m => m.Value));
+    }
+
+    /// <summary>Like the build it precedes, the stable job's fontconfig install only runs when there is something to test.</summary>
+    [Fact]
+    public void Compat_StableFontconfigStep_IsGatedLikeItsTestStep()
+    {
+        var text = Compat.Replace("\r\n", "\n");
+        Assert.Contains("- name: Install fontconfig\n        if: steps.ver.outputs.newer == 'true'\n", text);
+        Assert.Contains("- name: Install fontconfig\n        if: steps.ver.outputs.preview != ''\n", text);
+    }
+
     /// <summary>The job's PCRE for the host version picks SkiaSharp itself, not SkiaSharp.* siblings.</summary>
     [Fact]
     public void Compat_HostPattern_ReadsOnlyTheSkiaSharpPackage()
