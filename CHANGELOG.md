@@ -9,7 +9,7 @@ sentence, a blank line, and then one bullet per change.
 The plugin now draws covers with SkiaSharp, the same graphics engine Jellyfin uses, instead of ImageSharp. Your designs and templates are unchanged and load as before.
 
 - Why: newer ImageSharp releases, including the ones with security fixes, need a paid licence key to build. SkiaSharp is free and open source, so the plugin stays free for everyone.
-- Smaller download: the plugin is now a single file. SkiaSharp is already part of your Jellyfin server, on every platform Jellyfin supports. The download shrinks from about 2.0 MB to 0.9 MB, and the installed plugin from 5.4 MB in five files to 2.0 MB in two.
+- Smaller download: the plugin is now a single file. SkiaSharp is already part of your Jellyfin server. The download shrinks from about 2.0 MB to 0.9 MB, and the installed plugin from 5.4 MB in five files to 2.0 MB in two.
 - Text is now laid out like the live preview in your browser, with the same kerning and letter shapes, so the server render and the preview match more closely. Some covers may look very slightly different from before.
 - Text outlines are now drawn like the preview: on semi-transparent text the outline no longer fills the inside of the letters.
 - Custom fonts: .ttf, .otf and .ttc are supported. WOFF and WOFF2 fonts can no longer be uploaded. Designs that use one you uploaded earlier still render, with Noto Sans for that text; the editor shows which font to upload again as TTF or OTF. A .ttc font collection now uses its first font instead of falling back to Noto Sans.

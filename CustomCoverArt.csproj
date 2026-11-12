@@ -38,6 +38,7 @@
       pin against the latest Jellyfin release. Keep in sync with the test project.
     -->
     <SkiaSharpVersion Condition="'$(SkiaSharpVersion)' == ''">3.119.4</SkiaSharpVersion>
+    <!-- The plugin gets HarfBuzzSharp transitively through SkiaSharp.HarfBuzz (no direct reference); this property mirrors Jellyfin's pin for the test project and the compat workflow. -->
     <HarfBuzzSharpVersion Condition="'$(HarfBuzzSharpVersion)' == ''">8.3.1.5</HarfBuzzSharpVersion>
   </PropertyGroup>
 

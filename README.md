@@ -51,7 +51,7 @@ Layered text and logos, backgrounds and composition effects, designed on a live 
 | ⌨️ | **Keyboard & screen readers** | Select layers with Tab and Enter, nudge with the arrow keys (Shift for bigger steps), Esc closes the poster browser, every icon button is named |
 | 📱 | **Mobile-friendly** | Large touch targets, sticky preview, full-screen poster browser, grabbable canvas handles |
 | 🔍 | **In-context preview** | See the cover wide, square and poster-shaped before applying |
-| 🔠 | **Fonts** | Bundled Noto Sans (matches Jellyfin's UI, so text always renders), or upload your own `.ttf` / `.otf` / `.ttc`, which the live canvas renders too. WOFF and WOFF2 are not accepted; fonts uploaded earlier in those formats render as Noto Sans until uploaded again as TTF or OTF |
+| 🔠 | **Fonts** | Bundled Noto Sans (matches Jellyfin's UI, so text always renders), or upload your own `.ttf` / `.otf` / `.ttc`, which the live canvas renders too. WOFF and WOFF2 are not accepted; fonts uploaded earlier in those formats render as Noto Sans until uploaded again as TTF or OTF. Fonts that contain only colour or bitmap glyphs (such as emoji fonts) do not draw on the server |
 | 📐 | **Presets & sizes** | Landscape 16:9 (the default), square cover, portrait poster, wide banner, or custom dimensions from 100 to 2048 px |
 | 🖱️ | **Interactive canvas** | The preview is a live canvas: drag layers to position them, resize/rotate them with handles, drag/scroll/pinch to reposition and zoom the background |
 | 🎯 | **Authoritative server render** | The canvas is a fast approximation; "Show server render" renders the exact same design on the server before you apply |
@@ -113,8 +113,8 @@ English by default.*
 
 - **Jellyfin Server 12.x** (the plugin is ABI‑locked to this major version)
 - The **.NET 10 SDK**, only if you build from source (the runtime ships with Jellyfin)
-- Works on every platform Jellyfin 12 runs on. The plugin draws with the SkiaSharp that comes with
-  Jellyfin and ships none of its own. If the server cannot load SkiaSharp, the health check says so
+- Tested on Linux x64 (Docker), Linux arm64 and Windows x64. The plugin uses the SkiaSharp that
+  comes with Jellyfin and ships none of its own. If the server cannot load SkiaSharp, the health check says so
   and renders are refused with a clear message.
 - Size: the release download is about 0.9 MB and the installed plugin about 2.0 MB in two files
   (`CustomCoverArt.dll` and `meta.json`). Version 4.1.3.0 was 2.0 MB to download and 5.4 MB in five files.
@@ -334,7 +334,7 @@ resets of the same target run one at a time.
   frame larger than 8192×8192 pixels is refused at upload.
 - The plugin only ever decodes **PNG, JPEG, GIF, BMP and WebP**, whatever a file is called, so a
   TIFF or other image renamed to `.png`, or a library poster in another format, is treated as
-  unreadable. Embedded colour (ICC) profiles are ignored and never parsed. An animated PNG (APNG)
+  unreadable. Embedded colour (ICC) profiles may be read by the image decoder but are never applied or kept: pixels are used as stored. An animated PNG (APNG)
   is used as a still image (its first frame).
 - Background, font and layer-image paths supplied by the browser are **sandboxed** to the
   plugin's data directory, so the generator cannot be pointed at arbitrary files on the server.
