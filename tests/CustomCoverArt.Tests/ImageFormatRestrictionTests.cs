@@ -7,14 +7,6 @@ using CustomCoverArt.Services;
 using CustomCoverArt.Services.Rendering;
 using Microsoft.AspNetCore.Http;
 using NSubstitute;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Formats;
-using SixLabors.ImageSharp.Formats.Bmp;
-using SixLabors.ImageSharp.Formats.Gif;
-using SixLabors.ImageSharp.Formats.Jpeg;
-using SixLabors.ImageSharp.Formats.Png;
-using SixLabors.ImageSharp.Formats.Webp;
-using SixLabors.ImageSharp.PixelFormats;
 using SkiaSharp;
 using Xunit;
 
@@ -27,17 +19,10 @@ namespace CustomCoverArt.Tests;
 /// </summary>
 public class ImageFormatRestrictionTests
 {
-    private static byte[] Encode(Image image, IImageEncoder encoder)
-    {
-        using var ms = new MemoryStream();
-        image.Save(ms, encoder);
-        return ms.ToArray();
-    }
-
-    /// <summary>16×16 red TIFF (little-endian, "II*\0"), exported once from ImageSharp's TiffEncoder.</summary>
+    /// <summary>16×16 red TIFF (little-endian, "II*\0"), generated once by an external encoder.</summary>
     private static byte[] TiffBytes() => File.ReadAllBytes(TestImages.Fixture("tiff16.tif"));
 
-    /// <summary>16×16 red TGA, exported once from ImageSharp's TgaEncoder.</summary>
+    /// <summary>16×16 red TGA, generated once by an external encoder.</summary>
     private static byte[] TgaBytes() => File.ReadAllBytes(TestImages.Fixture("tga16.tga"));
 
     private static ILocalizationService Loc()
@@ -106,17 +91,30 @@ public class ImageFormatRestrictionTests
 
     private static byte[] SupportedBytes(string format)
     {
-        using var img = new Image<Rgba32>(24, 24, Color.Green);
-        IImageEncoder encoder = format switch
+        using var bitmap = RenderSurface.New(24, 24, SKColors.Green);
+        switch (format)
         {
-            "png" => new PngEncoder(),
-            "jpeg" => new JpegEncoder(),
-            "gif" => new GifEncoder(),
-            "bmp" => new BmpEncoder(),
-            "webp" => new WebpEncoder(),
-            _ => throw new ArgumentOutOfRangeException(nameof(format)),
-        };
-        return Encode(img, encoder);
+            case "png":
+                return TestImages.SkiaPng(bitmap);
+            case "jpeg":
+            case "webp":
+                using (var data = bitmap.Encode(format == "jpeg" ? SKEncodedImageFormat.Jpeg : SKEncodedImageFormat.Webp, 100))
+                {
+                    return data.ToArray();
+                }
+
+            case "gif":
+                using (var ms = new MemoryStream())
+                {
+                    GifWriter.Write(ms, new[] { new GifFrame(bitmap, 0) }, loop: false);
+                    return ms.ToArray();
+                }
+
+            case "bmp":
+                return TestImages.Bmp24(24, 24, 0, 128, 0);
+            default:
+                throw new ArgumentOutOfRangeException(nameof(format));
+        }
     }
 
     [Theory]
@@ -148,14 +146,17 @@ public class ImageFormatRestrictionTests
     public void AnimatedGif_KeepsFrameDelaysRepeatCountAndTransparency()
     {
         var path = TestImages.TempPath(".gif");
-        using (var gif = new Image<Rgba32>(16, 16, Color.Transparent))
+        using (var transparent = RenderSurface.New(16, 16, SKColors.Transparent))
+        using (var blue = RenderSurface.New(16, 16, SKColors.Blue))
+        using (var ms = new MemoryStream())
         {
-            gif.Metadata.GetGifMetadata().RepeatCount = 3;
-            gif.Frames.RootFrame.Metadata.GetGifMetadata().FrameDelay = 7;
-            using var second = new Image<Rgba32>(16, 16, Color.Blue);
-            var added = gif.Frames.AddFrame(second.Frames.RootFrame);
-            added.Metadata.GetGifMetadata().FrameDelay = 13;
-            gif.SaveAsGif(path);
+            GifWriter.Write(ms, new[] { new GifFrame(transparent, 7), new GifFrame(blue, 13) }, loop: true);
+            var gif = ms.ToArray();
+            // GifWriter loops forever (count 0); patch the NETSCAPE2.0 block to a repeat count of 3.
+            var netscape = gif.AsSpan().IndexOf("NETSCAPE2.0"u8);
+            Assert.True(netscape > 0);
+            BinaryPrimitives.WriteUInt16LittleEndian(gif.AsSpan(netscape + 11 + 2), 3);
+            File.WriteAllBytes(path, gif);
         }
 
         try
@@ -176,7 +177,11 @@ public class ImageFormatRestrictionTests
     public void PngTransparency_Survives()
     {
         var path = TestImages.TempPath(".png");
-        using (var img = new Image<Rgba32>(8, 8, new Rgba32(255, 0, 0, 0))) { img[0, 0] = new Rgba32(0, 0, 255, 128); img.SaveAsPng(path); }
+        using (var bitmap = RenderSurface.New(8, 8, SKColors.Transparent))
+        {
+            bitmap.SetPixel(0, 0, new SKColor(0, 0, 255, 128));
+            File.WriteAllBytes(path, TestImages.SkiaPng(bitmap));
+        }
         try
         {
             using var loaded = SafeImageLoader.TryDecode(path, maxFrames: 1);
@@ -190,7 +195,7 @@ public class ImageFormatRestrictionTests
     }
 
     /// <summary>
-    /// 16×16 green images carrying an ICC profile, exported once from ImageSharp: a minimal
+    /// 16×16 green images carrying an ICC profile, generated once by an external encoder: a minimal
     /// well-formed header (JPEG APP2, PNG iCCP, WebP ICCP) and the GHSA-gwg2-r3hj-4w44 profile
     /// (an mpet CLUT declaring 15×15 channels, truncated) in a PNG.
     /// </summary>

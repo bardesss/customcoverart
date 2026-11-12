@@ -6,8 +6,6 @@ using CustomCoverArt.Services;
 using CustomCoverArt.Services.Rendering;
 using Microsoft.AspNetCore.Http;
 using NSubstitute;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
 using SkiaSharp;
 using Xunit;
 
@@ -140,7 +138,7 @@ public class SafeImageLoaderTests
     public void PlainPng_CountsAsOneFrameAndLoads()
     {
         var path = TestImages.TempPath(".png");
-        using (var img = new Image<Rgba32>(20, 20, Color.Green)) { img.SaveAsPng(path); }
+        using (var bitmap = RenderSurface.New(20, 20, SKColors.Green)) { File.WriteAllBytes(path, TestImages.SkiaPng(bitmap)); }
         try
         {
             Assert.Equal(1, SafeImageLoader.FrameCount(SafeImageLoader.TryProbe(path)!));
@@ -307,8 +305,9 @@ public class SafeImageLoaderTests
             doc.Background.DimColor = "#ff0000";
 
             var output = await svc.GenerateFromDocumentAsync(doc);
-            using var img = Image.Load<Rgba32>(output);
-            Assert.True(img[50, 50].R > 200 && img[50, 50].G < 50);
+            using var img = SKBitmap.Decode(output);
+            var px = img.GetPixel(50, 50);
+            Assert.True(px.Red > 200 && px.Green < 50);
         }
         finally { try { Directory.Delete(dataDir, true); } catch { } }
     }

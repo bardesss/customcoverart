@@ -1262,7 +1262,7 @@ export default function (view) {
         //
         // A passed alpha REPLACES an 8-digit hex's own alpha rather than multiplying with
         // it, matching the server: DocumentRenderer.BuildColorStops does
-        // SafeColor(s.Color).WithAlpha(s.Alpha), and ImageSharp's WithAlpha overwrites
+        // SafeColor(s.Color).WithAlpha(s.Alpha), and SkiaColors.WithAlpha overwrites
         // (measured: '#ff000080' + Alpha 0.5 => A=128, not 64). The hex's own alpha is
         // therefore only used when no alpha is passed at all. NOTE: nothing in the editor
         // currently emits 8-digit hex (<input type="color"> is always #rrggbb), so that
@@ -1521,10 +1521,10 @@ export default function (view) {
         //
         // WHY THE SUBDIVISION BELOW EXISTS (do not "simplify" it away):
         // the two renderers interpolate colour stops in DIFFERENT alpha spaces.
-        //   * ImageSharp's LinearGradientBrush (the authoritative server render) lerps in
+        //   * The server's Skia linear gradient shader (the authoritative render) lerps in
         //     STRAIGHT / non-premultiplied alpha: r, g, b and a are each interpolated
         //     independently, so a fully transparent stop's HUE still bleeds into the ramp.
-        //     Measured: '#ff0000' a=0 -> '#0000ff' a=1 gives Rgba32(150, 0, 105, 105) at
+        //     Measured on the original renderer: '#ff0000' a=0 -> '#0000ff' a=1 gives (150, 0, 105, 105) at
         //     mid-canvas. Note the red channel surviving from a stop with zero alpha.
         //   * HTML Canvas 2D gradients interpolate in PREMULTIPLIED alpha, where a stop
         //     with alpha 0 contributes no colour at all.

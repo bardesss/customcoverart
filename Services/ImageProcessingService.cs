@@ -1,6 +1,5 @@
 using CustomCoverArt.Models;
 using Microsoft.AspNetCore.Http;
-using SixLabors.ImageSharp;
 
 namespace CustomCoverArt.Services;
 

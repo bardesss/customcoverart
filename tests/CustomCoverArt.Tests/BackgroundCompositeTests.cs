@@ -221,7 +221,7 @@ public class BackgroundCompositeTests
     }
 
     /// <summary>
-    /// The blur clamps at the image's edges, as ImageSharp's did: a flat image stays flat right up to
+    /// The blur clamps at the image's edges, as the original renderer's did: a flat image stays flat right up to
     /// the canvas edge instead of fading towards transparent or black.
     /// </summary>
     [Theory]

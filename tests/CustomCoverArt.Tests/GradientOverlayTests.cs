@@ -141,8 +141,8 @@ public class GradientOverlayTests
 
     /// <summary>
     /// THE important one. Filling the canvas directly with a semi-transparent brush is the
-    /// trap that once blacked out dimmed backgrounds: ImageSharp's Fill ignores brush alpha
-    /// on alpha-less pixel formats. If that happens here the middle row goes solid black
+    /// trap that once blacked out dimmed backgrounds: a fill that ignores brush alpha
+    /// on alpha-less pixel formats paints it opaque. If that happens here the middle row goes solid black
     /// instead of mid-grey, so this assertion is the regression guard for the whole feature.
     /// </summary>
     [Fact]

@@ -3,9 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Formats.Gif;
-using SixLabors.ImageSharp.PixelFormats;
+using CustomCoverArt.Services.Rendering;
 using SkiaSharp;
 using Xunit;
 
@@ -310,8 +308,8 @@ public class RenderCorpusTests
     public void Compare_IdenticalGifs_PassAnimated()
     {
         using var scratch = new TempDir();
-        var a = scratch.Gif("a.gif", new[] { Color.Red, Color.Blue, Color.Green }, 10, 0);
-        var b = scratch.Gif("b.gif", new[] { Color.Red, Color.Blue, Color.Green }, 10, 0);
+        var a = scratch.Gif("a.gif", new[] { SKColors.Red, SKColors.Blue, SKColors.Green }, 10, 0);
+        var b = scratch.Gif("b.gif", new[] { SKColors.Red, SKColors.Blue, SKColors.Green }, 10, 0);
 
         var r = RenderCorpus.Compare(a, b, CorpusClass.Animated);
         Assert.True(r.Pass, r.Note);
@@ -322,8 +320,8 @@ public class RenderCorpusTests
     public void Compare_GifFrameCountMismatch_FailsAnimated()
     {
         using var scratch = new TempDir();
-        var a = scratch.Gif("a.gif", new[] { Color.Red, Color.Blue, Color.Green }, 10, 0);
-        var b = scratch.Gif("b.gif", new[] { Color.Red, Color.Blue, Color.Green, Color.Red }, 10, 0);
+        var a = scratch.Gif("a.gif", new[] { SKColors.Red, SKColors.Blue, SKColors.Green }, 10, 0);
+        var b = scratch.Gif("b.gif", new[] { SKColors.Red, SKColors.Blue, SKColors.Green, SKColors.Red }, 10, 0);
 
         var r = RenderCorpus.Compare(a, b, CorpusClass.Animated);
         Assert.False(r.Pass);
@@ -334,8 +332,8 @@ public class RenderCorpusTests
     public void Compare_GifDelayMismatch_FailsAnimated()
     {
         using var scratch = new TempDir();
-        var a = scratch.Gif("a.gif", new[] { Color.Red, Color.Blue }, 10, 0);
-        var b = scratch.Gif("b.gif", new[] { Color.Red, Color.Blue }, 12, 0);
+        var a = scratch.Gif("a.gif", new[] { SKColors.Red, SKColors.Blue }, 10, 0);
+        var b = scratch.Gif("b.gif", new[] { SKColors.Red, SKColors.Blue }, 12, 0);
 
         var r = RenderCorpus.Compare(a, b, CorpusClass.Animated);
         Assert.False(r.Pass);
@@ -347,8 +345,8 @@ public class RenderCorpusTests
     public void Compare_GifLoopMismatch_FailsAnimated()
     {
         using var scratch = new TempDir();
-        var a = scratch.Gif("a.gif", new[] { Color.Red, Color.Blue }, 10, 0);
-        var b = scratch.Gif("b.gif", new[] { Color.Red, Color.Blue }, 10, 1);
+        var a = scratch.Gif("a.gif", new[] { SKColors.Red, SKColors.Blue }, 10, 0);
+        var b = scratch.Gif("b.gif", new[] { SKColors.Red, SKColors.Blue }, 10, 1);
 
         var r = RenderCorpus.Compare(a, b, CorpusClass.Animated);
         Assert.False(r.Pass);
@@ -359,8 +357,8 @@ public class RenderCorpusTests
     public void Compare_GifFramePixelsOutsideLoose_FailsAnimated_OnTheWorstFrame()
     {
         using var scratch = new TempDir();
-        var a = scratch.Gif("a.gif", new[] { Color.Red, Color.Blue }, 10, 0);
-        var b = scratch.Gif("b.gif", new[] { Color.Red, Color.Green }, 10, 0);
+        var a = scratch.Gif("a.gif", new[] { SKColors.Red, SKColors.Blue }, 10, 0);
+        var b = scratch.Gif("b.gif", new[] { SKColors.Red, SKColors.Green }, 10, 0);
 
         var r = RenderCorpus.Compare(a, b, CorpusClass.Animated);
         Assert.False(r.Pass);
@@ -372,7 +370,7 @@ public class RenderCorpusTests
     public void Compare_Animated_RequiresMoreThanOneFrame_InBothImages()
     {
         using var scratch = new TempDir();
-        var one = scratch.Gif("a.gif", new[] { Color.Red }, 10, 0);
+        var one = scratch.Gif("a.gif", new[] { SKColors.Red }, 10, 0);
         var r = RenderCorpus.Compare(one, one, CorpusClass.Animated);
         Assert.False(r.Pass);
         Assert.Contains("more than one frame", r.Note);
@@ -472,7 +470,7 @@ public class RenderCorpusTests
     public void Decode_ReadsGifFramesAndDelaysInMilliseconds()
     {
         using var scratch = new TempDir();
-        var path = scratch.Gif("a.gif", new[] { Color.Red, Color.Blue, Color.Red }, 7, 0);
+        var path = scratch.Gif("a.gif", new[] { SKColors.Red, SKColors.Blue, SKColors.Red }, 7, 0);
 
         var d = RenderCorpus.Decode(path);
         Assert.Equal(3, d.Frames.Count);
@@ -664,21 +662,30 @@ public class RenderCorpusTests
         }
 
         /// <summary>A 16x16 GIF with one flat-colour frame each; delay in centiseconds, repeat count 0 = forever.</summary>
-        public string Gif(string name, Color[] frames, int delayCentis, int repeat)
+        public string Gif(string name, SKColor[] frames, int delayCentis, int repeat)
         {
-            using var gif = new Image<Rgba32>(16, 16, frames[0]);
-            gif.Frames.RootFrame.Metadata.GetGifMetadata().FrameDelay = delayCentis;
-            for (int i = 1; i < frames.Length; i++)
+            var bitmaps = frames.Select(c => RenderSurface.New(16, 16, c)).ToList();
+            try
             {
-                using var f = new Image<Rgba32>(16, 16, frames[i]);
-                f.Frames.RootFrame.Metadata.GetGifMetadata().FrameDelay = delayCentis;
-                gif.Frames.AddFrame(f.Frames.RootFrame);
-            }
+                using var ms = new MemoryStream();
+                GifWriter.Write(ms, bitmaps.Select(b => new GifFrame(b, delayCentis)).ToList(), loop: true);
+                var gif = ms.ToArray();
+                if (repeat != 0)
+                {
+                    // GifWriter loops forever (count 0); patch the NETSCAPE2.0 block to the wanted count.
+                    var netscape = gif.AsSpan().IndexOf("NETSCAPE2.0"u8);
+                    Assert.True(netscape > 0);
+                    System.Buffers.Binary.BinaryPrimitives.WriteUInt16LittleEndian(gif.AsSpan(netscape + 11 + 2), (ushort)repeat);
+                }
 
-            gif.Metadata.GetGifMetadata().RepeatCount = (ushort)repeat;
-            var file = System.IO.Path.Combine(Path, name);
-            gif.SaveAsGif(file);
-            return file;
+                var file = System.IO.Path.Combine(Path, name);
+                File.WriteAllBytes(file, gif);
+                return file;
+            }
+            finally
+            {
+                bitmaps.ForEach(b => b.Dispose());
+            }
         }
 
         public void Dispose()

@@ -67,7 +67,7 @@ public class TextEffectParityTests
 
     /// <summary>
     /// The HTML canvas spec blurs a shadow with a Gaussian whose standard deviation is
-    /// shadowBlur / 2. ImageSharp's GaussianBlur takes the sigma itself, so passing Blur
+    /// shadowBlur / 2. The renderer's Gaussian blur takes the sigma itself, so passing Blur
     /// through unchanged made every server shadow twice as soft as the preview. Convolving
     /// with a Gaussian adds exactly sigma² to a shape's variance on each axis, so the
     /// variance gained between a hard and a blurred shadow measures the sigma the server
@@ -183,7 +183,7 @@ public class TextEffectParityTests
     /// <summary>
     /// Width parity: the canvas strokes with lineWidth = 2 × Width centred on the glyph
     /// contour, so the outline reaches Width px beyond the glyphs on each side.
-    /// Measured (Skia path fill, Windows): 12 at Width 6 (ImageSharp dilation: 12). With the
+    /// Measured (Skia path fill, Windows): 12 at Width 6 (the earlier dilation gave the same 12). With the
     /// glyph-mask fill it read 10, because the mask gamma widened the plain text's R &gt; 128 edge
     /// by about 1 px per side while the stroke stayed a path; the fill now shares the stroke's
     /// geometry. The coverage-weighted (sub-pixel) edges grow by 11.95 px, i.e. 2 x Width.

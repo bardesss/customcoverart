@@ -49,7 +49,7 @@ public class EffectsRenderTests
     }
 
     /// <summary>
-    /// Pinned on the ImageSharp implementation before the port (spec 7.1, Exact class: the arithmetic and the
+    /// Pinned on the implementation that shipped before the SkiaSharp port (spec 7.1, Exact class: the arithmetic and the
     /// seeded walk are unchanged), so the Skia port must reproduce these bytes.
     /// </summary>
     [Fact]
@@ -63,7 +63,7 @@ public class EffectsRenderTests
         Assert.Equal((149, 149, 149), Rgb(img, 8, 8));
     }
 
-    /// <summary>Pinned on the ImageSharp implementation before the port (Exact class).</summary>
+    /// <summary>Pinned on the implementation that shipped before the SkiaSharp port (Exact class).</summary>
     [Fact]
     public void Vignette_OnOpaqueCanvas_MatchesPinnedBytes()
     {
@@ -236,7 +236,7 @@ public class EffectsRenderTests
 
     /// <summary>
     /// A border wider than the canvas leaves no centre line to stroke (the inset path collapses), so it draws
-    /// nothing rather than throwing, exactly as the ImageSharp implementation did.
+    /// nothing rather than throwing, exactly as the earlier implementation did.
     /// </summary>
     [Fact]
     public void Border_WiderThanTheCanvas_DoesNotThrowAndDrawsNothing()
@@ -320,7 +320,7 @@ public class EffectsRenderTests
 
     /// <summary>
     /// Pins the soft-light arithmetic (1/255f scaling, fused multiply-add, round half to even). Expected values
-    /// were captured from ImageSharp's DrawImage(overlay, opacity) over an opaque backdrop (spec 7.1, Exact);
+    /// were captured from the pre-port renderer's DrawImage(overlay, opacity) over an opaque backdrop (spec 7.1, Exact);
     /// the first row is corpus case 07.
     /// </summary>
     [Theory]

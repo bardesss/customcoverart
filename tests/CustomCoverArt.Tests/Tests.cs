@@ -8,8 +8,7 @@ using MediaBrowser.Common.Configuration;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
+using SkiaSharp;
 using Xunit;
 
 namespace CustomCoverArt.Tests;
@@ -78,11 +77,8 @@ public class UploadValidationTests
     [Fact]
     public async Task AcceptsRealPng()
     {
-        using var img = new Image<Rgba32>(16, 16);
-        using var ms = new MemoryStream();
-        img.SaveAsPng(ms);
-
-        var result = await NewService().ValidateFileAsync(FileFrom(ms.ToArray(), "cover.png"));
+        using var bitmap = new SKBitmap(16, 16);
+        var result = await NewService().ValidateFileAsync(FileFrom(TestImages.SkiaPng(bitmap), "cover.png"));
         Assert.True(result.IsValid);
     }
 

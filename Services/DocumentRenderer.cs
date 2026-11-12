@@ -122,7 +122,7 @@ public static class DocumentRenderer
             }
 
             // Integer halves, so an unrotated layer lands on whole pixels (crisp edges) at the same
-            // place the ImageSharp renderer put it: top-left = centre - size / 2.
+            // place the earlier renderer put it: top-left = centre - size / 2.
             var dst = SKRect.Create(-(size.Width / 2), -(size.Height / 2), size.Width, size.Height);
             using var paint = new SKPaint
             {
@@ -237,7 +237,7 @@ public static class DocumentRenderer
         }
 
         // Dim: a flat wash of the base colour at fractional opacity over the background only (the
-        // layers come later). Blended per pixel with ImageSharp's float arithmetic, because dim over a
+        // layers come later). Blended per pixel with float arithmetic (see EffectsComposer.Wash), because dim over a
         // solid colour is an Exact case (spec 7.1).
         if (bg.Dim > 0)
         {
@@ -247,7 +247,7 @@ public static class DocumentRenderer
 
     /// <summary>
     /// The scaled window, blurred in destination space (sigma = <paramref name="sigma"/>) with its edges
-    /// clamped to the footprint, as ImageSharp blurred the fitted image before drawing it: the scaled
+    /// clamped to the footprint (the fitted image is blurred before it is drawn): the scaled
     /// image is drawn into a footprint-sized bitmap first, so the blur's clamp sees the footprint's
     /// edges and nothing of the letterbox bars, and the result is clipped back to the footprint.
     /// </summary>

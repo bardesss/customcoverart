@@ -279,29 +279,6 @@ public class DecodeGuardTests
         Assert.Equal((null, false), SafeImageLoader.ProbeAndDecodeFirstFrame(File.ReadAllBytes(TestImages.Fixture("tiff16.tif"))));
     }
 
-    /// <summary>The bridge's animated load releases each Skia frame as it copies, and still keeps every frame and GIF delay.</summary>
-    [Fact]
-    public void BridgeTryLoad_KeepsEveryFrameAndDelay()
-    {
-        var gif = FourColourGif(3);
-        using var decoded = SafeImageLoader.TryDecode(gif, 60);
-        WithFile(gif, ".gif", path =>
-        {
-            using var image = ImageSharpBridge.TryLoad(path, 60);
-            Assert.NotNull(image);
-            Assert.Equal(3, image!.Frames.Count);
-            for (var i = 0; i < 3; i++)
-            {
-                Assert.Equal(5, SixLabors.ImageSharp.MetadataExtensions.GetGifMetadata(image.Frames[i].Metadata).FrameDelay);
-                var expected = TestPixels.Px(decoded!.Frames[i], 20, 7);
-                var actual = image.Frames[i][20, 7];
-                Assert.Equal(expected, new Rgba(actual.R, actual.G, actual.B, actual.A));
-            }
-
-            return 0;
-        });
-    }
-
     /// <summary>A real WebP with its inner fourcc changed is a RIFF container of something else: refused.</summary>
     [Fact]
     public async Task WebpWithWrongInnerFourcc_IsRefused()
@@ -428,13 +405,7 @@ public class DecodeGuardTests
         AssertCanonical(decoded!);
     }
 
-    private static byte[] BmpBytes()
-    {
-        using var img = new SixLabors.ImageSharp.Image<SixLabors.ImageSharp.PixelFormats.Rgba32>(5, 3, SixLabors.ImageSharp.Color.Green);
-        using var ms = new MemoryStream();
-        SixLabors.ImageSharp.ImageExtensions.SaveAsBmp(img, ms);
-        return ms.ToArray();
-    }
+    private static byte[] BmpBytes() => TestImages.Bmp24(5, 3, 0, 0x80, 0);
 
     private static byte[] GrayPng()
     {

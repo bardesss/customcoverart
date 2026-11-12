@@ -11,8 +11,8 @@ namespace CustomCoverArt.Tests;
 /// <summary>
 /// Regression guard for the background-dim black-out bug, and the dim arithmetic itself.
 ///
-/// JPEG library posters decode without an alpha channel. Under ImageSharp, filling such an
-/// image with a semi-transparent brush ignored the brush alpha and painted fully opaque, so ANY
+/// JPEG library posters decode without an alpha channel. A naive fill of such an
+/// image with a semi-transparent brush can ignore the brush alpha and painted fully opaque, so ANY
 /// non-zero dim turned the whole background black. The dim is a flat wash at fractional opacity,
 /// which blends correctly whatever the source was.
 /// </summary>
@@ -88,7 +88,7 @@ public class BackgroundDimTests
     }
 
     /// <summary>
-    /// Dim over a solid colour is an Exact case (spec 7.1): the bytes ImageSharp's float blend produced,
+    /// Dim over a solid colour is an Exact case (spec 7.1): the bytes the float blend produced,
     /// out = dim colour * 0.35 + backdrop * 0.65, rounded. Over (200, 60, 60): 135.6, 53.7, 72.6 -> (136, 54, 73).
     /// Over (1, 1, 1): 6.25, 15.35, 34.25 -> (6, 15, 34), where a SrcOver DrawRect with a byte alpha of
     /// round(0.35 * 255) = 89 lands one level high on every channel, (7, 16, 35).

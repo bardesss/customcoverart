@@ -3,8 +3,6 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using CustomCoverArt.Services.Rendering;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
 using SkiaSharp;
 
 namespace CustomCoverArt.Tests;
@@ -229,17 +227,84 @@ internal static class TestImages
         target.Add((byte)((value >> 16) & 0xFF));
     }
 
-    /// <summary>Writes an animated PNG (APNG) whose frames alternate red / blue.</summary>
+    /// <summary>
+    /// Writes an animated PNG (APNG) whose frames alternate red / blue. Skia encodes the two
+    /// stills; their IDAT data is re-wrapped with acTL / fcTL / fdAT chunks (full-frame, 1/10 s).
+    /// </summary>
     public static void SaveMultiFrameApng(string path, int width, int height, int frames)
     {
-        using var png = new Image<Rgba32>(width, height, Color.Red);
-        for (int i = 1; i < frames; i++)
+        byte[][] idat = new byte[2][];
+        byte[] header = Array.Empty<byte>();
+        for (int c = 0; c < 2; c++)
         {
-            using var frame = new Image<Rgba32>(width, height, i % 2 == 0 ? Color.Red : Color.Blue);
-            png.Frames.AddFrame(frame.Frames.RootFrame);
+            using var bitmap = RenderSurface.New(width, height, c == 0 ? SKColors.Red : SKColors.Blue);
+            var png = SkiaPng(bitmap);
+            var data = new List<byte>();
+            int pos = 8;
+            while (pos + 8 <= png.Length)
+            {
+                int len = BinaryPrimitives.ReadInt32BigEndian(png.AsSpan(pos));
+                var type = System.Text.Encoding.ASCII.GetString(png, pos + 4, 4);
+                if (type == "IHDR" && c == 0)
+                {
+                    header = png.AsSpan(pos + 8, len).ToArray();
+                }
+                else if (type == "IDAT")
+                {
+                    data.AddRange(png.AsSpan(pos + 8, len).ToArray());
+                }
+
+                pos += 12 + len;
+            }
+
+            idat[c] = data.ToArray();
         }
 
-        png.SaveAsPng(path);
+        using var file = File.Create(path);
+        file.Write(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A });
+        WritePngChunk(file, "IHDR", header);
+        var actl = new byte[8];
+        BinaryPrimitives.WriteInt32BigEndian(actl, frames);
+        WritePngChunk(file, "acTL", actl); // play count 0 = forever
+        int seq = 0;
+        for (int i = 0; i < frames; i++)
+        {
+            var fctl = new byte[26];
+            BinaryPrimitives.WriteInt32BigEndian(fctl, seq++);
+            BinaryPrimitives.WriteInt32BigEndian(fctl.AsSpan(4), width);
+            BinaryPrimitives.WriteInt32BigEndian(fctl.AsSpan(8), height);
+            BinaryPrimitives.WriteInt16BigEndian(fctl.AsSpan(20), 1);  // delay numerator
+            BinaryPrimitives.WriteInt16BigEndian(fctl.AsSpan(22), 10); // delay denominator
+            WritePngChunk(file, "fcTL", fctl);
+            var pixels = idat[i % 2];
+            if (i == 0)
+            {
+                WritePngChunk(file, "IDAT", pixels);
+            }
+            else
+            {
+                var fdat = new byte[4 + pixels.Length];
+                BinaryPrimitives.WriteInt32BigEndian(fdat, seq++);
+                pixels.CopyTo(fdat, 4);
+                WritePngChunk(file, "fdAT", fdat);
+            }
+        }
+
+        WritePngChunk(file, "IEND", Array.Empty<byte>());
+    }
+
+    private static void WritePngChunk(Stream stream, string type, byte[] body)
+    {
+        var typed = new byte[4 + body.Length];
+        System.Text.Encoding.ASCII.GetBytes(type).CopyTo(typed, 0);
+        body.CopyTo(typed, 4);
+        var len = new byte[4];
+        BinaryPrimitives.WriteInt32BigEndian(len, body.Length);
+        stream.Write(len);
+        stream.Write(typed);
+        var crc = new byte[4];
+        BinaryPrimitives.WriteUInt32BigEndian(crc, Crc32(typed));
+        stream.Write(crc);
     }
 
     /// <summary>
@@ -321,6 +386,35 @@ internal static class TestImages
         all.AddRange("IDAT"u8.ToArray());
         all.AddRange(idatBody);
         return all.ToArray();
+    }
+
+    /// <summary>A hand-built <paramref name="width"/>x<paramref name="height"/> 24-bit BMP filled with one colour (rows padded to 4 bytes).</summary>
+    public static byte[] Bmp24(int width, int height, byte red, byte green, byte blue)
+    {
+        int stride = ((width * 3) + 3) / 4 * 4;
+        var bytes = new byte[54 + (stride * height)];
+        bytes[0] = (byte)'B';
+        bytes[1] = (byte)'M';
+        BinaryPrimitives.WriteInt32LittleEndian(bytes.AsSpan(2), bytes.Length);
+        BinaryPrimitives.WriteInt32LittleEndian(bytes.AsSpan(10), 54);  // pixel data offset
+        BinaryPrimitives.WriteInt32LittleEndian(bytes.AsSpan(14), 40);  // BITMAPINFOHEADER
+        BinaryPrimitives.WriteInt32LittleEndian(bytes.AsSpan(18), width);
+        BinaryPrimitives.WriteInt32LittleEndian(bytes.AsSpan(22), height);
+        BinaryPrimitives.WriteInt16LittleEndian(bytes.AsSpan(26), 1);   // planes
+        BinaryPrimitives.WriteInt16LittleEndian(bytes.AsSpan(28), 24);  // bits per pixel
+        BinaryPrimitives.WriteInt32LittleEndian(bytes.AsSpan(34), stride * height);
+        for (var y = 0; y < height; y++)
+        {
+            for (var x = 0; x < width; x++)
+            {
+                var o = 54 + (y * stride) + (x * 3);
+                bytes[o] = blue;
+                bytes[o + 1] = green;
+                bytes[o + 2] = red;
+            }
+        }
+
+        return bytes;
     }
 
     /// <summary>Path of a committed binary fixture under Fixtures/images.</summary>

@@ -503,7 +503,7 @@ public class AnimationTests
 
     /// <summary>
     /// Spec 6.2: only a GIF source supplies its own delay. An animated WebP's frame durations
-    /// (500 ms here) are ignored and the document's delay applies, as with ImageSharp.
+    /// (500 ms here) are ignored and the document's delay applies, as the Skia GIF codec reports them.
     /// </summary>
     [Fact]
     public async Task Passthrough_WebpSource_UsesTheDocumentDelay()
@@ -797,14 +797,14 @@ public class AnimationTests
         finally { try { Directory.Delete(dataDir, true); } catch { } }
     }
 
-    /// <summary>Plan Task 11: the render service builds GIFs on SkiaSharp only, no ImageSharp or bridge copies.</summary>
+    /// <summary>The render service builds GIFs with the plugin's own writer, and the plugin references no managed image library.</summary>
     [Fact]
-    public void CoverArtService_UsesNoImageSharp()
+    public void CoverArtService_BuildsGifsWithGifWriterOnly()
     {
         var source = RepoFiles.Read("Services/CoverArtService.cs");
-        Assert.DoesNotContain("SixLabors", source);
-        Assert.DoesNotContain("ImageSharpBridge", source);
         Assert.Contains("GifWriter.Write(", source);
+        var references = typeof(CoverArtService).Assembly.GetReferencedAssemblies().Select(a => a.Name ?? string.Empty);
+        Assert.DoesNotContain(references, n => n.StartsWith("Six" + "Labors", StringComparison.Ordinal));
     }
 
     // ------------------------------------------------------------------ helpers

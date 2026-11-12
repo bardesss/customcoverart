@@ -1,7 +1,6 @@
 using System;
 using CustomCoverArt.Services;
 using CustomCoverArt.Services.Rendering;
-using SixLabors.ImageSharp.PixelFormats;
 using SkiaSharp;
 using Xunit;
 
@@ -9,16 +8,20 @@ namespace CustomCoverArt.Tests;
 
 public class SkiaColorsTests
 {
+    /// <summary>
+    /// The hex rules SafeColor has always followed (3/4/6/8 digits, optional '#', anything else gray);
+    /// the expected tuples are frozen literals.
+    /// </summary>
     [Theory]
-    [InlineData("#ff0000")] [InlineData("ff0000")] [InlineData("#F0A")] [InlineData("#f0a8")]
-    [InlineData("#11223344")] [InlineData("#000000")] [InlineData("#FFFFFF")] [InlineData("#12345")]
-    [InlineData("#gg0000")] [InlineData("#1234567")]
-    public void Parse_MatchesImageSharpParseHex(string hex)
+    [InlineData("#ff0000", 255, 0, 0, 255)] [InlineData("ff0000", 255, 0, 0, 255)]
+    [InlineData("#F0A", 255, 0, 170, 255)] [InlineData("#f0a8", 255, 0, 170, 136)]
+    [InlineData("#11223344", 17, 34, 51, 68)] [InlineData("#000000", 0, 0, 0, 255)]
+    [InlineData("#FFFFFF", 255, 255, 255, 255)] [InlineData("#12345", 128, 128, 128, 255)]
+    [InlineData("#gg0000", 128, 128, 128, 255)] [InlineData("#1234567", 128, 128, 128, 255)]
+    public void Parse_FollowsHexRules(string hex, int r, int g, int b, int a)
     {
-        // ImageSharp's own parser is the oracle (the rules SafeColor followed before the port).
-        var expected = (SixLabors.ImageSharp.Color.TryParseHex(hex, out var parsed) ? parsed : SixLabors.ImageSharp.Color.Gray).ToPixel<Rgba32>();
         var actual = SkiaColors.Parse(hex, new SKColor(128, 128, 128));
-        Assert.Equal((expected.R, expected.G, expected.B, expected.A), (actual.Red, actual.Green, actual.Blue, actual.Alpha));
+        Assert.Equal((r, g, b, a), ((int)actual.Red, (int)actual.Green, (int)actual.Blue, (int)actual.Alpha));
     }
 
     /// <summary>DocumentRenderer.SafeColor is SkiaColors.Parse: same values, same fallback.</summary>
@@ -52,11 +55,9 @@ public class SkiaColorsTests
     public void WithAlpha_ClampsToUnitRange(float a, int expected)
         => Assert.Equal(expected, SkiaColors.WithAlpha(SKColors.White, a).Alpha);
 
+    /// <summary>Exact alpha bytes (round half away from zero of a * 255), frozen literals.</summary>
     [Theory]
-    [InlineData(0.1f)] [InlineData(0.25f)] [InlineData(0.5f)] [InlineData(0.75f)] [InlineData(0.9f)]
-    public void WithAlpha_MatchesImageSharpWithAlpha(float a)
-    {
-        var expected = SixLabors.ImageSharp.Color.White.WithAlpha(a).ToPixel<Rgba32>().A;
-        Assert.InRange(SkiaColors.WithAlpha(SKColors.White, a).Alpha, expected - 1, expected + 1);
-    }
+    [InlineData(0.1f, 26)] [InlineData(0.25f, 64)] [InlineData(0.5f, 128)] [InlineData(0.75f, 191)] [InlineData(0.9f, 230)]
+    public void WithAlpha_GivesExactByte(float a, int expected)
+        => Assert.Equal(expected, SkiaColors.WithAlpha(SKColors.White, a).Alpha);
 }

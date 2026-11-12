@@ -40,7 +40,7 @@ public static class EffectsComposer
 
     /// <summary>
     /// SrcOver of a flat <paramref name="color"/> (its own alpha times <paramref name="opacity"/>) over
-    /// the whole canvas, with ImageSharp's float arithmetic. Shared by soft light and the background dim,
+    /// the whole canvas, with float arithmetic. Shared by soft light and the background dim,
     /// both of which are Exact over a solid colour (spec 7.1).
     /// </summary>
     internal static void Wash(SKBitmap canvas, SKColor color, float opacity)
@@ -48,12 +48,10 @@ public static class EffectsComposer
         RequirePremulRgba(canvas);
 
         // A flat SrcOver wash, blended per pixel rather than with DrawRect: Skia's SrcOver of the colour at
-        // alpha = round(opacity * 255) was one level off ImageSharp's float blend on many pixels, and soft
+        // alpha = round(opacity * 255) was one level off the float blend on many pixels, and soft
         // light over a solid colour is an Exact case (spec 7.1). The arithmetic below (values scaled by
-        // 1/255f, fused multiply-add, round half to even) matches ImageSharp's SIMD path exactly: 0
-        // differences against DrawImage over 256 backdrop levels x 7 colours x 9 opacities. ImageSharp's
-        // scalar row tail (the last width % 8 pixels of a row) rounds exact .5 ties up instead, so up to one
-        // level can differ there; that is an ImageSharp inconsistency and is not reproduced.
+        // 1/255f, fused multiply-add, round half to even) reproduces the float blend the plugin shipped
+        // with before the SkiaSharp port: 0 differences over 256 backdrop levels x 7 colours x 9 opacities.
         // Pinned by EffectsRenderTests.SoftLight_FractionalOpacity_MatchesPinnedBytes.
         const float inv = 1f / 255f;
         float srcAlpha = color.Alpha * inv * opacity;

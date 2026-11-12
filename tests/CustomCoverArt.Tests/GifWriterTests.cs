@@ -3,8 +3,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using CustomCoverArt.Services.Rendering;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Formats.Gif;
 using SkiaSharp;
 using Xunit;
 
@@ -123,15 +121,6 @@ public class GifWriterTests
         frames.ForEach(f => f.Dispose());
         var gif = Parse(Write(bmp));
         Assert.True(gif.Frames[0].HasTransparency);
-    }
-
-    [Fact]
-    public void Write_DecodesWithImageSharpToo()
-    {
-        using var image = SixLabors.ImageSharp.Image.Load(WriteRgb(loop: true));
-        Assert.Equal(3, image.Frames.Count);
-        Assert.Equal(0, image.Metadata.GetGifMetadata().RepeatCount);
-        Assert.Equal(new[] { 10, 20, 7 }, image.Frames.Select(f => f.Metadata.GetGifMetadata().FrameDelay));
     }
 
     [Fact]

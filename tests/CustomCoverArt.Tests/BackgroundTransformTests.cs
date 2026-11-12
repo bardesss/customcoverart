@@ -1,6 +1,5 @@
 using CustomCoverArt.Models;
 using CustomCoverArt.Services;
-using SixLabors.ImageSharp;
 using Xunit;
 
 namespace CustomCoverArt.Tests;

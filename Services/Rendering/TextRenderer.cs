@@ -33,8 +33,8 @@ internal sealed record ShapedLine(SKTextBlob? Blob, float Width, float Ascent, f
 /// blob through cached glyph masks with a colour-dependent "fake gamma + contrast" boost (white
 /// Noto Light at 34 px measured 28 % heavier than its path, black 10 % lighter, and the boost
 /// switches off abruptly above 256 px); the mask tables also differ per platform build. A path
-/// fill has none of that, so weight does not depend on colour, size or platform, matches the old
-/// ImageSharp geometry, and shares its geometry with the outline stroke.
+/// fill has none of that, so weight does not depend on colour, size or platform, matches the
+/// earlier renderer's geometry, and shares its geometry with the outline stroke.
 /// </summary>
 internal static class TextRenderer
 {
