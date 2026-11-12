@@ -239,6 +239,9 @@ public sealed class RendererHealthTests : IDisposable
         new FileLoadException("SkiaSharp could not be loaded"),
         new EntryPointNotFoundException("sk_version_get_milestone"),
         new BadImageFormatException("libSkiaSharp is for another architecture"),
+        new TypeLoadException("Could not load type 'SkiaSharp.SKPMColor' from assembly 'SkiaSharp'."),
+        new MissingMethodException("Method not found: 'Boolean SkiaSharp.SkiaSharpVersion.CheckNativeLibraryCompatible(Boolean)'."),
+        new MissingFieldException("Field not found: 'SkiaSharp.SKColors.Black'."),
     };
 
     [Theory]

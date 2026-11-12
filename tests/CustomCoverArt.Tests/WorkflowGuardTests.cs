@@ -32,7 +32,7 @@ public class WorkflowGuardTests
         var text = Release;
         Assert.Contains("cp bin/Release/net10.0/CustomCoverArt.dll dist/stage/", text);
         Assert.DoesNotContain("SixLabors", text);
-        Assert.Contains("if ls dist/stage | grep -i -E '^(sixlabors|skiasharp|harfbuzzsharp)|^runtimes$'; then", text);
+        Assert.Contains("if ls dist/stage | grep -i -E '^(sixlabors|skiasharp|harfbuzzsharp|libskiasharp|libharfbuzzsharp)|^runtimes$'; then", text);
         Assert.Contains("echo \"Unexpected third-party binaries in the plugin package\"; exit 1", text);
 
         // Exactly one file is copied in; meta.json is written, not copied.
@@ -55,6 +55,12 @@ public class WorkflowGuardTests
     [InlineData("HarfBuzzSharp.dll")]
     [InlineData("HARFBUZZSHARP.DLL")]
     [InlineData("runtimes")]
+    [InlineData("libSkiaSharp.so")]
+    [InlineData("libSkiaSharp.dll")]
+    [InlineData("libSkiaSharp.dylib")]
+    [InlineData("libHarfBuzzSharp.dylib")]
+    [InlineData("libharfbuzzsharp.so")]
+    [InlineData("LIBSKIASHARP")]
     public void Release_Guard_MatchesEveryForbiddenName(string stagedName)
     {
         Assert.Matches(StageGuard(), stagedName);
@@ -65,6 +71,7 @@ public class WorkflowGuardTests
     [InlineData("meta.json")]
     [InlineData("runtimes.json")]
     [InlineData("CustomCoverArt.SkiaSharp.notes")]
+    [InlineData("CustomCoverArt.libSkiaSharp.txt")]
     public void Release_Guard_LeavesThePluginsOwnFilesAlone(string stagedName)
     {
         Assert.DoesNotMatch(StageGuard(), stagedName);

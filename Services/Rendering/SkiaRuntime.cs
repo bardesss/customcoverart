@@ -58,7 +58,8 @@ public static class SkiaRuntime
         => new(() => Evaluate(probe, log()), LazyThreadSafetyMode.ExecutionAndPublication);
 
     /// <summary>
-    /// Runs the probe. Every way the host's SkiaSharp can be missing or unusable becomes
+    /// Runs the probe. Every way the host's SkiaSharp can be missing or unusable (including a host copy
+    /// that loads but lacks a type, method or field the plugin uses) becomes
     /// <c>(false, null)</c> and one Warning; nothing is thrown.
     /// </summary>
     internal static (bool Available, string? Version) Evaluate(Func<string?> probe, ILogger log)
@@ -73,7 +74,10 @@ public static class SkiaRuntime
             or EntryPointNotFoundException
             or BadImageFormatException
             or TypeInitializationException
-            or InvalidOperationException)
+            or InvalidOperationException
+            or TypeLoadException
+            or MissingMethodException
+            or MissingFieldException)
         {
             log.LogWarning(
                 "Image engine unavailable on {OS} {Arch}: {Type}: {Message}. Cover rendering is disabled; the rest of the server is not affected.",
