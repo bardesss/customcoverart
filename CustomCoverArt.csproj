@@ -21,7 +21,7 @@
     <Copyright>Copyright © 2026 Bardesss. Licensed under GPL-3.0-only.</Copyright>
     <!-- Single source of truth for the plugin version. Bump this in a PR;
          merging to main triggers a release of the new version. -->
-    <Version>4.1.3.0</Version>
+    <Version>4.2.0.0</Version>
     <!--
       Single source of truth for the Jellyfin package versions. Overridable so the
       jellyfin-compat workflow can build against a newer server release without
