@@ -1,7 +1,6 @@
 using System.Collections.Concurrent;
 using CustomCoverArt.Models;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 using SkiaSharp;
 
 namespace CustomCoverArt.Services.Rendering;
@@ -23,13 +22,8 @@ internal static class FontStore
 
     private static ReadOnlySpan<byte> TrueTypeMagic => new byte[] { 0x00, 0x01, 0x00, 0x00 };
 
-    private static volatile ILogger? _testLog;
-
     /// <summary>Extensions a custom font may have (matched case-insensitively).</summary>
     public static IReadOnlySet<string> SupportedExtensions => Extensions;
-
-    /// <summary>Where the once-per-file legacy warning goes; set by <c>CoverArtService</c>.</summary>
-    public static ILogger Log { get; set; } = NullLogger.Instance;
 
     /// <summary>
     /// True when <paramref name="head"/> starts with the sfnt signature of TrueType (0x00010000),
@@ -155,7 +149,7 @@ internal static class FontStore
         var format = Extensions.Contains(extension) || extension.Length == 0
             ? "unreadable"
             : extension.TrimStart('.').ToUpperInvariant();
-        (_testLog ?? Log).LogWarning(
+        RenderLog.Logger.LogWarning(
             "Custom font {Name} is in a format this version no longer reads ({Format}); rendering with Noto Sans. Re-upload it as TTF or OTF.",
             Path.GetFileName(path),
             format);
@@ -172,19 +166,15 @@ internal static class FontStore
             return;
         }
 
-        (_testLog ?? Log).LogWarning(
+        RenderLog.Logger.LogWarning(
             "Custom font {Name} could not be read; rendering with Noto Sans. Re-upload it.",
             Path.GetFileName(path));
     }
 
     internal static void ResetWarningsForTests() => Warned.Clear();
 
-    /// <summary>Routes warnings to <paramref name="logger"/> whatever <see cref="Log"/> is set to, until disposed.</summary>
-    internal static IDisposable CaptureLogForTests(ILogger logger)
-    {
-        _testLog = logger;
-        return new Restore();
-    }
+    /// <summary>Routes this store's warnings on the calling flow to <paramref name="logger"/>, until disposed.</summary>
+    internal static IDisposable CaptureLogForTests(ILogger logger) => RenderLog.Use(logger);
 
     private static SKTypeface LoadBundled(string faceName)
     {
@@ -217,10 +207,5 @@ internal static class FontStore
 
         using var data = SKData.CreateCopy(bytes);
         return SKTypeface.FromData(data, 0);
-    }
-
-    private sealed class Restore : IDisposable
-    {
-        public void Dispose() => _testLog = null;
     }
 }

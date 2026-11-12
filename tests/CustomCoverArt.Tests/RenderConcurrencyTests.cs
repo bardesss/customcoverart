@@ -328,6 +328,47 @@ public sealed class RenderConcurrencyTests : IDisposable
         Assert.Equal(1, log.Entries.Count(e => e.Level == LogLevel.Warning));
     }
 
+    /// <summary>
+    /// A service's logger hears only that service's renders. Constructing one used to point the
+    /// process-wide renderer and font-store loggers at it, so any other render running at the same
+    /// time (another test class, in xUnit) logged into it and broke exact warning counts.
+    /// </summary>
+    [Fact]
+    public void ServiceLogger_DoesNotHearRendersOutsideTheService()
+    {
+        var log = new CapturingLogger<CoverArtService>();
+        NewService(log);
+
+        var bad = Path.Combine(Uploads(), "elsewhere.png");
+        File.WriteAllBytes(bad, new byte[] { 1, 2, 3 });
+        var missingFont = Path.Combine(Uploads(), $"elsewhere_{Guid.NewGuid():N}.ttf");
+        var elsewhere = new Thread(() =>
+        {
+            using var canvas = RenderSurface.New(20, 20);
+            DocumentRenderer.RenderImageLayer(canvas, new CoverLayer { Type = "image", ImagePath = bad, Width = 0.5f, Height = 0.5f });
+            FontStore.Resolve(new CoverLayer { FontPath = missingFont });
+        });
+        elsewhere.Start();
+        elsewhere.Join();
+
+        Assert.Empty(log.Entries);
+    }
+
+    /// <summary>What the renderer warns about during the service's own render still reaches the service's logger.</summary>
+    [Fact]
+    public async Task ServiceLogger_HearsTheRendererDuringItsOwnRender()
+    {
+        var log = new CapturingLogger<CoverArtService>();
+        var font = $"gone_{Guid.NewGuid():N}.ttf";
+        var doc = new CoverDocument { Canvas = new CanvasSettings { Width = 100, Height = 100, Format = "png" } };
+        doc.Layers.Add(new CoverLayer { Type = "text", Content = "Hi", Size = 0.2f, FontPath = Path.Combine(Uploads(), font) });
+
+        await NewService(log).GenerateFromDocumentAsync(doc);
+
+        var warning = Assert.Single(log.Entries, e => e.Message.Contains(font));
+        Assert.Equal(LogLevel.Warning, warning.Level);
+    }
+
     [Fact]
     public async Task GoodLogo_IsNotBlankedByTheUpFrontCheck()
     {

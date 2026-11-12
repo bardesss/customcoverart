@@ -1,7 +1,6 @@
 using CustomCoverArt.Models;
 using CustomCoverArt.Services.Rendering;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 using SkiaSharp;
 
 namespace CustomCoverArt.Services;
@@ -20,12 +19,8 @@ internal sealed record GradientStops(SKColor[] Colors, float[] Positions);
 /// </summary>
 public static class DocumentRenderer
 {
-    private static readonly AsyncLocal<ILogger?> TestLog = new();
-
-    /// <summary>Where skipped-layer warnings go; set by <c>CoverArtService</c>.</summary>
-    public static ILogger Log { get; set; } = NullLogger.Instance;
-
-    private static ILogger Logger => TestLog.Value ?? Log;
+    /// <summary>Where skipped-layer warnings go: the logger of the render on this flow (see <see cref="RenderLog"/>).</summary>
+    private static ILogger Logger => RenderLog.Logger;
 
     /// <summary>
     /// Composites one frame (background + visible layers + effects) onto the supplied canvas.
@@ -139,12 +134,7 @@ public static class DocumentRenderer
     }
 
     /// <summary>Routes this renderer's warnings to <paramref name="logger"/> on the calling flow only, until disposed.</summary>
-    internal static IDisposable CaptureLogForTests(ILogger logger)
-    {
-        var previous = TestLog.Value;
-        TestLog.Value = logger;
-        return new RestoreLog(previous);
-    }
+    internal static IDisposable CaptureLogForTests(ILogger logger) => RenderLog.Use(logger);
 
     /// <summary>Largest an image layer may be, as a multiple of the canvas on each axis.</summary>
     internal const float MaxImageLayerScale = 1.5f;
@@ -397,24 +387,5 @@ public static class DocumentRenderer
         return new GradientStops(
             new[] { SafeColor(gradient.StartColor, SKColors.Black), SafeColor(gradient.EndColor, SKColors.White) },
             new[] { 0f, 1f });
-    }
-
-    private sealed class RestoreLog : IDisposable
-    {
-        private readonly ILogger? _previous;
-        private bool _disposed;
-
-        public RestoreLog(ILogger? previous) => _previous = previous;
-
-        public void Dispose()
-        {
-            if (_disposed)
-            {
-                return;
-            }
-
-            _disposed = true;
-            TestLog.Value = _previous;
-        }
     }
 }

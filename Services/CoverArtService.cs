@@ -25,8 +25,6 @@ public class CoverArtService : ICoverArtService
         _applicationPaths = applicationPaths;
         _logger = logger;
         _mediaItemService = mediaItemService;
-        FontStore.Log = logger;
-        DocumentRenderer.Log = logger;
 
         // Data location comes from Jellyfin's application paths (via DI), so there
         // is no guessing at filesystem locations or falling back to temp.
@@ -36,6 +34,9 @@ public class CoverArtService : ICoverArtService
 
     public async Task<string> GenerateFromDocumentAsync(CoverDocument document)
     {
+        // The renderer's warnings (skipped logo, unreadable font) go to this service's logger for
+        // this render only; a process-wide logger would also catch every other render's warnings.
+        using var renderLog = RenderLog.Use(_logger);
         try
         {
             if (document == null)
