@@ -5,18 +5,36 @@ using SkiaSharp.HarfBuzz;
 
 namespace CustomCoverArt.Services.Rendering;
 
-/// <summary>One shaped line of text: a blob positioned from origin (0, 0) on the baseline, its advance width and the font's vertical metrics.</summary>
-/// <param name="Blob">The glyphs, or null when shaping produced none (empty text). The caller disposes it.</param>
+/// <summary>
+/// One shaped line of text positioned from origin (0, 0) on the baseline: the glyphs as a blob and
+/// as one outline path, its advance width and the font's vertical metrics. Dispose it to release both.
+/// </summary>
+/// <param name="Blob">The glyphs, or null when shaping produced none (empty text).</param>
 /// <param name="Width">Total advance width in pixels.</param>
 /// <param name="Ascent">Skia ascent: distance above the baseline, negative.</param>
 /// <param name="Descent">Skia descent: distance below the baseline, positive.</param>
-internal sealed record ShapedLine(SKTextBlob? Blob, float Width, float Ascent, float Descent);
+/// <param name="Path">The same glyphs at the same HarfBuzz positions as one path (what is drawn); null when <paramref name="Blob"/> is.</param>
+internal sealed record ShapedLine(SKTextBlob? Blob, float Width, float Ascent, float Descent, SKPath? Path = null) : IDisposable
+{
+    public void Dispose()
+    {
+        Blob?.Dispose();
+        Path?.Dispose();
+    }
+}
 
 /// <summary>
 /// Draws text layers with SkiaSharp, shaped by HarfBuzz (spec 6.4). Layout follows the editor's
 /// canvas, which is the reference: <c>textBaseline = 'middle'</c>, <c>textAlign</c> left/centre/right
 /// of the shaped advance, rotation about the layer anchor, a screen-space shadow blurred with sigma
 /// <c>blur / 2</c>, and an outline that is one round-joined stroke of width <c>2 x Width</c>.
+///
+/// Shadow, outline and fill all draw the glyph OUTLINE PATH, never the blob. Skia rasterises a
+/// blob through cached glyph masks with a colour-dependent "fake gamma + contrast" boost (white
+/// Noto Light at 34 px measured 28 % heavier than its path, black 10 % lighter, and the boost
+/// switches off abruptly above 256 px); the mask tables also differ per platform build. A path
+/// fill has none of that, so weight does not depend on colour, size or platform, matches the old
+/// ImageSharp geometry, and shares its geometry with the outline stroke.
 /// </summary>
 internal static class TextRenderer
 {
@@ -58,9 +76,9 @@ internal static class TextRenderer
         var outlineWidth = layer.Outline.Enabled ? Math.Clamp(layer.Outline.Width, 0, 10) : 0;
         var outlineColor = SkiaColors.WithAlpha(SkiaColors.Parse(layer.Outline.Color, SKColors.Black), opacity);
 
-        var line = Shape(face, fontPixelSize, layer.Content);
-        using var blob = line.Blob;
-        if (blob is null)
+        using var line = Shape(face, fontPixelSize, layer.Content);
+        var glyphs = line.Path;
+        if (glyphs is null)
         {
             return;
         }
@@ -70,11 +88,12 @@ internal static class TextRenderer
         // The shadow first, so it sits beneath the outline and the fill.
         if (layer.Shadow.Enabled)
         {
-            DrawShadow(canvas, blob, origin, shadowDx, shadowDy, shadowTransform, shadowColor, shadowBlur);
+            DrawShadow(canvas, glyphs, origin, shadowDx, shadowDy, shadowTransform, shadowColor, shadowBlur);
         }
 
         using var target = new SKCanvas(canvas);
         target.SetMatrix(ToSkMatrix(rotate));
+        target.Translate(origin.X, origin.Y);
 
         // Outline: the canvas strokes the glyph contours ONCE under globalAlpha with lineWidth =
         // 2 x Width and round joins, so half the stroke lies inside the glyph, under the fill.
@@ -88,11 +107,11 @@ internal static class TextRenderer
                 StrokeJoin = SKStrokeJoin.Round,
                 Color = outlineColor,
             };
-            target.DrawText(blob, origin.X, origin.Y, stroke);
+            target.DrawPath(glyphs, stroke);
         }
 
         using var fill = new SKPaint { IsAntialias = true, Style = SKPaintStyle.Fill, Color = textColor };
-        target.DrawText(blob, origin.X, origin.Y, fill);
+        target.DrawPath(glyphs, fill);
     }
 
     /// <summary>
@@ -110,17 +129,17 @@ internal static class TextRenderer
             try
             {
                 // Plain bundled Regular at half size, centred on the canvas, no effects or opacity.
-                var line = Shape(FontStore.Bundled(FontWeight.Normal), FallbackFontPixelSize(layer, doc), layer.Content);
-                using var blob = line.Blob;
-                if (blob is null)
+                using var line = Shape(FontStore.Bundled(FontWeight.Normal), FallbackFontPixelSize(layer, doc), layer.Content);
+                if (line.Path is null)
                 {
                     return;
                 }
 
                 var origin = Origin(line, TextAlign.Center, new Vector2(canvas.Width / 2f, canvas.Height / 2f));
                 using var target = new SKCanvas(canvas);
+                target.Translate(origin.X, origin.Y);
                 using var paint = new SKPaint { IsAntialias = true, Color = SkiaColors.Parse(layer.Color, SKColors.White) };
-                target.DrawText(blob, origin.X, origin.Y, paint);
+                target.DrawPath(line.Path, paint);
             }
             catch
             {
@@ -198,13 +217,31 @@ internal static class TextRenderer
         var run = builder.AllocatePositionedRun(font, count);
         var glyphs = run.Glyphs;
         var positions = run.Positions;
-        for (var i = 0; i < count; i++)
+        var path = new SKPath();
+        try
         {
-            glyphs[i] = (ushort)result.Codepoints[i];
-            positions[i] = result.Points[i];
-        }
+            for (var i = 0; i < count; i++)
+            {
+                var glyph = (ushort)result.Codepoints[i];
+                var at = result.Points[i];
+                glyphs[i] = glyph;
+                positions[i] = at;
 
-        return new ShapedLine(builder.Build(), result.Width, metrics.Ascent, metrics.Descent);
+                // Each glyph's outline at its shaped position; glyphs without one (spaces) add nothing.
+                using var outline = font.GetGlyphPath(glyph);
+                if (outline is not null && !outline.IsEmpty)
+                {
+                    path.AddPath(outline, at.X, at.Y);
+                }
+            }
+
+            return new ShapedLine(builder.Build(), result.Width, metrics.Ascent, metrics.Descent, path);
+        }
+        catch
+        {
+            path.Dispose();
+            throw;
+        }
     }
 
     private static SKFont NewFont(SKTypeface face, float pixelSize) => new(face, pixelSize)
@@ -235,7 +272,7 @@ internal static class TextRenderer
 
     private static void DrawShadow(
         SKBitmap canvas,
-        SKTextBlob blob,
+        SKPath glyphs,
         SKPoint origin,
         float dx,
         float dy,
@@ -250,7 +287,8 @@ internal static class TextRenderer
             // An unblurred shadow is a plain offset copy; one SrcOver draw needs no surface of its own.
             using var direct = new SKCanvas(canvas);
             direct.SetMatrix(ToSkMatrix(shadowTransform));
-            direct.DrawText(blob, origin.X + dx, origin.Y + dy, paint);
+            direct.Translate(origin.X + dx, origin.Y + dy);
+            direct.DrawPath(glyphs, paint);
             return;
         }
 
@@ -261,7 +299,8 @@ internal static class TextRenderer
         using (var shadowCanvas = new SKCanvas(surface))
         {
             shadowCanvas.SetMatrix(ToSkMatrix(shadowTransform));
-            shadowCanvas.DrawText(blob, origin.X + dx, origin.Y + dy, paint);
+            shadowCanvas.Translate(origin.X + dx, origin.Y + dy);
+            shadowCanvas.DrawPath(glyphs, paint);
         }
 
         var sigma = blur / 2f;

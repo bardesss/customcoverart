@@ -80,7 +80,7 @@ public class TextRendererTests
         var av = TextRenderer.Shape(Regular, 80, "AV");
         var a = TextRenderer.Shape(Regular, 80, "A");
         var v = TextRenderer.Shape(Regular, 80, "V");
-        using (av.Blob) using (a.Blob) using (v.Blob)
+        using (av) using (a) using (v)
         {
             Assert.True(av.Width < a.Width + v.Width - 1, $"AV={av.Width}, A+V={a.Width + v.Width}: the kern pair was not applied.");
         }
@@ -92,7 +92,91 @@ public class TextRendererTests
         var line = TextRenderer.Shape(Regular, 40, string.Empty);
 
         Assert.Null(line.Blob);
+        Assert.Null(line.Path);
         Assert.Equal(0f, line.Width);
+    }
+
+    [Fact]
+    public void Shape_PathHoldsEveryOutlinedGlyph_AndSpacesAddNone()
+    {
+        using var word = TextRenderer.Shape(Regular, 40, "HOH");
+        using var spaced = TextRenderer.Shape(Regular, 40, "H O H");
+        using var spaces = TextRenderer.Shape(Regular, 40, "   ");
+
+        Assert.NotNull(word.Path);
+        Assert.False(word.Path!.IsEmpty);
+        Assert.True(spaces.Path!.IsEmpty);
+        // The spaces only move the glyphs apart: same contours, wider bounds.
+        Assert.Equal(word.Path.PointCount, spaced.Path!.PointCount);
+        Assert.True(spaced.Path.Bounds.Width > word.Path.Bounds.Width);
+        // The path's ink lies inside the shaped advance (with Noto's side bearings).
+        Assert.InRange(word.Path.Bounds.Left, 0f, 0.15f * 40);
+        Assert.InRange(word.Path.Bounds.Right, word.Width - (0.15f * 40), word.Width);
+    }
+
+    /// <summary>
+    /// The fill is a plain path fill, not Skia's glyph-mask text pipeline (whose gamma and contrast
+    /// tables depend on the text colour, the size and the platform build): one glyph drawn by the
+    /// renderer is byte-identical to the same glyph filled from <see cref="SKFont.GetTextPath(string, SKPoint)"/>.
+    /// </summary>
+    [Theory]
+    [InlineData("H", 0.2f)]
+    [InlineData("g", 0.11f)]
+    [InlineData("W", 0.6f)]
+    public void Fill_IsTheGlyphPath_ByteForByte(string glyph, float size)
+    {
+        var pixels = size * Px;
+        using var actual = Render(Layer(l => { l.Content = glyph; l.Size = size; }));
+
+        using var line = TextRenderer.Shape(Regular, pixels, glyph);
+        using var font = new SKFont(Regular, pixels) { Edging = SKFontEdging.Antialias, Subpixel = true, Hinting = SKFontHinting.None, LinearMetrics = true };
+        using var expected = RenderSurface.New(Px, Px, SKColors.Black);
+        using (var canvas = new SKCanvas(expected))
+        using (var paint = new SKPaint { IsAntialias = true, Color = SKColors.White })
+        {
+            canvas.Translate(150f - (line.Width / 2f), 150f - ((line.Ascent + line.Descent) / 2f));
+            using var path = font.GetTextPath(glyph, new SKPoint(0, 0));
+            canvas.DrawPath(path, paint);
+        }
+
+        Assert.True(SameBytes(expected, actual));
+    }
+
+    /// <summary>
+    /// Skia's glyph masks drew white Light text up to 28 % heavier and black text up to 21 % lighter
+    /// than its outline. A path fill does not depend on the colour: white on black and black on
+    /// white cover the same area.
+    /// </summary>
+    [Theory]
+    [InlineData(FontWeight.Light, 0.06f)]
+    [InlineData(FontWeight.Light, 0.12f)]
+    [InlineData(FontWeight.ExtraBold, 0.12f)]
+    public void Fill_InkDoesNotDependOnTheTextColour(FontWeight weight, float size)
+    {
+        var doc = Doc();
+        using var light = RenderSurface.New(Px, Px, SKColors.Black);
+        TextRenderer.RenderTextLayer(light, Layer(l => { l.Weight = weight; l.Size = size; l.Content = "Midnight"; }), doc);
+        using var dark = RenderSurface.New(Px, Px, SKColors.White);
+        TextRenderer.RenderTextLayer(dark, Layer(l => { l.Weight = weight; l.Size = size; l.Content = "Midnight"; l.Color = "#000000"; }), doc);
+
+        var whiteInk = Measure(light, p => p.G);
+        var blackInk = Measure(dark, p => 255 - p.G);
+
+        Assert.InRange(whiteInk.Mass / blackInk.Mass, 0.99, 1.01);
+    }
+
+    [Fact]
+    public void Weight_InkGrowsFromLightThroughRegularToExtraBold()
+    {
+        using var light = Render(Layer(l => l.Weight = FontWeight.Light));
+        using var regular = Render(Layer(l => l.Weight = FontWeight.Normal));
+        using var extraBold = Render(Layer(l => l.Weight = FontWeight.ExtraBold));
+
+        var l = Measure(light, GlyphInk).Mass;
+        var r = Measure(regular, GlyphInk).Mass;
+        var x = Measure(extraBold, GlyphInk).Mass;
+        Assert.True(l < r * 0.95, $"Light {l:F0} should be lighter than Regular {r:F0}.");
+        Assert.True(r < x * 0.8, $"Regular {r:F0} should be lighter than ExtraBold {x:F0}.");
     }
 
     [Fact]
@@ -106,7 +190,7 @@ public class TextRendererTests
     {
         var small = TextRenderer.Shape(Regular, 40, "Hello");
         var large = TextRenderer.Shape(Regular, 80, "Hello");
-        using (small.Blob) using (large.Blob)
+        using (small) using (large)
         {
             Assert.NotNull(small.Blob);
             Assert.InRange(large.Width / small.Width, 1.98, 2.02);
@@ -123,7 +207,7 @@ public class TextRendererTests
     public void Shape_SpacesOnly_HasWidthButNoInk()
     {
         var line = TextRenderer.Shape(Regular, 40, "   ");
-        using (line.Blob)
+        using (line)
         {
             Assert.True(line.Width > 10, $"Three spaces should advance, got {line.Width}.");
         }
@@ -164,7 +248,7 @@ public class TextRendererTests
     {
         const float size = 60f;
         var line = TextRenderer.Shape(Regular, size, "HOH");
-        line.Blob?.Dispose();
+        line.Dispose();
         using var left = Render(Layer(l => l.Align = TextAlign.Left));
         using var centre = Render(Layer(l => l.Align = TextAlign.Center));
         using var right = Render(Layer(l => l.Align = TextAlign.Right));
