@@ -33,7 +33,13 @@ public static class DocumentRenderer
 
         // Soft-light washes the background BEFORE the layers, so text and logos sit on
         // top of the tint rather than under it. The client mirrors this order exactly.
-        EffectsComposer.ApplySoftLight(canvas, doc.Effects.SoftLight);
+        // The canvas is still ImageSharp until the compositing port, so effects run through the
+        // bridge; skipped when nothing is on, so a disabled effect costs no premultiply round trip.
+        var softLight = doc.Effects.SoftLight;
+        if (softLight.Enabled && softLight.Opacity > 0f)
+        {
+            ImageSharpBridge.DrawOnto(canvas, c => EffectsComposer.ApplySoftLight(c, softLight));
+        }
 
         // The overlay goes last before the layers: its colour must be authoritative (a
         // soft-light wash after it would desaturate it) and it must be the last thing
@@ -57,7 +63,11 @@ public static class DocumentRenderer
         }
 
         // Vignette → grain → border, the border outermost and last.
-        EffectsComposer.Apply(canvas, doc.Effects);
+        var fx = doc.Effects;
+        if (fx.Vignette.Enabled || fx.Grain.Enabled || fx.Border.Enabled)
+        {
+            ImageSharpBridge.DrawOnto(canvas, c => EffectsComposer.Apply(c, fx));
+        }
     }
 
     /// <summary>
