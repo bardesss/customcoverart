@@ -9,6 +9,9 @@
     <IsTestProject>true</IsTestProject>
     <!-- Mirrors the property in CustomCoverArt.csproj; see the comment there. -->
     <JellyfinVersion Condition="'$(JellyfinVersion)' == ''">12.0.0</JellyfinVersion>
+    <!-- Mirrors the property in CustomCoverArt.csproj; see the comment there. -->
+    <SkiaSharpVersion Condition="'$(SkiaSharpVersion)' == ''">3.119.4</SkiaSharpVersion>
+    <HarfBuzzSharpVersion Condition="'$(HarfBuzzSharpVersion)' == ''">8.3.1.5</HarfBuzzSharpVersion>
   </PropertyGroup>
 
   <ItemGroup>
@@ -22,6 +25,12 @@
     <PackageReference Include="Jellyfin.Common" Version="$(JellyfinVersion)" />
     <PackageReference Include="Jellyfin.Controller" Version="$(JellyfinVersion)" />
     <PackageReference Include="Jellyfin.Model" Version="$(JellyfinVersion)" />
+    <!-- Full references (managed and native) so tests run on Windows and the Linux CI runner;
+         the plugin itself references Skia compile-only. -->
+    <PackageReference Include="SkiaSharp" Version="$(SkiaSharpVersion)" />
+    <PackageReference Include="SkiaSharp.HarfBuzz" Version="$(SkiaSharpVersion)" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux" Version="$(SkiaSharpVersion)" />
+    <PackageReference Include="HarfBuzzSharp.NativeAssets.Linux" Version="$(HarfBuzzSharpVersion)" />
   </ItemGroup>
 
   <ItemGroup>

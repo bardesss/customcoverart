@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using CustomCoverArt.Models;
+using CustomCoverArt.Services.Rendering;
 using SixLabors.Fonts;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Drawing.Processing;
@@ -132,11 +133,11 @@ public static class DocumentRenderer
     /// so they are clamped before they become an allocation: a layer bigger than 1.5× the
     /// canvas is mostly off-canvas anyway, and Rotate grows the buffer further still.
     /// </summary>
-    internal static Size ImageLayerPixelSize(CoverLayer layer, int canvasWidth, int canvasHeight)
+    internal static PixelSize ImageLayerPixelSize(CoverLayer layer, int canvasWidth, int canvasHeight)
     {
         var normW = Math.Clamp(layer.Width, 0f, MaxImageLayerScale);
         var normH = Math.Clamp(layer.Height, 0f, MaxImageLayerScale);
-        return new Size(
+        return new PixelSize(
             Math.Max(1, (int)Math.Round(normW * canvasWidth)),
             Math.Max(1, (int)Math.Round(normH * canvasHeight)));
     }
@@ -258,7 +259,7 @@ public static class DocumentRenderer
 
         if (rect.X != 0 || rect.Y != 0 || rect.Width != backgroundImage.Width || rect.Height != backgroundImage.Height)
         {
-            backgroundImage.Mutate(x => x.Crop(rect));
+            backgroundImage.Mutate(x => x.Crop(new Rectangle(rect.X, rect.Y, rect.Width, rect.Height)));
         }
 
         // Only a zoomed window needs resampling back up: an unzoomed crop already IS
@@ -274,7 +275,7 @@ public static class DocumentRenderer
     /// destination footprint shrunk by the zoom, panned across everything the
     /// fit-scaled image has to spare. Clamped in-bounds.
     /// </summary>
-    public static Rectangle TransformedSourceRect(int fittedW, int fittedH, int footprintW, int footprintH, BackgroundTransform t)
+    public static PixelRect TransformedSourceRect(int fittedW, int fittedH, int footprintW, int footprintH, BackgroundTransform t)
     {
         var scale = Math.Max(1f, t.Scale);
         // Clamp to the image: a "contain" footprint can exceed it on an axis, and a
@@ -289,7 +290,7 @@ public static class DocumentRenderer
         var y = (slackY / 2) + (int)Math.Round(Math.Clamp(t.OffsetY, -1f, 1f) * slackY / 2f);
         x = Math.Clamp(x, 0, slackX);
         y = Math.Clamp(y, 0, slackY);
-        return new Rectangle(x, y, w, h);
+        return new PixelRect(x, y, w, h);
     }
 
     internal static void CreateGradientBackground(Image<Rgba32> image, BackgroundLayer bg)

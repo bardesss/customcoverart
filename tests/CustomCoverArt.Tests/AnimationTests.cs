@@ -260,7 +260,7 @@ public class AnimationTests
     public void KenBurnsCrop_WideSourceSquareCanvas_CropsAtCanvasAspect()
     {
         var wide = CoverArtService.KenBurnsCrop(2000, 1000, 500, 500, 0f, 0.2f, "in");
-        Assert.Equal(new SixLabors.ImageSharp.Rectangle(500, 0, 1000, 1000), wide);
+        Assert.Equal(new CustomCoverArt.Services.Rendering.PixelRect(500, 0, 1000, 1000), wide);
 
         var tight = CoverArtService.KenBurnsCrop(2000, 1000, 500, 500, 1f, 0.2f, "in");
         Assert.Equal(833, tight.Width);

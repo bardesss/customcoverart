@@ -1,5 +1,6 @@
 using CustomCoverArt.Common;
 using CustomCoverArt.Models;
+using CustomCoverArt.Services.Rendering;
 using MediaBrowser.Common.Configuration;
 using Microsoft.Extensions.Logging;
 using SixLabors.ImageSharp;
@@ -244,7 +245,7 @@ public class CoverArtService : ICoverArtService
         => value <= 0 ? value : System.Math.Max(1, (int)System.Math.Round(value * scale));
 
     /// <summary>Source crop rectangle for a Ken Burns frame at progress t (0..1), at the source's own aspect.</summary>
-    public static Rectangle KenBurnsCrop(int srcW, int srcH, float t, float zoomAmount, string direction)
+    public static PixelRect KenBurnsCrop(int srcW, int srcH, float t, float zoomAmount, string direction)
         => KenBurnsCrop(srcW, srcH, srcW, srcH, t, zoomAmount, direction);
 
     /// <summary>
@@ -254,7 +255,7 @@ public class CoverArtService : ICoverArtService
     /// the canvas without distortion. Cropping at the source aspect and resizing to the canvas
     /// stretched any background whose shape differed from the cover.
     /// </summary>
-    public static Rectangle KenBurnsCrop(int srcW, int srcH, int dstW, int dstH, float t, float zoomAmount, string direction)
+    public static PixelRect KenBurnsCrop(int srcW, int srcH, int dstW, int dstH, float t, float zoomAmount, string direction)
     {
         var z = System.Math.Clamp(zoomAmount, 0f, 1f);
         // progress from wide (0) to tight (1)
@@ -288,7 +289,7 @@ public class CoverArtService : ICoverArtService
         var h = System.Math.Clamp((int)System.Math.Round(baseH * scale), 1, System.Math.Max(1, srcH));
         var x = (srcW - w) / 2;
         var y = (srcH - h) / 2;
-        return new Rectangle(x, y, w, h);
+        return new PixelRect(x, y, w, h);
     }
 
     // Best-effort cleanup of stale generated/preview files so the folder does
@@ -472,7 +473,7 @@ public class CoverArtService : ICoverArtService
                             var crop = KenBurnsCrop(background!.Width, background.Height, w, h, t,
                                 document.Background.Animation.ZoomAmount, document.Background.Animation.Direction);
                             // Crop first, then resize: the clone is the small window, never the full source.
-                            frameBg = background.Clone(x => x.Crop(crop).Resize(w, h));
+                            frameBg = background.Clone(x => x.Crop(new Rectangle(crop.X, crop.Y, crop.Width, crop.Height)).Resize(w, h));
                         }
 
                         ComposeFrame(frameCanvas, frameBg, composeDocument);

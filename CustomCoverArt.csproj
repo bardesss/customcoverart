@@ -35,6 +35,16 @@
       Keep this in sync with the same property in tests/CustomCoverArt.Tests.
     -->
     <JellyfinVersion Condition="'$(JellyfinVersion)' == ''">12.0.0</JellyfinVersion>
+    <!--
+      SkiaSharp is provided by the Jellyfin server, which loads it (and the native
+      libSkiaSharp/libHarfBuzzSharp) at startup. Compile against exactly the version
+      Jellyfin 12 ships (Directory.Packages.props, v12.0 to v12.4) and never ship a copy:
+      PluginManager loads every DLL in the plugin folder, and a second SkiaSharp with a
+      different native range throws on first use. The jellyfin-compat workflow checks this
+      pin against the latest Jellyfin release. Keep in sync with the test project.
+    -->
+    <SkiaSharpVersion Condition="'$(SkiaSharpVersion)' == ''">3.119.4</SkiaSharpVersion>
+    <HarfBuzzSharpVersion Condition="'$(HarfBuzzSharpVersion)' == ''">8.3.1.5</HarfBuzzSharpVersion>
   </PropertyGroup>
 
   <!--
@@ -52,6 +62,11 @@
     </PackageReference>
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="SkiaSharp" Version="$(SkiaSharpVersion)" ExcludeAssets="runtime;native" />
+    <PackageReference Include="SkiaSharp.HarfBuzz" Version="$(SkiaSharpVersion)" ExcludeAssets="runtime;native" />
+  </ItemGroup>
+
   <!--
     Image processing. NOTE: the drawing APIs used by this plugin (DrawText,
     LinearGradientBrush, SolidBrush, FontCollection, SystemFonts) live in
@@ -67,6 +82,8 @@
        out of this project's default compilation. -->
   <ItemGroup>
     <Compile Remove="tests/**/*.cs" />
+    <Compile Remove="docs/**/*.cs" />
+    <Compile Remove=".superpowers/**/*.cs" />
   </ItemGroup>
 
   <!-- Lets the test project pin internal render/limit helpers without widening the public API. -->
