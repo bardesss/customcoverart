@@ -65,6 +65,12 @@ jobs:
           echo "newer=$NEWER"   >> "$GITHUB_OUTPUT"
           echo "Pinned: $PINNED | latest stable: $LATEST | newer available: $NEWER"
 
+      # SkiaSharp's native library needs fontconfig. GitHub's runner image ships it today;
+      # installing it keeps the tests independent of that. (Jellyfin's own images ship it.)
+      - name: Install fontconfig
+        if: steps.ver.outputs.newer == 'true'
+        run: sudo apt-get update && sudo apt-get install -y libfontconfig1
+
       - name: Build and test against latest stable
         id: test
         if: steps.ver.outputs.newer == 'true'
@@ -156,6 +162,12 @@ jobs:
             echo "preview=$ALL" >> "$GITHUB_OUTPUT"
           fi
 
+      # SkiaSharp's native library needs fontconfig. GitHub's runner image ships it today;
+      # installing it keeps the tests independent of that. (Jellyfin's own images ship it.)
+      - name: Install fontconfig
+        if: steps.ver.outputs.preview != ''
+        run: sudo apt-get update && sudo apt-get install -y libfontconfig1
+
       - name: Build and test against preview
         if: steps.ver.outputs.preview != ''
         run: |
@@ -163,3 +175,70 @@ jobs:
             -c Release \
             -p:JellyfinVersion=${{ steps.ver.outputs.preview }} \
             -p:PluginTargetFramework=${{ env.PREVIEW_TFM }}
+
+  skia-pin:
+    name: Jellyfin's SkiaSharp version
+    runs-on: ubuntu-latest
+    # The plugin ships no SkiaSharp: it compiles against the version the server ships and
+    # uses the server's copy at runtime. When a Jellyfin release moves SkiaSharp, the pin
+    # must follow, or the plugin may call an API the host's copy no longer has.
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Compare the pin with the latest Jellyfin release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          PINNED=$(grep -oPm1 '(?<=>)[^<]+(?=</SkiaSharpVersion>)' CustomCoverArt.csproj || true)
+          if [ -z "$PINNED" ]; then
+            echo "No <SkiaSharpVersion> found in CustomCoverArt.csproj"; exit 1
+          fi
+          HB_PINNED=$(grep -oPm1 '(?<=>)[^<]+(?=</HarfBuzzSharpVersion>)' CustomCoverArt.csproj || true)
+          if [ -z "$HB_PINNED" ]; then
+            echo "No <HarfBuzzSharpVersion> found in CustomCoverArt.csproj"; exit 1
+          fi
+          TAG=$(gh api repos/jellyfin/jellyfin/releases/latest --jq .tag_name)
+          # Jellyfin pins its packages centrally in Directory.Packages.props.
+          PROPS=$(gh api "repos/jellyfin/jellyfin/contents/Directory.Packages.props?ref=$TAG" --jq .content | base64 -d)
+          HOST=$(printf '%s\n' "$PROPS" | grep -oP '(?<=Include="SkiaSharp" Version=")[^"]+' || true)
+          HB_HOST=$(printf '%s\n' "$PROPS" | grep -oP '(?<=Include="HarfBuzzSharp" Version=")[^"]+' || true)
+          if [ -z "$HOST" ] || [ -z "$HB_HOST" ]; then
+            echo "Could not read the SkiaSharp and HarfBuzzSharp versions from Directory.Packages.props at $TAG"; exit 1
+          fi
+          echo "Jellyfin $TAG ships SkiaSharp $HOST, HarfBuzzSharp $HB_HOST | plugin pins $PINNED, $HB_PINNED"
+          if [ "$HOST" = "$PINNED" ] && [ "$HB_HOST" = "$HB_PINNED" ]; then
+            exit 0
+          fi
+
+          # The SkiaSharp title when SkiaSharp moved (with or without HarfBuzzSharp), else the HarfBuzzSharp one.
+          if [ "$HOST" != "$PINNED" ]; then
+            TITLE="Jellyfin $TAG ships SkiaSharp $HOST (plugin pins $PINNED)"
+          else
+            TITLE="Jellyfin $TAG ships HarfBuzzSharp $HB_HOST (plugin pins $HB_PINNED)"
+          fi
+          # gh issue create rejects an unknown label, and the label may not exist yet.
+          gh label create jellyfin-compat \
+            --color B60205 \
+            --description "Plugin fails to build against a newer Jellyfin release" \
+            >/dev/null 2>&1 || true
+          # One issue per Jellyfin release: the weekly cron must not refile it every Monday.
+          EXISTING=$(gh issue list --label jellyfin-compat --state open \
+            --json number,title \
+            --jq "[.[] | select(.title == \"$TITLE\")] | first | .number // empty")
+          if [ -n "$EXISTING" ]; then
+            echo "Issue #$EXISTING already tracks this; not filing a duplicate."
+          else
+            {
+              echo "Jellyfin **$TAG** ships SkiaSharp \`$HOST\` and HarfBuzzSharp \`$HB_HOST\`; this plugin compiles against SkiaSharp \`$PINNED\` and HarfBuzzSharp \`$HB_PINNED\`."
+              echo
+              echo "The plugin uses the server's SkiaSharp and HarfBuzzSharp at runtime, so the pins should match what the server ships."
+              echo
+              echo "To move the pins: read the SkiaSharp and HarfBuzzSharp release notes between the versions for breaking API changes, then update both \`<SkiaSharpVersion>\` (to \`$HOST\`) and \`<HarfBuzzSharpVersion>\` (to \`$HB_HOST\`) in \`CustomCoverArt.csproj\` and \`tests/CustomCoverArt.Tests/CustomCoverArt.Tests.csproj\`."
+            } > /tmp/skia-issue.md
+            gh issue create --title "$TITLE" --label jellyfin-compat --body-file /tmp/skia-issue.md
+          fi
+          exit 1

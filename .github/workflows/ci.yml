@@ -30,5 +30,10 @@ jobs:
           cp Configuration/configPage.js "$RUNNER_TEMP/configPage.mjs"
           node --check "$RUNNER_TEMP/configPage.mjs"
 
+      # SkiaSharp's native library needs fontconfig. GitHub's runner image ships it today;
+      # installing it keeps the tests independent of that. (Jellyfin's own images ship it.)
+      - name: Install fontconfig
+        run: sudo apt-get update && sudo apt-get install -y libfontconfig1
+
       - name: Test
         run: dotnet test tests/CustomCoverArt.Tests/CustomCoverArt.Tests.csproj -c Release

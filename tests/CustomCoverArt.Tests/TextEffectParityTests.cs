@@ -1,8 +1,8 @@
 using System;
 using CustomCoverArt.Models;
 using CustomCoverArt.Services;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
+using CustomCoverArt.Services.Rendering;
+using SkiaSharp;
 using Xunit;
 
 namespace CustomCoverArt.Tests;
@@ -33,22 +33,22 @@ public class TextEffectParityTests
         return d;
     }
 
-    private static Image<Rgba32> Render(CoverDocument doc)
+    private static SKBitmap Render(CoverDocument doc)
     {
-        var img = new Image<Rgba32>(Px, Px);
+        var img = RenderSurface.New(Px, Px);
         DocumentRenderer.ComposeDocumentFrame(img, null, doc);
         return img;
     }
 
     // Weighted centroid and per-axis variance of a per-pixel weight over the whole image.
     private static (double Mass, double Mx, double My, double Vx, double Vy) Moments(
-        Image<Rgba32> img, Func<Rgba32, double> weight)
+        SKBitmap img, Func<Rgba, double> weight)
     {
         double m = 0, sx = 0, sy = 0, sxx = 0, syy = 0;
         for (var y = 0; y < img.Height; y++)
             for (var x = 0; x < img.Width; x++)
             {
-                var w = weight(img[x, y]);
+                var w = weight(TestPixels.Px(img, x, y));
                 if (w <= 0) { continue; }
                 m += w; sx += w * x; sy += w * y; sxx += w * x * x; syy += w * y * y;
             }
@@ -60,14 +60,14 @@ public class TextEffectParityTests
 
     // Shadow ink: a pure-red shadow over black is (255a, 0, 0). The white glyphs and their
     // grey antialiasing have R == G, so R - G is 255 × shadow alpha wherever the two do not touch.
-    private static double ShadowInk(Rgba32 p) => p.R - p.G;
+    private static double ShadowInk(Rgba p) => p.R - p.G;
 
     // Glyph ink: the red shadow has no green at all, so G is the glyphs alone.
-    private static double GlyphInk(Rgba32 p) => p.G;
+    private static double GlyphInk(Rgba p) => p.G;
 
     /// <summary>
     /// The HTML canvas spec blurs a shadow with a Gaussian whose standard deviation is
-    /// shadowBlur / 2. ImageSharp's GaussianBlur takes the sigma itself, so passing Blur
+    /// shadowBlur / 2. The renderer's Gaussian blur takes the sigma itself, so passing Blur
     /// through unchanged made every server shadow twice as soft as the preview. Convolving
     /// with a Gaussian adds exactly sigma² to a shape's variance on each axis, so the
     /// variance gained between a hard and a blurred shadow measures the sigma the server
@@ -128,7 +128,7 @@ public class TextEffectParityTests
     [Fact]
     public void ShadowTransform_UnrotatedLayer_IsIdentity()
     {
-        Assert.True(DocumentRenderer.ShadowTransform(System.Numerics.Matrix3x2.Identity, 7f, -3f).IsIdentity);
+        Assert.True(CustomCoverArt.Services.Rendering.TextRenderer.ShadowTransform(System.Numerics.Matrix3x2.Identity, 7f, -3f).IsIdentity);
     }
 
     // 60px "HELLO" with a red outline, centred on black.
@@ -141,15 +141,15 @@ public class TextEffectParityTests
     });
 
     // A pixel that is outline and nothing else: fully red, no white fill mixed in.
-    private static bool IsPureOutline(Rgba32 p) => p.R >= 250 && p.G <= 5 && p.B <= 5;
+    private static bool IsPureOutline(Rgba p) => p.R >= 250 && p.G <= 5 && p.B <= 5;
 
     // Horizontal extent of anything bright (white fill or red outline).
-    private static int InkWidth(Image<Rgba32> img)
+    private static int InkWidth(SKBitmap img)
     {
         int min = int.MaxValue, max = int.MinValue;
         for (var y = 0; y < img.Height; y++)
             for (var x = 0; x < img.Width; x++)
-                if (img[x, y].R > 128) { if (x < min) { min = x; } if (x > max) { max = x; } }
+                if (TestPixels.Px(img, x, y).R > 128) { if (x < min) { min = x; } if (x > max) { max = x; } }
         return max < min ? 0 : max - min + 1;
     }
 
@@ -169,9 +169,9 @@ public class TextEffectParityTests
         for (var y = 0; y < Px; y++)
             for (var x = 0; x < Px; x++)
             {
-                if (!IsPureOutline(opaque[x, y])) { continue; }
-                sumR += half[x, y].R;
-                sumG += half[x, y].G;
+                if (!IsPureOutline(TestPixels.Px(opaque, x, y))) { continue; }
+                sumR += TestPixels.Px(half, x, y).R;
+                sumG += TestPixels.Px(half, x, y).G;
                 n++;
             }
 
@@ -183,6 +183,10 @@ public class TextEffectParityTests
     /// <summary>
     /// Width parity: the canvas strokes with lineWidth = 2 × Width centred on the glyph
     /// contour, so the outline reaches Width px beyond the glyphs on each side.
+    /// Measured (Skia path fill, Windows): 12 at Width 6 (the earlier dilation gave the same 12). With the
+    /// glyph-mask fill it read 10, because the mask gamma widened the plain text's R &gt; 128 edge
+    /// by about 1 px per side while the stroke stayed a path; the fill now shares the stroke's
+    /// geometry. The coverage-weighted (sub-pixel) edges grow by 11.95 px, i.e. 2 x Width.
     /// </summary>
     [Fact]
     public void Outline_ReachesWidthPixelsBeyondTheGlyphs()
@@ -204,7 +208,7 @@ public class TextEffectParityTests
         for (var y = 0; y < Px; y++)
             for (var x = 0; x < Px; x++)
             {
-                if (!IsPureOutline(img[x, y])) { continue; }
+                if (!IsPureOutline(TestPixels.Px(img, x, y))) { continue; }
                 minX = Math.Min(minX, x); maxX = Math.Max(maxX, x);
                 minY = Math.Min(minY, y); maxY = Math.Max(maxY, y);
             }

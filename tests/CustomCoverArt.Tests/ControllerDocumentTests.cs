@@ -1,8 +1,6 @@
 using System.Linq;
 using CustomCoverArt.Controllers;
 using CustomCoverArt.Models;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
 using Xunit;
 
 namespace CustomCoverArt.Tests;
@@ -153,9 +151,9 @@ public class ControllerDocumentTests
             var uploads = System.IO.Path.Combine(dataDir, "customcoverart", "uploads");
             System.IO.Directory.CreateDirectory(uploads);
             var bgPath = System.IO.Path.Combine(uploads, "bg.png");
-            using (var bg = new Image<Rgba32>(80, 80, Color.Green))
+            using (var bg = CustomCoverArt.Services.Rendering.RenderSurface.New(80, 80, SkiaSharp.SKColors.Green))
             {
-                bg.SaveAsPng(bgPath);
+                TestPixels.SavePng(bg, bgPath);
             }
 
             var doc = new CoverDocument { Canvas = new CanvasSettings { Width = 100, Height = 100, Format = "png" } };

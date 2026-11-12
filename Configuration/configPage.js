@@ -90,7 +90,8 @@ export default function (view) {
                 'd.landscape': 'Landscape 16:9 (1280×720)', 'd.cover': 'Square (1400×1400)', 'd.poster': 'Portrait Poster (1000×1500)', 'd.banner': 'Wide Banner (1920×540)', 'd.custom': 'Custom',
                 'out.format': 'Format', 'fmt.auto': 'Auto (recommended)', 'out.width': 'Width', 'out.height': 'Height',
                 'f.chooseFont': 'Choose font…',
-                'hint.font': 'TTF, OTF, TTC, WOFF or WOFF2 · up to 5 MB. Leave empty to use the bundled Noto Sans.',
+                'hint.font': 'TTF, OTF or TTC · up to 5 MB. Leave empty to use the bundled Noto Sans.',
+                'font.reupload': 'This font format is no longer supported. Upload it again as TTF or OTF; until then Noto Sans is used.',
                 'card.preview': 'Preview', 'preview.placeholder': 'The preview appears here automatically.',
                 'bg.adjust': 'Reposition background (drag to pan, scroll or pinch to zoom)',
                 'action.apply': 'Apply to library', 'action.applying': 'Applying…', 'action.download': 'Download image', 'action.serverRender': 'Show server render', 'serverrender.label': 'Authoritative render (server)', 'preview.hint': 'The preview updates automatically as you adjust settings.', 'preview.collageFail': 'The collage preview could not be loaded. Use Show server render to see it.',
@@ -165,7 +166,8 @@ export default function (view) {
                 'd.landscape': 'Liggend 16:9 (1280×720)', 'd.cover': 'Vierkant (1400×1400)', 'd.poster': 'Staande poster (1000×1500)', 'd.banner': 'Brede banner (1920×540)', 'd.custom': 'Aangepast',
                 'out.format': 'Formaat', 'fmt.auto': 'Automatisch (aanbevolen)', 'out.width': 'Breedte', 'out.height': 'Hoogte',
                 'f.chooseFont': 'Kies lettertype…',
-                'hint.font': 'TTF, OTF, TTC, WOFF of WOFF2 · max. 5 MB. Laat leeg voor de meegeleverde Noto Sans.',
+                'hint.font': 'TTF, OTF of TTC · max. 5 MB. Laat leeg voor de meegeleverde Noto Sans.',
+                'font.reupload': 'Dit lettertypeformaat wordt niet meer ondersteund. Upload het opnieuw als TTF of OTF; tot die tijd wordt Noto Sans gebruikt.',
                 'card.preview': 'Voorbeeld', 'preview.placeholder': 'Het voorbeeld verschijnt hier automatisch.',
                 'bg.adjust': 'Achtergrond verplaatsen (sleep om te verschuiven, scroll of knijp om te zoomen)',
                 'action.apply': 'Toepassen op bibliotheek', 'action.applying': 'Bezig met toepassen…', 'action.download': 'Afbeelding downloaden', 'action.serverRender': 'Serverweergave tonen', 'serverrender.label': 'Gezaghebbende weergave (server)', 'preview.hint': 'Het voorbeeld wordt automatisch bijgewerkt terwijl je instellingen aanpast.', 'preview.collageFail': 'Het collagevoorbeeld kon niet worden geladen. Gebruik Serverweergave tonen om het te zien.',
@@ -240,7 +242,8 @@ export default function (view) {
                 'd.landscape': 'Horizontal 16:9 (1280×720)', 'd.cover': 'Cuadrado (1400×1400)', 'd.poster': 'Póster vertical (1000×1500)', 'd.banner': 'Banner ancho (1920×540)', 'd.custom': 'Personalizado',
                 'out.format': 'Formato', 'fmt.auto': 'Automático (recomendado)', 'out.width': 'Ancho', 'out.height': 'Alto',
                 'f.chooseFont': 'Elegir fuente…',
-                'hint.font': 'TTF, OTF, TTC, WOFF o WOFF2 · hasta 5 MB. Déjalo vacío para usar la Noto Sans incluida.',
+                'hint.font': 'TTF, OTF o TTC · hasta 5 MB. Déjalo vacío para usar la Noto Sans incluida.',
+                'font.reupload': 'Este formato de fuente ya no es compatible. Súbela de nuevo como TTF u OTF; mientras tanto se usa Noto Sans.',
                 'card.preview': 'Vista previa', 'preview.placeholder': 'La vista previa aparecerá aquí automáticamente.',
                 'bg.adjust': 'Reposicionar el fondo (arrastra para desplazar, usa la rueda o pellizca para acercar)',
                 'action.apply': 'Aplicar a la biblioteca', 'action.applying': 'Aplicando…', 'action.download': 'Descargar imagen', 'action.serverRender': 'Mostrar el render del servidor', 'serverrender.label': 'Render de referencia (servidor)', 'preview.hint': 'La vista previa se actualiza automáticamente mientras ajustas los valores.', 'preview.collageFail': 'No se pudo cargar la vista previa del collage. Usa «Mostrar el render del servidor» para verlo.',
@@ -1259,7 +1262,7 @@ export default function (view) {
         //
         // A passed alpha REPLACES an 8-digit hex's own alpha rather than multiplying with
         // it, matching the server: DocumentRenderer.BuildColorStops does
-        // SafeColor(s.Color).WithAlpha(s.Alpha), and ImageSharp's WithAlpha overwrites
+        // SafeColor(s.Color).WithAlpha(s.Alpha), and SkiaColors.WithAlpha overwrites
         // (measured: '#ff000080' + Alpha 0.5 => A=128, not 64). The hex's own alpha is
         // therefore only used when no alpha is passed at all. NOTE: nothing in the editor
         // currently emits 8-digit hex (<input type="color"> is always #rrggbb), so that
@@ -1518,10 +1521,10 @@ export default function (view) {
         //
         // WHY THE SUBDIVISION BELOW EXISTS (do not "simplify" it away):
         // the two renderers interpolate colour stops in DIFFERENT alpha spaces.
-        //   * ImageSharp's LinearGradientBrush (the authoritative server render) lerps in
+        //   * The server's Skia linear gradient shader (the authoritative render) lerps in
         //     STRAIGHT / non-premultiplied alpha: r, g, b and a are each interpolated
         //     independently, so a fully transparent stop's HUE still bleeds into the ramp.
-        //     Measured: '#ff0000' a=0 -> '#0000ff' a=1 gives Rgba32(150, 0, 105, 105) at
+        //     Measured on the original renderer: '#ff0000' a=0 -> '#0000ff' a=1 gives (150, 0, 105, 105) at
         //     mid-canvas. Note the red channel surviving from a stop with zero alpha.
         //   * HTML Canvas 2D gradients interpolate in PREMULTIPLIED alpha, where a stop
         //     with alpha 0 contributes no colour at all.
@@ -1709,7 +1712,7 @@ export default function (view) {
 
         // An uploaded font is registered (ensureLayerFont) as one FontFace with no weight
         // descriptor, i.e. a single 400 face, and the server renders custom fonts at their own
-        // weight: DocumentRenderer.CreateFont ignores Weight for them. Asking the canvas for
+        // weight: FontStore.Resolve ignores Weight for them. Asking the canvas for
         // 700 of a 400-only family makes the browser fake a bold the cover will never have,
         // so a ready custom font is requested at 400. While it is loading or failed,
         // fontFamilyFor draws Noto Sans instead, which the server's fallback also renders at
@@ -1720,12 +1723,25 @@ export default function (view) {
             return weight + ' ' + fontPx + 'px ' + fontFamilyFor(layer);
         }
 
+        // Must match FontStore.SupportedExtensions on the server (a test compares them).
+        const SUPPORTED_FONT_EXT = ['.ttf', '.otf', '.ttc'];
+
+        // True for a stored font path the server no longer reads (an old WOFF/WOFF2 upload).
+        function isLegacyFontPath(path) {
+            if (!path) { return false; }
+            var m = /\.[^.\\/]*$/.exec(String(path));
+            var ext = m ? m[0].toLowerCase() : '';
+            return SUPPORTED_FONT_EXT.indexOf(ext) < 0;
+        }
+
         // Fetches an uploaded font through the authenticated endpoint and registers it with
         // the FontFace API, then re-renders so the canvas picks it up. Best-effort: on
         // failure the canvas keeps Noto Sans while the server still renders the real face.
         function ensureLayerFont(layer) {
             var path = layer && layer.FontPath;
-            if (!path || _customFonts[path]) { return; }
+            // A font in a format the server no longer reads renders in Noto Sans there, so the
+            // preview keeps Noto Sans too instead of fetching a file it would draw differently.
+            if (!path || isLegacyFontPath(path) || _customFonts[path]) { return; }
             var family = customFontFamily(path);
             _customFonts[path] = { family: family, state: 'loading' };
             authFetch('CustomCoverArt/customFont?path=' + encodeURIComponent(path))
@@ -3191,6 +3207,7 @@ export default function (view) {
 
             // Re-sync dependent visibility + labels.
             syncFileNames();
+            el('ccaFontLegacy').hidden = !(isText && isLegacyFontPath(l.FontPath));
             updateUI();
             updateBackgroundVisibility();
             updateAnimVisibility();
@@ -4148,6 +4165,7 @@ export default function (view) {
                     var l = selectedLayer();
                     if (l) { l.FontPath = path; }
                     syncFileNames();
+                    el('ccaFontLegacy').hidden = !isLegacyFontPath(path);
                     scheduleRender();
                 }).catch(function (e) {
                     input.value = '';

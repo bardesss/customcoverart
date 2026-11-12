@@ -5,6 +5,19 @@ and Jellyfin shows it as that version's changelog. Add a new `## <version>` sect
 bump `<Version>` in the csproj. Jellyfin renders the text as Markdown, so keep a short opening
 sentence, a blank line, and then one bullet per change.
 
+## 4.2.0.0
+The plugin now draws covers with SkiaSharp, the same graphics engine Jellyfin uses, instead of ImageSharp. Your designs and templates are unchanged and load as before.
+
+- Why: newer ImageSharp releases, including the ones with security fixes, need a paid licence key to build. SkiaSharp is free and open source, so the plugin stays free for everyone.
+- Smaller download: the plugin is now a single file. SkiaSharp is already part of your Jellyfin server. The download shrinks from about 2.0 MB to 0.9 MB, and the installed plugin from 5.4 MB in five files to 2.0 MB in two.
+- Text is now laid out like the live preview in your browser, with the same kerning and letter shapes, so the server render and the preview match more closely. Some covers may look very slightly different from before.
+- Text outlines are now drawn like the preview: on semi-transparent text the outline no longer fills the inside of the letters.
+- Custom fonts: .ttf, .otf and .ttc are supported. WOFF and WOFF2 fonts can no longer be uploaded. Designs that use one you uploaded earlier still render, with Noto Sans for that text; the editor shows which font to upload again as TTF or OTF. A .ttc font collection now uses its first font instead of falling back to Noto Sans.
+- Known change: an animated PNG (APNG) background now counts as a still image. Animated covers built on it use its first frame. Animated GIF backgrounds still animate.
+- Animated covers are still GIFs with the same frame count, speed and looping. They render faster: a 30-frame Ken Burns cover at 1280 px takes about 15 to 20 seconds instead of 28 to 41, and a 60-frame GIF passthrough about 35 seconds instead of 49 to 65. Frames that do not change are now written only once. Colours in animated covers may differ slightly because the GIF encoder is new.
+- If your Jellyfin server cannot load its image engine, the plugin now says so in the editor's server render and in its health check instead of failing with an error; the rest of the server keeps working.
+- If you installed the plugin by hand, you can delete the old SixLabors files from the plugin folder.
+
 ## 4.1.3.0
 A security hardening release. Nothing changes in how your covers look.
 

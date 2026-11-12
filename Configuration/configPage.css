@@ -294,6 +294,7 @@
         #CustomCoverArtConfigPage button[disabled] { opacity: .4; cursor: not-allowed; }
         #CustomCoverArtConfigPage .ccaFileName { opacity: .6; font-size: .9em; word-break: break-all; }
         #CustomCoverArtConfigPage .fieldDescription { margin-top: .4em; opacity: .55; font-size: .85em; }
+        #CustomCoverArtConfigPage .fieldDescription.ccaWarn { opacity: 1; color: #e8a33d; }
         #CustomCoverArtConfigPage .ccaPreviewHint { text-align: center; margin-top: .35em; }
 
         /* Preview column */

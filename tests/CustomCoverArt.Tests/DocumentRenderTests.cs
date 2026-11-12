@@ -1,7 +1,7 @@
 using CustomCoverArt.Models;
 using CustomCoverArt.Services;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
+using CustomCoverArt.Services.Rendering;
+using SkiaSharp;
 using Xunit;
 
 namespace CustomCoverArt.Tests;
@@ -19,7 +19,7 @@ public class DocumentRenderTests
         };
         doc.Layers.Add(new CoverLayer { Type = "text", Content = "HELLO", Color = "#ffffff", Size = 0.2f, X = 0.5f, Y = 0.5f });
 
-        using var canvas = new Image<Rgba32>(200, 200);
+        using var canvas = RenderSurface.New(200, 200);
         DocumentRenderer.ComposeDocumentFrame(canvas, null, doc);
 
         // At least one near-white pixel from the text exists over the black gradient.
@@ -27,19 +27,19 @@ public class DocumentRenderTests
         for (int y = 0; y < 200 && !found; y++)
             for (int x = 0; x < 200; x++)
             {
-                var p = canvas[x, y];
+                var p = TestPixels.Px(canvas, x, y);
                 if (p.R > 200 && p.G > 200 && p.B > 200) { found = true; break; }
             }
         Assert.True(found, "Expected white text pixels over the black background.");
     }
 
     // Widest column of text ink, i.e. how far the glyphs spread horizontally.
-    private static int InkWidth(Image<Rgba32> canvas)
+    private static int InkWidth(SKBitmap canvas)
     {
         int min = int.MaxValue, max = int.MinValue;
         for (var y = 0; y < canvas.Height; y++)
             for (var x = 0; x < canvas.Width; x++)
-                if (canvas[x, y].R > 128) { if (x < min) { min = x; } if (x > max) { max = x; } }
+                if (TestPixels.Px(canvas, x, y).R > 128) { if (x < min) { min = x; } if (x > max) { max = x; } }
         return max < min ? 0 : max - min + 1;
     }
 
@@ -64,9 +64,9 @@ public class DocumentRenderTests
             return d;
         }
 
-        using var flat = new Image<Rgba32>(300, 300);
+        using var flat = RenderSurface.New(300, 300);
         DocumentRenderer.ComposeDocumentFrame(flat, null, Doc(0f));
-        using var turned = new Image<Rgba32>(300, 300);
+        using var turned = RenderSurface.New(300, 300);
         DocumentRenderer.ComposeDocumentFrame(turned, null, Doc(90f));
 
         var flatWidth = InkWidth(flat);
@@ -93,12 +93,12 @@ public class DocumentRenderTests
                 Type = "text", Content = "HELLO", Color = "#ffffff",
                 Size = 0.25f, X = 0.5f, Y = 0.5f, Opacity = opacity
             });
-            using var canvas = new Image<Rgba32>(200, 200);
+            using var canvas = RenderSurface.New(200, 200);
             DocumentRenderer.ComposeDocumentFrame(canvas, null, d);
             byte max = 0;
             for (var y = 0; y < 200; y++)
                 for (var x = 0; x < 200; x++)
-                    if (canvas[x, y].R > max) { max = canvas[x, y].R; }
+                    max = System.Math.Max(max, TestPixels.Px(canvas, x, y).R);
             return max;
         }
 
@@ -114,12 +114,12 @@ public class DocumentRenderTests
         doc.Background.DimColor = "#000000";
         doc.Layers.Add(new CoverLayer { Type = "text", Content = "X", Color = "#ffffff", Size = 0.5f, Visible = false });
 
-        using var canvas = new Image<Rgba32>(100, 100);
+        using var canvas = RenderSurface.New(100, 100);
         DocumentRenderer.ComposeDocumentFrame(canvas, null, doc);
 
         for (int y = 0; y < 100; y++)
             for (int x = 0; x < 100; x++)
-                Assert.True(canvas[x, y].R < 40, "Hidden layer must not render.");
+                Assert.True(TestPixels.Px(canvas, x, y).R < 40, "Hidden layer must not render.");
     }
 
     /// <summary>
@@ -134,25 +134,18 @@ public class DocumentRenderTests
     [InlineData(1f, 0, 0, 255)]    // panned to the bottom -> blue
     public void ComposeDocumentFrame_CoverFit_OffsetYChoosesBandAtScale1(float offsetY, byte r, byte g, byte b)
     {
-        using var background = new Image<Rgba32>(100, 300);
-        for (var y = 0; y < 300; y++)
-        {
-            var band = y < 100 ? new Rgba32(255, 0, 0) : y < 200 ? new Rgba32(0, 255, 0) : new Rgba32(0, 0, 255);
-            for (var x = 0; x < 100; x++)
-            {
-                background[x, y] = band;
-            }
-        }
+        using var background = TestPixels.Painted(100, 300, (_, y) =>
+            y < 100 ? new SKColor(255, 0, 0) : y < 200 ? new SKColor(0, 255, 0) : new SKColor(0, 0, 255));
 
         var doc = new CoverDocument { Canvas = new CanvasSettings { Width = 100, Height = 100 } };
         doc.Background.Fit = "cover";
         doc.Background.Dim = 0f;
         doc.Background.Transform = new BackgroundTransform { Scale = 1f, OffsetY = offsetY };
 
-        using var canvas = new Image<Rgba32>(100, 100);
+        using var canvas = RenderSurface.New(100, 100);
         DocumentRenderer.ComposeDocumentFrame(canvas, background, doc);
 
-        var centre = canvas[50, 50];
+        var centre = TestPixels.Px(canvas, 50, 50);
         Assert.Equal(r, centre.R);
         Assert.Equal(g, centre.G);
         Assert.Equal(b, centre.B);
@@ -170,7 +163,7 @@ public class DocumentRenderTests
 
         Assert.True(System.IO.File.Exists(path));
         Assert.EndsWith(".png", path);
-        using var img = SixLabors.ImageSharp.Image.Load(path);
+        using var img = TestPixels.Load(path);
         Assert.Equal(200, img.Width);
         try { System.IO.File.Delete(path); } catch { }
     }
@@ -203,11 +196,11 @@ public class DocumentRenderTests
         doc.Background.DimColor = "#000000";
         doc.Layers.Add(new CoverLayer { Type = "text", Content = "H", Color = "#ffffff", Size = 0.2f, X = 0.5f, Y = 0.5f });
 
-        using var bufferMatchingCanvas = new Image<Rgba32>(500, 500);
+        using var bufferMatchingCanvas = RenderSurface.New(500, 500);
         DocumentRenderer.ComposeDocumentFrame(bufferMatchingCanvas, null, doc);
         var heightAtMatchingBuffer = MeasureGlyphPixelHeight(bufferMatchingCanvas);
 
-        using var smallerBuffer = new Image<Rgba32>(300, 300);
+        using var smallerBuffer = RenderSurface.New(300, 300);
         DocumentRenderer.ComposeDocumentFrame(smallerBuffer, null, doc);
         var heightAtSmallerBuffer = MeasureGlyphPixelHeight(smallerBuffer);
 
@@ -216,13 +209,13 @@ public class DocumentRenderTests
     }
 
     /// <summary>Bounding-box height of near-white pixels, in absolute pixels.</summary>
-    private static int MeasureGlyphPixelHeight(Image<Rgba32> canvas)
+    private static int MeasureGlyphPixelHeight(SKBitmap canvas)
     {
         int minY = int.MaxValue, maxY = int.MinValue;
         for (int y = 0; y < canvas.Height; y++)
             for (int x = 0; x < canvas.Width; x++)
             {
-                var p = canvas[x, y];
+                var p = TestPixels.Px(canvas, x, y);
                 if (p.R > 200 && p.G > 200 && p.B > 200)
                 {
                     if (y < minY) { minY = y; }

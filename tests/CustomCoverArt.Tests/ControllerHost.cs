@@ -17,12 +17,13 @@ internal static class ControllerHost
         ILibraryDetectionService? library = null,
         IRateLimitingService? rateLimiter = null,
         IStartupValidationService? startup = null,
-        IMediaItemService? media = null)
+        IMediaItemService? media = null,
+        string? dataPath = null)
     {
         var loc = Substitute.For<ILocalizationService>();
         loc.GetString(Arg.Any<string>(), Arg.Any<object[]>()).Returns(ci => (string)ci[0]);
         var paths = Substitute.For<IApplicationPaths>();
-        paths.DataPath.Returns(Path.Combine(Path.GetTempPath(), "cca_ctl_" + Guid.NewGuid().ToString("N")));
+        paths.DataPath.Returns(dataPath ?? Path.Combine(Path.GetTempPath(), "cca_ctl_" + Guid.NewGuid().ToString("N")));
 
         var controller = new CustomCoverArtController(
             library ?? Substitute.For<ILibraryDetectionService>(),

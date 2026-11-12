@@ -86,11 +86,11 @@ public class RenderParityPageTests
 
     /// <summary>
     /// An uploaded font is registered as a single weight-400 FontFace, and the server
-    /// renders custom fonts at their own weight (CreateFont ignores Weight for them).
+    /// renders custom fonts at their own weight (FontStore.Resolve ignores Weight for them).
     /// Requesting e.g. 700 from the canvas made the browser synthesise a bold that the
     /// applied cover never has. Only while the custom face is actually ready, though: while
     /// it is loading or failed, fontFamilyFor falls back to Noto Sans, and the server's own
-    /// fallback (CreateFont) renders Noto at layer.Weight.
+    /// fallback (FontStore.Resolve) renders Noto at layer.Weight.
     /// </summary>
     [Fact]
     public void CustomFontsAreRequestedAtTheirOwnWeight()

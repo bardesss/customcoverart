@@ -1,0 +1,258 @@
+using System.Collections.Concurrent;
+using CustomCoverArt.Models;
+using Microsoft.Extensions.Logging;
+using SkiaSharp;
+
+namespace CustomCoverArt.Services.Rendering;
+
+/// <summary>
+/// Owns every typeface the renderer draws with: the six bundled Noto Sans faces and uploaded
+/// custom fonts. Typefaces are shared native objects handed to concurrent renders, so nothing
+/// in the cache is ever disposed; a replaced file version is left to the finalizer.
+/// </summary>
+internal static class FontStore
+{
+    private static readonly HashSet<string> Extensions = new(StringComparer.OrdinalIgnoreCase) { ".ttf", ".otf", ".ttc" };
+
+    // Windows paths are case-insensitive, so two spellings must share one entry there.
+    private static readonly StringComparer PathComparer = OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
+
+    private static readonly ConcurrentDictionary<string, Lazy<SKTypeface>> BundledFaces = new(StringComparer.Ordinal);
+    private static readonly ConcurrentDictionary<string, (DateTime WriteTimeUtc, SKTypeface Typeface)> CustomFaces = new(PathComparer);
+    private static readonly ConcurrentDictionary<string, DateTime> BrokenFiles = new(PathComparer);
+    private static readonly ConcurrentDictionary<string, byte> Warned = new(PathComparer);
+    private static readonly object LoadLock = new();
+
+    /// <summary>Upper bound on the per-path caches; a full one is cleared (they refill on demand).</summary>
+    internal const int MaxTrackedPaths = 256;
+
+    private static ReadOnlySpan<byte> TrueTypeMagic => new byte[] { 0x00, 0x01, 0x00, 0x00 };
+
+    /// <summary>Extensions a custom font may have (matched case-insensitively).</summary>
+    public static IReadOnlySet<string> SupportedExtensions => Extensions;
+
+    /// <summary>
+    /// True when <paramref name="head"/> starts with the sfnt signature of TrueType (0x00010000),
+    /// OpenType/CFF (OTTO), Apple TrueType (true) or a collection (ttcf).
+    /// </summary>
+    public static bool IsSupportedSignature(ReadOnlySpan<byte> head)
+    {
+        return head.StartsWith(TrueTypeMagic)
+            || head.StartsWith("OTTO"u8)
+            || head.StartsWith("true"u8)
+            || head.StartsWith("ttcf"u8);
+    }
+
+    /// <summary>The Noto Sans face for a weight, loaded once from the embedded resources.</summary>
+    public static SKTypeface Bundled(FontWeight weight)
+    {
+        var faceName = weight switch
+        {
+            FontWeight.Light => "NotoSans-Light",
+            FontWeight.Medium => "NotoSans-Medium",
+            FontWeight.SemiBold => "NotoSans-SemiBold",
+            FontWeight.Bold => "NotoSans-Bold",
+            FontWeight.ExtraBold => "NotoSans-ExtraBold",
+            _ => "NotoSans-Regular", // Normal and any unmapped value
+        };
+
+        return BundledFaces.GetOrAdd(faceName, static name => new Lazy<SKTypeface>(() => LoadBundled(name))).Value;
+    }
+
+    /// <summary>
+    /// The face a layer draws with: its uploaded font, or the bundled face at the layer's weight
+    /// when it has none or the file cannot be used (see <see cref="TryGetCustom"/>).
+    /// </summary>
+    public static SKTypeface Resolve(CoverLayer layer)
+    {
+        if (!string.IsNullOrEmpty(layer.FontPath) && TryGetCustom(layer.FontPath, out var custom))
+        {
+            return custom;
+        }
+
+        return Bundled(layer.Weight);
+    }
+
+    /// <summary>
+    /// Loads (or reuses) the typeface of a custom font file, face 0 for collections. False, with
+    /// one Warning per path per process, when the extension is no longer supported or the file
+    /// is missing, has the wrong signature, fails the sanity check or is refused by Skia.
+    /// </summary>
+    public static bool TryGetCustom(string path, out SKTypeface typeface)
+    {
+        typeface = null!;
+        if (!Extensions.Contains(Path.GetExtension(path)))
+        {
+            NoteUnusable(path);
+            return false;
+        }
+
+        try
+        {
+            // One entry per file however the client spelled the path (a/./f.ttf, a//f.ttf).
+            path = Path.GetFullPath(path);
+            var writeTime = File.GetLastWriteTimeUtc(path);
+            if (CustomFaces.TryGetValue(path, out var cached) && cached.WriteTimeUtc == writeTime)
+            {
+                typeface = cached.Typeface;
+                return true;
+            }
+
+            if (BrokenFiles.TryGetValue(path, out var brokenAt) && brokenAt == writeTime)
+            {
+                // Remembered as broken, possibly by a lookup outside any render, where the
+                // warning could not be heard: give it its one chance now.
+                NoteUnreadable(path);
+                return false;
+            }
+
+            lock (LoadLock)
+            {
+                if (CustomFaces.TryGetValue(path, out cached) && cached.WriteTimeUtc == writeTime)
+                {
+                    typeface = cached.Typeface;
+                    return true;
+                }
+
+                // A missing file is remembered like a broken one: its write time reads as the
+                // 1601 sentinel until it reappears, so later calls stop at the check above
+                // instead of throwing and catching FileNotFoundException on every render.
+                var loaded = LoadCustom(path);
+                if (loaded is null)
+                {
+                    BoundedAdd(BrokenFiles, path, writeTime);
+                    NoteUnreadable(path);
+                    return false;
+                }
+
+                BrokenFiles.TryRemove(path, out _);
+                BoundedAdd(CustomFaces, path, (writeTime, loaded));
+                typeface = loaded;
+                return true;
+            }
+        }
+        catch (Exception)
+        {
+            // Permissions, a sharing violation, a native loader that threw: not remembered, as
+            // these can be transient, but warned about once like any unreadable font.
+            NoteUnreadable(path);
+            return false;
+        }
+    }
+
+    /// <summary>True when the current version of the file at <paramref name="path"/> is cached.</summary>
+    public static bool IsCustomFontCached(string path)
+    {
+        path = Path.GetFullPath(path);
+        return CustomFaces.TryGetValue(path, out var cached) && cached.WriteTimeUtc == File.GetLastWriteTimeUtc(path);
+    }
+
+    /// <summary>Entries currently held by the per-path caches (custom faces, broken files, warned paths); for tests.</summary>
+    internal static (int Faces, int Broken, int Warned) CacheCountsForTests() => (CustomFaces.Count, BrokenFiles.Count, Warned.Count);
+
+    internal static void ResetCachesForTests()
+    {
+        CustomFaces.Clear();
+        BrokenFiles.Clear();
+        Warned.Clear();
+    }
+
+    private static void BoundedAdd<TValue>(ConcurrentDictionary<string, TValue> cache, string key, TValue value)
+    {
+        // Evicted typefaces are left to the finalizer: renders in flight may still hold them.
+        if (cache.Count >= MaxTrackedPaths && !cache.ContainsKey(key))
+        {
+            cache.Clear();
+        }
+
+        cache[key] = value;
+    }
+
+    /// <summary>
+    /// Logs, once per path per process, that a font is not being used because of its format. Outside a
+    /// render scope nobody would hear it, so the path is not marked as warned there. A path
+    /// whose extension is not supported reports the upper-cased extension as its format, a path
+    /// without one "unreadable".
+    /// </summary>
+    internal static void NoteUnusable(string path)
+    {
+        if (!RenderLog.IsActive || !TryMarkWarned(path))
+        {
+            return;
+        }
+
+        var extension = Path.GetExtension(path);
+        var format = extension.Length == 0
+            ? "unreadable"
+            : extension.TrimStart('.').ToUpperInvariant();
+        RenderLog.Logger.LogWarning(
+            "Custom font {Name} is in a format this version no longer reads ({Format}); rendering with Noto Sans. Re-upload it as TTF or OTF.",
+            Path.GetFileName(path),
+            format);
+    }
+
+    /// <summary>
+    /// Logs, once per path per process, that a font with a supported extension is missing, damaged
+    /// or refused, so the user knows to upload it again rather than convert it. Like
+    /// <see cref="NoteUnusable"/>, only inside a render scope.
+    /// </summary>
+    private static void NoteUnreadable(string path)
+    {
+        if (!RenderLog.IsActive || !TryMarkWarned(path))
+        {
+            return;
+        }
+
+        RenderLog.Logger.LogWarning(
+            "Custom font {Name} could not be read; rendering with Noto Sans. Re-upload it.",
+            Path.GetFileName(path));
+    }
+
+    private static bool TryMarkWarned(string path)
+    {
+        if (Warned.Count >= MaxTrackedPaths && !Warned.ContainsKey(path))
+        {
+            Warned.Clear();
+        }
+
+        return Warned.TryAdd(path, 0);
+    }
+
+    internal static void ResetWarningsForTests() => Warned.Clear();
+
+    /// <summary>Routes this store's warnings on the calling flow to <paramref name="logger"/>, until disposed.</summary>
+    internal static IDisposable CaptureLogForTests(ILogger logger) => RenderLog.Use(logger);
+
+    private static SKTypeface LoadBundled(string faceName)
+    {
+        var resource = $"CustomCoverArt.Resources.fonts.{faceName}.ttf";
+        using var stream = typeof(FontStore).Assembly.GetManifestResourceStream(resource)
+            ?? throw new InvalidOperationException($"Bundled font not found: {resource}");
+        using var buffer = new MemoryStream();
+        stream.CopyTo(buffer);
+        using var data = SKData.CreateCopy(buffer.ToArray());
+        return SKTypeface.FromData(data, 0)
+            ?? throw new InvalidOperationException($"Bundled font could not be loaded: {resource}");
+    }
+
+    private static SKTypeface? LoadCustom(string path)
+    {
+        byte[] bytes;
+        try
+        {
+            bytes = File.ReadAllBytes(path);
+        }
+        catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException)
+        {
+            return null;
+        }
+
+        if (!IsSupportedSignature(bytes) || !SfntSanity.LooksValid(bytes))
+        {
+            return null;
+        }
+
+        using var data = SKData.CreateCopy(bytes);
+        return SKTypeface.FromData(data, 0);
+    }
+}

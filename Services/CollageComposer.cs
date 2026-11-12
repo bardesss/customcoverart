@@ -1,7 +1,6 @@
 using System.Collections.Generic;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
-using SixLabors.ImageSharp.Processing;
+using CustomCoverArt.Services.Rendering;
+using SkiaSharp;
 
 namespace CustomCoverArt.Services;
 
@@ -18,10 +17,10 @@ public static class CollageComposer
         _ => 6,
     };
 
-    public static Image<Rgba32> BuildCollage(
+    public static SKBitmap BuildCollage(
         IReadOnlyList<string> posterPaths, int width, int height, string density, int seed)
     {
-        var canvas = new Image<Rgba32>(width, height, Color.FromRgb(18, 18, 18));
+        var canvas = RenderSurface.New(width, height, new SKColor(18, 18, 18));
         if (posterPaths is null || posterPaths.Count == 0)
         {
             return canvas;
@@ -42,37 +41,65 @@ public static class CollageComposer
             (order[i], order[j]) = (order[j], order[i]);
         }
 
-        int tileIndex = 0;
-        for (int r = 0; r < rows; r++)
+        try
         {
-            for (int c = 0; c < cols; c++)
+            using var target = new SKCanvas(canvas);
+            using var paint = new SKPaint { IsAntialias = true };
+            int tileIndex = 0;
+            for (int r = 0; r < rows; r++)
             {
-                // Repeat posters to fill the grid.
-                var path = posterPaths[order[tileIndex % order.Count]];
-                tileIndex++;
-                try
+                for (int c = 0; c < cols; c++)
                 {
-                    // Shared decompression-bomb guard; a tile is a still, so one frame.
-                    using var poster = SafeImageLoader.TryLoadRgba32(path, maxFrames: 1);
-                    if (poster is null)
+                    // Repeat posters to fill the grid.
+                    var path = posterPaths[order[tileIndex % order.Count]];
+                    tileIndex++;
+                    try
                     {
-                        continue;
-                    }
+                        // Shared decompression-bomb guard; a tile is a still, so one frame.
+                        using var poster = SafeImageLoader.TryDecode(path, maxFrames: 1);
+                        if (poster is null)
+                        {
+                            continue;
+                        }
 
-                    poster.Mutate(x => x.Resize(new ResizeOptions
+                        DrawCoverCropped(target, paint, poster.RootFrame, c * tileW, r * tileH, tileW, tileH);
+                    }
+                    catch
                     {
-                        Size = new Size(tileW, tileH),
-                        Mode = ResizeMode.Crop, // cover-crop into the tile
-                    }));
-                    canvas.Mutate(x => x.DrawImage(poster, new Point(c * tileW, r * tileH), 1f));
-                }
-                catch
-                {
-                    // Skip unreadable poster; leave the dark canvas showing through.
+                        // Skip unreadable poster; leave the dark canvas showing through.
+                    }
                 }
             }
         }
+        catch
+        {
+            canvas.Dispose();
+            throw;
+        }
 
         return canvas;
+    }
+
+    /// <summary>
+    /// Draws <paramref name="poster"/> into the tile at (<paramref name="x"/>, <paramref name="y"/>): the
+    /// centred source window with the tile's aspect, scaled to fill it (cover-crop).
+    /// </summary>
+    private static void DrawCoverCropped(SKCanvas target, SKPaint paint, SKBitmap poster, int x, int y, int tileW, int tileH)
+    {
+        var scale = System.Math.Max(tileW / (double)poster.Width, tileH / (double)poster.Height);
+        var cropW = System.Math.Min(poster.Width, tileW / scale);
+        var cropH = System.Math.Min(poster.Height, tileH / scale);
+        var src = SKRect.Create((float)((poster.Width - cropW) / 2), (float)((poster.Height - cropH) / 2), (float)cropW, (float)cropH);
+        var dst = SKRect.Create(x, y, tileW, tileH);
+
+        using var pixmap = poster.PeekPixels();
+        if (pixmap is null)
+        {
+            return;
+        }
+
+        using var image = SKImage.FromPixels(pixmap);
+        var sampling = Resampling.For((int)System.Math.Round(cropW), (int)System.Math.Round(cropH), tileW, tileH);
+        target.DrawImage(image, src, dst, sampling, paint);
     }
 }

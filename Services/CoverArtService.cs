@@ -1,13 +1,10 @@
+using System.Runtime.CompilerServices;
 using CustomCoverArt.Common;
 using CustomCoverArt.Models;
+using CustomCoverArt.Services.Rendering;
 using MediaBrowser.Common.Configuration;
 using Microsoft.Extensions.Logging;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Formats.Gif;
-using SixLabors.ImageSharp.PixelFormats;
-using SixLabors.ImageSharp.Processing;
-// ImageSharp.Drawing also defines a `Path` type; this file only uses System.IO.Path.
-using Path = System.IO.Path;
+using SkiaSharp;
 
 namespace CustomCoverArt.Services;
 
@@ -34,10 +31,31 @@ public class CoverArtService : ICoverArtService
         // is no guessing at filesystem locations or falling back to temp.
         _outputDirectory = PluginPaths.Generated(applicationPaths);
         Directory.CreateDirectory(_outputDirectory);
+
+        // DI builds this service before any controller action that checks the engine runs, so
+        // the engine probe's one Warning (if the host's SkiaSharp is unusable) has a real logger.
+        SkiaRuntime.UseLogger(logger);
     }
 
-    public async Task<string> GenerateFromDocumentAsync(CoverDocument document)
+    public Task<string> GenerateFromDocumentAsync(CoverDocument document)
     {
+        // Checked before any work, and in a method that names no Skia type: the render below is
+        // compiled only once the engine is known to load (S4.4), so a missing SkiaSharp.dll is
+        // this clear refusal rather than a JIT failure.
+        if (!SkiaRuntime.IsAvailable)
+        {
+            return Task.FromException<string>(new CoverValidationException(SkiaRuntime.UnavailableMessage));
+        }
+
+        return GenerateCoreAsync(document);
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private async Task<string> GenerateCoreAsync(CoverDocument document)
+    {
+        // The renderer's warnings (skipped logo, unreadable font) go to this service's logger for
+        // this render only; a process-wide logger would also catch every other render's warnings.
+        using var renderLog = RenderLog.Use(_logger);
         try
         {
             if (document == null)
@@ -96,6 +114,20 @@ public class CoverArtService : ICoverArtService
                     }
                     layer.ImagePath = string.Empty;
                 }
+
+                // A logo that cannot be decoded is dropped here, once, so the per-frame
+                // renderer (an animated export draws it on every frame) never retries it.
+                // The full decode (not a header probe) is deliberate: it catches corrupt bodies a
+                // header would pass, at the cost of decoding each logo once more.
+                if (layer.Type == "image" && !string.IsNullOrEmpty(layer.ImagePath))
+                {
+                    using var probe = SafeImageLoader.TryDecode(layer.ImagePath, maxFrames: 1);
+                    if (probe is null)
+                    {
+                        _logger.LogWarning("Layer image ignored (missing, undecodable or too large): {Path}", layer.ImagePath);
+                        layer.ImagePath = string.Empty;
+                    }
+                }
             }
 
             // Clamp client-controlled background effect sizes (guards against
@@ -128,7 +160,8 @@ public class CoverArtService : ICoverArtService
             var outputPath = Path.Combine(_outputDirectory, fileName);
 
             // Load background image if provided (path already sandboxed above).
-            Image? backgroundImage = null;
+            SKBitmap? collage = null;
+            DecodedImage? decoded = null;
             try
             {
                 if (document.Background.Source == BackgroundSources.Collage && document.Background.Collage is not null
@@ -139,7 +172,7 @@ public class CoverArtService : ICoverArtService
                         .GetPosterPathsAsync(document.Background.Collage.SourceId, 60)
                         .ConfigureAwait(false);
 
-                    backgroundImage = CollageComposer.BuildCollage(
+                    collage = CollageComposer.BuildCollage(
                         posters, document.Canvas.Width, document.Canvas.Height,
                         document.Background.Collage.Density, document.Background.Collage.Seed);
                 }
@@ -150,8 +183,8 @@ public class CoverArtService : ICoverArtService
                     // this render uses. A still cover takes ONE frame of an animated source,
                     // so the resize/blur in ApplyBackgroundLayer no longer runs on frames that
                     // are never drawn.
-                    backgroundImage = SafeImageLoader.TryLoad(document.Background.ImagePath, BackgroundMaxFrames(document));
-                    if (backgroundImage is null)
+                    decoded = SafeImageLoader.TryDecode(document.Background.ImagePath, BackgroundMaxFrames(document));
+                    if (decoded is null)
                     {
                         _logger.LogWarning("Background image ignored (missing, undecodable or too large): {Path}", document.Background.ImagePath);
                     }
@@ -160,22 +193,31 @@ public class CoverArtService : ICoverArtService
                 // Animated GIF export: build multiple frames instead of one image.
                 if (document.Background.Animation?.Enabled == true)
                 {
-                    return await GenerateAnimatedAsync(document, backgroundImage).ConfigureAwait(false);
+                    // A collage is a still background, like a one-frame image.
+                    return collage is not null
+                        ? await GenerateAnimatedAsync(document, new[] { collage }, gifDurationsMs: null).ConfigureAwait(false)
+                        : await GenerateAnimatedAsync(document, decoded).ConfigureAwait(false);
                 }
 
-                // Create new image with specified dimensions and composite one frame.
-                using var image = new Image<Rgba32>(document.Canvas.Width, document.Canvas.Height);
-                ComposeFrame(image, backgroundImage, document);
+                // Composite one frame at the document's dimensions, straight from the decoded
+                // pixels (no copy of the background).
+                byte[] encoded;
+                using (var canvas = RenderSurface.New(document.Canvas.Width, document.Canvas.Height))
+                {
+                    DocumentRenderer.ComposeDocumentFrame(canvas, collage ?? decoded?.RootFrame, document);
+                    encoded = Encode(canvas, outputFormat);
+                }
 
                 // Save image with retry mechanism
-                await SaveImageWithRetryAsync(image, outputPath, outputFormat);
+                await SaveImageWithRetryAsync(encoded, outputPath);
 
                 return outputPath;
             }
             finally
             {
                 // Always release the decoded background image.
-                backgroundImage?.Dispose();
+                collage?.Dispose();
+                decoded?.Dispose();
             }
         }
         catch (CoverValidationException)
@@ -244,7 +286,7 @@ public class CoverArtService : ICoverArtService
         => value <= 0 ? value : System.Math.Max(1, (int)System.Math.Round(value * scale));
 
     /// <summary>Source crop rectangle for a Ken Burns frame at progress t (0..1), at the source's own aspect.</summary>
-    public static Rectangle KenBurnsCrop(int srcW, int srcH, float t, float zoomAmount, string direction)
+    public static PixelRect KenBurnsCrop(int srcW, int srcH, float t, float zoomAmount, string direction)
         => KenBurnsCrop(srcW, srcH, srcW, srcH, t, zoomAmount, direction);
 
     /// <summary>
@@ -254,7 +296,7 @@ public class CoverArtService : ICoverArtService
     /// the canvas without distortion. Cropping at the source aspect and resizing to the canvas
     /// stretched any background whose shape differed from the cover.
     /// </summary>
-    public static Rectangle KenBurnsCrop(int srcW, int srcH, int dstW, int dstH, float t, float zoomAmount, string direction)
+    public static PixelRect KenBurnsCrop(int srcW, int srcH, int dstW, int dstH, float t, float zoomAmount, string direction)
     {
         var z = System.Math.Clamp(zoomAmount, 0f, 1f);
         // progress from wide (0) to tight (1)
@@ -288,7 +330,7 @@ public class CoverArtService : ICoverArtService
         var h = System.Math.Clamp((int)System.Math.Round(baseH * scale), 1, System.Math.Max(1, srcH));
         var x = (srcW - w) / 2;
         var y = (srcH - h) / 2;
-        return new Rectangle(x, y, w, h);
+        return new PixelRect(x, y, w, h);
     }
 
     // Best-effort cleanup of stale generated/preview files so the folder does
@@ -388,22 +430,71 @@ public class CoverArtService : ICoverArtService
     }
 
     /// <summary>
-    /// Composites one frame (background + layers) onto the supplied canvas. Shared
-    /// by the single-image path and the animated-GIF path (which calls it per frame).
-    /// Delegates directly to the shared <see cref="DocumentRenderer"/> compositor.
+    /// Composites one frame (background + layers) at <paramref name="width"/> x <paramref name="height"/>
+    /// through the shared <see cref="DocumentRenderer"/> compositor into a new bitmap the caller owns.
     /// </summary>
-    private static void ComposeFrame(Image<Rgba32> canvas, Image? background, CoverDocument document)
+    private static SKBitmap ComposeFrame(int width, int height, SKBitmap? background, CoverDocument document)
     {
-        DocumentRenderer.ComposeDocumentFrame(canvas, background, document);
+        var canvas = RenderSurface.New(width, height);
+        try
+        {
+            DocumentRenderer.ComposeDocumentFrame(canvas, background, document);
+            return canvas;
+        }
+        catch
+        {
+            canvas.Dispose();
+            throw;
+        }
     }
 
     /// <summary>
-    /// Builds an animated GIF: either passing through an animated-source background
-    /// frame-by-frame, or applying a Ken Burns pan/zoom to a static background.
-    /// Frame count is clamped to [2, 30]; loop uses the GIF repeat count.
+    /// The Ken Burns window <paramref name="crop"/> of <paramref name="image"/> (made once per render, so
+    /// Skia builds the source's mipmaps once rather than once per frame), resized to
+    /// <paramref name="width"/> x <paramref name="height"/> (the canvas aspect, so nothing is squashed).
     /// </summary>
-    private async Task<string> GenerateAnimatedAsync(CoverDocument document, Image? background)
+    private static SKBitmap KenBurnsWindow(SKImage image, PixelRect crop, int width, int height)
     {
+        var window = RenderSurface.New(width, height);
+        try
+        {
+            using var canvas = new SKCanvas(window);
+            canvas.DrawImage(
+                image,
+                SKRect.Create(crop.X, crop.Y, crop.Width, crop.Height),
+                SKRect.Create(0, 0, width, height),
+                Resampling.For(crop.Width, crop.Height, width, height));
+            return window;
+        }
+        catch
+        {
+            window.Dispose();
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Builds an animated GIF from a decoded background: its frames pass through when it is
+    /// animated, otherwise a still gets Ken Burns or is repeated. Only a GIF source supplies its own
+    /// frame delays (spec 6.2); an animated WebP takes the document's delay.
+    /// </summary>
+    private Task<string> GenerateAnimatedAsync(CoverDocument document, DecodedImage? background)
+        => GenerateAnimatedAsync(
+            document,
+            background?.Frames ?? Array.Empty<SKBitmap>(),
+            background?.Kind == ImageKind.Gif ? background.FrameDurationsMs : null);
+
+    /// <summary>
+    /// Builds an animated GIF: either passing through an animated background frame by frame
+    /// (<paramref name="backgroundFrames"/> holds more than one), or applying a Ken Burns pan/zoom
+    /// to a still one, or repeating one composed frame. Passthrough keeps the source's frame count
+    /// (2..60); otherwise the document's count applies (2..30). The loop flag comes from the
+    /// document, never from the source. <paramref name="gifDurationsMs"/> (GIF sources only) gives
+    /// each source frame's own delay; a zero delay falls back to the document's.
+    /// </summary>
+    private async Task<string> GenerateAnimatedAsync(CoverDocument document, IReadOnlyList<SKBitmap> backgroundFrames, IReadOnlyList<int>? gifDurationsMs)
+    {
+        var animation = document.Background.Animation!;
         var w = document.Canvas.Width;
         var h = document.Canvas.Height;
 
@@ -423,96 +514,119 @@ public class CoverArtService : ICoverArtService
         }
 
         // Passthrough when the source background is itself animated.
-        var animatedSource = background is not null && background.Frames.Count > 1;
-        var kenBurns = !animatedSource && background is not null && document.Background.Animation!.KenBurns;
+        var root = backgroundFrames.Count > 0 ? backgroundFrames[0] : null;
+        var animatedSource = backgroundFrames.Count > 1;
+        var kenBurns = !animatedSource && root is not null && animation.KenBurns;
 
         // An animated source drives its own frame count (so its motion isn't
         // truncated or padded); Ken Burns / static sources use the requested count.
         var frameCount = animatedSource
-            ? System.Math.Clamp(background!.Frames.Count, 2, 60)
-            : System.Math.Clamp(document.Background.Animation!.FrameCount, 2, 30);
-        var delayCentis = System.Math.Max(2, document.Background.Animation!.DelayMs / 10); // GIF delay is 1/100s
+            ? System.Math.Clamp(backgroundFrames.Count, 2, SafeImageLoader.MaxAnimatedFrames)
+            : System.Math.Clamp(animation.FrameCount, 2, 30);
+        var delayCentis = System.Math.Max(2, animation.DelayMs / 10); // GIF delay is 1/100 s
 
-        // A still background without Ken Burns gives the same picture on every frame:
-        // compose it once and repeat it, instead of cloning the full-size source and
-        // re-running the whole compositor for each frame. ApplyBackgroundLayer mutates the
-        // background it is given, which is fine here because it is used exactly once.
-        Image<Rgba32>? staticFrame = null;
-        Image<Rgba32>? output = null;
+        // Every bitmap made here, disposed once in the finally (also when a frame fails mid-loop).
+        var owned = new List<SKBitmap>(frameCount);
+        SKPixmap? sourcePixmap = null;
+        SKImage? sourceImage = null;
         try
         {
-            if (!animatedSource && !kenBurns)
+            if (kenBurns)
             {
-                staticFrame = new Image<Rgba32>(w, h);
-                ComposeFrame(staticFrame, background, composeDocument);
+                // One image over the source's pixels for every frame; both are disposed before the
+                // source bitmap (which the caller owns) can go.
+                sourcePixmap = root!.PeekPixels();
+                sourceImage = SKImage.FromPixels(sourcePixmap);
             }
 
+            // A still background without Ken Burns gives the same picture on every frame:
+            // compose it once and hand the same bitmap to every GIF frame.
+            SKBitmap? staticFrame = null;
+            if (!animatedSource && !kenBurns)
+            {
+                staticFrame = ComposeFrame(w, h, root, composeDocument);
+                owned.Add(staticFrame);
+            }
+
+            var frames = new List<GifFrame>(frameCount);
             for (int i = 0; i < frameCount; i++)
             {
-                var t = frameCount == 1 ? 0f : i / (float)(frameCount - 1);
                 var frameDelay = delayCentis;
-
-                using var frameCanvas = staticFrame is not null ? staticFrame.Clone() : new Image<Rgba32>(w, h);
-                if (staticFrame is null)
+                SKBitmap frame;
+                if (staticFrame is not null)
                 {
-                    Image? frameBg = null;
-                    try
-                    {
-                        if (animatedSource)
-                        {
-                            var srcIndex = i % background!.Frames.Count;
-                            // One clone of one frame, in the source's own pixel format.
-                            frameBg = background.Frames.CloneFrame(srcIndex);
-                            // Preserve the source GIF's own timing so playback speed matches.
-                            var srcDelay = background.Frames[srcIndex].Metadata.GetGifMetadata().FrameDelay;
-                            if (srcDelay > 0) { frameDelay = srcDelay; }
-                        }
-                        else
-                        {
-                            var crop = KenBurnsCrop(background!.Width, background.Height, w, h, t,
-                                document.Background.Animation.ZoomAmount, document.Background.Animation.Direction);
-                            // Crop first, then resize: the clone is the small window, never the full source.
-                            frameBg = background.Clone(x => x.Crop(crop).Resize(w, h));
-                        }
-
-                        ComposeFrame(frameCanvas, frameBg, composeDocument);
-                    }
-                    finally
-                    {
-                        frameBg?.Dispose();
-                    }
+                    frame = staticFrame;
                 }
-
-                if (output is null)
+                else if (animatedSource)
                 {
-                    output = frameCanvas.Clone();
-                    var gm = output.Metadata.GetGifMetadata();
-                    gm.RepeatCount = (ushort)(document.Background.Animation!.Loop ? 0 : 1);
-                    output.Frames.RootFrame.Metadata.GetGifMetadata().FrameDelay = frameDelay;
+                    var srcIndex = i % backgroundFrames.Count;
+                    frame = ComposeFrame(w, h, backgroundFrames[srcIndex], composeDocument);
+                    owned.Add(frame);
+
+                    // Preserve the source GIF's own timing so playback speed matches.
+                    var srcDelay = gifDurationsMs is not null && srcIndex < gifDurationsMs.Count ? gifDurationsMs[srcIndex] / 10 : 0;
+                    if (srcDelay > 0)
+                    {
+                        frameDelay = srcDelay;
+                    }
                 }
                 else
                 {
-                    var added = frameCanvas.Frames.RootFrame;
-                    added.Metadata.GetGifMetadata().FrameDelay = frameDelay;
-                    output.Frames.AddFrame(added);
+                    var t = i / (float)(frameCount - 1);
+                    var crop = KenBurnsCrop(root!.Width, root.Height, w, h, t, animation.ZoomAmount, animation.Direction);
+                    // Crop and resize in one draw: the window is canvas-sized, never the full source.
+                    using var window = KenBurnsWindow(sourceImage!, crop, w, h);
+                    frame = ComposeFrame(w, h, window, composeDocument);
+                    owned.Add(frame);
                 }
+
+                frames.Add(new GifFrame(frame, frameDelay));
+            }
+
+            byte[] encoded;
+            using (var gif = new MemoryStream())
+            {
+                GifWriter.Write(gif, frames, loop: animation.Loop);
+                encoded = gif.ToArray();
             }
 
             var outputPath = Path.Combine(_outputDirectory, $"cover_{Guid.NewGuid():N}.gif");
-            await output!.SaveAsync(outputPath, new GifEncoder()).ConfigureAwait(false);
+            await SaveImageWithRetryAsync(encoded, outputPath).ConfigureAwait(false);
             return outputPath;
         }
         finally
         {
-            staticFrame?.Dispose();
-            output?.Dispose();
+            sourceImage?.Dispose();
+            sourcePixmap?.Dispose();
+            foreach (var bitmap in owned)
+            {
+                bitmap.Dispose();
+            }
         }
     }
 
     /// <summary>
-    /// Saves image with retry mechanism for transient failures
+    /// Encodes a finished cover: PNG through Skia (zlib level 6, all filters), or a one-frame GIF.
     /// </summary>
-    private static async Task SaveImageWithRetryAsync(Image<Rgba32> image, string outputPath, string outputFormat)
+    internal static byte[] Encode(SKBitmap canvas, string outputFormat)
+    {
+        if (string.Equals(outputFormat, "gif", StringComparison.OrdinalIgnoreCase))
+        {
+            using var gif = new MemoryStream();
+            GifWriter.Write(gif, new[] { new GifFrame(canvas, 0) }, loop: false);
+            return gif.ToArray();
+        }
+
+        using var pixmap = canvas.PeekPixels();
+        using var data = pixmap.Encode(new SKPngEncoderOptions(SKPngEncoderFilterFlags.AllFilters, 6))
+            ?? throw new InvalidOperationException("PNG encoding failed");
+        return data.ToArray();
+    }
+
+    /// <summary>
+    /// Writes encoded bytes with a retry for transient failures (file locked, permissions).
+    /// </summary>
+    internal static async Task SaveImageWithRetryAsync(byte[] encoded, string outputPath)
     {
         const int maxRetries = 3;
         const int delayMs = 100;
@@ -521,14 +635,7 @@ public class CoverArtService : ICoverArtService
         {
             try
             {
-                if (outputFormat?.ToLowerInvariant() == "gif")
-                {
-                    await image.SaveAsync(outputPath, new SixLabors.ImageSharp.Formats.Gif.GifEncoder());
-                }
-                else
-                {
-                    await image.SaveAsync(outputPath, new SixLabors.ImageSharp.Formats.Png.PngEncoder());
-                }
+                await File.WriteAllBytesAsync(outputPath, encoded);
                 return;
             }
             catch (IOException) when (attempt < maxRetries - 1)

@@ -3,10 +3,10 @@ using System.IO;
 using System.Threading.Tasks;
 using CustomCoverArt.Models;
 using CustomCoverArt.Services;
+using CustomCoverArt.Services.Rendering;
 using Microsoft.AspNetCore.Http;
 using NSubstitute;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
+using SkiaSharp;
 using Xunit;
 
 namespace CustomCoverArt.Tests;
@@ -20,9 +20,11 @@ public class SafeImageLoaderTests
         File.WriteAllBytes(path, TestImages.GifWithScreen(65535, 65535));
         try
         {
-            var info = Image.Identify(path);
+            var info = SafeImageLoader.TryProbe(path);
+            Assert.NotNull(info);
+            Assert.Equal((65535, 65535), (info!.Width, info.Height));
             Assert.False(SafeImageLoader.IsWithinBudget(info, maxFrames: 1));
-            Assert.Null(SafeImageLoader.TryLoad(path, maxFrames: 1));
+            Assert.Null(SafeImageLoader.TryDecode(path, maxFrames: 1));
         }
         finally { File.Delete(path); }
     }
@@ -35,45 +37,58 @@ public class SafeImageLoaderTests
         TestImages.SaveMultiFrameGif(path, 32, 32, frames: 10);
         try
         {
-            var info = Image.Identify(path);
-            Assert.Equal(10, SafeImageLoader.FrameCount(info));
+            var info = SafeImageLoader.TryProbe(path);
+            Assert.NotNull(info);
+            Assert.Equal(10, SafeImageLoader.FrameCount(info!));
 
             const long budget = 32 * 32 * 5; // room for five frames
-            Assert.True(SafeImageLoader.IsWithinBudget(info, maxFrames: 60, budget));
-            Assert.Equal(5, SafeImageLoader.FramesToDecode(info, maxFrames: 60, budget));
-            Assert.Equal(1, SafeImageLoader.FramesToDecode(info, maxFrames: 1, budget));
+            Assert.True(SafeImageLoader.IsWithinBudget(info!, maxFrames: 60, budget));
+            Assert.Equal(5, SafeImageLoader.FramesToDecode(info!, maxFrames: 60, budget));
+            Assert.Equal(1, SafeImageLoader.FramesToDecode(info!, maxFrames: 1, budget));
 
-            using var loaded = SafeImageLoader.TryLoad(path, maxFrames: 60, budget);
+            using var loaded = SafeImageLoader.TryDecode(path, maxFrames: 60, budget);
             Assert.NotNull(loaded);
             Assert.Equal(5, loaded!.Frames.Count);
         }
         finally { File.Delete(path); }
     }
 
-    /// <summary>Identify reports no frame metadata for APNG, so an unknown count must not collapse to a still.</summary>
+    /// <summary>
+    /// Skia's PNG codec returns only the default image of an APNG, so an APNG background
+    /// becomes a still (spec 6.2, accepted change). A plain PNG stays one frame.
+    /// </summary>
     [Fact]
-    public void Apng_KeepsItsFrames_AndPlainPngStaysOneFrame()
+    public void Apng_DecodesAsAStill_AndPlainPngStaysOneFrame()
     {
-        var apng = TestImages.TempPath(".png");
+        var apng = TestImages.Fixture("apng-2frames.png");
         var still = TestImages.TempPath(".png");
-        TestImages.SaveMultiFrameApng(apng, 16, 16, frames: 4);
         TestImages.SaveMultiFrameApng(still, 16, 16, frames: 1);
+        var generated = TestImages.TempPath(".png");
+        TestImages.SaveMultiFrameApng(generated, 16, 16, frames: 3);
         try
         {
-            using var animated = SafeImageLoader.TryLoad(apng, maxFrames: 60);
+            // The generated 3-frame APNG is a valid PNG to Skia and decodes as a one-frame still (red first).
+            Assert.Equal(1, SafeImageLoader.TryProbe(generated)!.FrameCount);
+            using var generatedStill = SafeImageLoader.TryDecode(generated, maxFrames: 60);
+            Assert.NotNull(generatedStill);
+            Assert.Single(generatedStill!.Frames);
+            Assert.True(TestPixels.Px(generatedStill.RootFrame, 8, 8).R > 200);
+
+            var probe = SafeImageLoader.TryProbe(apng);
+            Assert.NotNull(probe);
+            Assert.Equal(ImageKind.Png, probe!.Kind);
+            Assert.Equal(1, probe.FrameCount);
+
+            using var animated = SafeImageLoader.TryDecode(apng, maxFrames: 60);
             Assert.NotNull(animated);
-            Assert.True(animated!.Frames.Count > 1, $"APNG decoded {animated.Frames.Count} frame(s)");
+            Assert.Single(animated!.Frames);
+            Assert.True(TestPixels.Px(animated.RootFrame, 8, 8).R > 200, "The still must be the first (red) frame.");
 
-            using var plain = SafeImageLoader.TryLoad(still, maxFrames: 60);
+            using var plain = SafeImageLoader.TryDecode(still, maxFrames: 60);
             Assert.NotNull(plain);
-            Assert.Equal(1, plain!.Frames.Count);
-
-            // Still bounded by the budget when the declared count is unknown.
-            using var clamped = SafeImageLoader.TryLoad(apng, maxFrames: 60, pixelBudget: 16 * 16 * 2);
-            Assert.NotNull(clamped);
-            Assert.True(clamped!.Frames.Count <= 2);
+            Assert.Single(plain!.Frames);
         }
-        finally { File.Delete(apng); File.Delete(still); }
+        finally { File.Delete(still); File.Delete(generated); }
     }
 
     /// <summary>A frame that alone exceeds the budget is still refused.</summary>
@@ -84,9 +99,10 @@ public class SafeImageLoaderTests
         TestImages.SaveMultiFrameGif(path, 32, 32, frames: 3);
         try
         {
-            var info = Image.Identify(path);
-            Assert.False(SafeImageLoader.IsWithinBudget(info, maxFrames: 60, pixelBudget: 32 * 32 - 1));
-            Assert.Null(SafeImageLoader.TryLoad(path, maxFrames: 60, pixelBudget: 32 * 32 - 1));
+            var info = SafeImageLoader.TryProbe(path);
+            Assert.NotNull(info);
+            Assert.False(SafeImageLoader.IsWithinBudget(info!, maxFrames: 60, pixelBudget: 32 * 32 - 1));
+            Assert.Null(SafeImageLoader.TryDecode(path, maxFrames: 60, pixelBudget: 32 * 32 - 1));
         }
         finally { File.Delete(path); }
     }
@@ -99,7 +115,7 @@ public class SafeImageLoaderTests
         var loc = Substitute.For<ILocalizationService>();
         loc.GetString(Arg.Any<string>(), Arg.Any<object[]>()).Returns(ci => (string)ci[0]);
         var bytes = TestImages.GifWithScreenFrames(4096, 4096, 5);
-        Assert.True(SafeImageLoader.FrameCount(Image.Identify(bytes)) >= 2, "test GIF must declare several frames");
+        Assert.True(SafeImageLoader.FrameCount(SafeImageLoader.TryProbe(bytes)!) >= 2, "test GIF must declare several frames");
         var file = new FormFile(new MemoryStream(bytes), 0, bytes.Length, "file", "long.gif");
 
         var result = await new ImageProcessingService(loc).ValidateFileAsync(file);
@@ -114,14 +130,15 @@ public class SafeImageLoaderTests
         TestImages.SaveMultiFrameGif(path, 16, 16, frames: 10);
         try
         {
-            using var still = SafeImageLoader.TryLoad(path, maxFrames: 1);
+            using var still = SafeImageLoader.TryDecode(path, maxFrames: 1);
             Assert.NotNull(still);
-            Assert.Equal(1, still!.Frames.Count);
+            Assert.Single(still!.Frames);
 
-            using var some = SafeImageLoader.TryLoadRgba32(path, maxFrames: 4);
+            using var some = SafeImageLoader.TryDecode(path, maxFrames: 4);
             Assert.NotNull(some);
             Assert.Equal(4, some!.Frames.Count);
-            Assert.True(some[8, 8].R > 200, "Root frame must be the first (red) frame.");
+            Assert.True(TestPixels.Px(some.RootFrame, 8, 8).R > 200, "Root frame must be the first (red) frame.");
+            Assert.True(TestPixels.Px(some.Frames[1], 8, 8).B > 200, "Second frame must be blue.");
         }
         finally { File.Delete(path); }
     }
@@ -130,11 +147,11 @@ public class SafeImageLoaderTests
     public void PlainPng_CountsAsOneFrameAndLoads()
     {
         var path = TestImages.TempPath(".png");
-        using (var img = new Image<Rgba32>(20, 20, Color.Green)) { img.SaveAsPng(path); }
+        using (var bitmap = RenderSurface.New(20, 20, SKColors.Green)) { File.WriteAllBytes(path, TestImages.SkiaPng(bitmap)); }
         try
         {
-            Assert.Equal(1, SafeImageLoader.FrameCount(Image.Identify(path)));
-            using var loaded = SafeImageLoader.TryLoad(path, maxFrames: 1);
+            Assert.Equal(1, SafeImageLoader.FrameCount(SafeImageLoader.TryProbe(path)!));
+            using var loaded = SafeImageLoader.TryDecode(path, maxFrames: 1);
             Assert.NotNull(loaded);
         }
         finally { File.Delete(path); }
@@ -143,10 +160,15 @@ public class SafeImageLoaderTests
     [Fact]
     public void MissingOrGarbage_ReturnsNull_NeverThrows()
     {
-        Assert.Null(SafeImageLoader.TryLoad("/no/such/file.png", 1));
+        Assert.Null(SafeImageLoader.TryDecode("/no/such/file.png", 1));
+        Assert.Null(SafeImageLoader.TryProbe("/no/such/file.png"));
         var path = TestImages.TempPath(".png");
         File.WriteAllText(path, "not an image");
-        try { Assert.Null(SafeImageLoader.TryLoadRgba32(path, 1)); }
+        try
+        {
+            Assert.Null(SafeImageLoader.TryDecode(path, 1));
+            Assert.Null(SafeImageLoader.TryProbe(path));
+        }
         finally { File.Delete(path); }
     }
 
@@ -164,7 +186,7 @@ public class SafeImageLoaderTests
         Assert.Equal("errors.image_too_large", result.ErrorMessage);
     }
 
-    /// <summary>Identify throws on ImageSharp 3.1.12's own APNG output; the upload check must still accept it.</summary>
+    /// <summary>An APNG upload stays accepted; it renders as its first frame.</summary>
     [Fact]
     public async Task Upload_AcceptsAnApng()
     {
@@ -220,7 +242,7 @@ public class SafeImageLoaderTests
 
         var path = TestImages.TempPath(".png");
         File.WriteAllBytes(path, bytes);
-        try { Assert.Null(SafeImageLoader.TryLoad(path, maxFrames: 1)); }
+        try { Assert.Null(SafeImageLoader.TryDecode(path, maxFrames: 1)); }
         finally { File.Delete(path); }
     }
 
@@ -235,10 +257,14 @@ public class SafeImageLoaderTests
         Assert.Equal("errors.invalid_file_format", result.ErrorMessage);
     }
 
+    /// <summary>
+    /// A PNG whose IHDR (well-formed, correct CRC) declares 65535×65535. libpng needs a valid
+    /// IHDR before the header reader reports a size, so the fixture carries one; the IDAT body is junk.
+    /// </summary>
     [Fact]
     public async Task OversizePngHeader_IsTooLarge_AndNeverLoaded()
     {
-        var bytes = PngHeadThen(65535, 65535, new byte[64]);
+        var bytes = TestImages.PngWithValidIhdr(65535, 65535, new byte[64]);
 
         var result = await UploadAsync(bytes);
 
@@ -247,14 +273,17 @@ public class SafeImageLoaderTests
 
         var path = TestImages.TempPath(".png");
         File.WriteAllBytes(path, bytes);
-        try { Assert.Null(SafeImageLoader.TryLoad(path, maxFrames: 1)); }
+        try { Assert.Null(SafeImageLoader.TryDecode(path, maxFrames: 1)); }
         finally { File.Delete(path); }
     }
 
     [Fact]
     public void TryIdentify_NullBytes_ReturnsNull()
     {
-        Assert.Null(SafeImageLoader.TryIdentify((byte[])null!));
+        Assert.Null(SafeImageLoader.TryProbe((byte[])null!));
+        Assert.False(SafeImageLoader.CanDecodeFirstFrame(null));
+        Assert.Null(SafeImageLoader.TryProbe((string)null!));
+        Assert.Null(SafeImageLoader.TryDecode((string)null!, 1));
     }
 
     /// <summary>A2: a still cover decodes one frame; only an animated export takes up to 60.</summary>
@@ -285,9 +314,69 @@ public class SafeImageLoaderTests
             doc.Background.DimColor = "#ff0000";
 
             var output = await svc.GenerateFromDocumentAsync(doc);
-            using var img = Image.Load<Rgba32>(output);
-            Assert.True(img[50, 50].R > 200 && img[50, 50].G < 50);
+            using var img = SKBitmap.Decode(output);
+            var px = img.GetPixel(50, 50);
+            Assert.True(px.Red > 200 && px.Green < 50);
         }
         finally { try { Directory.Delete(dataDir, true); } catch { } }
+    }
+
+    public static TheoryData<string> UnusualPixelFormats => new() { "gray8-png", "rgba16-png", "paletted-gif" };
+
+    /// <summary>
+    /// Review focus 2: sources in pixel formats other than 8-bit RGBA (greyscale PNG, 16-bit
+    /// PNG, a paletted GIF with a transparent index) all come out as RGBA8888 with the source colour.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(UnusualPixelFormats))]
+    public void Decode_UnusualPixelFormats_LoadAsRgba(string kind)
+    {
+        byte[] bytes;
+        Rgba expected;
+        (int X, int Y) spot = (1, 1);
+        switch (kind)
+        {
+            case "gray8-png":
+                using (var gray = new SKBitmap(new SKImageInfo(8, 8, SKColorType.Gray8, SKAlphaType.Opaque)))
+                {
+                    gray.Erase(new SKColor(128, 128, 128));
+                    bytes = TestImages.SkiaPng(gray);
+                }
+
+                Assert.Equal(0, bytes[25] & 0x02); // IHDR colour type has no colour bit: really greyscale
+                expected = new Rgba(128, 128, 128, 255);
+                break;
+            case "rgba16-png":
+                // Skia 3.119 has no PNG encoding for Rgba16161616; from RgbaF16 it writes a 16-bit PNG.
+                using (var deep = new SKBitmap(new SKImageInfo(8, 8, SKColorType.RgbaF16, SKAlphaType.Unpremul)))
+                {
+                    deep.Erase(new SKColor(200, 100, 50, 255));
+                    bytes = TestImages.SkiaPng(deep);
+                }
+
+                Assert.Equal(16, bytes[24]); // IHDR bit depth: really 16-bit
+                expected = new Rgba(200, 100, 50, 255);
+                break;
+            default:
+                bytes = TestImages.PalettedGifWithTransparentIndex();
+                expected = new Rgba(255, 0, 0, 255);
+                break;
+        }
+
+        var path = TestImages.TempPath(kind.EndsWith("gif", StringComparison.Ordinal) ? ".gif" : ".png");
+        File.WriteAllBytes(path, bytes);
+        try
+        {
+            using var decoded = SafeImageLoader.TryDecode(path, maxFrames: 1);
+            Assert.NotNull(decoded);
+            Assert.Equal(SKColorType.Rgba8888, decoded!.RootFrame.ColorType);
+            var px = TestPixels.Px(decoded.RootFrame, spot.X, spot.Y);
+            Assert.True(TestPixels.Near(px, expected, 1), $"{kind}: got {px}, expected {expected}");
+            if (kind == "paletted-gif")
+            {
+                Assert.Equal(0, TestPixels.Px(decoded.RootFrame, 3, 1).A);
+            }
+        }
+        finally { File.Delete(path); }
     }
 }

@@ -2,6 +2,7 @@ using System.IO;
 using CustomCoverArt.Common;
 using CustomCoverArt.Models;
 using CustomCoverArt.Services;
+using CustomCoverArt.Services.Rendering;
 using MediaBrowser.Common.Configuration;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -85,6 +86,14 @@ public class CustomCoverArtController : ControllerBase
     [HttpPost("document/preview")]
     public async Task<IActionResult> GeneratePreviewDocument([FromBody] CoverDocument document)
     {
+        // Every action that renders or decodes checks the image engine first (spec S4.4). The
+        // actions name no Skia type; what they call next (the cover service, the upload
+        // validators) is compiled only after this check passes.
+        if (!SkiaRuntime.IsAvailable)
+        {
+            return BadRequest(new { error = SkiaRuntime.UnavailableMessage });
+        }
+
         // Higher limit: the canvas renders a live preview on every adjustment.
         if (RateLimited("preview", maxRequests: 240, TimeSpan.FromMinutes(1)))
         {
@@ -113,6 +122,11 @@ public class CustomCoverArtController : ControllerBase
     [HttpPost("document/apply")]
     public async Task<ApiResponse<bool>> ApplyDocument([FromBody] ApplyDocumentRequest request)
     {
+        if (!SkiaRuntime.IsAvailable)
+        {
+            return Fail<bool>(SkiaRuntime.UnavailableMessage);
+        }
+
         // Applying renders a full cover (up to a 30-frame GIF) and writes to disk.
         if (RateLimited("apply", maxRequests: 30, TimeSpan.FromMinutes(1)))
         {
@@ -282,6 +296,12 @@ public class CustomCoverArtController : ControllerBase
     [HttpPost("upload")]
     public async Task<ApiResponse<string>> UploadImage(IFormFile file)
     {
+        // Validation decodes the image with Skia.
+        if (!SkiaRuntime.IsAvailable)
+        {
+            return Fail<string>(SkiaRuntime.UnavailableMessage);
+        }
+
         return await SaveUploadAsync(
             file,
             directory: PluginPaths.Uploads(_applicationPaths),
@@ -296,6 +316,12 @@ public class CustomCoverArtController : ControllerBase
     [HttpPost("uploadFont")]
     public async Task<ApiResponse<string>> UploadFont(IFormFile file)
     {
+        // Validation goes through FontStore, whose static state holds Skia typefaces.
+        if (!SkiaRuntime.IsAvailable)
+        {
+            return Fail<string>(SkiaRuntime.UnavailableMessage);
+        }
+
         return await SaveUploadAsync(
             file,
             directory: PluginPaths.Fonts(_applicationPaths),
@@ -306,17 +332,17 @@ public class CustomCoverArtController : ControllerBase
             validate: ValidateFontAsync).ConfigureAwait(false);
     }
 
+    // Never inlined into an action: it is the first controller code that touches FontStore (and so
+    // Skia), and must only be compiled after the action's SkiaRuntime check has passed.
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
     private async Task<ValidationResult> ValidateFontAsync(IFormFile file)
     {
         var result = new ValidationResult { IsValid = true };
 
-        var allowedExtensions = new[] { ".ttf", ".otf", ".ttc", ".woff", ".woff2" };
         var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
-        if (!allowedExtensions.Contains(extension))
+        if (!FontStore.SupportedExtensions.Contains(extension))
         {
-            result.IsValid = false;
-            result.ErrorMessage = _localizationService.GetString("errors.invalid_file_format");
-            return result;
+            return InvalidFont(result);
         }
 
         if (file.Length > 5 * 1024 * 1024)
@@ -326,28 +352,30 @@ public class CustomCoverArtController : ControllerBase
             return result;
         }
 
-        // Verify a real font signature (magic bytes), not just the extension.
-        var header = new byte[4];
-        await using var stream = file.OpenReadStream();
-        var read = await stream.ReadAsync(header.AsMemory(0, 4)).ConfigureAwait(false);
-        if (read < 4 || !IsFontSignature(header))
+        // Verify a real font signature (magic bytes), not just the extension, and that the
+        // sfnt table directory is self-consistent before the bytes can reach a native loader.
+        // The size cap above bounds the read.
+        byte[] bytes;
+        await using (var stream = file.OpenReadStream())
         {
-            result.IsValid = false;
-            result.ErrorMessage = _localizationService.GetString("errors.invalid_file_format");
+            using var buffer = new MemoryStream();
+            await stream.CopyToAsync(buffer).ConfigureAwait(false);
+            bytes = buffer.ToArray();
+        }
+
+        if (!FontStore.IsSupportedSignature(bytes) || !SfntSanity.LooksValid(bytes))
+        {
+            return InvalidFont(result);
         }
 
         return result;
     }
 
-    private static bool IsFontSignature(byte[] h)
+    private ValidationResult InvalidFont(ValidationResult result)
     {
-        bool Eq(byte a, byte b, byte c, byte d) => h[0] == a && h[1] == b && h[2] == c && h[3] == d;
-        return Eq(0x00, 0x01, 0x00, 0x00) // TrueType (TTF)
-            || Eq(0x4F, 0x54, 0x54, 0x4F) // 'OTTO' (OpenType/CFF)
-            || Eq(0x74, 0x72, 0x75, 0x65) // 'true'
-            || Eq(0x74, 0x74, 0x63, 0x66) // 'ttcf' (font collection)
-            || Eq(0x77, 0x4F, 0x46, 0x46) // 'wOFF'
-            || Eq(0x77, 0x4F, 0x46, 0x32); // 'wOF2'
+        result.IsValid = false;
+        result.ErrorMessage = _localizationService.GetString("errors.invalid_font_format");
+        return result;
     }
 
     private async Task<ApiResponse<string>> SaveUploadAsync(
@@ -423,7 +451,13 @@ public class CustomCoverArtController : ControllerBase
         try
         {
             var ready = await _startupValidationService.IsPluginReadyAsync().ConfigureAwait(false);
-            return Success<object>(new { PluginReady = ready, Version = Plugin.Instance?.Version.ToString() });
+            return Success<object>(new
+            {
+                PluginReady = ready,
+                Version = Plugin.Instance?.Version.ToString(),
+                RendererAvailable = SkiaRuntime.IsAvailable,
+                RendererVersion = SkiaRuntime.NativeVersion, // null when unavailable
+            });
         }
         catch (Exception ex)
         {
@@ -661,6 +695,11 @@ public class CustomCoverArtController : ControllerBase
     [HttpPost("batchApply")]
     public async Task<ApiResponse<List<BatchApplyResult>>> BatchApply([FromBody] BatchApplyRequest request)
     {
+        if (!SkiaRuntime.IsAvailable)
+        {
+            return Fail<List<BatchApplyResult>>(SkiaRuntime.UnavailableMessage);
+        }
+
         if (request is null || request.Targets.Count == 0)
         {
             return Fail<List<BatchApplyResult>>("No targets selected.");
