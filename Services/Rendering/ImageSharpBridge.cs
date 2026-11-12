@@ -50,16 +50,25 @@ internal static class ImageSharpBridge
     /// codec's duration, so the animated passthrough keeps GIF timing; other sources (animated
     /// WebP) leave it 0 and the document's delay applies, as with ImageSharp's own decoder (spec 6.2).
     /// </summary>
-    public static Image<Rgba32> ToImageSharp(DecodedImage decoded)
+    public static Image<Rgba32> ToImageSharp(DecodedImage decoded) => ToImageSharp(decoded, releaseCopiedFrames: false);
+
+    /// <summary>
+    /// As <see cref="ToImageSharp(DecodedImage)"/>; with <paramref name="releaseCopiedFrames"/> each
+    /// bitmap is disposed as soon as it has been copied, so the peak holds one Skia frame rather
+    /// than all of them. The <paramref name="decoded"/> image must not be read afterwards.
+    /// </summary>
+    private static Image<Rgba32> ToImageSharp(DecodedImage decoded, bool releaseCopiedFrames)
     {
         ArgumentNullException.ThrowIfNull(decoded);
         var image = ToImageSharp(decoded.RootFrame);
         try
         {
             SetGifDelay(decoded, 0, image.Frames.RootFrame);
+            Release(decoded, 0, releaseCopiedFrames);
             for (var i = 1; i < decoded.Frames.Count; i++)
             {
                 using var frame = ToImageSharp(decoded.Frames[i]);
+                Release(decoded, i, releaseCopiedFrames);
                 var added = image.Frames.AddFrame(frame.Frames.RootFrame);
                 SetGifDelay(decoded, i, added);
             }
@@ -73,9 +82,18 @@ internal static class ImageSharpBridge
         }
     }
 
+    private static void Release(DecodedImage decoded, int index, bool release)
+    {
+        if (release)
+        {
+            decoded.Frames[index].Dispose();
+        }
+    }
+
     /// <summary>
     /// The first frame of an untrusted image through <see cref="SafeImageLoader"/>'s guard, as an
-    /// ImageSharp image (logos, poster tiles), or null when the guard refuses it.
+    /// ImageSharp image (logos, poster tiles), or null when the guard refuses it. The guard itself
+    /// never throws, but the ImageSharp copy can (OutOfMemoryException), so callers keep their try.
     /// </summary>
     public static Image<Rgba32>? TryLoadStill(string path)
     {
@@ -83,11 +101,15 @@ internal static class ImageSharpBridge
         return decoded is null ? null : ToImageSharp(decoded.RootFrame);
     }
 
-    /// <summary>Every decoded frame of an untrusted image (see <see cref="ToImageSharp(DecodedImage)"/>), or null when the guard refuses it.</summary>
+    /// <summary>
+    /// Every decoded frame of an untrusted image (see <see cref="ToImageSharp(DecodedImage)"/>), or
+    /// null when the guard refuses it. Each Skia frame is released once copied. The guard itself
+    /// never throws, but the ImageSharp copy can (OutOfMemoryException), so callers keep their try.
+    /// </summary>
     public static Image<Rgba32>? TryLoad(string path, int maxFrames)
     {
         using var decoded = SafeImageLoader.TryDecode(path, maxFrames);
-        return decoded is null ? null : ToImageSharp(decoded);
+        return decoded is null ? null : ToImageSharp(decoded, releaseCopiedFrames: true);
     }
 
     private static void SetGifDelay(DecodedImage decoded, int index, ImageFrame frame)

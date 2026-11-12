@@ -74,9 +74,9 @@ public class ImageProcessingService : IImageProcessingService
             return result;
         }
 
-        // Content-based validation. This is NOT antivirus. It verifies the bytes are
-        // an identifiable image (a PNG identified only by its header must also decode
-        // its first frame) and rejects obvious executable content, which is what closes
+        // Content-based validation. This is NOT antivirus. It verifies the bytes are one of
+        // the five allowed image formats whose first frame really decodes, and rejects
+        // obvious executable content, which is what closes
         // the "wrong file with an image extension" gap that an extension check alone leaves open.
         return await ScanContentAsync(file);
     }
@@ -115,10 +115,10 @@ public class ImageProcessingService : IImageProcessingService
         // matching codec, and a single frame must fit the decode budget. The probe reads
         // headers only. A header proves nothing about the rest of the file (a valid PNG header
         // followed by junk or HTML opens a codec), so after the budget check the first frame is
-        // always decoded to prove the file is really an image.
+        // always decoded to prove the file is really an image. Both come from one codec.
         try
         {
-            var info = SafeImageLoader.TryProbe(bytes);
+            var (info, firstFrameDecodes) = SafeImageLoader.ProbeAndDecodeFirstFrame(bytes);
             if (info is null || info.Width <= 0 || info.Height <= 0)
             {
                 result.IsValid = false;
@@ -132,7 +132,7 @@ public class ImageProcessingService : IImageProcessingService
                 result.IsValid = false;
                 result.ErrorMessage = _localizationService.GetString("errors.image_too_large");
             }
-            else if (!SafeImageLoader.CanDecodeFirstFrame(bytes))
+            else if (!firstFrameDecodes)
             {
                 result.IsValid = false;
                 result.ErrorMessage = _localizationService.GetString("errors.invalid_file_format");

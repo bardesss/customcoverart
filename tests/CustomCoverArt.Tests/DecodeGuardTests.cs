@@ -139,6 +139,7 @@ public class DecodeGuardTests
     [InlineData(1)]
     [InlineData(8)]
     [InlineData(11)]
+    [InlineData(12)]
     public async Task EmptyOrShorterThanAHeader_IsRefusedEverywhere(int length)
     {
         var png = File.ReadAllBytes(TestImages.Fixture("icc-valid.png"));
@@ -156,6 +157,149 @@ public class DecodeGuardTests
             Assert.False(result.IsValid);
             Assert.Equal("errors.invalid_file_format", result.ErrorMessage);
         }
+    }
+
+    /// <summary>A file of <paramref name="length"/> bytes starting with <paramref name="head"/>, the rest left to the file system (zeros, not written by the test).</summary>
+    private static string BigFile(byte[] head, long length)
+    {
+        var path = TestImages.TempPath(".png");
+        using var fs = new FileStream(path, FileMode.CreateNew, FileAccess.Write);
+        fs.Write(head);
+        fs.SetLength(length);
+        return path;
+    }
+
+    /// <summary>
+    /// A large non-image (a TIFF head, under and over the size cap) is refused from its 12-byte
+    /// head: the loader allocates nothing like the file's size, so it never read the body.
+    /// </summary>
+    [Theory]
+    [InlineData(60L * 1024 * 1024)]
+    [InlineData(100L * 1024 * 1024)]
+    public void LargeNonImageFile_IsRefusedWithoutReadingItsBody(long length)
+    {
+        var path = BigFile(new byte[] { 0x49, 0x49, 0x2A, 0x00, 8, 0, 0, 0, 0, 0, 0, 0 }, length);
+        try
+        {
+            var before = GC.GetAllocatedBytesForCurrentThread();
+            Assert.Null(SafeImageLoader.TryProbe(path));
+            Assert.Null(SafeImageLoader.TryDecode(path, 1));
+            Assert.Null(SafeImageLoader.TryReadEncodedFile(path, out _));
+            var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+            Assert.True(allocated < 1024 * 1024, $"allocated {allocated} bytes for a {length}-byte file");
+        }
+        finally { File.Delete(path); }
+    }
+
+    /// <summary>A file over <see cref="SafeImageLoader.MaxEncodedFileBytes"/> is refused even when it starts with a real PNG.</summary>
+    [Fact]
+    public void OverCapFileWithPngHead_IsRefused()
+    {
+        var png = File.ReadAllBytes(TestImages.Fixture("icc-valid.png"));
+        var path = BigFile(png, SafeImageLoader.MaxEncodedFileBytes + 1);
+        try
+        {
+            var before = GC.GetAllocatedBytesForCurrentThread();
+            Assert.Null(SafeImageLoader.TryReadEncodedFile(path, out _));
+            Assert.Null(SafeImageLoader.TryProbe(path));
+            Assert.Null(SafeImageLoader.TryDecode(path, 1));
+            Assert.True(GC.GetAllocatedBytesForCurrentThread() - before < 1024 * 1024);
+        }
+        finally { File.Delete(path); }
+
+        // The same PNG at its own size decodes, so only the size refused it.
+        using var ok = WithFile(png, ".png", p => SafeImageLoader.TryDecode(p, 1));
+        Assert.NotNull(ok);
+    }
+
+    /// <summary>The cap is inclusive: a file of exactly maxBytes is read in full; one byte less of allowance refuses it.</summary>
+    [Fact]
+    public void EncodedFileCap_IsInclusive()
+    {
+        var png = File.ReadAllBytes(TestImages.Fixture("icc-valid.png"));
+        WithFile(png, ".png", path =>
+        {
+            using (var data = SafeImageLoader.TryReadEncodedFile(path, out var kind, maxBytes: png.Length))
+            {
+                Assert.NotNull(data);
+                Assert.Equal(ImageKind.Png, kind);
+                Assert.Equal(png, data!.ToArray());
+            }
+
+            Assert.Null(SafeImageLoader.TryReadEncodedFile(path, out _, maxBytes: png.Length - 1));
+            return 0;
+        });
+    }
+
+    /// <summary>A file bigger than the read buffer is reassembled byte for byte and decodes like the same bytes in memory.</summary>
+    [Fact]
+    public void LargeValidFile_IsReadInChunks_AndDecodesLikeTheBytes()
+    {
+        byte[] png;
+        using (var bmp = TestImages.NoiseBitmap(300, 300, seed: 11))
+        {
+            png = TestImages.SkiaPng(bmp);
+        }
+
+        Assert.True(png.Length > 3 * 81920, $"fixture only {png.Length} bytes");
+        WithFile(png, ".png", path =>
+        {
+            using (var data = SafeImageLoader.TryReadEncodedFile(path, out _))
+            {
+                Assert.Equal(png, data!.ToArray());
+            }
+
+            using var fromFile = SafeImageLoader.TryDecode(path, 1);
+            using var fromBytes = SafeImageLoader.TryDecode(png, 1);
+            Assert.True(fromFile!.RootFrame.GetPixelSpan().SequenceEqual(fromBytes!.RootFrame.GetPixelSpan()));
+            return 0;
+        });
+    }
+
+    /// <summary>The upload check opens one codec and reports both the probe and the frame-0 verdict.</summary>
+    [Fact]
+    public void ProbeAndDecodeFirstFrame_ReportsBothFromOneCodec()
+    {
+        var valid = File.ReadAllBytes(TestImages.Fixture("icc-valid.png"));
+        var (probe, decodes) = SafeImageLoader.ProbeAndDecodeFirstFrame(valid);
+        Assert.Equal(new ImageProbe(ImageKind.Png, 16, 16, 1), probe);
+        Assert.True(decodes);
+
+        // Header fine, body junk: probed, but frame 0 does not decode.
+        (probe, decodes) = SafeImageLoader.ProbeAndDecodeFirstFrame(TestImages.PngWithValidIhdr(16, 16, new byte[64]));
+        Assert.NotNull(probe);
+        Assert.False(decodes);
+
+        // Over budget: probed, never decoded.
+        (probe, decodes) = SafeImageLoader.ProbeAndDecodeFirstFrame(valid, pixelBudget: 16 * 16 - 1);
+        Assert.NotNull(probe);
+        Assert.False(decodes);
+
+        Assert.Equal((null, false), SafeImageLoader.ProbeAndDecodeFirstFrame(null));
+        Assert.Equal((null, false), SafeImageLoader.ProbeAndDecodeFirstFrame(File.ReadAllBytes(TestImages.Fixture("tiff16.tif"))));
+    }
+
+    /// <summary>The bridge's animated load releases each Skia frame as it copies, and still keeps every frame and GIF delay.</summary>
+    [Fact]
+    public void BridgeTryLoad_KeepsEveryFrameAndDelay()
+    {
+        var gif = FourColourGif(3);
+        using var decoded = SafeImageLoader.TryDecode(gif, 60);
+        WithFile(gif, ".gif", path =>
+        {
+            using var image = ImageSharpBridge.TryLoad(path, 60);
+            Assert.NotNull(image);
+            Assert.Equal(3, image!.Frames.Count);
+            for (var i = 0; i < 3; i++)
+            {
+                Assert.Equal(5, SixLabors.ImageSharp.MetadataExtensions.GetGifMetadata(image.Frames[i].Metadata).FrameDelay);
+                var expected = TestPixels.Px(decoded!.Frames[i], 20, 7);
+                var actual = image.Frames[i][20, 7];
+                Assert.Equal(expected, new Rgba(actual.R, actual.G, actual.B, actual.A));
+            }
+
+            return 0;
+        });
     }
 
     /// <summary>A real WebP with its inner fourcc changed is a RIFF container of something else: refused.</summary>

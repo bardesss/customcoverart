@@ -53,8 +53,26 @@ public static class SafeImageLoader
         return (int)Math.Max(1L, frames);
     }
 
+    /// <summary>
+    /// Largest encoded file the loader reads, far above any real poster or upload (uploads are
+    /// capped at a few MB). Library poster paths are not upload-capped, so without this a huge
+    /// file would be read in full before the codec refused it.
+    /// </summary>
+    internal const long MaxEncodedFileBytes = 64L * 1024 * 1024;
+
     /// <summary>Header-only inspection of a file; null when it is missing or not a supported image.</summary>
-    public static ImageProbe? TryProbe(string path) => TryProbe(TryReadFile(path));
+    public static ImageProbe? TryProbe(string path)
+    {
+        try
+        {
+            using var opened = OpenFile(path);
+            return opened?.Probe;
+        }
+        catch
+        {
+            return null;
+        }
+    }
 
     /// <summary>Header-only inspection of in-memory bytes (uploads); null when not a supported image.</summary>
     public static ImageProbe? TryProbe(byte[]? bytes)
@@ -75,16 +93,34 @@ public static class SafeImageLoader
     /// completely. A valid header followed by junk opens a codec but fails here. False for
     /// anything over <see cref="MaxPixelBudget"/>, so this never allocates more than one budget.
     /// </summary>
-    public static bool CanDecodeFirstFrame(byte[]? bytes)
+    public static bool CanDecodeFirstFrame(byte[]? bytes) => ProbeAndDecodeFirstFrame(bytes).FirstFrameDecodes;
+
+    /// <summary>
+    /// The upload check in one pass over one codec: the probe (null when the bytes are not a
+    /// supported image), and whether frame 0 decodes completely. Frame 0 is decoded only when a
+    /// single frame fits <paramref name="pixelBudget"/>; otherwise the second value is false.
+    /// </summary>
+    internal static (ImageProbe? Probe, bool FirstFrameDecodes) ProbeAndDecodeFirstFrame(byte[]? bytes, long pixelBudget = MaxPixelBudget)
     {
         try
         {
-            using var decoded = TryDecode(bytes, maxFrames: 1);
-            return decoded is not null;
+            using var opened = Open(bytes);
+            if (opened is null)
+            {
+                return (null, false);
+            }
+
+            if (!IsWithinBudget(opened.Probe, maxFrames: 1, pixelBudget))
+            {
+                return (opened.Probe, false);
+            }
+
+            using var decoded = DecodeFrames(opened, 1);
+            return (opened.Probe, decoded is not null);
         }
         catch
         {
-            return false;
+            return (null, false);
         }
     }
 
@@ -94,7 +130,17 @@ public static class SafeImageLoader
     /// that fails ends the list there.
     /// </summary>
     public static DecodedImage? TryDecode(string path, int maxFrames, long pixelBudget = MaxPixelBudget)
-        => TryDecode(TryReadFile(path), maxFrames, pixelBudget);
+    {
+        try
+        {
+            using var opened = OpenFile(path);
+            return Decode(opened, maxFrames, pixelBudget);
+        }
+        catch
+        {
+            return null;
+        }
+    }
 
     /// <summary>As <see cref="TryDecode(string, int, long)"/> for bytes already in memory.</summary>
     internal static DecodedImage? TryDecode(byte[]? bytes, int maxFrames, long pixelBudget = MaxPixelBudget)
@@ -102,51 +148,126 @@ public static class SafeImageLoader
         try
         {
             using var opened = Open(bytes);
-            if (opened is null || !IsWithinBudget(opened.Probe, maxFrames, pixelBudget))
-            {
-                return null;
-            }
-
-            return DecodeFrames(opened, FramesToDecode(opened.Probe, maxFrames, pixelBudget));
+            return Decode(opened, maxFrames, pixelBudget);
         }
         catch
         {
             return null;
         }
+    }
+
+    private static DecodedImage? Decode(OpenedCodec? opened, int maxFrames, long pixelBudget)
+        => opened is null || !IsWithinBudget(opened.Probe, maxFrames, pixelBudget)
+            ? null
+            : DecodeFrames(opened, FramesToDecode(opened.Probe, maxFrames, pixelBudget));
+
+    /// <summary>
+    /// Reads an encoded image file into native memory, but only after the cheap checks pass: the
+    /// file is at most <paramref name="maxBytes"/> long and its first bytes carry an allowed
+    /// signature. Nothing past the 12-byte head is read for a file that fails them. The body is
+    /// read once, straight into the <see cref="SKData"/> the codec uses. Not
+    /// <see cref="SKData.Create(string)"/>: that maps the file, and a library poster truncated by
+    /// another process while mapped would fault the whole server instead of failing one decode.
+    /// A file that shrinks while it is read gives null.
+    /// </summary>
+    internal static SKData? TryReadEncodedFile(string? path, out ImageKind kind, long maxBytes = MaxEncodedFileBytes)
+    {
+        kind = default;
+        if (string.IsNullOrEmpty(path) || !File.Exists(path))
+        {
+            return null;
+        }
+
+        using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete, bufferSize: 1);
+        var length = stream.Length;
+        if (length <= 0 || length > maxBytes)
+        {
+            return null;
+        }
+
+        var head = new byte[ImageSignature.HeadLength];
+        var headRead = ReadUpTo(stream, head);
+        if (ImageSignature.Detect(head.AsSpan(0, headRead)) is not { } detected)
+        {
+            return null;
+        }
+
+        var data = SKData.Create(length);
+        try
+        {
+            System.Runtime.InteropServices.Marshal.Copy(head, 0, data.Data, headRead);
+            var buffer = new byte[(int)Math.Min(81920L, length)];
+            long offset = headRead;
+            while (offset < length)
+            {
+                var n = stream.Read(buffer, 0, (int)Math.Min(buffer.Length, length - offset));
+                if (n <= 0)
+                {
+                    data.Dispose();
+                    return null;
+                }
+
+                System.Runtime.InteropServices.Marshal.Copy(buffer, 0, data.Data + (nint)offset, n);
+                offset += n;
+            }
+
+            kind = detected;
+            return data;
+        }
+        catch
+        {
+            data.Dispose();
+            throw;
+        }
+    }
+
+    private static int ReadUpTo(Stream stream, byte[] buffer)
+    {
+        var total = 0;
+        while (total < buffer.Length)
+        {
+            var n = stream.Read(buffer, total, buffer.Length - total);
+            if (n <= 0)
+            {
+                break;
+            }
+
+            total += n;
+        }
+
+        return total;
+    }
+
+    private static OpenedCodec? OpenFile(string? path)
+    {
+        var data = TryReadEncodedFile(path, out var kind);
+        return data is null ? null : Open(data, kind);
+    }
+
+    /// <summary>In-memory bytes: signature and size cap first, then a single native copy for the codec.</summary>
+    private static OpenedCodec? Open(byte[]? bytes)
+    {
+        if (bytes is null || bytes.LongLength > MaxEncodedFileBytes || ImageSignature.Detect(bytes) is not { } kind)
+        {
+            return null;
+        }
+
+        var data = SKData.CreateCopy(bytes);
+        return data is null ? null : Open(data, kind);
     }
 
     /// <summary>
-    /// Reads the file into managed memory. Not <see cref="SKData.Create(string)"/>: that maps the
-    /// file, and a library poster truncated by another process while mapped would fault the whole
-    /// server instead of failing one decode.
+    /// Header-only codec over <paramref name="data"/> (which it takes ownership of) and format
+    /// agreement with the sniffed <paramref name="kind"/>. Null when any step refuses.
     /// </summary>
-    private static byte[]? TryReadFile(string path)
+    private static OpenedCodec? Open(SKData data, ImageKind kind)
     {
-        try
-        {
-            return string.IsNullOrEmpty(path) || !File.Exists(path) ? null : File.ReadAllBytes(path);
-        }
-        catch
-        {
-            return null;
-        }
-    }
-
-    /// <summary>Signature check, header-only codec, format agreement. Null when any step refuses.</summary>
-    private static OpenedCodec? Open(byte[]? bytes)
-    {
-        if (bytes is null || ImageSignature.Detect(bytes) is not { } kind)
-        {
-            return null;
-        }
-
-        SKData? data = null;
+        SKData? owned = data;
         SKCodec? codec = null;
         try
         {
-            data = SKData.CreateCopy(bytes);
-            codec = data is null ? null : SKCodec.Create(data);
-            if (data is null || codec is null || !ImageSignature.Matches(kind, codec.EncodedFormat))
+            codec = SKCodec.Create(owned);
+            if (codec is null || !ImageSignature.Matches(kind, codec.EncodedFormat))
             {
                 return null;
             }
@@ -157,15 +278,15 @@ public static class SafeImageLoader
                 return null;
             }
 
-            var opened = new OpenedCodec(data, codec, new ImageProbe(kind, info.Width, info.Height, Math.Max(1, codec.FrameCount)));
-            data = null;
+            var opened = new OpenedCodec(owned, codec, new ImageProbe(kind, info.Width, info.Height, Math.Max(1, codec.FrameCount)));
+            owned = null;
             codec = null;
             return opened;
         }
         finally
         {
             codec?.Dispose();
-            data?.Dispose();
+            owned?.Dispose();
         }
     }
 
