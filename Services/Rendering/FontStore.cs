@@ -109,11 +109,14 @@ internal static class FontStore
                     return true;
                 }
 
+                // A missing file is remembered like a broken one: its write time reads as the
+                // 1601 sentinel until it reappears, so later calls stop at the check above
+                // instead of throwing and catching FileNotFoundException on every render.
                 var loaded = LoadCustom(path);
                 if (loaded is null)
                 {
                     BrokenFiles[path] = writeTime;
-                    NoteUnusable(path);
+                    NoteUnreadable(path);
                     return false;
                 }
 
@@ -125,8 +128,9 @@ internal static class FontStore
         }
         catch (Exception)
         {
-            // Missing file, permissions, a native loader that threw: same as an unusable font.
-            NoteUnusable(path);
+            // Permissions, a sharing violation, a native loader that threw: not remembered, as
+            // these can be transient, but warned about once like any unreadable font.
+            NoteUnreadable(path);
             return false;
         }
     }
@@ -136,8 +140,9 @@ internal static class FontStore
         => CustomFaces.TryGetValue(path, out var cached) && cached.WriteTimeUtc == File.GetLastWriteTimeUtc(path);
 
     /// <summary>
-    /// Logs, once per path per process, that a font is not being used. A path whose extension is
-    /// not supported reports the upper-cased extension as its format, any other path "unreadable".
+    /// Logs, once per path per process, that a font is not being used because of its format. A path
+    /// whose extension is not supported reports the upper-cased extension as its format, a path
+    /// without one "unreadable".
     /// </summary>
     internal static void NoteUnusable(string path)
     {
@@ -154,6 +159,22 @@ internal static class FontStore
             "Custom font {Name} is in a format this version no longer reads ({Format}); rendering with Noto Sans. Re-upload it as TTF or OTF.",
             Path.GetFileName(path),
             format);
+    }
+
+    /// <summary>
+    /// Logs, once per path per process, that a font with a supported extension is missing, damaged
+    /// or refused, so the user knows to upload it again rather than convert it.
+    /// </summary>
+    private static void NoteUnreadable(string path)
+    {
+        if (!Warned.TryAdd(path, 0))
+        {
+            return;
+        }
+
+        (_testLog ?? Log).LogWarning(
+            "Custom font {Name} could not be read; rendering with Noto Sans. Re-upload it.",
+            Path.GetFileName(path));
     }
 
     internal static void ResetWarningsForTests() => Warned.Clear();
@@ -179,7 +200,16 @@ internal static class FontStore
 
     private static SKTypeface? LoadCustom(string path)
     {
-        var bytes = File.ReadAllBytes(path);
+        byte[] bytes;
+        try
+        {
+            bytes = File.ReadAllBytes(path);
+        }
+        catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException)
+        {
+            return null;
+        }
+
         if (!IsSupportedSignature(bytes) || !SfntSanity.LooksValid(bytes))
         {
             return null;

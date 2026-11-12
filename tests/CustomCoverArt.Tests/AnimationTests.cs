@@ -155,7 +155,7 @@ public class AnimationTests
     }
 
     /// <summary>
-    /// Regression guard for the font-sizing invariant in DocumentRenderer.RenderTextLayer:
+    /// Regression guard for the font-sizing invariant in TextRenderer.RenderTextLayer:
     /// font pixel size MUST be computed as `layer.Size * doc.Canvas.Height` (the
     /// document's declared canvas size), not from the actual pixel buffer height.
     ///

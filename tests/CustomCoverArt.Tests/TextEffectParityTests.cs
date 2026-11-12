@@ -128,7 +128,7 @@ public class TextEffectParityTests
     [Fact]
     public void ShadowTransform_UnrotatedLayer_IsIdentity()
     {
-        Assert.True(DocumentRenderer.ShadowTransform(System.Numerics.Matrix3x2.Identity, 7f, -3f).IsIdentity);
+        Assert.True(CustomCoverArt.Services.Rendering.TextRenderer.ShadowTransform(System.Numerics.Matrix3x2.Identity, 7f, -3f).IsIdentity);
     }
 
     // 60px "HELLO" with a red outline, centred on black.

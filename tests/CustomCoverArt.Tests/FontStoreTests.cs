@@ -313,7 +313,69 @@ public class FontStoreTests
 
         var warning = Assert.Single(log.Entries, e => e.Message.Contains(Path.GetFileName(path)));
         Assert.Equal(LogLevel.Warning, warning.Level);
-        Assert.Contains("(unreadable)", warning.Message);
+        Assert.Contains("could not be read", warning.Message);
+        Assert.DoesNotContain("no longer reads", warning.Message);
+    }
+
+    [Fact]
+    public void CustomFont_MissingFile_IsRemembered_SoLaterCallsDoNotThrowAndCatch()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "cca_missing_" + Guid.NewGuid().ToString("N") + ".ttf");
+        var name = Path.GetFileName(path);
+        var thrown = 0;
+        void Count(object? sender, System.Runtime.ExceptionServices.FirstChanceExceptionEventArgs e)
+        {
+            if (e.Exception is IOException && e.Exception.Message.Contains(name)) { System.Threading.Interlocked.Increment(ref thrown); }
+        }
+
+        Assert.False(FontStore.TryGetCustom(path, out _));
+        AppDomain.CurrentDomain.FirstChanceException += Count;
+        try
+        {
+            for (var i = 0; i < 5; i++)
+            {
+                Assert.Same(FontStore.Bundled(FontWeight.Normal), FontStore.Resolve(new CoverLayer { FontPath = path }));
+            }
+        }
+        finally
+        {
+            AppDomain.CurrentDomain.FirstChanceException -= Count;
+        }
+
+        Assert.Equal(0, thrown);
+    }
+
+    [Fact]
+    public void CustomFont_MissingFileThatAppearsLater_IsPickedUp()
+    {
+        using var dir = new TempFolder();
+        var path = dir.File("late-upload.ttf");
+
+        Assert.False(FontStore.TryGetCustom(path, out _));
+        File.Copy(FontFixtures.Path("sub.ttf"), path);
+
+        Assert.True(FontStore.TryGetCustom(path, out var face));
+        Assert.True(HasOutline(face, 'H'));
+    }
+
+    [Fact]
+    public void CustomFont_DamagedFileWithASupportedExtension_LogsThatItCouldNotBeRead()
+    {
+        using var dir = new TempFolder();
+        var path = dir.File("damaged-upload.otf");
+        File.WriteAllText(path, "not a font at all");
+        var log = new CapturingLogger<FontStoreTests>();
+        using var capture = FontStore.CaptureLogForTests(log);
+        FontStore.ResetWarningsForTests();
+
+        Assert.Same(FontStore.Bundled(FontWeight.Normal), FontStore.Resolve(new CoverLayer { FontPath = path }));
+        Assert.Same(FontStore.Bundled(FontWeight.Normal), FontStore.Resolve(new CoverLayer { FontPath = path }));
+
+        var warning = Assert.Single(log.Entries, e => e.Message.Contains("damaged-upload.otf"));
+        Assert.Equal(LogLevel.Warning, warning.Level);
+        Assert.Equal(
+            "Custom font damaged-upload.otf could not be read; rendering with Noto Sans. Re-upload it.",
+            warning.Message);
     }
 
     [Fact]

@@ -36,6 +36,6 @@ public class TextFallbackTests
     public void FallbackFontPixelSize_IsClamped(float size, int canvasHeight, float expected)
     {
         var doc = new CoverDocument { Canvas = new CanvasSettings { Width = canvasHeight, Height = canvasHeight } };
-        Assert.Equal(expected, DocumentRenderer.FallbackFontPixelSize(new CoverLayer { Size = size }, doc), 3);
+        Assert.Equal(expected, CustomCoverArt.Services.Rendering.TextRenderer.FallbackFontPixelSize(new CoverLayer { Size = size }, doc), 3);
     }
 }

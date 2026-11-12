@@ -1712,7 +1712,7 @@ export default function (view) {
 
         // An uploaded font is registered (ensureLayerFont) as one FontFace with no weight
         // descriptor, i.e. a single 400 face, and the server renders custom fonts at their own
-        // weight: DocumentRenderer.CreateFont ignores Weight for them. Asking the canvas for
+        // weight: FontStore.Resolve ignores Weight for them. Asking the canvas for
         // 700 of a 400-only family makes the browser fake a bold the cover will never have,
         // so a ready custom font is requested at 400. While it is loading or failed,
         // fontFamilyFor draws Noto Sans instead, which the server's fallback also renders at
