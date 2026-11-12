@@ -88,7 +88,7 @@ public static class DocumentRenderer
         {
             // Shared decompression-bomb guard; a logo is always drawn as a still, so only
             // its first frame is ever decoded.
-            using var logo = SafeImageLoader.TryLoadRgba32(layer.ImagePath, maxFrames: 1);
+            using var logo = ImageSharpBridge.TryLoadStill(layer.ImagePath);
             if (logo is null)
             {
                 return;

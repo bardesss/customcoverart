@@ -3,8 +3,8 @@ using System.Buffers.Binary;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using CustomCoverArt.Models;
 using CustomCoverArt.Services;
+using CustomCoverArt.Services.Rendering;
 using Microsoft.AspNetCore.Http;
 using NSubstitute;
 using SixLabors.ImageSharp;
@@ -13,19 +13,17 @@ using SixLabors.ImageSharp.Formats.Bmp;
 using SixLabors.ImageSharp.Formats.Gif;
 using SixLabors.ImageSharp.Formats.Jpeg;
 using SixLabors.ImageSharp.Formats.Png;
-using SixLabors.ImageSharp.Formats.Tga;
-using SixLabors.ImageSharp.Formats.Tiff;
 using SixLabors.ImageSharp.Formats.Webp;
-using SixLabors.ImageSharp.Metadata.Profiles.Icc;
 using SixLabors.ImageSharp.PixelFormats;
+using SkiaSharp;
 using Xunit;
 
 namespace CustomCoverArt.Tests;
 
 /// <summary>
 /// The plugin decodes only PNG, JPEG, GIF, BMP and WebP. Whatever the file name, bytes in any
-/// other format (TIFF above all, whose ImageSharp 3.1.12 codec has open advisories) must never
-/// reach a decoder, and embedded ICC profiles must never be kept for later parsing.
+/// other format (TIFF and TGA, and ICO, WBMP, HEIF, AVIF, RAW, which Skia could open) must never
+/// reach a decoder, and embedded ICC profiles must never be applied or kept.
 /// </summary>
 public class ImageFormatRestrictionTests
 {
@@ -36,17 +34,11 @@ public class ImageFormatRestrictionTests
         return ms.ToArray();
     }
 
-    private static byte[] TiffBytes()
-    {
-        using var img = new Image<Rgba32>(16, 16, Color.Red);
-        return Encode(img, new TiffEncoder());
-    }
+    /// <summary>16×16 red TIFF (little-endian, "II*\0"), exported once from ImageSharp's TiffEncoder.</summary>
+    private static byte[] TiffBytes() => File.ReadAllBytes(TestImages.Fixture("tiff16.tif"));
 
-    private static byte[] TgaBytes()
-    {
-        using var img = new Image<Rgba32>(16, 16, Color.Red);
-        return Encode(img, new TgaEncoder());
-    }
+    /// <summary>16×16 red TGA, exported once from ImageSharp's TgaEncoder.</summary>
+    private static byte[] TgaBytes() => File.ReadAllBytes(TestImages.Fixture("tga16.tga"));
 
     private static ILocalizationService Loc()
     {
@@ -56,10 +48,12 @@ public class ImageFormatRestrictionTests
     }
 
     [Fact]
-    public void DecodeConfiguration_KnowsOnlyTheFiveSupportedFormats()
+    public void AllowList_IsExactlyTheFiveSupportedFormats()
     {
-        var names = SafeImageLoader.DecodeConfiguration.ImageFormats.Select(f => f.Name).OrderBy(n => n).ToArray();
-        Assert.Equal(new[] { "BMP", "GIF", "JPEG", "PNG", "Webp" }.OrderBy(n => n), names, StringComparer.OrdinalIgnoreCase);
+        Assert.Equal(
+            new[] { ImageKind.Png, ImageKind.Jpeg, ImageKind.Gif, ImageKind.Bmp, ImageKind.Webp }.OrderBy(k => k),
+            ImageSignature.Allowed.OrderBy(k => k));
+        Assert.Equal(Enum.GetValues<ImageKind>().OrderBy(k => k), ImageSignature.Allowed.OrderBy(k => k));
     }
 
     [Theory]
@@ -70,18 +64,21 @@ public class ImageFormatRestrictionTests
     public void UnsupportedFormat_UnderAnyName_IsNeverDecoded(string format, string ext)
     {
         var bytes = format == "tiff" ? TiffBytes() : TgaBytes();
-        // Sanity: ImageSharp's full default configuration does decode these bytes.
-        using (Image.Load(bytes)) { }
+        if (format == "tiff")
+        {
+            Assert.Equal(new byte[] { 0x49, 0x49, 0x2A, 0x00 }, bytes.Take(4)); // sanity: really a TIFF
+        }
+
+        Assert.Null(ImageSignature.Detect(bytes));
 
         var path = TestImages.TempPath(ext);
         File.WriteAllBytes(path, bytes);
         try
         {
-            Assert.Null(SafeImageLoader.TryIdentify(path));
-            Assert.Null(SafeImageLoader.TryIdentify(bytes));
+            Assert.Null(SafeImageLoader.TryProbe(path));
+            Assert.Null(SafeImageLoader.TryProbe(bytes));
             Assert.False(SafeImageLoader.CanDecodeFirstFrame(bytes));
-            Assert.Null(SafeImageLoader.TryLoad(path, maxFrames: 1));
-            Assert.Null(SafeImageLoader.TryLoadRgba32(path, maxFrames: 1));
+            Assert.Null(SafeImageLoader.TryDecode(path, maxFrames: 1));
         }
         finally { File.Delete(path); }
     }
@@ -131,14 +128,14 @@ public class ImageFormatRestrictionTests
         File.WriteAllBytes(path, bytes);
         try
         {
-            Assert.NotNull(SafeImageLoader.TryIdentify(path));
+            var probe = SafeImageLoader.TryProbe(path);
+            Assert.NotNull(probe);
+            Assert.Equal(format, probe!.Kind.ToString(), StringComparer.OrdinalIgnoreCase);
             Assert.True(SafeImageLoader.CanDecodeFirstFrame(bytes));
-            using var native = SafeImageLoader.TryLoad(path, maxFrames: 1);
-            Assert.NotNull(native);
-            Assert.Equal(24, native!.Width);
-            using var rgba = SafeImageLoader.TryLoadRgba32(path, maxFrames: 1);
-            Assert.NotNull(rgba);
-            Assert.True(rgba![12, 12].G > 100, $"{format} decoded to the wrong colour");
+            using var decoded = SafeImageLoader.TryDecode(path, maxFrames: 1);
+            Assert.NotNull(decoded);
+            Assert.Equal(24, decoded!.Width);
+            Assert.True(TestPixels.Px(decoded.RootFrame, 12, 12).G > 100, $"{format} decoded to the wrong colour");
 
             var file = new FormFile(new MemoryStream(bytes), 0, bytes.Length, "file", "cover" + ext);
             var result = await new ImageProcessingService(Loc()).ValidateFileAsync(file);
@@ -163,13 +160,14 @@ public class ImageFormatRestrictionTests
 
         try
         {
-            using var loaded = SafeImageLoader.TryLoadRgba32(path, maxFrames: 60);
+            using var loaded = SafeImageLoader.TryDecode(path, maxFrames: 60);
             Assert.NotNull(loaded);
-            Assert.Equal(2, loaded!.Frames.Count);
-            Assert.Equal(7, loaded.Frames[0].Metadata.GetGifMetadata().FrameDelay);
-            Assert.Equal(13, loaded.Frames[1].Metadata.GetGifMetadata().FrameDelay);
-            Assert.Equal(3, loaded.Metadata.GetGifMetadata().RepeatCount);
-            Assert.Equal(0, loaded[8, 8].A);
+            Assert.Equal(ImageKind.Gif, loaded!.Kind);
+            Assert.Equal(2, loaded.Frames.Count);
+            Assert.Equal(new[] { 70, 130 }, loaded.FrameDurationsMs);
+            Assert.Equal(3, loaded.RepetitionCount);
+            Assert.Equal(0, TestPixels.Px(loaded.RootFrame, 8, 8).A);
+            Assert.Equal(new Rgba(0, 0, 255, 255), TestPixels.Px(loaded.Frames[1], 8, 8));
         }
         finally { File.Delete(path); }
     }
@@ -181,114 +179,97 @@ public class ImageFormatRestrictionTests
         using (var img = new Image<Rgba32>(8, 8, new Rgba32(255, 0, 0, 0))) { img[0, 0] = new Rgba32(0, 0, 255, 128); img.SaveAsPng(path); }
         try
         {
-            using var loaded = SafeImageLoader.TryLoadRgba32(path, maxFrames: 1);
+            using var loaded = SafeImageLoader.TryDecode(path, maxFrames: 1);
             Assert.NotNull(loaded);
-            Assert.Equal(0, loaded![4, 4].A);
-            Assert.Equal(128, loaded[0, 0].A);
+            Assert.Equal(0, TestPixels.Px(loaded!.RootFrame, 4, 4).A);
+            var half = TestPixels.Px(loaded.RootFrame, 0, 0);
+            Assert.Equal(128, half.A);
+            Assert.True(TestPixels.Near(half, new Rgba(0, 0, 255, 128), 1), $"got {half}");
         }
         finally { File.Delete(path); }
     }
 
-    /// <summary>A minimal well-formed ICC header (no tags) that ImageSharp accepts as valid.</summary>
-    private static byte[] MinimalIccProfile()
-    {
-        var p = new byte[132];
-        BinaryPrimitives.WriteUInt32BigEndian(p.AsSpan(0), (uint)p.Length);
-        BinaryPrimitives.WriteUInt32BigEndian(p.AsSpan(8), 0x04000000);
-        BinaryPrimitives.WriteUInt32BigEndian(p.AsSpan(12), 0x6D6E7472); // mntr
-        BinaryPrimitives.WriteUInt32BigEndian(p.AsSpan(16), 0x52474220); // 'RGB '
-        BinaryPrimitives.WriteUInt32BigEndian(p.AsSpan(20), 0x58595A20); // 'XYZ '
-        "acsp"u8.CopyTo(p.AsSpan(36));
-        return p;
-    }
-
-    /// <summary>The GHSA-gwg2-r3hj-4w44 profile: an mpet CLUT declaring 15x15 channels, truncated.</summary>
-    private static byte[] MalformedClutProfile()
-    {
-        const int tagOffset = 144;
-        const int elementOffset = 168;
-        var p = new byte[200];
-        void U32(int o, uint v) => BinaryPrimitives.WriteUInt32BigEndian(p.AsSpan(o), v);
-        void U16(int o, ushort v) => BinaryPrimitives.WriteUInt16BigEndian(p.AsSpan(o), v);
-        U32(0, (uint)p.Length);
-        U32(8, 0x04000000);
-        U32(12, 0x6D6E7472);
-        U32(16, 0x52474220);
-        U32(20, 0x58595A20);
-        "acsp"u8.CopyTo(p.AsSpan(36));
-        U32(128, 1);
-        U32(132, 0x41324230); // A2B0
-        U32(136, tagOffset);
-        U32(140, 56);
-        U32(tagOffset, 0x6D706574); // mpet
-        U32(tagOffset + 12, 1);
-        U32(tagOffset + 16, 24);
-        U32(tagOffset + 20, 32);
-        U32(elementOffset, 0x636C7574); // clut
-        U16(elementOffset + 4, 15);
-        U16(elementOffset + 6, 15);
-        for (int i = 0; i < 15; i++) { p[elementOffset + 8 + i] = 3; }
-        return p;
-    }
-
+    /// <summary>
+    /// 16×16 green images carrying an ICC profile, exported once from ImageSharp: a minimal
+    /// well-formed header (JPEG APP2, PNG iCCP, WebP ICCP) and the GHSA-gwg2-r3hj-4w44 profile
+    /// (an mpet CLUT declaring 15×15 channels, truncated) in a PNG.
+    /// </summary>
     public static TheoryData<string, string> IccCarriers => new()
     {
-        { "jpeg", "valid" },
-        { "png", "valid" },
-        { "webp", "valid" },
-        { "png", "malformed" },
+        { "icc-valid.jpg", "ICC_PROFILE" },
+        { "icc-valid.png", "iCCP" },
+        { "icc-valid.webp", "ICCP" },
+        { "icc-malformed-clut.png", "iCCP" },
     };
 
     [Theory]
     [MemberData(nameof(IccCarriers))]
-    public void EmbeddedIccProfile_LoadsButIsNeverKept(string format, string profile)
+    public void EmbeddedIccProfile_LoadsButIsNeverKept(string fixture, string marker)
     {
-        var icc = profile == "valid" ? MinimalIccProfile() : MalformedClutProfile();
-        byte[] bytes;
-        using (var img = new Image<Rgba32>(16, 16, Color.Green))
+        var path = TestImages.Fixture(fixture);
+        var bytes = File.ReadAllBytes(path);
+
+        // Sanity: the fixture really carries the profile.
+        Assert.True(
+            bytes.AsSpan().IndexOf(System.Text.Encoding.ASCII.GetBytes(marker)) >= 0,
+            $"{fixture} lost its {marker} chunk");
+
+        var decoded = SafeImageLoader.TryDecode(path, maxFrames: 1);
+        if (decoded is null)
         {
-            img.Metadata.IccProfile = new IccProfile(icc);
-            bytes = Encode(img, format switch
-            {
-                "jpeg" => new JpegEncoder(),
-                "webp" => new WebpEncoder(),
-                _ => new PngEncoder(),
-            });
+            // The malformed profile may be refused outright; it must never throw.
+            Assert.StartsWith("icc-malformed", fixture, StringComparison.Ordinal);
+            return;
         }
 
-        // Sanity: the fixture really carries the profile (ImageSharp's default decode keeps it).
-        using (var full = Image.Load(bytes))
+        using (decoded)
         {
-            Assert.NotNull(full.Metadata.IccProfile);
+            Assert.Null(decoded.RootFrame.ColorSpace);
+            Assert.True(TestPixels.Px(decoded.RootFrame, 8, 8).G > 100);
         }
-
-        var path = TestImages.TempPath("." + (format == "jpeg" ? "jpg" : format));
-        File.WriteAllBytes(path, bytes);
-        try
-        {
-            using var native = SafeImageLoader.TryLoad(path, maxFrames: 1);
-            Assert.NotNull(native);
-            Assert.Null(native!.Metadata.IccProfile);
-            Assert.All(native.Frames, f => Assert.Null(f.Metadata.IccProfile));
-
-            using var rgba = SafeImageLoader.TryLoadRgba32(path, maxFrames: 1);
-            Assert.NotNull(rgba);
-            Assert.Null(rgba!.Metadata.IccProfile);
-            Assert.True(rgba[8, 8].G > 100);
-        }
-        finally { File.Delete(path); }
     }
 
+    /// <summary>
+    /// Skia ships an ICO codec. An ICO wrapping a perfectly good PNG must still be refused,
+    /// because the allow-list runs on the bytes before any codec does.
+    /// </summary>
     [Fact]
-    public void LoadedImages_CarryTheRestrictedConfiguration()
+    public async Task Decoder_RejectsAnIcoEvenThoughSkiaCanReadIt()
     {
+        var png = File.ReadAllBytes(TestImages.Fixture("icc-valid.png"));
+        var ico = new byte[22 + png.Length];
+        BinaryPrimitives.WriteUInt16LittleEndian(ico.AsSpan(2), 1);   // type: icon
+        BinaryPrimitives.WriteUInt16LittleEndian(ico.AsSpan(4), 1);   // one image
+        ico[6] = 16;                                                  // width
+        ico[7] = 16;                                                  // height
+        BinaryPrimitives.WriteUInt16LittleEndian(ico.AsSpan(10), 1);  // planes
+        BinaryPrimitives.WriteUInt16LittleEndian(ico.AsSpan(12), 32); // bits per pixel
+        BinaryPrimitives.WriteUInt32LittleEndian(ico.AsSpan(14), (uint)png.Length);
+        BinaryPrimitives.WriteUInt32LittleEndian(ico.AsSpan(18), 22);
+        png.CopyTo(ico, 22);
+
+        // Sanity: Skia itself opens this file as an ICO.
+        using (var data = SKData.CreateCopy(ico))
+        using (var codec = SKCodec.Create(data))
+        {
+            Assert.NotNull(codec);
+            Assert.Equal(SKEncodedImageFormat.Ico, codec!.EncodedFormat);
+        }
+
         var path = TestImages.TempPath(".png");
-        using (var img = new Image<Rgba32>(8, 8, Color.Green)) { img.SaveAsPng(path); }
+        File.WriteAllBytes(path, ico);
         try
         {
-            using var loaded = SafeImageLoader.TryLoad(path, maxFrames: 1);
-            Assert.NotNull(loaded);
-            Assert.DoesNotContain(loaded!.Configuration.ImageFormats, f => f is TiffFormat);
+            Assert.Null(ImageSignature.Detect(ico));
+            Assert.Null(SafeImageLoader.TryProbe(path));
+            Assert.Null(SafeImageLoader.TryProbe(ico));
+            Assert.Null(SafeImageLoader.TryDecode(path, maxFrames: 1));
+            Assert.False(SafeImageLoader.CanDecodeFirstFrame(ico));
+
+            var file = new FormFile(new MemoryStream(ico), 0, ico.Length, "file", "logo.png");
+            var result = await new ImageProcessingService(Loc()).ValidateFileAsync(file);
+            Assert.False(result.IsValid);
+            Assert.Equal("errors.invalid_file_format", result.ErrorMessage);
         }
         finally { File.Delete(path); }
     }

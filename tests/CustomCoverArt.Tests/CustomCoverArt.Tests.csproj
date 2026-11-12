@@ -37,4 +37,8 @@
     <ProjectReference Include="..\..\CustomCoverArt.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="Fixtures\**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

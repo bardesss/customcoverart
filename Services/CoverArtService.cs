@@ -151,7 +151,7 @@ public class CoverArtService : ICoverArtService
                     // this render uses. A still cover takes ONE frame of an animated source,
                     // so the resize/blur in ApplyBackgroundLayer no longer runs on frames that
                     // are never drawn.
-                    backgroundImage = SafeImageLoader.TryLoad(document.Background.ImagePath, BackgroundMaxFrames(document));
+                    backgroundImage = ImageSharpBridge.TryLoad(document.Background.ImagePath, BackgroundMaxFrames(document));
                     if (backgroundImage is null)
                     {
                         _logger.LogWarning("Background image ignored (missing, undecodable or too large): {Path}", document.Background.ImagePath);

@@ -1,4 +1,5 @@
 using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Gif;
 using SixLabors.ImageSharp.PixelFormats;
 using SkiaSharp;
 
@@ -43,6 +44,60 @@ internal static class ImageSharpBridge
         }
     }
 
+    /// <summary>
+    /// Copies every decoded frame into one straight-alpha ImageSharp image. For a GIF source each
+    /// frame also gets its <see cref="GifFrameMetadata.FrameDelay"/> (centiseconds) from the
+    /// codec's duration, so the animated passthrough keeps GIF timing; other sources (animated
+    /// WebP) leave it 0 and the document's delay applies, as with ImageSharp's own decoder (spec 6.2).
+    /// </summary>
+    public static Image<Rgba32> ToImageSharp(DecodedImage decoded)
+    {
+        ArgumentNullException.ThrowIfNull(decoded);
+        var image = ToImageSharp(decoded.RootFrame);
+        try
+        {
+            SetGifDelay(decoded, 0, image.Frames.RootFrame);
+            for (var i = 1; i < decoded.Frames.Count; i++)
+            {
+                using var frame = ToImageSharp(decoded.Frames[i]);
+                var added = image.Frames.AddFrame(frame.Frames.RootFrame);
+                SetGifDelay(decoded, i, added);
+            }
+
+            return image;
+        }
+        catch
+        {
+            image.Dispose();
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// The first frame of an untrusted image through <see cref="SafeImageLoader"/>'s guard, as an
+    /// ImageSharp image (logos, poster tiles), or null when the guard refuses it.
+    /// </summary>
+    public static Image<Rgba32>? TryLoadStill(string path)
+    {
+        using var decoded = SafeImageLoader.TryDecode(path, maxFrames: 1);
+        return decoded is null ? null : ToImageSharp(decoded.RootFrame);
+    }
+
+    /// <summary>Every decoded frame of an untrusted image (see <see cref="ToImageSharp(DecodedImage)"/>), or null when the guard refuses it.</summary>
+    public static Image<Rgba32>? TryLoad(string path, int maxFrames)
+    {
+        using var decoded = SafeImageLoader.TryDecode(path, maxFrames);
+        return decoded is null ? null : ToImageSharp(decoded);
+    }
+
+    private static void SetGifDelay(DecodedImage decoded, int index, ImageFrame frame)
+    {
+        if (decoded.Kind == ImageKind.Gif)
+        {
+            frame.Metadata.GetGifMetadata().FrameDelay = decoded.FrameDurationsMs[index] / 10;
+        }
+    }
+
     /// <summary>Copies <paramref name="canvas"/> into a bitmap, runs <paramref name="draw"/> on it, and copies the result back.</summary>
     public static void DrawOnto(Image<Rgba32> canvas, Action<SKBitmap> draw)
     {
@@ -79,6 +134,17 @@ internal static class ImageSharpBridge
 
     private static void CopyOut(SKBitmap src, Image<Rgba32> dst)
     {
+        // The byte walk below assumes premultiplied RGBA8888, tightly packed, same size.
+        if (src.ColorType != SKColorType.Rgba8888 || src.AlphaType != SKAlphaType.Premul)
+        {
+            throw new ArgumentException($"Expected an Rgba8888/Premul bitmap, got {src.ColorType}/{src.AlphaType}.", nameof(src));
+        }
+
+        if (src.RowBytes != src.Width * 4 || src.Width != dst.Width || src.Height != dst.Height)
+        {
+            throw new ArgumentException($"Bitmap {src.Width}x{src.Height} (row bytes {src.RowBytes}) does not match a tightly packed {dst.Width}x{dst.Height} target.", nameof(src));
+        }
+
         var w = dst.Width;
         var bytes = src.GetPixelSpan().ToArray();
         dst.ProcessPixelRows(accessor =>

@@ -111,14 +111,14 @@ public class ImageProcessingService : IImageProcessingService
             }
         }
 
-        // The real check: the bytes must be a supported image, and a single frame must fit
-        // the decode budget. Image.Identify reads headers and frame metadata only, never
-        // pixel data. When Identify failed and only the PNG header fallback identified the
-        // file (it throws on some valid APNGs), a header proves nothing, so after the budget
-        // check one frame is decoded to prove the file is really an image.
+        // The real check: the bytes must carry one of the five allowed signatures, open in the
+        // matching codec, and a single frame must fit the decode budget. The probe reads
+        // headers only. A header proves nothing about the rest of the file (a valid PNG header
+        // followed by junk or HTML opens a codec), so after the budget check the first frame is
+        // always decoded to prove the file is really an image.
         try
         {
-            var info = SafeImageLoader.TryIdentify(bytes, out var viaHeaderFallback);
+            var info = SafeImageLoader.TryProbe(bytes);
             if (info is null || info.Width <= 0 || info.Height <= 0)
             {
                 result.IsValid = false;
@@ -132,7 +132,7 @@ public class ImageProcessingService : IImageProcessingService
                 result.IsValid = false;
                 result.ErrorMessage = _localizationService.GetString("errors.image_too_large");
             }
-            else if (viaHeaderFallback && !SafeImageLoader.CanDecodeFirstFrame(bytes))
+            else if (!SafeImageLoader.CanDecodeFirstFrame(bytes))
             {
                 result.IsValid = false;
                 result.ErrorMessage = _localizationService.GetString("errors.invalid_file_format");

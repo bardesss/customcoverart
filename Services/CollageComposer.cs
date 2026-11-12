@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using CustomCoverArt.Services.Rendering;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
@@ -53,7 +54,7 @@ public static class CollageComposer
                 try
                 {
                     // Shared decompression-bomb guard; a tile is a still, so one frame.
-                    using var poster = SafeImageLoader.TryLoadRgba32(path, maxFrames: 1);
+                    using var poster = ImageSharpBridge.TryLoadStill(path);
                     if (poster is null)
                     {
                         continue;
