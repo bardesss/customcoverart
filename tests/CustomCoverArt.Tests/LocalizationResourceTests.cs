@@ -27,6 +27,7 @@ public class LocalizationResourceTests
         "errors.file_too_large",
         "errors.font_too_large",
         "errors.invalid_file_format",
+        "errors.invalid_font_format",
         "errors.too_many_uploads",
         "errors.suspicious_content",
         "errors.image_too_large",

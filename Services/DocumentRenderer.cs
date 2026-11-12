@@ -680,11 +680,19 @@ public static class DocumentRenderer
     /// </summary>
     internal static Font CreateFont(CoverLayer layer, float fontPixelSize)
     {
-        // Custom uploaded font takes priority (its path is already sandboxed).
-        if (!string.IsNullOrEmpty(layer.FontPath) && File.Exists(layer.FontPath)
-            && TryGetCustomFamily(layer.FontPath, out var custom))
+        // Custom uploaded font takes priority (its path is already sandboxed). A format this
+        // version no longer reads (an old WOFF/WOFF2 upload) keeps rendering in Noto Sans, with
+        // one logged warning per file; Task 7 moves text drawing onto FontStore entirely.
+        if (!string.IsNullOrEmpty(layer.FontPath) && File.Exists(layer.FontPath))
         {
-            return custom.CreateFont(fontPixelSize);
+            if (!FontStore.SupportedExtensions.Contains(Path.GetExtension(layer.FontPath)))
+            {
+                FontStore.NoteUnusable(layer.FontPath);
+            }
+            else if (TryGetCustomFamily(layer.FontPath, out var custom))
+            {
+                return custom.CreateFont(fontPixelSize);
+            }
         }
 
         return BundledFamily(layer.Weight).CreateFont(fontPixelSize);

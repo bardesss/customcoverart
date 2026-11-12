@@ -1,11 +1,12 @@
 using System;
 using System.IO;
 using CustomCoverArt.Models;
-using CustomCoverArt.Services;
+using CustomCoverArt.Services.Rendering;
 using Xunit;
 
 namespace CustomCoverArt.Tests;
 
+[Collection("FontStoreState")]
 public class CustomFontCacheTests
 {
     private static string CopyBundledFont()
@@ -28,17 +29,19 @@ public class CustomFontCacheTests
         try
         {
             var layer = new CoverLayer { FontPath = path };
-            Assert.False(DocumentRenderer.IsCustomFontCached(path));
+            Assert.False(FontStore.IsCustomFontCached(path));
 
-            DocumentRenderer.CreateFont(layer, 24f);
-            Assert.True(DocumentRenderer.IsCustomFontCached(path));
+            var first = FontStore.Resolve(layer);
+            Assert.True(FontStore.IsCustomFontCached(path));
+            Assert.Same(first, FontStore.Resolve(layer));
 
             File.SetLastWriteTimeUtc(path, DateTime.UtcNow.AddMinutes(5));
-            Assert.False(DocumentRenderer.IsCustomFontCached(path));
+            Assert.False(FontStore.IsCustomFontCached(path));
 
-            var font = DocumentRenderer.CreateFont(layer, 24f);
-            Assert.True(DocumentRenderer.IsCustomFontCached(path));
-            Assert.Equal(24f, font.Size);
+            var second = FontStore.Resolve(layer);
+            Assert.True(FontStore.IsCustomFontCached(path));
+            Assert.NotSame(first, second);
+            Assert.NotSame(FontStore.Bundled(FontWeight.Normal), second);
         }
         finally { File.Delete(path); }
     }
@@ -50,9 +53,9 @@ public class CustomFontCacheTests
         File.WriteAllText(path, "not a font");
         try
         {
-            var font = DocumentRenderer.CreateFont(new CoverLayer { FontPath = path }, 20f);
-            Assert.Equal("Noto Sans", font.Family.Name);
-            Assert.False(DocumentRenderer.IsCustomFontCached(path));
+            var face = FontStore.Resolve(new CoverLayer { FontPath = path });
+            Assert.Equal("Noto Sans", face.FamilyName);
+            Assert.False(FontStore.IsCustomFontCached(path));
         }
         finally { File.Delete(path); }
     }

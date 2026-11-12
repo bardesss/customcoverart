@@ -30,6 +30,7 @@ public class CoverArtService : ICoverArtService
         _applicationPaths = applicationPaths;
         _logger = logger;
         _mediaItemService = mediaItemService;
+        FontStore.Log = logger;
 
         // Data location comes from Jellyfin's application paths (via DI), so there
         // is no guessing at filesystem locations or falling back to temp.

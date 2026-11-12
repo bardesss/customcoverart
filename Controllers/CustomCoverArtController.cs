@@ -2,6 +2,7 @@ using System.IO;
 using CustomCoverArt.Common;
 using CustomCoverArt.Models;
 using CustomCoverArt.Services;
+using CustomCoverArt.Services.Rendering;
 using MediaBrowser.Common.Configuration;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -310,13 +311,10 @@ public class CustomCoverArtController : ControllerBase
     {
         var result = new ValidationResult { IsValid = true };
 
-        var allowedExtensions = new[] { ".ttf", ".otf", ".ttc", ".woff", ".woff2" };
         var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
-        if (!allowedExtensions.Contains(extension))
+        if (!FontStore.SupportedExtensions.Contains(extension))
         {
-            result.IsValid = false;
-            result.ErrorMessage = _localizationService.GetString("errors.invalid_file_format");
-            return result;
+            return InvalidFont(result);
         }
 
         if (file.Length > 5 * 1024 * 1024)
@@ -326,28 +324,30 @@ public class CustomCoverArtController : ControllerBase
             return result;
         }
 
-        // Verify a real font signature (magic bytes), not just the extension.
-        var header = new byte[4];
-        await using var stream = file.OpenReadStream();
-        var read = await stream.ReadAsync(header.AsMemory(0, 4)).ConfigureAwait(false);
-        if (read < 4 || !IsFontSignature(header))
+        // Verify a real font signature (magic bytes), not just the extension, and that the
+        // sfnt table directory is self-consistent before the bytes can reach a native loader.
+        // The size cap above bounds the read.
+        byte[] bytes;
+        await using (var stream = file.OpenReadStream())
         {
-            result.IsValid = false;
-            result.ErrorMessage = _localizationService.GetString("errors.invalid_file_format");
+            using var buffer = new MemoryStream();
+            await stream.CopyToAsync(buffer).ConfigureAwait(false);
+            bytes = buffer.ToArray();
+        }
+
+        if (!FontStore.IsSupportedSignature(bytes) || !SfntSanity.LooksValid(bytes))
+        {
+            return InvalidFont(result);
         }
 
         return result;
     }
 
-    private static bool IsFontSignature(byte[] h)
+    private ValidationResult InvalidFont(ValidationResult result)
     {
-        bool Eq(byte a, byte b, byte c, byte d) => h[0] == a && h[1] == b && h[2] == c && h[3] == d;
-        return Eq(0x00, 0x01, 0x00, 0x00) // TrueType (TTF)
-            || Eq(0x4F, 0x54, 0x54, 0x4F) // 'OTTO' (OpenType/CFF)
-            || Eq(0x74, 0x72, 0x75, 0x65) // 'true'
-            || Eq(0x74, 0x74, 0x63, 0x66) // 'ttcf' (font collection)
-            || Eq(0x77, 0x4F, 0x46, 0x46) // 'wOFF'
-            || Eq(0x77, 0x4F, 0x46, 0x32); // 'wOF2'
+        result.IsValid = false;
+        result.ErrorMessage = _localizationService.GetString("errors.invalid_font_format");
+        return result;
     }
 
     private async Task<ApiResponse<string>> SaveUploadAsync(

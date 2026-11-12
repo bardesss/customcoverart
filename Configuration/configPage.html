@@ -259,8 +259,9 @@
                                 <button is="emby-button" type="button" id="ccaFontBtn" class="raised"><span data-i18n="f.chooseFont">Choose font…</span></button>
                                 <span class="ccaFileName" id="ccaFontName" data-i18n="f.none">No file chosen</span>
                             </div>
-                            <div class="fieldDescription" data-i18n="hint.font">TTF, OTF, TTC, WOFF or WOFF2 · up to 5 MB. Leave empty to use the bundled Noto Sans.</div>
-                            <input type="file" id="ccaFont" accept=".ttf,.otf,.ttc,.woff,.woff2" class="ccaHiddenFile" />
+                            <div id="ccaFontLegacy" class="fieldDescription ccaWarn" hidden data-i18n="font.reupload">This font format is no longer supported. Upload it again as TTF or OTF; until then Noto Sans is used.</div>
+                            <div class="fieldDescription" data-i18n="hint.font">TTF, OTF or TTC · up to 5 MB. Leave empty to use the bundled Noto Sans.</div>
+                            <input type="file" id="ccaFont" accept=".ttf,.otf,.ttc" class="ccaHiddenFile" />
                         </div>
                         <div class="ccaGrid">
                             <div class="inputContainer">
