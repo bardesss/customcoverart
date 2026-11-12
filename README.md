@@ -8,7 +8,7 @@ Layered text and logos, backgrounds and composition effects, designed on a live 
 
 [![Jellyfin 12](https://img.shields.io/badge/Jellyfin-12-00A4DC?style=flat-square&logo=jellyfin&logoColor=white)](https://jellyfin.org)
 [![.NET 10](https://img.shields.io/badge/.NET-10-512BD4?style=flat-square&logo=dotnet&logoColor=white)](https://dotnet.microsoft.com)
-[![SixLabors.ImageSharp](https://img.shields.io/badge/ImageSharp-3.1-31708E?style=flat-square)](https://github.com/SixLabors/ImageSharp)
+[![SkiaSharp](https://img.shields.io/badge/SkiaSharp-3.119-512BD4?style=flat-square)](https://github.com/mono/SkiaSharp)
 
 [![Tests](https://img.shields.io/github/actions/workflow/status/bardesss/customcoverart/ci.yml?branch=main&label=tests&style=flat-square&logo=github)](https://github.com/bardesss/customcoverart/actions/workflows/ci.yml)
 [![Jellyfin compatibility](https://img.shields.io/github/actions/workflow/status/bardesss/customcoverart/jellyfin-compat.yml?branch=main&label=Jellyfin%20compatibility&style=flat-square&logo=github)](https://github.com/bardesss/customcoverart/actions/workflows/jellyfin-compat.yml)
@@ -51,7 +51,7 @@ Layered text and logos, backgrounds and composition effects, designed on a live 
 | ⌨️ | **Keyboard & screen readers** | Select layers with Tab and Enter, nudge with the arrow keys (Shift for bigger steps), Esc closes the poster browser, every icon button is named |
 | 📱 | **Mobile-friendly** | Large touch targets, sticky preview, full-screen poster browser, grabbable canvas handles |
 | 🔍 | **In-context preview** | See the cover wide, square and poster-shaped before applying |
-| 🔠 | **Fonts** | Bundled Noto Sans (matches Jellyfin's UI, so text always renders), or upload your own `.ttf` / `.otf` / `.ttc` / `.woff` / `.woff2`, which the live canvas renders too |
+| 🔠 | **Fonts** | Bundled Noto Sans (matches Jellyfin's UI, so text always renders), or upload your own `.ttf` / `.otf` / `.ttc`, which the live canvas renders too. WOFF and WOFF2 are not accepted; fonts uploaded earlier in those formats render as Noto Sans until uploaded again as TTF or OTF |
 | 📐 | **Presets & sizes** | Landscape 16:9 (the default), square cover, portrait poster, wide banner, or custom dimensions from 100 to 2048 px |
 | 🖱️ | **Interactive canvas** | The preview is a live canvas: drag layers to position them, resize/rotate them with handles, drag/scroll/pinch to reposition and zoom the background |
 | 🎯 | **Authoritative server render** | The canvas is a fast approximation; "Show server render" renders the exact same design on the server before you apply |
@@ -61,7 +61,7 @@ Layered text and logos, backgrounds and composition effects, designed on a live 
 | 🕗 | **Restore original** | One-click revert to a target's original cover, and Reset backup to choose a new original |
 | 🎞️ | **Animated GIF** | Export animated covers (animated-source passthrough or Ken Burns pan/zoom) |
 | 🌍 | **Localisation** | English, Dutch and Spanish included; easy to add more |
-| 🪶 | **Lightweight** | The plugin DLL is about 1.9 MB, with the fonts subset-embedded |
+| 🪶 | **Lightweight** | The plugin is one DLL of about 2 MB (the download is under 1 MB), with the fonts subset-embedded |
 
 ## 📸 Screenshots
 
@@ -113,6 +113,12 @@ English by default.*
 
 - **Jellyfin Server 12.x** (the plugin is ABI‑locked to this major version)
 - The **.NET 10 SDK**, only if you build from source (the runtime ships with Jellyfin)
+- Works on every platform Jellyfin 12 runs on. The plugin draws with the SkiaSharp that comes with
+  Jellyfin and ships none of its own. If the server cannot load SkiaSharp, the health check says so
+  and renders are refused with a clear message.
+- Size: the release download is about 0.9 MB and the installed plugin about 2.0 MB in two files
+  (`CustomCoverArt.dll` and `meta.json`). Version 4.1.3.0 was 2.0 MB to download and 5.4 MB in five files.
+  Most of what is left is the six embedded Noto Sans fonts.
 
 > **Still on Jellyfin 10.11?** Version **3.5.1.0** is the last release for it, and it keeps
 > working: `manifest.json` still carries that entry with `targetAbi 10.11.0.0`, so a 10.11
@@ -141,7 +147,8 @@ This installs the plugin from within Jellyfin and keeps it updated automatically
    `plugins/CustomCoverArt/`
    *(e.g. `/var/lib/jellyfin/plugins/CustomCoverArt/` on Linux, or
    `%ProgramData%\Jellyfin\Server\plugins\CustomCoverArt\` on Windows).*
-3. Copy `CustomCoverArt.dll` **and the bundled `SixLabors.*.dll` files** into that folder.
+3. Copy `CustomCoverArt.dll` into that folder. Nothing else is needed: SkiaSharp comes with Jellyfin.
+   If the folder still has `SixLabors.*.dll` files from a version before 4.2.0.0, delete them.
 4. Restart the Jellyfin server.
 5. Open **Dashboard → Plugins** and confirm *Custom Cover Art* is listed and active.
 
@@ -152,9 +159,8 @@ dotnet restore
 dotnet build -c Release
 ```
 
-The output is in `bin/Release/net10.0/`. Copy `CustomCoverArt.dll` plus the
-`SixLabors.ImageSharp*.dll` and `SixLabors.Fonts.dll` files into the plugin folder above.
-*(The `Jellyfin.*` assemblies are provided by the server and are intentionally **not** shipped.)*
+The output is in `bin/Release/net10.0/`. Copy only `CustomCoverArt.dll` into the plugin folder above.
+*(The `Jellyfin.*` assemblies and SkiaSharp are provided by the server and are intentionally **not** shipped.)*
 
 ## 🎬 Usage
 
@@ -328,7 +334,8 @@ resets of the same target run one at a time.
   frame larger than 8192×8192 pixels is refused at upload.
 - The plugin only ever decodes **PNG, JPEG, GIF, BMP and WebP**, whatever a file is called, so a
   TIFF or other image renamed to `.png`, or a library poster in another format, is treated as
-  unreadable. Embedded colour (ICC) profiles are ignored and never parsed.
+  unreadable. Embedded colour (ICC) profiles are ignored and never parsed. An animated PNG (APNG)
+  is used as a still image (its first frame).
 - Background, font and layer-image paths supplied by the browser are **sandboxed** to the
   plugin's data directory, so the generator cannot be pointed at arbitrary files on the server.
 - Uploaded files are stored under Jellyfin's data path using randomised names.
@@ -450,6 +457,7 @@ workflow is a no-op.
 | `Models/CoverDocument.cs` | The layered design document shared by the client canvas and the server renderer |
 | `Services/DocumentRenderer.cs` | The compositor: backgrounds, text and image layers |
 | `Services/EffectsComposer.cs` | Composition effects (colour wash, vignette, grain, border) |
+| `Services/Rendering/` | Rendering helpers: fonts, text, the GIF writer, image decoding and engine availability |
 | `Services/` | Cover‑art generation, image processing, library/media access, etc. |
 | `Common/PluginPaths.cs` | Data‑directory resolution and the path sandbox |
 | `Resources/` | Server message translations and the bundled Noto Sans faces |
@@ -468,15 +476,13 @@ For larger changes, opening an issue first to discuss the approach is appreciate
 Why GPLv3 and not something more permissive: this plugin is compiled against Jellyfin's shared
 libraries (`Jellyfin.Controller` and `Jellyfin.Model`, both published under GPL‑3.0‑only) and is
 loaded into the Jellyfin server process at runtime. The result is a combined work, so the plugin
-inherits the same copyleft terms. Matching Jellyfin's licence keeps that unambiguous, and it also
-satisfies the open‑source qualification of the Six Labors Split License, under which ImageSharp is
-free to use.
+inherits the same copyleft terms. Matching Jellyfin's licence keeps that unambiguous.
 
 ## 🙏 Credits
 
 - [**Jellyfin**](https://jellyfin.org/): the media server platform this plugin extends.
-- [**SixLabors ImageSharp**](https://github.com/SixLabors/ImageSharp): image rendering and text drawing,
-  licensed under the [Six Labors Split License 1.0](https://github.com/SixLabors/ImageSharp/blob/main/LICENSE)
-  (free for open‑source projects such as this one; commercial use may require a paid licence).
+- [**SkiaSharp**](https://github.com/mono/SkiaSharp): image rendering and text drawing, provided by the
+  Jellyfin server and licensed under the MIT licence. It wraps Skia (BSD-3-Clause), and text shaping
+  uses HarfBuzz through SkiaSharp.HarfBuzz (MIT).
 - [**Noto Sans**](https://fonts.google.com/noto/specimen/Noto+Sans) by Google: the bundled default font, licensed under the
   [SIL Open Font License 1.1](https://openfontlicense.org/).
