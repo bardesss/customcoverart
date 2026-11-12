@@ -126,3 +126,12 @@ public class TextFallbackTests
         Assert.Empty(log.Entries);
     }
 }
+
+/// <summary>
+/// The text-skip warning is once per process, so a render in any other test class that skips a
+/// text layer could use it up mid-test. Run this collection on its own, after the parallel ones.
+/// </summary>
+[CollectionDefinition("TextSkipWarning", DisableParallelization = true)]
+public class TextSkipWarningCollection
+{
+}
