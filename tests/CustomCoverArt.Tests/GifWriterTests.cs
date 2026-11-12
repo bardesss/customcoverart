@@ -497,6 +497,179 @@ public class GifWriterTests
 
     // ---- helpers ------------------------------------------------------------------------
 
+    // ---- frame differencing (controller ruling R14) ---------------------------------------
+
+    /// <summary>
+    /// Differenced frames decode (composited through RequiredFrame) to exactly the pixels of a
+    /// full-canvas encoding of the same frames: partial change, repeat, total change, transparency
+    /// appearing and disappearing, and a change touching the canvas corners.
+    /// </summary>
+    [Fact]
+    public void Differencing_DecodesIdenticalToFullFrames()
+    {
+        using var photo = Photo(64, 48, seed: 4);
+        using var patched = Copy(photo, (x, y, c) => x is >= 10 and < 20 && y is >= 30 and < 35 ? new SKColor(250, 10, 200) : c);
+        using var other = Photo(64, 48, seed: 9);
+        using var holed = Copy(other, (x, y, c) => x is >= 40 and < 50 && y is >= 5 and < 15 ? SKColors.Transparent : c);
+        using var corners = Copy(other, (x, y, c) => (x, y) is (0, 0) or (63, 47) ? SKColors.Yellow : c);
+        var frames = new[]
+        {
+            new GifFrame(photo, 5), new GifFrame(patched, 6), new GifFrame(patched, 7), new GifFrame(other, 8),
+            new GifFrame(holed, 9), new GifFrame(other, 10), new GifFrame(corners, 11), new GifFrame(holed, 12),
+        };
+
+        var differenced = WriteWith(frames, loop: true, differencing: true);
+        var full = WriteWith(frames, loop: true, differencing: false);
+        Assert.True(differenced.Length < full.Length, $"{differenced.Length} vs {full.Length}");
+
+        var (dc, df) = Decode(differenced);
+        var (fc, ff) = Decode(full);
+        using (dc)
+        using (fc)
+        {
+            Assert.Equal(frames.Length, dc.FrameCount);
+            Assert.Equal(fc.FrameInfo.Select(f => f.Duration), dc.FrameInfo.Select(f => f.Duration));
+            Assert.Equal(fc.RepetitionCount, dc.RepetitionCount);
+            for (var i = 0; i < frames.Length; i++)
+            {
+                Assert.True(df[i].GetPixelSpan().SequenceEqual(ff[i].GetPixelSpan()), $"frame {i} differs");
+            }
+        }
+
+        df.ForEach(f => f.Dispose());
+        ff.ForEach(f => f.Dispose());
+    }
+
+    /// <summary>A still repeated many times costs about one frame: every repeat is a 1x1 sub-image.</summary>
+    [Fact]
+    public void Differencing_IdenticalFrames_ShrinkToAboutOneFrame()
+    {
+        using var photo = Photo(120, 90, seed: 2);
+        var one = Write(new[] { new GifFrame(photo, 10) }, loop: true);
+        var ten = Write(Enumerable.Repeat(new GifFrame(photo, 10), 10).ToList(), loop: true);
+
+        // Each repeat: GCE (8) + descriptor (10) + a few bytes of LZW.
+        Assert.InRange(ten.Length - one.Length, 1, 9 * 30);
+        var gif = Parse(ten);
+        Assert.Equal(10, gif.Frames.Count);
+        Assert.Equal((0, 0, 120, 90), gif.Frames[0].Bounds);
+        Assert.All(gif.Frames.Skip(1), f => Assert.Equal((0, 0, 1, 1), f.Bounds));
+    }
+
+    /// <summary>The repeated 1x1 frame re-draws the previous index at (0, 0).</summary>
+    [Fact]
+    public void Differencing_NoChangeFrame_CarriesThePreviousIndex()
+    {
+        using var bmp = Make(8, 6, (x, _) => x == 0 ? SKColors.Blue : SKColors.Red);
+        var gif = Parse(Write(new[] { new GifFrame(bmp, 4), new GifFrame(bmp, 4) }, loop: false));
+        var index = LzwDecode(gif.Frames[1].Data, gif.Frames[1].MinCodeSize);
+        Assert.Single(index);
+        Assert.Equal(SKColors.Blue, gif.Table[index[0]]);
+    }
+
+    /// <summary>A change confined to a small region is written as exactly its bounding box.</summary>
+    [Fact]
+    public void Differencing_SmallChange_WritesItsBoundingBox()
+    {
+        using var a = Make(60, 40, (_, _) => SKColors.Red);
+        using var b = Make(60, 40, (x, y) => (x, y) is (10, 5) or (22, 17) ? SKColors.Lime : SKColors.Red);
+        using var c = Make(60, 40, (x, y) => (x, y) is (59, 39) ? SKColors.Blue : (x, y) is (10, 5) or (22, 17) ? SKColors.Lime : SKColors.Red);
+        var gif = Parse(Write(new[] { new GifFrame(a, 3), new GifFrame(b, 4), new GifFrame(c, 5) }, loop: true));
+
+        Assert.Equal((0, 0, 60, 40), gif.Frames[0].Bounds);
+        Assert.Equal((10, 5, 13, 13), gif.Frames[1].Bounds);
+        Assert.Equal((59, 39, 1, 1), gif.Frames[2].Bounds);
+
+        var region = LzwDecode(gif.Frames[1].Data, gif.Frames[1].MinCodeSize);
+        Assert.Equal(13 * 13, region.Length);
+        Assert.Equal(SKColors.Lime, gif.Table[region[0]]);            // (10, 5)
+        Assert.Equal(SKColors.Lime, gif.Table[region[(12 * 13) + 12]]); // (22, 17)
+        Assert.Equal(SKColors.Red, gif.Table[region[1]]);
+        Assert.Equal(new[] { 3, 4, 5 }, gif.Frames.Select(f => f.Delay));
+        Assert.All(gif.Frames, f => Assert.Equal(1, f.Disposal));
+    }
+
+    /// <summary>The first frame always covers the canvas, also for a single frame and for repeats.</summary>
+    [Fact]
+    public void Differencing_FirstFrameIsAlwaysFull()
+    {
+        using var bmp = Make(7, 5, (_, _) => SKColors.Teal);
+        Assert.Equal((0, 0, 7, 5), Parse(Write(bmp)).Frames[0].Bounds);
+        Assert.Equal((0, 0, 7, 5), Parse(Write(new[] { new GifFrame(bmp, 1), new GifFrame(bmp, 1) }, loop: true)).Frames[0].Bounds);
+    }
+
+    /// <summary>Differencing keeps frame count, every delay (including 0) and the loop flag.</summary>
+    [Theory]
+    [InlineData(true, -1)]
+    [InlineData(false, 0)]
+    public void Differencing_KeepsCountDelaysAndLoop(bool loop, int repetition)
+    {
+        using var photo = Photo(30, 20, seed: 6);
+        var delays = new[] { 5, 0, 7, 3, 250 };
+        var bytes = Write(delays.Select(d => new GifFrame(photo, d)).ToList(), loop);
+        var (codec, frames) = Decode(bytes);
+        using (codec)
+        {
+            Assert.Equal(delays.Length, codec.FrameCount);
+            Assert.Equal(delays.Select(d => d * 10), codec.FrameInfo.Select(f => f.Duration));
+            Assert.Equal(repetition, codec.RepetitionCount);
+        }
+
+        frames.ForEach(f => f.Dispose());
+        Assert.Equal(delays, Parse(bytes).Frames.Select(f => f.Delay));
+    }
+
+    [Fact]
+    public void Differencing_IsDeterministic()
+    {
+        using var a = Photo(50, 40, seed: 1);
+        using var b = Copy(a, (x, y, c) => x > 30 && y < 10 ? SKColors.Orange : c);
+        var frames = new[] { new GifFrame(a, 4), new GifFrame(b, 4), new GifFrame(b, 4), new GifFrame(a, 4) };
+        Assert.Equal(Write(frames, loop: true), Write(frames, loop: true));
+    }
+
+    [Fact]
+    public void ChangedBounds_FindsTheTightRectangle()
+    {
+        var prev = new byte[5 * 4];
+        Assert.Equal(new PixelRect(0, 0, 1, 1), GifWriter.ChangedBounds(prev, prev.ToArray(), 5, 4));
+
+        var one = prev.ToArray();
+        one[(2 * 5) + 3] = 1;
+        Assert.Equal(new PixelRect(3, 2, 1, 1), GifWriter.ChangedBounds(prev, one, 5, 4));
+
+        var spread = prev.ToArray();
+        spread[(0 * 5) + 4] = 2;
+        spread[(3 * 5) + 1] = 2;
+        Assert.Equal(new PixelRect(1, 0, 4, 4), GifWriter.ChangedBounds(prev, spread, 5, 4));
+
+        var all = Enumerable.Repeat((byte)7, 20).ToArray();
+        Assert.Equal(new PixelRect(0, 0, 5, 4), GifWriter.ChangedBounds(prev, all, 5, 4));
+    }
+
+    private static byte[] WriteWith(IReadOnlyList<GifFrame> frames, bool loop, bool differencing)
+    {
+        using var ms = new MemoryStream();
+        GifWriter.Write(ms, frames, loop, differencing);
+        return ms.ToArray();
+    }
+
+    /// <summary>A copy of <paramref name="source"/> with <paramref name="map"/>(x, y, straight colour) applied.</summary>
+    private static SKBitmap Copy(SKBitmap source, Func<int, int, SKColor, SKColor> map)
+    {
+        var px = new SKColor[source.Width, source.Height];
+        for (var y = 0; y < source.Height; y++)
+        {
+            for (var x = 0; x < source.Width; x++)
+            {
+                var (r, g, b, a) = Px(source, x, y);
+                px[x, y] = new SKColor((byte)r, (byte)g, (byte)b, (byte)a);
+            }
+        }
+
+        return Make(source.Width, source.Height, (x, y) => map(x, y, px[x, y]));
+    }
+
     private static byte[] WriteRgb(bool loop)
     {
         using var r = Make(40, 30, (_, _) => new SKColor(255, 0, 0));

@@ -7,12 +7,18 @@ internal readonly record struct GifFrame(SKBitmap Pixels, int DelayCentiseconds)
 
 /// <summary>
 /// A GIF89a encoder (SkiaSharp cannot encode GIF): one global palette for all frames, Floyd-Steinberg
-/// dithering, full-canvas frames with disposal 1, and a NETSCAPE2.0 loop block when looping.
-/// The same frames always give the same bytes.
+/// dithering of every frame, disposal 1, and a NETSCAPE2.0 loop block when looping. The first frame
+/// covers the canvas; each later frame holds only the bounding rectangle of the palette indices that
+/// changed since the previous frame (a 1x1 copy of the previous index when nothing changed), so a
+/// repeated still costs one frame. The same frames always give the same bytes.
 /// </summary>
 internal static class GifWriter
 {
     public static void Write(Stream output, IReadOnlyList<GifFrame> frames, bool loop)
+        => Write(output, frames, loop, differencing: true);
+
+    /// <summary>As <see cref="Write(Stream, IReadOnlyList{GifFrame}, bool)"/>; without <paramref name="differencing"/> every frame covers the canvas (the reference the tests compare against).</summary>
+    internal static void Write(Stream output, IReadOnlyList<GifFrame> frames, bool loop, bool differencing)
     {
         ArgumentNullException.ThrowIfNull(output);
         ArgumentNullException.ThrowIfNull(frames);
@@ -72,10 +78,29 @@ internal static class GifWriter
         output.Write(header.ToArray());
 
         var indices = new byte[width * height];
+        var previous = new byte[width * height];
+        var region = new byte[width * height];
         var frameHeader = new List<byte>(20);
         for (var f = 0; f < bitmaps.Length; f++)
         {
             Dither(bitmaps[f], palette, indices);
+
+            // Frame 0 covers the canvas. Later frames hold only what changed: with disposal 1 the
+            // decoder keeps every pixel outside the rectangle, and inside it an unchanged index draws
+            // exactly what the previous frame drew, so the composited result equals a full frame.
+            var bounds = f == 0 || !differencing ? new PixelRect(0, 0, width, height) : ChangedBounds(previous, indices, width, height);
+            ReadOnlySpan<byte> data = indices;
+            if (bounds.Width != width || bounds.Height != height)
+            {
+                for (var y = 0; y < bounds.Height; y++)
+                {
+                    indices.AsSpan(((bounds.Y + y) * width) + bounds.X, bounds.Width)
+                        .CopyTo(region.AsSpan(y * bounds.Width, bounds.Width));
+                }
+
+                data = region.AsSpan(0, bounds.Width * bounds.Height);
+            }
+
             frameHeader.Clear();
             var transparent = palette.TransparentIndex >= 0;
             frameHeader.AddRange([0x21, 0xF9, 4, (byte)((1 << 2) | (transparent ? 1 : 0))]); // disposal 1: do not dispose
@@ -83,13 +108,14 @@ internal static class GifWriter
             frameHeader.Add(transparent ? (byte)palette.TransparentIndex : (byte)0);
             frameHeader.Add(0);
             frameHeader.Add(0x2C);
-            AddU16(frameHeader, 0);
-            AddU16(frameHeader, 0);
-            AddU16(frameHeader, width);
-            AddU16(frameHeader, height);
+            AddU16(frameHeader, bounds.X);
+            AddU16(frameHeader, bounds.Y);
+            AddU16(frameHeader, bounds.Width);
+            AddU16(frameHeader, bounds.Height);
             frameHeader.Add(0); // no local table, not interlaced
             output.Write(frameHeader.ToArray());
-            GifLzw.Encode(indices, Math.Max(2, bits), output);
+            GifLzw.Encode(data, Math.Max(2, bits), output);
+            (previous, indices) = (indices, previous);
         }
 
         output.WriteByte(0x3B);
@@ -145,6 +171,43 @@ internal static class GifWriter
 
             (current, below) = (below, current);
         }
+    }
+
+    /// <summary>
+    /// The smallest rectangle holding every index that differs between two frames, or (0, 0, 1, 1)
+    /// when none does: a frame must still be written to keep its place and delay, and re-drawing
+    /// the previous index at (0, 0) changes nothing.
+    /// </summary>
+    internal static PixelRect ChangedBounds(ReadOnlySpan<byte> previous, ReadOnlySpan<byte> current, int width, int height)
+    {
+        int top = -1, bottom = -1, left = width, right = -1;
+        for (var y = 0; y < height; y++)
+        {
+            var a = previous.Slice(y * width, width);
+            var b = current.Slice(y * width, width);
+            var first = a.CommonPrefixLength(b);
+            if (first == width)
+            {
+                continue;
+            }
+
+            var last = width - 1;
+            while (a[last] == b[last])
+            {
+                last--;
+            }
+
+            if (top < 0)
+            {
+                top = y;
+            }
+
+            bottom = y;
+            left = Math.Min(left, first);
+            right = Math.Max(right, last);
+        }
+
+        return top < 0 ? new PixelRect(0, 0, 1, 1) : new PixelRect(left, top, right - left + 1, bottom - top + 1);
     }
 
     private static void AddU16(List<byte> bytes, int value)
