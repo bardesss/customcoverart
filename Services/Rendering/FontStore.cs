@@ -14,11 +14,17 @@ internal static class FontStore
 {
     private static readonly HashSet<string> Extensions = new(StringComparer.OrdinalIgnoreCase) { ".ttf", ".otf", ".ttc" };
 
+    // Windows paths are case-insensitive, so two spellings must share one entry there.
+    private static readonly StringComparer PathComparer = OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
+
     private static readonly ConcurrentDictionary<string, Lazy<SKTypeface>> BundledFaces = new(StringComparer.Ordinal);
-    private static readonly ConcurrentDictionary<string, (DateTime WriteTimeUtc, SKTypeface Typeface)> CustomFaces = new(StringComparer.Ordinal);
-    private static readonly ConcurrentDictionary<string, DateTime> BrokenFiles = new(StringComparer.Ordinal);
-    private static readonly ConcurrentDictionary<string, byte> Warned = new(StringComparer.Ordinal);
+    private static readonly ConcurrentDictionary<string, (DateTime WriteTimeUtc, SKTypeface Typeface)> CustomFaces = new(PathComparer);
+    private static readonly ConcurrentDictionary<string, DateTime> BrokenFiles = new(PathComparer);
+    private static readonly ConcurrentDictionary<string, byte> Warned = new(PathComparer);
     private static readonly object LoadLock = new();
+
+    /// <summary>Upper bound on the per-path caches; a full one is cleared (they refill on demand).</summary>
+    internal const int MaxTrackedPaths = 256;
 
     private static ReadOnlySpan<byte> TrueTypeMagic => new byte[] { 0x00, 0x01, 0x00, 0x00 };
 
@@ -83,6 +89,8 @@ internal static class FontStore
 
         try
         {
+            // One entry per file however the client spelled the path (a/./f.ttf, a//f.ttf).
+            path = Path.GetFullPath(path);
             var writeTime = File.GetLastWriteTimeUtc(path);
             if (CustomFaces.TryGetValue(path, out var cached) && cached.WriteTimeUtc == writeTime)
             {
@@ -112,13 +120,13 @@ internal static class FontStore
                 var loaded = LoadCustom(path);
                 if (loaded is null)
                 {
-                    BrokenFiles[path] = writeTime;
+                    BoundedAdd(BrokenFiles, path, writeTime);
                     NoteUnreadable(path);
                     return false;
                 }
 
                 BrokenFiles.TryRemove(path, out _);
-                CustomFaces[path] = (writeTime, loaded);
+                BoundedAdd(CustomFaces, path, (writeTime, loaded));
                 typeface = loaded;
                 return true;
             }
@@ -134,7 +142,31 @@ internal static class FontStore
 
     /// <summary>True when the current version of the file at <paramref name="path"/> is cached.</summary>
     public static bool IsCustomFontCached(string path)
-        => CustomFaces.TryGetValue(path, out var cached) && cached.WriteTimeUtc == File.GetLastWriteTimeUtc(path);
+    {
+        path = Path.GetFullPath(path);
+        return CustomFaces.TryGetValue(path, out var cached) && cached.WriteTimeUtc == File.GetLastWriteTimeUtc(path);
+    }
+
+    /// <summary>Entries currently held by the per-path caches (custom faces, broken files, warned paths); for tests.</summary>
+    internal static (int Faces, int Broken, int Warned) CacheCountsForTests() => (CustomFaces.Count, BrokenFiles.Count, Warned.Count);
+
+    internal static void ResetCachesForTests()
+    {
+        CustomFaces.Clear();
+        BrokenFiles.Clear();
+        Warned.Clear();
+    }
+
+    private static void BoundedAdd<TValue>(ConcurrentDictionary<string, TValue> cache, string key, TValue value)
+    {
+        // Evicted typefaces are left to the finalizer: renders in flight may still hold them.
+        if (cache.Count >= MaxTrackedPaths && !cache.ContainsKey(key))
+        {
+            cache.Clear();
+        }
+
+        cache[key] = value;
+    }
 
     /// <summary>
     /// Logs, once per path per process, that a font is not being used because of its format. Outside a
@@ -144,13 +176,13 @@ internal static class FontStore
     /// </summary>
     internal static void NoteUnusable(string path)
     {
-        if (!RenderLog.IsActive || !Warned.TryAdd(path, 0))
+        if (!RenderLog.IsActive || !TryMarkWarned(path))
         {
             return;
         }
 
         var extension = Path.GetExtension(path);
-        var format = Extensions.Contains(extension) || extension.Length == 0
+        var format = extension.Length == 0
             ? "unreadable"
             : extension.TrimStart('.').ToUpperInvariant();
         RenderLog.Logger.LogWarning(
@@ -166,7 +198,7 @@ internal static class FontStore
     /// </summary>
     private static void NoteUnreadable(string path)
     {
-        if (!RenderLog.IsActive || !Warned.TryAdd(path, 0))
+        if (!RenderLog.IsActive || !TryMarkWarned(path))
         {
             return;
         }
@@ -174,6 +206,16 @@ internal static class FontStore
         RenderLog.Logger.LogWarning(
             "Custom font {Name} could not be read; rendering with Noto Sans. Re-upload it.",
             Path.GetFileName(path));
+    }
+
+    private static bool TryMarkWarned(string path)
+    {
+        if (Warned.Count >= MaxTrackedPaths && !Warned.ContainsKey(path))
+        {
+            Warned.Clear();
+        }
+
+        return Warned.TryAdd(path, 0);
     }
 
     internal static void ResetWarningsForTests() => Warned.Clear();

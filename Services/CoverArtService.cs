@@ -449,16 +449,15 @@ public class CoverArtService : ICoverArtService
     }
 
     /// <summary>
-    /// The Ken Burns window <paramref name="crop"/> of <paramref name="source"/>, resized to
+    /// The Ken Burns window <paramref name="crop"/> of <paramref name="image"/> (made once per render, so
+    /// Skia builds the source's mipmaps once rather than once per frame), resized to
     /// <paramref name="width"/> x <paramref name="height"/> (the canvas aspect, so nothing is squashed).
     /// </summary>
-    private static SKBitmap KenBurnsWindow(SKBitmap source, PixelRect crop, int width, int height)
+    private static SKBitmap KenBurnsWindow(SKImage image, PixelRect crop, int width, int height)
     {
         var window = RenderSurface.New(width, height);
         try
         {
-            using var pixmap = source.PeekPixels();
-            using var image = SKImage.FromPixels(pixmap);
             using var canvas = new SKCanvas(window);
             canvas.DrawImage(
                 image,
@@ -528,8 +527,18 @@ public class CoverArtService : ICoverArtService
 
         // Every bitmap made here, disposed once in the finally (also when a frame fails mid-loop).
         var owned = new List<SKBitmap>(frameCount);
+        SKPixmap? sourcePixmap = null;
+        SKImage? sourceImage = null;
         try
         {
+            if (kenBurns)
+            {
+                // One image over the source's pixels for every frame; both are disposed before the
+                // source bitmap (which the caller owns) can go.
+                sourcePixmap = root!.PeekPixels();
+                sourceImage = SKImage.FromPixels(sourcePixmap);
+            }
+
             // A still background without Ken Burns gives the same picture on every frame:
             // compose it once and hand the same bitmap to every GIF frame.
             SKBitmap? staticFrame = null;
@@ -566,7 +575,7 @@ public class CoverArtService : ICoverArtService
                     var t = i / (float)(frameCount - 1);
                     var crop = KenBurnsCrop(root!.Width, root.Height, w, h, t, animation.ZoomAmount, animation.Direction);
                     // Crop and resize in one draw: the window is canvas-sized, never the full source.
-                    using var window = KenBurnsWindow(root, crop, w, h);
+                    using var window = KenBurnsWindow(sourceImage!, crop, w, h);
                     frame = ComposeFrame(w, h, window, composeDocument);
                     owned.Add(frame);
                 }
@@ -587,6 +596,8 @@ public class CoverArtService : ICoverArtService
         }
         finally
         {
+            sourceImage?.Dispose();
+            sourcePixmap?.Dispose();
             foreach (var bitmap in owned)
             {
                 bitmap.Dispose();

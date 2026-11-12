@@ -14,7 +14,7 @@ namespace CustomCoverArt.Services.Rendering;
 /// </summary>
 /// <remarks>
 /// JIT isolation: no member signature or field of this type names a Skia type, and the only code that
-/// does is <see cref="ProbeNative"/>, which is never inlined. A missing SkiaSharp.dll therefore surfaces
+/// does is <see cref="ProbeNative"/> and <see cref="ProbeHarfBuzz"/>, which are never inlined. A missing SkiaSharp.dll therefore surfaces
 /// when <c>ProbeNative</c> is compiled, inside <see cref="Evaluate"/>'s try, as a catchable exception,
 /// not when this type or a caller is loaded. Callers follow the same rule: they check
 /// <see cref="IsAvailable"/> and only then call a separate method that touches Skia.
@@ -98,6 +98,23 @@ public static class SkiaRuntime
     {
         SkiaSharpVersion.CheckNativeLibraryCompatible(true);
         _ = SKPMColor.PreMultiply(SKColors.Black);
+        ProbeHarfBuzz();
         return SkiaSharpVersion.Native.ToString();
+    }
+
+    /// <summary>
+    /// Shapes one glyph with the bundled face, which loads libHarfBuzzSharp: a missing or mismatched
+    /// native HarfBuzz then reads as "engine unavailable" instead of text silently vanishing.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    internal static void ProbeHarfBuzz()
+    {
+        var face = FontStore.Bundled(CustomCoverArt.Models.FontWeight.Normal);
+        using var font = new SKFont(face, 16f);
+        using var shaper = new SkiaSharp.HarfBuzz.SKShaper(face);
+        if (shaper.Shape("A", font).Codepoints.Length == 0)
+        {
+            throw new InvalidOperationException("HarfBuzz shaped no glyph for a bundled font.");
+        }
     }
 }

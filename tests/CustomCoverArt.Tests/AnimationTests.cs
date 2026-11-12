@@ -183,6 +183,63 @@ public class AnimationTests
         finally { try { File.Delete(path); } catch { } }
     }
 
+    /// <summary>
+    /// Ken Burns draws every frame from one shared source image. Frames must still differ as the
+    /// window moves, and two renders of the same document must be byte-identical.
+    /// </summary>
+    [Fact]
+    public async Task KenBurns_OverAPhoto_IsDeterministic_AndEachFrameMovesTheWindow()
+    {
+        var (svc, dataDir) = AnimationTestHost.New();
+        try
+        {
+            var photo = Path.Combine(AnimationTestHost.Uploads(dataDir), "photo.png");
+            using (var bmp = new SKBitmap(600, 400))
+            {
+                for (var y = 0; y < 400; y++)
+                {
+                    for (var x = 0; x < 600; x++)
+                    {
+                        bmp.SetPixel(x, y, new SKColor((byte)(x * 255 / 599), (byte)(y * 255 / 399), (byte)(((x / 20) + (y / 20)) % 2 == 0 ? 220 : 40)));
+                    }
+                }
+
+                using var image = SKImage.FromBitmap(bmp);
+                using var data = image.Encode(SKEncodedImageFormat.Png, 100);
+                File.WriteAllBytes(photo, data.ToArray());
+            }
+
+            var settings = new CoverArtSettings
+            {
+                Title = string.Empty,
+                ExportWidth = 150,
+                ExportHeight = 100,
+                OutputFormat = "gif",
+                BackgroundSource = "upload",
+                BackgroundImagePath = photo,
+                Animation = new AnimationSettings { Enabled = true, KenBurns = true, FrameCount = 5, DelayMs = 80, ZoomAmount = 0.3f },
+            };
+
+            var a = await svc.GenerateFromDocumentAsync(DocumentMigration.FromSettings(settings));
+            var b = await svc.GenerateFromDocumentAsync(DocumentMigration.FromSettings(settings));
+
+            Assert.Equal(File.ReadAllBytes(a), File.ReadAllBytes(b));
+            using var gif = GifReadBack.Read(a);
+            Assert.Equal(5, gif.FrameCount);
+            var changed = 0;
+            for (var f = 1; f < gif.FrameCount; f++)
+            {
+                if (!gif.Frames[f].Bytes.AsSpan().SequenceEqual(gif.Frames[f - 1].Bytes))
+                {
+                    changed++;
+                }
+            }
+
+            Assert.Equal(gif.FrameCount - 1, changed);
+        }
+        finally { try { Directory.Delete(dataDir, true); } catch { } }
+    }
+
     [Fact]
     public async Task AnimatedGifBackground_PassesThroughItsFrames()
     {

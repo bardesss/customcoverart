@@ -85,11 +85,10 @@ public class TextRendererTests
     }
 
     [Fact]
-    public void Shape_EmptyText_HasNoBlobAndZeroWidth()
+    public void Shape_EmptyText_HasNoPathAndZeroWidth()
     {
         var line = TextRenderer.Shape(Regular, 40, string.Empty);
 
-        Assert.Null(line.Blob);
         Assert.Null(line.Path);
         Assert.Equal(0f, line.Width);
     }
@@ -190,7 +189,7 @@ public class TextRendererTests
         var large = TextRenderer.Shape(Regular, 80, "Hello");
         using (small) using (large)
         {
-            Assert.NotNull(small.Blob);
+            Assert.NotNull(small.Path);
             Assert.InRange(large.Width / small.Width, 1.98, 2.02);
             Assert.True(small.Ascent < 0, "Skia's ascent is above the baseline, so negative.");
             Assert.True(small.Descent > 0, "Skia's descent is below the baseline, so positive.");

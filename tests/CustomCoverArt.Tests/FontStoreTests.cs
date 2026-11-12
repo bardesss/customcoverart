@@ -445,4 +445,98 @@ public class FontStoreTests
         Assert.All(faces, f => Assert.Same(faces[0], f));
         Assert.NotSame(FontStore.Bundled(FontWeight.Normal), faces[0]);
     }
+
+    private static string TempFont()
+    {
+        var path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"cca_font_{Guid.NewGuid():N}.ttf");
+        File.WriteAllBytes(path, FontFixtures.Bytes("sub.ttf"));
+        return path;
+    }
+
+    [Fact]
+    public void TwoSpellingsOfOnePath_ShareOneCacheEntry()
+    {
+        var path = TempFont();
+        try
+        {
+            FontStore.ResetCachesForTests();
+            var dir = System.IO.Path.GetDirectoryName(path)!;
+            var other = System.IO.Path.Combine(dir, ".", "nested", "..", System.IO.Path.GetFileName(path));
+            Assert.NotEqual(path, other);
+
+            var first = Custom(path);
+            var second = Custom(other);
+
+            Assert.Same(first, second);
+            Assert.Equal(1, FontStore.CacheCountsForTests().Faces);
+            Assert.True(FontStore.IsCustomFontCached(other));
+            Assert.True(FontStore.IsCustomFontCached(path));
+        }
+        finally { File.Delete(path); }
+    }
+
+    [Fact]
+    public void MissingFilesAndWarnings_AreBoundedAtTheCap()
+    {
+        var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "cca_cap_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            FontStore.ResetCachesForTests();
+            var logger = new CapturingLogger<FontStoreTests>();
+            using (FontStore.CaptureLogForTests(logger))
+            {
+                for (var i = 0; i < FontStore.MaxTrackedPaths * 2 + 10; i++)
+                {
+                    Assert.False(FontStore.TryGetCustom(System.IO.Path.Combine(dir, $"missing{i}.ttf"), out _));
+                    var (_, broken, warned) = FontStore.CacheCountsForTests();
+                    Assert.InRange(broken, 1, FontStore.MaxTrackedPaths);
+                    Assert.InRange(warned, 1, FontStore.MaxTrackedPaths);
+                }
+            }
+
+            // Every distinct path was still warned about when it was first seen.
+            Assert.Equal(FontStore.MaxTrackedPaths * 2 + 10, logger.Entries.Count);
+        }
+        finally { Directory.Delete(dir, true); }
+    }
+
+    [Fact]
+    public void CustomFaceCache_IsBoundedAtTheCap_AndStillServesTheNewestFace()
+    {
+        var paths = new System.Collections.Generic.List<string>();
+        try
+        {
+            FontStore.ResetCachesForTests();
+            var bytes = FontFixtures.Bytes("sub.ttf");
+            string last = string.Empty;
+            for (var i = 0; i < FontStore.MaxTrackedPaths + 5; i++)
+            {
+                last = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"cca_capface_{Guid.NewGuid():N}.ttf");
+                File.WriteAllBytes(last, bytes);
+                paths.Add(last);
+                Custom(last);
+                Assert.InRange(FontStore.CacheCountsForTests().Faces, 1, FontStore.MaxTrackedPaths);
+            }
+
+            Assert.True(FontStore.IsCustomFontCached(last));
+        }
+        finally { paths.ForEach(File.Delete); }
+    }
+
+    [Fact]
+    public void UnsupportedExtensionWarning_NamesTheFormat_AndEmptyExtensionIsUnreadable()
+    {
+        FontStore.ResetCachesForTests();
+        var logger = new CapturingLogger<FontStoreTests>();
+        using (FontStore.CaptureLogForTests(logger))
+        {
+            Assert.False(FontStore.TryGetCustom("/fonts/a.woff2", out _));
+            Assert.False(FontStore.TryGetCustom("/fonts/noextension", out _));
+        }
+
+        Assert.Equal(2, logger.Entries.Count);
+        Assert.Contains("(WOFF2)", logger.Entries[0].Message);
+        Assert.Contains("(unreadable)", logger.Entries[1].Message);
+    }
 }

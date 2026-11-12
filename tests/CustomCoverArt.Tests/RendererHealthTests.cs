@@ -241,6 +241,8 @@ public sealed class RendererHealthTests : IDisposable
         new BadImageFormatException("libSkiaSharp is for another architecture"),
         new TypeLoadException("Could not load type 'SkiaSharp.SKPMColor' from assembly 'SkiaSharp'."),
         new MissingMethodException("Method not found: 'Boolean SkiaSharp.SkiaSharpVersion.CheckNativeLibraryCompatible(Boolean)'."),
+        new DllNotFoundException("Unable to load shared library 'libHarfBuzzSharp' or one of its dependencies."),
+        new TypeInitializationException("HarfBuzzSharp.Blob", new DllNotFoundException("libHarfBuzzSharp")),
         new MissingFieldException("Field not found: 'SkiaSharp.SKColors.Black'."),
     };
 
@@ -260,6 +262,31 @@ public sealed class RendererHealthTests : IDisposable
         Assert.Contains(failure.Message, entry.Message);
         Assert.StartsWith("Image engine unavailable on ", entry.Message);
         Assert.EndsWith(". Cover rendering is disabled; the rest of the server is not affected.", entry.Message);
+    }
+
+    /// <summary>The engine probe shapes a glyph through HarfBuzz, so a host with a working Skia and a broken HarfBuzz is reported unavailable.</summary>
+    [Fact]
+    public void ProbeHarfBuzz_WorksOnThisHost()
+    {
+        SkiaRuntime.ProbeHarfBuzz();
+        Assert.True(SkiaRuntime.IsAvailable);
+    }
+
+    [Fact]
+    public void Evaluate_HarfBuzzProbeFailure_ReportsUnavailable()
+    {
+        var log = new CapturingLogger<RendererHealthTests>();
+
+        var result = SkiaRuntime.Evaluate(
+            () =>
+            {
+                SkiaRuntime.ProbeHarfBuzz();
+                throw new DllNotFoundException("libHarfBuzzSharp"); // what the shaper would throw on a broken host
+            },
+            log);
+
+        Assert.False(result.Available);
+        Assert.Contains("libHarfBuzzSharp", Assert.Single(log.Entries).Message);
     }
 
     [Fact]

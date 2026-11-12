@@ -2,25 +2,38 @@ using System.Numerics;
 using CustomCoverArt.Models;
 using SkiaSharp;
 using SkiaSharp.HarfBuzz;
+using Microsoft.Extensions.Logging;
 
 namespace CustomCoverArt.Services.Rendering;
 
 /// <summary>
-/// One shaped line of text positioned from origin (0, 0) on the baseline: the glyphs as a blob and
-/// as one outline path, its advance width and the font's vertical metrics. Dispose it to release both.
+/// One shaped line of text positioned from origin (0, 0) on the baseline: the glyphs as one outline
+/// path (what is drawn), its advance width and the font's vertical metrics. It owns the path; dispose
+/// it to release it.
 /// </summary>
-/// <param name="Blob">The glyphs, or null when shaping produced none (empty text).</param>
-/// <param name="Width">Total advance width in pixels.</param>
-/// <param name="Ascent">Skia ascent: distance above the baseline, negative.</param>
-/// <param name="Descent">Skia descent: distance below the baseline, positive.</param>
-/// <param name="Path">The same glyphs at the same HarfBuzz positions as one path (what is drawn); null when <paramref name="Blob"/> is.</param>
-internal sealed record ShapedLine(SKTextBlob? Blob, float Width, float Ascent, float Descent, SKPath? Path = null) : IDisposable
+internal sealed class ShapedLine : IDisposable
 {
-    public void Dispose()
+    public ShapedLine(float width, float ascent, float descent, SKPath? path = null)
     {
-        Blob?.Dispose();
-        Path?.Dispose();
+        Width = width;
+        Ascent = ascent;
+        Descent = descent;
+        Path = path;
     }
+
+    /// <summary>Total advance width in pixels.</summary>
+    public float Width { get; }
+
+    /// <summary>Skia ascent: distance above the baseline, negative.</summary>
+    public float Ascent { get; }
+
+    /// <summary>Skia descent: distance below the baseline, positive.</summary>
+    public float Descent { get; }
+
+    /// <summary>The glyphs at their HarfBuzz positions; null when shaping produced no glyphs (empty text).</summary>
+    public SKPath? Path { get; }
+
+    public void Dispose() => Path?.Dispose();
 }
 
 /// <summary>
@@ -141,13 +154,39 @@ internal static class TextRenderer
                 using var paint = new SKPaint { IsAntialias = true, Color = SkiaColors.Parse(layer.Color, SKColors.White) };
                 target.DrawPath(line.Path, paint);
             }
-            catch
+            catch (Exception ex)
             {
                 // Skip this layer. Filling the canvas here (as this once did) erased the
-                // background and every layer already drawn.
+                // background and every layer already drawn. Say so once, or a broken HarfBuzz
+                // would drop every title without a trace.
+                NoteLayerSkipped(ex);
             }
         }
     }
+
+    private static int _skipWarned;
+
+    /// <summary>Test seam: makes <see cref="Shape"/> throw this on the calling flow, to simulate a broken HarfBuzz.</summary>
+    internal static readonly AsyncLocal<Exception?> ShapeFaultForTests = new();
+
+    /// <summary>
+    /// Logs one Warning per process (and only inside a render scope, where it can be heard) that a
+    /// text layer could not be drawn at all, so a missing or mismatched native HarfBuzz is visible.
+    /// </summary>
+    private static void NoteLayerSkipped(Exception ex)
+    {
+        if (!RenderLog.IsActive || Interlocked.CompareExchange(ref _skipWarned, 1, 0) != 0)
+        {
+            return;
+        }
+
+        RenderLog.Logger.LogWarning(
+            "A text layer could not be drawn and was skipped ({Type}: {Message}). If the server's HarfBuzz library is missing or does not match, no text will appear on covers. This is logged once per server start.",
+            ex.GetType().Name,
+            ex.Message);
+    }
+
+    internal static void ResetSkipWarningForTests() => Volatile.Write(ref _skipWarned, 0);
 
     /// <summary>
     /// Font size for the effects-free fallback: half the layer's size, clamped to the same
@@ -190,18 +229,22 @@ internal static class TextRenderer
 
     /// <summary>
     /// Shapes one line with HarfBuzz (kerning, ligatures, marks, as Chrome's canvas does) into a
-    /// positioned blob. A glyph the face lacks draws as its .notdef; there is no font fallback.
+    /// positioned outline path. A glyph the face lacks draws as its .notdef; there is no font fallback.
     /// </summary>
     public static ShapedLine Shape(SKTypeface face, float pixelSize, string text)
     {
         ArgumentNullException.ThrowIfNull(face);
         ArgumentNullException.ThrowIfNull(text);
+        if (ShapeFaultForTests.Value is { } fault)
+        {
+            throw fault;
+        }
 
         using var font = NewFont(face, pixelSize);
         var metrics = font.Metrics;
         if (text.Length == 0)
         {
-            return new ShapedLine(null, 0f, metrics.Ascent, metrics.Descent);
+            return new ShapedLine(0f, metrics.Ascent, metrics.Descent);
         }
 
         // SKShaper keeps a HarfBuzz buffer and is not thread-safe, so one per call.
@@ -210,13 +253,9 @@ internal static class TextRenderer
         var count = result.Codepoints.Length;
         if (count == 0)
         {
-            return new ShapedLine(null, result.Width, metrics.Ascent, metrics.Descent);
+            return new ShapedLine(result.Width, metrics.Ascent, metrics.Descent);
         }
 
-        using var builder = new SKTextBlobBuilder();
-        var run = builder.AllocatePositionedRun(font, count);
-        var glyphs = run.Glyphs;
-        var positions = run.Positions;
         var path = new SKPath();
         try
         {
@@ -224,8 +263,6 @@ internal static class TextRenderer
             {
                 var glyph = (ushort)result.Codepoints[i];
                 var at = result.Points[i];
-                glyphs[i] = glyph;
-                positions[i] = at;
 
                 // Each glyph's outline at its shaped position; glyphs without one (spaces) add nothing.
                 using var outline = font.GetGlyphPath(glyph);
@@ -235,7 +272,7 @@ internal static class TextRenderer
                 }
             }
 
-            return new ShapedLine(builder.Build(), result.Width, metrics.Ascent, metrics.Descent, path);
+            return new ShapedLine(result.Width, metrics.Ascent, metrics.Descent, path);
         }
         catch
         {

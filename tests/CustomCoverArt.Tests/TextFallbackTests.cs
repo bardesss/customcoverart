@@ -1,3 +1,4 @@
+using System;
 using CustomCoverArt.Models;
 using CustomCoverArt.Services;
 using CustomCoverArt.Services.Rendering;
@@ -6,6 +7,7 @@ using Xunit;
 
 namespace CustomCoverArt.Tests;
 
+[Collection("TextSkipWarning")]
 public class TextFallbackTests
 {
     /// <summary>
@@ -37,5 +39,90 @@ public class TextFallbackTests
     {
         var doc = new CoverDocument { Canvas = new CanvasSettings { Width = canvasHeight, Height = canvasHeight } };
         Assert.Equal(expected, CustomCoverArt.Services.Rendering.TextRenderer.FallbackFontPixelSize(new CoverLayer { Size = size }, doc), 3);
+    }
+
+    private static (CoverDocument Doc, CoverLayer Layer) SimpleText() => (
+        new CoverDocument { Canvas = new CanvasSettings { Width = 80, Height = 80 } },
+        new CoverLayer { Type = "text", Content = "Hi", Size = 0.3f });
+
+    /// <summary>
+    /// If shaping is impossible (HarfBuzz missing or mismatched) both attempts throw and the layer is
+    /// skipped: that must leave the canvas alone, say so in the log, and say it only once.
+    /// </summary>
+    [Fact]
+    public void LayerSkippedBecauseShapingFails_WarnsOncePerProcess()
+    {
+        var (doc, layer) = SimpleText();
+        var log = new CapturingLogger<TextFallbackTests>();
+        TextRenderer.ResetSkipWarningForTests();
+        TextRenderer.ShapeFaultForTests.Value = new DllNotFoundException("libHarfBuzzSharp");
+        try
+        {
+            using (RenderLog.Use(log))
+            {
+                for (var i = 0; i < 3; i++)
+                {
+                    using var canvas = RenderSurface.New(80, 80, new SKColor(0, 128, 0));
+                    TextRenderer.RenderTextLayerWithFallback(canvas, layer, doc);
+                    Assert.Equal(new Rgba(0, 128, 0, 255), TestPixels.Px(canvas, 40, 40));
+                }
+            }
+        }
+        finally
+        {
+            TextRenderer.ShapeFaultForTests.Value = null;
+            TextRenderer.ResetSkipWarningForTests();
+        }
+
+        var entry = Assert.Single(log.Entries);
+        Assert.Equal(Microsoft.Extensions.Logging.LogLevel.Warning, entry.Level);
+        Assert.Contains("DllNotFoundException", entry.Message);
+        Assert.Contains("libHarfBuzzSharp", entry.Message);
+        Assert.Contains("skipped", entry.Message);
+    }
+
+    [Fact]
+    public void LayerSkipped_OutsideARenderScope_DoesNotSpendTheWarning()
+    {
+        var (doc, layer) = SimpleText();
+        var log = new CapturingLogger<TextFallbackTests>();
+        TextRenderer.ResetSkipWarningForTests();
+        TextRenderer.ShapeFaultForTests.Value = new InvalidOperationException("no shaper");
+        try
+        {
+            using (var canvas = RenderSurface.New(80, 80))
+            {
+                TextRenderer.RenderTextLayerWithFallback(canvas, layer, doc); // nobody listening
+            }
+
+            using (RenderLog.Use(log))
+            {
+                using var canvas = RenderSurface.New(80, 80);
+                TextRenderer.RenderTextLayerWithFallback(canvas, layer, doc);
+            }
+        }
+        finally
+        {
+            TextRenderer.ShapeFaultForTests.Value = null;
+            TextRenderer.ResetSkipWarningForTests();
+        }
+
+        Assert.Single(log.Entries);
+    }
+
+    [Fact]
+    public void LayerThatRendersNormally_LogsNothing()
+    {
+        var (doc, layer) = SimpleText();
+        var log = new CapturingLogger<TextFallbackTests>();
+        TextRenderer.ResetSkipWarningForTests();
+
+        using (RenderLog.Use(log))
+        using (var canvas = RenderSurface.New(80, 80))
+        {
+            TextRenderer.RenderTextLayerWithFallback(canvas, layer, doc);
+        }
+
+        Assert.Empty(log.Entries);
     }
 }
