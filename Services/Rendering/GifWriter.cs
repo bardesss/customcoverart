@@ -10,10 +10,17 @@ internal readonly record struct GifFrame(SKBitmap Pixels, int DelayCentiseconds)
 /// dithering of every frame, disposal 1, and a NETSCAPE2.0 loop block when looping. The first frame
 /// covers the canvas; each later frame holds only the bounding rectangle of the palette indices that
 /// changed since the previous frame (a 1x1 copy of the previous index when nothing changed), so a
-/// repeated still costs one frame. The same frames always give the same bytes.
+/// repeated still costs one frame; the same bitmap instance passed again is dithered only once.
+/// With disposal 1 a pixel that turns transparent in a later frame keeps its previous colour (in full
+/// and in differenced frames alike); covers are opaque, so this does not arise in practice.
+/// The same frames always give the same bytes.
 /// </summary>
 internal static class GifWriter
 {
+    /// <summary>Frames dithered on this thread since the last reset (tests count the work done).</summary>
+    [ThreadStatic]
+    internal static int DitherCount;
+
     public static void Write(Stream output, IReadOnlyList<GifFrame> frames, bool loop)
         => Write(output, frames, loop, differencing: true);
 
@@ -83,7 +90,17 @@ internal static class GifWriter
         var frameHeader = new List<byte>(20);
         for (var f = 0; f < bitmaps.Length; f++)
         {
-            Dither(bitmaps[f], palette, indices);
+            if (f > 0 && ReferenceEquals(bitmaps[f], bitmaps[f - 1]))
+            {
+                // The same bitmap again (a repeated still): dithering is deterministic, so its
+                // indices are the previous frame's. Copy them instead of dithering again.
+                previous.CopyTo(indices, 0);
+            }
+            else
+            {
+                Dither(bitmaps[f], palette, indices);
+                DitherCount++;
+            }
 
             // Frame 0 covers the canvas. Later frames hold only what changed: with disposal 1 the
             // decoder keeps every pixel outside the rectangle, and inside it an unchanged index draws

@@ -647,6 +647,101 @@ public class GifWriterTests
         Assert.Equal(new PixelRect(0, 0, 5, 4), GifWriter.ChangedBounds(prev, all, 5, 4));
     }
 
+    // ---- repeated frames (controller ruling R16) -----------------------------------------
+
+    /// <summary>
+    /// N references to one bitmap decode exactly like N distinct identical copies (the palette is
+    /// sampled once for the references, N times for the copies; uniform weights give the same palette).
+    /// </summary>
+    [Fact]
+    public void Repeats_DecodeLikeDistinctCopies()
+    {
+        // Under the 1,048,576-pixel sample cap, so copies and references both sample every pixel.
+        using var photo = Photo(64, 48, seed: 12);
+        var copies = Enumerable.Range(0, 6).Select(_ => Copy(photo, (_, _, c) => c)).ToList();
+        try
+        {
+            var byReference = Write(Enumerable.Repeat(new GifFrame(photo, 7), 6).ToList(), loop: true);
+            var byCopy = Write(copies.Select(c => new GifFrame(c, 7)).ToList(), loop: true);
+
+            var (rc, rf) = Decode(byReference);
+            var (cc, cf) = Decode(byCopy);
+            using (rc)
+            using (cc)
+            {
+                Assert.Equal(6, rc.FrameCount);
+                Assert.Equal(cc.FrameInfo.Select(f => f.Duration), rc.FrameInfo.Select(f => f.Duration));
+                for (var i = 0; i < 6; i++)
+                {
+                    Assert.True(rf[i].GetPixelSpan().SequenceEqual(cf[i].GetPixelSpan()), $"frame {i} differs");
+                }
+            }
+
+            rf.ForEach(f => f.Dispose());
+            cf.ForEach(f => f.Dispose());
+        }
+        finally
+        {
+            copies.ForEach(c => c.Dispose());
+        }
+    }
+
+    /// <summary>
+    /// Over the sample cap, 6 distinct copies sample with a 6x wider stride than one bitmap, so their
+    /// palette can differ slightly; references sample the bitmap once, which is exactly the palette
+    /// and pixels of encoding that bitmap alone.
+    /// </summary>
+    [Fact]
+    public void Repeats_OverTheSampleCap_DecodeLikeTheBitmapAlone()
+    {
+        using var photo = Photo(1100, 1000, seed: 12);
+        var alone = Write(new[] { new GifFrame(photo, 7) }, loop: true);
+        var repeated = Write(Enumerable.Repeat(new GifFrame(photo, 7), 6).ToList(), loop: true);
+
+        var (ac, af) = Decode(alone);
+        var (rc, rf) = Decode(repeated);
+        using (ac)
+        using (rc)
+        {
+            Assert.Equal(6, rc.FrameCount);
+            Assert.All(rf, f => Assert.True(f.GetPixelSpan().SequenceEqual(af[0].GetPixelSpan())));
+        }
+
+        af.ForEach(f => f.Dispose());
+        rf.ForEach(f => f.Dispose());
+    }
+
+    /// <summary>A bitmap repeated by reference is dithered once; distinct bitmaps each once; A, B, A three times.</summary>
+    [Fact]
+    public void Repeats_AreDitheredOnce()
+    {
+        using var a = Photo(40, 30, seed: 3);
+        using var b = Photo(40, 30, seed: 4);
+
+        GifWriter.DitherCount = 0;
+        Write(Enumerable.Repeat(new GifFrame(a, 5), 30).ToList(), loop: true);
+        Assert.Equal(1, GifWriter.DitherCount);
+
+        GifWriter.DitherCount = 0;
+        Write(new[] { new GifFrame(a, 5), new GifFrame(b, 5), new GifFrame(a, 5), new GifFrame(a, 5) }, loop: true);
+        Assert.Equal(3, GifWriter.DitherCount);
+
+        GifWriter.DitherCount = 0;
+        WriteWith(Enumerable.Repeat(new GifFrame(a, 5), 4).ToList(), loop: false, differencing: false);
+        Assert.Equal(1, GifWriter.DitherCount);
+    }
+
+    /// <summary>The palette samples a repeated bitmap once: the same palette as for that bitmap alone.</summary>
+    [Fact]
+    public void Build_RepeatedReference_IsSampledOnce()
+    {
+        using var photo = Photo(1100, 1000, seed: 5);
+        var alone = WuQuantizer.Build(new[] { photo });
+        var repeated = WuQuantizer.Build(Enumerable.Repeat(photo, 30).ToList());
+        Assert.Equal(alone.Colors, repeated.Colors);
+        Assert.Equal(alone.TransparentIndex, repeated.TransparentIndex);
+    }
+
     private static byte[] WriteWith(IReadOnlyList<GifFrame> frames, bool loop, bool differencing)
     {
         using var ms = new MemoryStream();

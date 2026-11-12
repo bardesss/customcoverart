@@ -17,6 +17,10 @@ internal static class WuQuantizer
         ArgumentOutOfRangeException.ThrowIfLessThan(maxColors, 2);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(maxColors, 256);
 
+        // The same bitmap passed several times (a repeated still) is sampled once: repeats add no
+        // colours, and counting them would only widen the sampling stride.
+        frames = frames.Distinct(ReferenceEqualityComparer.Instance).Cast<SKBitmap>().ToList();
+
         var m = new Moments();
         var distinct = new HashSet<int>();
         var tooMany = false;
