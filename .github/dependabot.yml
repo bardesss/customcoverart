@@ -19,9 +19,7 @@ updates:
       - dependencies
     groups:
       # One PR a month for the safe bumps. Majors are deliberately excluded so
-      # they arrive as their own PR and get read properly. ImageSharp 4.x in
-      # particular is a breaking change, and ImageSharp.Drawing is versioned
-      # separately but must stay on the matching ImageSharp line.
+      # they arrive as their own PR and get read properly.
       nuget-minor-and-patch:
         update-types:
           - minor
@@ -32,22 +30,12 @@ updates:
       # routine version bump. They also read their version from the $(JellyfinVersion) MSBuild
       # property rather than a literal, which Dependabot cannot rewrite.
       - dependency-name: "Jellyfin.*"
-      # ImageSharp 4.x and ImageSharp.Drawing 3.x enforce a Six Labors licence
-      # key at BUILD time: the build dies inside the package's own targets with
-      # "No Six Labors license found" before any of our code compiles. Adopting
-      # them is a licensing decision. A free Community tier exists
-      # (licensing.sixlabors.com), but it puts a build-time credential in the
-      # chain and every fork would need its own key. See PR #42 for the detail.
-      #
-      # The same enforcement was then backported to the old lines: ImageSharp
-      # 3.2.0 and ImageSharp.Drawing 2.2.0 also fail the build without a key
-      # (Dependabot PRs #58/#59, 2026-11). So everything from those versions up
-      # is ignored; 3.1.x / 2.1.x patch releases still come through. If the
-      # pin ever has to go, switch to a free imaging library rather than a key.
-      - dependency-name: "SixLabors.ImageSharp"
-        versions: [">= 3.2.0"]
-      - dependency-name: "SixLabors.ImageSharp.Drawing"
-        versions: [">= 2.2.0"]
+      # SkiaSharp and HarfBuzzSharp are provided by the Jellyfin server at runtime. The
+      # plugin compiles against exactly the version the server ships (see the
+      # SkiaSharpVersion property in CustomCoverArt.csproj), so a NuGet release is never a
+      # reason to move it. The jellyfin-compat workflow reports when Jellyfin moves.
+      - dependency-name: "SkiaSharp*"
+      - dependency-name: "HarfBuzzSharp*"
 
   # ---------------------------------------------------------------------------
   # Workflow actions (actions/checkout, actions/setup-dotnet).

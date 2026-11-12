@@ -65,6 +65,11 @@ jobs:
           echo "newer=$NEWER"   >> "$GITHUB_OUTPUT"
           echo "Pinned: $PINNED | latest stable: $LATEST | newer available: $NEWER"
 
+      # SkiaSharp's native library needs fontconfig. GitHub's runner image ships it today;
+      # installing it keeps the tests independent of that. (Jellyfin's own images ship it.)
+      - name: Install fontconfig
+        run: sudo apt-get update && sudo apt-get install -y libfontconfig1
+
       - name: Build and test against latest stable
         id: test
         if: steps.ver.outputs.newer == 'true'
@@ -156,6 +161,12 @@ jobs:
             echo "preview=$ALL" >> "$GITHUB_OUTPUT"
           fi
 
+      # SkiaSharp's native library needs fontconfig. GitHub's runner image ships it today;
+      # installing it keeps the tests independent of that. (Jellyfin's own images ship it.)
+      - name: Install fontconfig
+        if: steps.ver.outputs.preview != ''
+        run: sudo apt-get update && sudo apt-get install -y libfontconfig1
+
       - name: Build and test against preview
         if: steps.ver.outputs.preview != ''
         run: |
@@ -163,3 +174,59 @@ jobs:
             -c Release \
             -p:JellyfinVersion=${{ steps.ver.outputs.preview }} \
             -p:PluginTargetFramework=${{ env.PREVIEW_TFM }}
+
+  skia-pin:
+    name: Jellyfin's SkiaSharp version
+    runs-on: ubuntu-latest
+    # The plugin ships no SkiaSharp: it compiles against the version the server ships and
+    # uses the server's copy at runtime. When a Jellyfin release moves SkiaSharp, the pin
+    # must follow, or the plugin may call an API the host's copy no longer has.
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Compare the pin with the latest Jellyfin release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          PINNED=$(grep -oPm1 '(?<=>)[^<]+(?=</SkiaSharpVersion>)' CustomCoverArt.csproj || true)
+          if [ -z "$PINNED" ]; then
+            echo "No <SkiaSharpVersion> found in CustomCoverArt.csproj"; exit 1
+          fi
+          TAG=$(gh api repos/jellyfin/jellyfin/releases/latest --jq .tag_name)
+          # Jellyfin pins its packages centrally in Directory.Packages.props.
+          HOST=$(gh api "repos/jellyfin/jellyfin/contents/Directory.Packages.props?ref=$TAG" --jq .content | base64 -d | grep -oP '(?<=Include="SkiaSharp" Version=")[^"]+' || true)
+          if [ -z "$HOST" ]; then
+            echo "Could not read the SkiaSharp version from Directory.Packages.props at $TAG"; exit 1
+          fi
+          echo "Jellyfin $TAG ships SkiaSharp $HOST | plugin pins $PINNED"
+          if [ "$HOST" = "$PINNED" ]; then
+            exit 0
+          fi
+
+          TITLE="Jellyfin $TAG ships SkiaSharp $HOST (plugin pins $PINNED)"
+          # gh issue create rejects an unknown label, and the label may not exist yet.
+          gh label create jellyfin-compat \
+            --color B60205 \
+            --description "Plugin fails to build against a newer Jellyfin release" \
+            >/dev/null 2>&1 || true
+          # One issue per Jellyfin release: the weekly cron must not refile it every Monday.
+          EXISTING=$(gh issue list --label jellyfin-compat --state open \
+            --json number,title \
+            --jq "[.[] | select(.title == \"$TITLE\")] | first | .number // empty")
+          if [ -n "$EXISTING" ]; then
+            echo "Issue #$EXISTING already tracks this; not filing a duplicate."
+          else
+            {
+              echo "Jellyfin **$TAG** ships SkiaSharp \`$HOST\`; this plugin compiles against \`$PINNED\`."
+              echo
+              echo "The plugin uses the server's SkiaSharp at runtime, so the pin should match what the server ships."
+              echo
+              echo "To move the pin: read the SkiaSharp release notes between the two versions for breaking API changes, then update both \`<SkiaSharpVersion>\` and \`<HarfBuzzSharpVersion>\` (to the HarfBuzzSharp version in the same Directory.Packages.props) in \`CustomCoverArt.csproj\` and \`tests/CustomCoverArt.Tests/CustomCoverArt.Tests.csproj\`."
+            } > /tmp/skia-issue.md
+            gh issue create --title "$TITLE" --label jellyfin-compat --body-file /tmp/skia-issue.md
+          fi
+          exit 1

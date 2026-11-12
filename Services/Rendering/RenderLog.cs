@@ -15,6 +15,12 @@ internal static class RenderLog
     /// <summary>The current flow's logger, or a no-op logger outside any render scope.</summary>
     public static ILogger Logger => Current.Value ?? NullLogger.Instance;
 
+    /// <summary>
+    /// True inside a render scope. A warn-once warning raised outside one would go to the no-op logger,
+    /// so callers that warn once check this before spending the warning.
+    /// </summary>
+    public static bool IsActive => Current.Value is not null;
+
     /// <summary>Routes renderer warnings on the calling flow to <paramref name="logger"/> until disposed, then restores the previous one.</summary>
     public static IDisposable Use(ILogger logger)
     {

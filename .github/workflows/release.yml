@@ -59,7 +59,11 @@ jobs:
           VER="${{ steps.ver.outputs.ver }}"
           mkdir -p dist/stage
           cp bin/Release/net10.0/CustomCoverArt.dll dist/stage/
-          cp bin/Release/net10.0/SixLabors.*.dll dist/stage/
+          # SkiaSharp and HarfBuzz come from the Jellyfin server; a copy in the plugin
+          # folder would be loaded next to the host's and can break rendering.
+          if ls dist/stage | grep -i -E '^(sixlabors|skiasharp|harfbuzzsharp)|^runtimes$'; then
+            echo "Unexpected third-party binaries in the plugin package"; exit 1
+          fi
           cat > dist/stage/meta.json <<EOF
           {
             "category": "General",

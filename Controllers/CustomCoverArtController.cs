@@ -86,6 +86,14 @@ public class CustomCoverArtController : ControllerBase
     [HttpPost("document/preview")]
     public async Task<IActionResult> GeneratePreviewDocument([FromBody] CoverDocument document)
     {
+        // Every action that renders or decodes checks the image engine first (spec S4.4). The
+        // actions name no Skia type; what they call next (the cover service, the upload
+        // validators) is compiled only after this check passes.
+        if (!SkiaRuntime.IsAvailable)
+        {
+            return BadRequest(new { error = SkiaRuntime.UnavailableMessage });
+        }
+
         // Higher limit: the canvas renders a live preview on every adjustment.
         if (RateLimited("preview", maxRequests: 240, TimeSpan.FromMinutes(1)))
         {
@@ -114,6 +122,11 @@ public class CustomCoverArtController : ControllerBase
     [HttpPost("document/apply")]
     public async Task<ApiResponse<bool>> ApplyDocument([FromBody] ApplyDocumentRequest request)
     {
+        if (!SkiaRuntime.IsAvailable)
+        {
+            return Fail<bool>(SkiaRuntime.UnavailableMessage);
+        }
+
         // Applying renders a full cover (up to a 30-frame GIF) and writes to disk.
         if (RateLimited("apply", maxRequests: 30, TimeSpan.FromMinutes(1)))
         {
@@ -283,6 +296,12 @@ public class CustomCoverArtController : ControllerBase
     [HttpPost("upload")]
     public async Task<ApiResponse<string>> UploadImage(IFormFile file)
     {
+        // Validation decodes the image with Skia.
+        if (!SkiaRuntime.IsAvailable)
+        {
+            return Fail<string>(SkiaRuntime.UnavailableMessage);
+        }
+
         return await SaveUploadAsync(
             file,
             directory: PluginPaths.Uploads(_applicationPaths),
@@ -297,6 +316,12 @@ public class CustomCoverArtController : ControllerBase
     [HttpPost("uploadFont")]
     public async Task<ApiResponse<string>> UploadFont(IFormFile file)
     {
+        // Validation goes through FontStore, whose static state holds Skia typefaces.
+        if (!SkiaRuntime.IsAvailable)
+        {
+            return Fail<string>(SkiaRuntime.UnavailableMessage);
+        }
+
         return await SaveUploadAsync(
             file,
             directory: PluginPaths.Fonts(_applicationPaths),
@@ -307,6 +332,9 @@ public class CustomCoverArtController : ControllerBase
             validate: ValidateFontAsync).ConfigureAwait(false);
     }
 
+    // Never inlined into an action: it is the first controller code that touches FontStore (and so
+    // Skia), and must only be compiled after the action's SkiaRuntime check has passed.
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
     private async Task<ValidationResult> ValidateFontAsync(IFormFile file)
     {
         var result = new ValidationResult { IsValid = true };
@@ -423,7 +451,14 @@ public class CustomCoverArtController : ControllerBase
         try
         {
             var ready = await _startupValidationService.IsPluginReadyAsync().ConfigureAwait(false);
-            return Success<object>(new { PluginReady = ready, Version = Plugin.Instance?.Version.ToString() });
+            var renderer = SkiaRuntime.IsAvailable;
+            return Success<object>(new
+            {
+                PluginReady = ready,
+                Version = Plugin.Instance?.Version.ToString(),
+                RendererAvailable = renderer,
+                RendererVersion = renderer ? SkiaRuntime.NativeVersion : null,
+            });
         }
         catch (Exception ex)
         {
@@ -661,6 +696,11 @@ public class CustomCoverArtController : ControllerBase
     [HttpPost("batchApply")]
     public async Task<ApiResponse<List<BatchApplyResult>>> BatchApply([FromBody] BatchApplyRequest request)
     {
+        if (!SkiaRuntime.IsAvailable)
+        {
+            return Fail<List<BatchApplyResult>>(SkiaRuntime.UnavailableMessage);
+        }
+
         if (request is null || request.Targets.Count == 0)
         {
             return Fail<List<BatchApplyResult>>("No targets selected.");

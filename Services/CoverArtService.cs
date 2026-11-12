@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using CustomCoverArt.Common;
 using CustomCoverArt.Models;
 using CustomCoverArt.Services.Rendering;
@@ -30,9 +31,27 @@ public class CoverArtService : ICoverArtService
         // is no guessing at filesystem locations or falling back to temp.
         _outputDirectory = PluginPaths.Generated(applicationPaths);
         Directory.CreateDirectory(_outputDirectory);
+
+        // DI builds this service before any controller action that checks the engine runs, so
+        // the engine probe's one Warning (if the host's SkiaSharp is unusable) has a real logger.
+        SkiaRuntime.UseLogger(logger);
     }
 
-    public async Task<string> GenerateFromDocumentAsync(CoverDocument document)
+    public Task<string> GenerateFromDocumentAsync(CoverDocument document)
+    {
+        // Checked before any work, and in a method that names no Skia type: the render below is
+        // compiled only once the engine is known to load (S4.4), so a missing SkiaSharp.dll is
+        // this clear refusal rather than a JIT failure.
+        if (!SkiaRuntime.IsAvailable)
+        {
+            return Task.FromException<string>(new CoverValidationException(SkiaRuntime.UnavailableMessage));
+        }
+
+        return GenerateCoreAsync(document);
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private async Task<string> GenerateCoreAsync(CoverDocument document)
     {
         // The renderer's warnings (skipped logo, unreadable font) go to this service's logger for
         // this render only; a process-wide logger would also catch every other render's warnings.

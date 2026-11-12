@@ -92,6 +92,9 @@ internal static class FontStore
 
             if (BrokenFiles.TryGetValue(path, out var brokenAt) && brokenAt == writeTime)
             {
+                // Remembered as broken, possibly by a lookup outside any render, where the
+                // warning could not be heard: give it its one chance now.
+                NoteUnreadable(path);
                 return false;
             }
 
@@ -134,13 +137,14 @@ internal static class FontStore
         => CustomFaces.TryGetValue(path, out var cached) && cached.WriteTimeUtc == File.GetLastWriteTimeUtc(path);
 
     /// <summary>
-    /// Logs, once per path per process, that a font is not being used because of its format. A path
+    /// Logs, once per path per process, that a font is not being used because of its format. Outside a
+    /// render scope nobody would hear it, so the path is not marked as warned there. A path
     /// whose extension is not supported reports the upper-cased extension as its format, a path
     /// without one "unreadable".
     /// </summary>
     internal static void NoteUnusable(string path)
     {
-        if (!Warned.TryAdd(path, 0))
+        if (!RenderLog.IsActive || !Warned.TryAdd(path, 0))
         {
             return;
         }
@@ -157,11 +161,12 @@ internal static class FontStore
 
     /// <summary>
     /// Logs, once per path per process, that a font with a supported extension is missing, damaged
-    /// or refused, so the user knows to upload it again rather than convert it.
+    /// or refused, so the user knows to upload it again rather than convert it. Like
+    /// <see cref="NoteUnusable"/>, only inside a render scope.
     /// </summary>
     private static void NoteUnreadable(string path)
     {
-        if (!Warned.TryAdd(path, 0))
+        if (!RenderLog.IsActive || !Warned.TryAdd(path, 0))
         {
             return;
         }
