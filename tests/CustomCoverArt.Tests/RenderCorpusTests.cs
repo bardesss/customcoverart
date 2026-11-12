@@ -42,6 +42,7 @@ public class RenderCorpusTests
         var run = Path.Combine(root, "run-" + DateTime.Now.ToString("yyyyMMdd-HHmmss"));
         var runOutputs = await RenderCorpus.RenderAsync(run, fonts, reuseInputsFrom: Path.Combine(baseline, "data", "customcoverart", "inputs"));
         var results = RenderCorpus.CompareRun(baseline, run, runOutputs);
+        Assert.Equal(RenderCorpus.Cases.Count, results.Count);
 
         var failures = results.Where(r => !r.Result.Pass).Select(r => $"{r.Case.Name}: {r.Result.Note}").ToList();
         Assert.True(failures.Count == 0, "Corpus cases out of tolerance (see " + run + "):\n" + string.Join("\n", failures));
@@ -175,7 +176,7 @@ public class RenderCorpusTests
         var runDir = scratch.Sub("run-x");
         var runOut = await RenderCorpus.RenderAsync(runDir, fonts, Path.Combine(baselineDir, "data", "customcoverart", "inputs"), pick);
 
-        var results = RenderCorpus.CompareRun(baselineDir, runDir, runOut);
+        var results = RenderCorpus.CompareRun(baselineDir, runDir, runOut, pick);
 
         Assert.Equal(2, results.Count);
         Assert.All(results, r => { Assert.True(r.Result.Pass, r.Result.Note); Assert.Equal(0, r.Result.MaxDiff); });
@@ -218,11 +219,11 @@ public class RenderCorpusTests
     {
         using var scratch = new TempDir();
         var a = scratch.Png("a.png", 50, 50, (x, y) => new SKColor(100, 120, 140, 255));
-        // Red channel +10 everywhere: one channel of four differs by 10.
+        // Red channel +10 everywhere: one of the three colour channels differs by 10.
         var b = scratch.Png("b.png", 50, 50, (x, y) => new SKColor(110, 120, 140, 255));
 
         var loose = RenderCorpus.Compare(a, b, CorpusClass.Loose);
-        Assert.Equal(2.5, loose.Mean, 6);
+        Assert.Equal(10 / 3d, loose.Mean, 6); // R differs by 10, G and B by 0: alpha does not dilute it
         Assert.Equal(10d, loose.P99);
         Assert.Equal(10, loose.MaxDiff);
         Assert.True(loose.Pass, loose.Note);
@@ -248,7 +249,7 @@ public class RenderCorpusTests
         var r = RenderCorpus.Compare(a, b, CorpusClass.Loose);
         Assert.Equal(0d, r.P99);
         Assert.Equal(200, r.MaxDiff);
-        Assert.Equal(50 * 3 * 200 / 40000d, r.Mean, 6);
+        Assert.Equal(50 * 3 * 200 / 30000d, r.Mean, 6);
         Assert.True(r.Pass, r.Note);
 
         // 2 % beyond the threshold moves the 99th percentile.
@@ -366,6 +367,106 @@ public class RenderCorpusTests
         Assert.True(r.Mean > 4);
         Assert.Contains("mean", r.Note);
     }
+
+    [Fact]
+    public void Compare_Animated_RequiresMoreThanOneFrame_InBothImages()
+    {
+        using var scratch = new TempDir();
+        var one = scratch.Gif("a.gif", new[] { Color.Red }, 10, 0);
+        var r = RenderCorpus.Compare(one, one, CorpusClass.Animated);
+        Assert.False(r.Pass);
+        Assert.Contains("more than one frame", r.Note);
+    }
+
+    [Fact]
+    public void Compare_TruncatedImage_IsAFailureNotAPartialSuccess()
+    {
+        using var scratch = new TempDir();
+        var good = scratch.Png("a.png", 64, 64, (x, y) => new SKColor((byte)(x * 4), (byte)(y * 4), (byte)(x ^ y), 255));
+        var bytes = File.ReadAllBytes(good);
+        var cut = Path.Combine(scratch.Path, "cut.png");
+        File.WriteAllBytes(cut, bytes[..(bytes.Length * 2 / 3)]);
+
+        var r = RenderCorpus.Compare(good, cut, CorpusClass.Loose);
+        Assert.False(r.Pass);
+        Assert.Contains("candidate unreadable", r.Note);
+    }
+
+    [Fact]
+    public void Compare_Exact_FailsOnAnAlphaOnlyDifference_AndRgbBoundsIgnoreAlphaWhenOpaque()
+    {
+        using var scratch = new TempDir();
+        var a = scratch.UnpremulPng("a.png", 10, 10, (x, y) => new SKColor(10, 20, 30, 255));
+        var b = scratch.UnpremulPng("b.png", 10, 10, (x, y) => new SKColor(10, 20, 30, 250));
+        var exact = RenderCorpus.Compare(a, b, CorpusClass.Exact);
+        Assert.False(exact.Pass);
+        Assert.Contains("alpha max diff 5", exact.Note);
+
+        // Once an image has a non-opaque pixel, alpha joins the pooled statistics (4 channels).
+        var c = scratch.UnpremulPng("c.png", 10, 10, (x, y) => new SKColor(30, 20, 30, 255));
+        var d = scratch.UnpremulPng("d.png", 10, 10, (x, y) => new SKColor(10, 20, 30, 255));
+        Assert.Equal(20 / 3d, RenderCorpus.Compare(c, d, CorpusClass.Loose).Mean, 6);
+        Assert.Equal((20 + 5) / 4d, RenderCorpus.Compare(c, b, CorpusClass.Loose).Mean, 6);
+    }
+
+    [Fact]
+    public async Task CompareRun_MissingRunOutput_Fails_AndSizeMismatchGetsAPlaceholderInTheIndex()
+    {
+        using var scratch = new TempDir();
+        var fonts = scratch.Sub("fonts");
+        File.WriteAllBytes(Path.Combine(fonts, "sub.ttf"), new byte[] { 0 });
+        Func<CorpusCase, bool> pick = c => c.Name == "01-solid" || c.Name == "02-solid-vignette";
+
+        var baselineDir = scratch.Sub("baseline");
+        await RenderCorpus.RenderAsync(baselineDir, fonts, filter: pick);
+        var runDir = scratch.Sub("run-x");
+        var runOut = new Dictionary<string, string>(
+            await RenderCorpus.RenderAsync(runDir, fonts, Path.Combine(baselineDir, "data", "customcoverart", "inputs"), pick));
+
+        // 02 is replaced by a picture of the wrong size; 01 is dropped from the outputs.
+        var wrong = scratch.Png("wrong.png", 10, 10, (x, y) => SKColors.Red);
+        File.Copy(wrong, runOut["02-solid-vignette"], overwrite: true);
+        runOut.Remove("01-solid");
+
+        var results = RenderCorpus.CompareRun(baselineDir, runDir, runOut, pick);
+
+        Assert.Equal(2, results.Count);
+        Assert.Contains(results, r => r.Case.Name == "01-solid" && !r.Result.Pass && r.Result.Note == "no run output");
+        Assert.Contains(results, r => r.Case.Name == "02-solid-vignette" && !r.Result.Pass && r.Result.Note.Contains("size 10x10"));
+        var html = File.ReadAllText(Path.Combine(runDir, "index.html"));
+        Assert.DoesNotContain("diff/02-solid-vignette.png", html);
+        Assert.DoesNotContain("diff/01-solid.png", html);
+        Assert.Contains("no diff image", html);
+    }
+
+    [Fact]
+    public async Task Case34_Passthrough_KeepsTheThreeFramesOfItsSource()
+    {
+        using var scratch = new TempDir();
+        var fonts = scratch.Sub("fonts");
+        File.WriteAllBytes(Path.Combine(fonts, "sub.ttf"), new byte[] { 0 });
+        var outputs = await RenderCorpus.RenderAsync(scratch.Sub("o"), fonts, filter: c => c.Name == "34-anim-passthrough");
+
+        var d = RenderCorpus.Decode(outputs["34-anim-passthrough"]);
+        Assert.Equal(3, d.Frames.Count);
+        foreach (var f in d.Frames)
+        {
+            f.Dispose();
+        }
+    }
+
+    [Fact]
+    public void DimCase_DimsASolidImageWithADistinctColour()
+    {
+        var c = Assert.Single(RenderCorpus.Cases, c => c.Name == "36-solid-image-dim");
+        Assert.Equal(CorpusClass.Exact, c.Class);
+        var doc = c.Build(RenderCorpus.InputsIn("x"));
+        Assert.True(doc.Background.Dim > 0);
+        Assert.Equal(BackgroundImageName, Path.GetFileName(doc.Background.ImagePath));
+        Assert.NotEqual("#3d8b6e", doc.Background.DimColor);
+    }
+
+    private const string BackgroundImageName = "solid.png";
 
     [Fact]
     public void Decode_ReadsGifFramesAndDelaysInMilliseconds()

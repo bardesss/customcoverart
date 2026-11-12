@@ -7,6 +7,7 @@ using System.Text;
 using System.Threading.Tasks;
 using CustomCoverArt.Models;
 using CustomCoverArt.Services;
+using CustomCoverArt.Services.Rendering;
 using SkiaSharp;
 
 namespace CustomCoverArt.Tests;
@@ -185,6 +186,15 @@ internal static class RenderCorpus
             return doc;
         });
 
+        // Dim over a solid colour (spec S7.1, Exact): a flat-coloured image dimmed with a distinct colour.
+        Add("36-solid-image-dim", CorpusClass.Exact, i =>
+        {
+            var doc = Photo(Path.Combine(Path.GetDirectoryName(i.PhotoPng)!, "solid.png"), "stretch");
+            doc.Background.Dim = 0.35f;
+            doc.Background.DimColor = "#102a60";
+            return doc;
+        });
+
         return list;
     }
 
@@ -311,6 +321,11 @@ internal static class RenderCorpus
         {
             File.WriteAllBytes(photoPng, Encode(photo, SKEncodedImageFormat.Png, 100));
             File.WriteAllBytes(photoJpg, Encode(photo, SKEncodedImageFormat.Jpeg, 90));
+        }
+
+        using (var solid = RenderSurface.New(Width, Height, new SKColor(0x3d, 0x8b, 0x6e)))
+        {
+            File.WriteAllBytes(Path.Combine(dir, "solid.png"), Encode(solid, SKEncodedImageFormat.Png, 100));
         }
 
         using (var logo = MakeLogo(240))
@@ -504,7 +519,7 @@ internal static class RenderCorpus
 
                 var options = new SKCodecOptions(i, required);
                 var result = codec.GetPixels(info, bitmap.GetPixels(), options);
-                if (result != SKCodecResult.Success && result != SKCodecResult.IncompleteInput)
+                if (result != SKCodecResult.Success)
                 {
                     bitmap.Dispose();
                     throw new InvalidDataException($"Cannot decode frame {i} of {path}: {result}");
@@ -557,20 +572,48 @@ internal static class RenderCorpus
         }
     }
 
-    // Per-channel absolute differences over all four channels. Where both pixels are fully transparent
-    // the colour channels are meaningless and count as equal.
-    private static FrameStats Diff(SKBitmap a, SKBitmap b, SKBitmap? diffOut)
+    private readonly record struct FrameDiff(FrameStats Rgb, FrameStats Alpha, bool NonOpaque)
     {
-        var stats = new FrameStats();
+        /// <summary>
+        /// The stats the class bounds apply to: RGB only while both images are fully opaque (alpha would
+        /// only dilute the colour differences by a quarter), RGB plus alpha as soon as either image has a
+        /// non-opaque pixel.
+        /// </summary>
+        public FrameStats Bound()
+        {
+            if (!NonOpaque)
+            {
+                return Rgb;
+            }
+
+            var merged = new FrameStats { Samples = Rgb.Samples + Alpha.Samples, Sum = Rgb.Sum + Alpha.Sum, Max = Math.Max(Rgb.Max, Alpha.Max) };
+            for (int d = 0; d < 256; d++)
+            {
+                merged.Histogram[d] = Rgb.Histogram[d] + Alpha.Histogram[d];
+            }
+
+            return merged;
+        }
+    }
+
+    // Absolute differences per channel, tracked as RGB (all three channels pooled) and alpha separately.
+    // Where both pixels are fully transparent the colour channels are meaningless and count as equal.
+    private static FrameDiff Diff(SKBitmap a, SKBitmap b, SKBitmap? diffOut)
+    {
+        var rgb = new FrameStats();
+        var alpha = new FrameStats();
+        bool nonOpaque = false;
         var pa = a.GetPixelSpan();
         var pb = b.GetPixelSpan();
         var po = diffOut is null ? default : diffOut.GetPixelSpan();
         for (int o = 0; o < pa.Length; o += 4)
         {
             bool bothClear = pa[o + 3] == 0 && pb[o + 3] == 0;
+            nonOpaque |= pa[o + 3] != 255 || pb[o + 3] != 255;
             for (int c = 0; c < 4; c++)
             {
                 int d = bothClear && c < 3 ? 0 : Math.Abs(pa[o + c] - pb[o + c]);
+                var stats = c < 3 ? rgb : alpha;
                 stats.Histogram[d]++;
                 stats.Sum += d;
                 stats.Samples++;
@@ -591,11 +634,13 @@ internal static class RenderCorpus
             }
         }
 
-        return stats;
+        return new FrameDiff(rgb, alpha, nonOpaque);
     }
 
     /// <summary>
-    /// Compares two outputs under a tolerance class (spec S7.2). Frame count, size, and for
+    /// Compares two outputs under a tolerance class (spec S7.2). Mean, P99 and max are taken over R, G, B
+    /// (all pooled); alpha is tracked separately, must be identical for Exact, and joins the pooled stats
+    /// only when either image has a non-opaque pixel. Decoding must be complete. Frame count, size, and for
     /// <see cref="CorpusClass.Animated"/> delays and loop count must match exactly. The Text class needs
     /// <paramref name="inkBackground"/>, the flat colour behind the text.
     /// </summary>
@@ -655,6 +700,11 @@ internal static class RenderCorpus
         var notes = new List<string>();
         if (c == CorpusClass.Animated)
         {
+            if (a.Frames.Count < 2)
+            {
+                notes.Add($"animated class needs more than one frame, got {a.Frames.Count}");
+            }
+
             if (!a.DelaysMs.SequenceEqual(b.DelaysMs))
             {
                 notes.Add($"delays [{string.Join(",", b.DelaysMs)}] differ from [{string.Join(",", a.DelaysMs)}]");
@@ -667,7 +717,7 @@ internal static class RenderCorpus
         }
 
         double worstMean = 0;
-        int worstP99 = 0, worstMax = 0;
+        int worstP99 = 0, worstMax = 0, worstAlphaMax = 0;
         SKBitmap? diffBitmap = null;
         try
         {
@@ -681,7 +731,9 @@ internal static class RenderCorpus
             {
                 // The diff picture shows the largest per-pixel disagreement over all frames.
                 using var frameDiff = diffBitmap is null ? null : new SKBitmap(diffBitmap.Info);
-                var s = Diff(a.Frames[i], b.Frames[i], frameDiff);
+                var fd = Diff(a.Frames[i], b.Frames[i], frameDiff);
+                var s = fd.Bound();
+                worstAlphaMax = Math.Max(worstAlphaMax, fd.Alpha.Max);
                 worstMean = Math.Max(worstMean, s.Mean);
                 worstP99 = Math.Max(worstP99, s.P99);
                 worstMax = Math.Max(worstMax, s.Max);
@@ -717,9 +769,9 @@ internal static class RenderCorpus
         switch (c)
         {
             case CorpusClass.Exact:
-                if (worstMax != 0)
+                if (worstMax != 0 || worstAlphaMax != 0)
                 {
-                    notes.Add($"max diff {worstMax} (exact required)");
+                    notes.Add($"max diff {worstMax}, alpha max diff {worstAlphaMax} (exact required)");
                 }
 
                 break;
@@ -839,13 +891,15 @@ internal static class RenderCorpus
     /// <paramref name="runDir"/>, and returns the per-case results.
     /// </summary>
     public static IReadOnlyList<(CorpusCase Case, CorpusResult Result)> CompareRun(
-        string baselineDir, string runDir, IReadOnlyDictionary<string, string> runOutputs)
+        string baselineDir, string runDir, IReadOnlyDictionary<string, string> runOutputs, Func<CorpusCase, bool>? filter = null)
     {
         var results = new List<(CorpusCase, CorpusResult)>();
-        foreach (var c in Cases)
+        foreach (var c in Cases.Where(c => filter?.Invoke(c) ?? true))
         {
+            // A case without a run output is a failure, never silently skipped.
             if (!runOutputs.TryGetValue(c.Name, out var candidate))
             {
+                results.Add((c, new CorpusResult(false, double.NaN, double.NaN, 255, "no run output")));
                 continue;
             }
 
@@ -914,18 +968,25 @@ internal static class RenderCorpus
         sb.Append("<h1>Render corpus</h1><table><tr><th>case</th><th>old (baseline)</th><th>new</th><th>diff x8</th></tr>");
         foreach (var (c, r) in results)
         {
-            var file = Path.GetFileName(outputs[c.Name]);
+            var file = outputs.TryGetValue(c.Name, out var outPath) ? Path.GetFileName(outPath) : null;
             var baseFile = Directory.GetFiles(Path.Combine(Path.GetDirectoryName(path)!, "..", baselineFolder), c.Name + ".*")
-                .Select(Path.GetFileName).FirstOrDefault() ?? file;
+                .Select(Path.GetFileName).FirstOrDefault();
             sb.Append("<tr><td><b>").Append(c.Name).Append("</b><br>").Append(c.Class)
               .Append("<br><span class=\"").Append(r.Pass ? "pass\">pass" : "fail\">FAIL").Append("</span>")
               .Append("<br>mean ").Append(r.Mean.ToString("F3", CultureInfo.InvariantCulture))
               .Append("<br>p99 ").Append(r.P99.ToString("F0", CultureInfo.InvariantCulture))
               .Append("<br>max ").Append(r.MaxDiff)
               .Append("<br>").Append(System.Net.WebUtility.HtmlEncode(r.Note)).Append("</td>");
-            sb.Append("<td><img src=\"../").Append(baselineFolder).Append('/').Append(baseFile).Append("\"></td>");
-            sb.Append("<td><img src=\"").Append(file).Append("\"></td>");
-            sb.Append("<td><img src=\"diff/").Append(c.Name).Append(".png\"></td></tr>");
+            sb.Append(baseFile is null ? "<td>(no baseline)</td>" : "<td><img src=\"../" + baselineFolder + "/" + baseFile + "\"></td>");
+            sb.Append(file is null ? "<td>(no run output)</td>" : "<td><img src=\"" + file + "\"></td>");
+            if (File.Exists(Path.Combine(Path.GetDirectoryName(path)!, "diff", c.Name + ".png")))
+            {
+                sb.Append("<td><img src=\"diff/").Append(c.Name).Append(".png\"></td></tr>");
+            }
+            else
+            {
+                sb.Append("<td>(no diff image: missing file, unreadable, or size/frame mismatch)</td></tr>");
+            }
         }
 
         sb.Append("</table>");
