@@ -1,6 +1,7 @@
 using CustomCoverArt.Models;
 using CustomCoverArt.Services;
 using CustomCoverArt.Services.Rendering;
+using System;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using SkiaSharp;
@@ -317,6 +318,112 @@ public class EffectsRenderTests
         using var img = Canvas(20, 20, "#000000");
         EffectsComposer.ApplySoftLight(img, new SoftLightSettings { Enabled = true, Color = "#ffffff", Opacity = 0.5f });
         Assert.InRange(P(img, 10, 10).R, 100, 160);
+    }
+
+    /// <summary>
+    /// Pins the soft-light arithmetic (1/255f scaling, fused multiply-add, round half to even). Expected values
+    /// were captured from ImageSharp's DrawImage(overlay, opacity) over an opaque backdrop (spec 7.1, Exact);
+    /// the first row is corpus case 07.
+    /// </summary>
+    [Theory]
+    [InlineData("#c0392b", "#ffe9a8", 0.3f, 211, 110, 80)]
+    [InlineData("#000000", "#ffffff", 0.5f, 128, 128, 128)]
+    [InlineData("#1e6ec8", "#ff8000", 0.25f, 86, 114, 150)]
+    [InlineData("#ffffff", "#0a141e", 0.7f, 84, 90, 98)]
+    [InlineData("#1163c9", "#c83296", 0.05f, 26, 97, 198)]
+    [InlineData("#783cf0", "#010203", 0.9f, 13, 8, 27)]
+    [InlineData("#333333", "#ff00ff", 0.55f, 163, 23, 163)]
+    public void SoftLight_FractionalOpacity_MatchesPinnedBytes(string backdrop, string colour, float opacity, int r, int g, int b)
+    {
+        using var img = Canvas(24, 8, backdrop);
+        EffectsComposer.ApplySoftLight(img, new SoftLightSettings { Enabled = true, Color = colour, Opacity = opacity });
+        Assert.Equal((r, g, b), Rgb(img, 3, 3));
+        Assert.Equal(255, P(img, 3, 3).A);
+    }
+
+    /// <summary>On a translucent (premultiplied) canvas the wash raises alpha as SrcOver does and keeps RGB &lt;= A.</summary>
+    [Fact]
+    public void SoftLight_OnTranslucentCanvas_RaisesAlphaAndKeepsChannelsWithinIt()
+    {
+        using var img = RenderSurface.New(10, 10, new SKColor(200, 100, 50, 128));
+        EffectsComposer.ApplySoftLight(img, new SoftLightSettings { Enabled = true, Color = "#ffffff", Opacity = 0.5f });
+        var span = img.GetPixelSpan();
+        for (var i = 0; i < span.Length; i += 4)
+        {
+            Assert.InRange(span[i + 3], 191, 192); // 0.5 + 0.502 * 0.5 = 0.751
+            Assert.True(span[i] <= span[i + 3] && span[i + 1] <= span[i + 3] && span[i + 2] <= span[i + 3]);
+        }
+
+        Assert.InRange(span[0], 176, 178); // premultiplied: 1 * 0.5 + (100/255) * 0.5
+    }
+
+    /// <summary>Vignette colour is premultiplied on translucent pixels: half-way to white lands at 0.5*base + 0.5*alpha.</summary>
+    [Fact]
+    public void Vignette_OnTranslucentPixel_BlendsAPremultipliedColour()
+    {
+        using var img = RenderSurface.New(40, 40, new SKColor(200, 100, 50, 128)); // premul 100, 50, 25
+        EffectsComposer.ApplyVignette(img, new VignetteSettings { Enabled = true, Amount = 0.5f, Softness = 1f, Color = "#ffffff" });
+        var s = img.GetPixelSpan(); // pixel (0,0): d = 1, edge = 1, a = 0.5
+        Assert.InRange(s[0], 113, 115); // 100*0.5 + 128*0.5
+        Assert.InRange(s[1], 88, 90);   // 50*0.5 + 64
+        Assert.InRange(s[2], 75, 77);   // 25*0.5 + 64
+        Assert.Equal(128, s[3]);
+    }
+
+    /// <summary>Grain on a half-covered pixel moves premultiplied channels by about half as much as on an opaque one.</summary>
+    [Fact]
+    public void Grain_OnTranslucentPixels_ScalesNoiseWithAlpha()
+    {
+        using var img = RenderSurface.New(32, 32, new SKColor(200, 200, 200, 128)); // premul 100
+        EffectsComposer.ApplyGrain(img, new GrainSettings { Enabled = true, Amount = 1f, Seed = 5 });
+        var s = img.GetPixelSpan();
+        var maxDelta = 0;
+        for (var i = 0; i < s.Length; i += 4)
+        {
+            maxDelta = Math.Max(maxDelta, Math.Abs(s[i] - 100));
+            Assert.Equal(s[i], s[i + 1]);
+            Assert.Equal(128, s[i + 3]);
+        }
+
+        Assert.InRange(maxDelta, 20, 33); // full-alpha noise reaches 64; half alpha reaches 32
+    }
+
+    [Fact]
+    public void Border_OnTranslucentCanvas_PaintsOpaqueEdgeAndLeavesTheInsideAlone()
+    {
+        using var img = RenderSurface.New(40, 40, new SKColor(200, 100, 50, 128));
+        var centre = Bytes(img).AsSpan(((20 * 40) + 20) * 4, 4).ToArray();
+        EffectsComposer.DrawBorder(img, new BorderSettings { Enabled = true, Color = "#ff0000", Thickness = 4 });
+        Assert.Equal(new Rgba(255, 0, 0, 255), P(img, 1, 20));
+        Assert.Equal(centre, Bytes(img).AsSpan(((20 * 40) + 20) * 4, 4).ToArray());
+    }
+
+    /// <summary>Odd thickness with a radius and a double line: inner ring is t/2 wide and its radius shrinks by the inset.</summary>
+    [Fact]
+    public void Border_Double_WithRadiusAndOddThickness()
+    {
+        using var img = Canvas(100, 100, "#000000");
+        EffectsComposer.DrawBorder(img, new BorderSettings { Enabled = true, Color = "#ff0000", Thickness = 5, Gap = 3, Double = true, Radius = 20 });
+        Assert.Equal((255, 0, 0), Rgb(img, 4, 50));  // outer ring 0..4
+        Assert.Equal((0, 0, 0), Rgb(img, 6, 50));    // gap 5..7
+        Assert.Equal((255, 0, 0), Rgb(img, 8, 50));  // inner ring 8..9 (thickness 2)
+        Assert.Equal((255, 0, 0), Rgb(img, 9, 50));
+        Assert.Equal((0, 0, 0), Rgb(img, 11, 50));
+        Assert.Equal((0, 0, 0), Rgb(img, 0, 0));     // outer corner rounded away
+
+        // The corner block holds fewer red pixels than the same frame with square corners.
+        using var square = Canvas(100, 100, "#000000");
+        EffectsComposer.DrawBorder(square, new BorderSettings { Enabled = true, Color = "#ff0000", Thickness = 5, Gap = 3, Double = true, Radius = 0 });
+        int Red(SKBitmap b)
+        {
+            var n = 0;
+            for (var y = 0; y < 14; y++)
+                for (var x = 0; x < 14; x++)
+                    if (P(b, x, y).R > 128) { n++; }
+            return n;
+        }
+
+        Assert.True(Red(img) < Red(square) - 20, $"rounded {Red(img)} vs square {Red(square)}");
     }
 
     [Fact]

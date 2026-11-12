@@ -38,11 +38,14 @@ public static class EffectsComposer
         RequirePremulRgba(canvas);
         var color = SkiaColors.Parse(s.Color, SKColors.White);
 
-        // A flat SrcOver wash. Skia's own blend of a colour at alpha = round(opacity * 255) is up to one
-        // level off ImageSharp's float blend (alpha quantisation plus its integer rounding), and soft light
-        // over a solid colour is an Exact case (spec 7.1), so the blend is done here in the same float
-        // arithmetic: values scaled by 1/255, fused multiply-add, round half to even. Checked against
-        // ImageSharp's DrawImage over all 256 backdrop levels x 7 colours x 9 opacities with zero differences.
+        // A flat SrcOver wash, blended per pixel rather than with DrawRect: Skia's SrcOver of the colour at
+        // alpha = round(opacity * 255) was one level off ImageSharp's float blend on many pixels, and soft
+        // light over a solid colour is an Exact case (spec 7.1). The arithmetic below (values scaled by
+        // 1/255f, fused multiply-add, round half to even) matches ImageSharp's SIMD path exactly: 0
+        // differences against DrawImage over 256 backdrop levels x 7 colours x 9 opacities. ImageSharp's
+        // scalar row tail (the last width % 8 pixels of a row) rounds exact .5 ties up instead, so up to one
+        // level can differ there; that is an ImageSharp inconsistency and is not reproduced.
+        // Pinned by EffectsRenderTests.SoftLight_FractionalOpacity_MatchesPinnedBytes.
         const float inv = 1f / 255f;
         float srcAlpha = color.Alpha * inv * opacity;
         float keep = 1f - srcAlpha;
@@ -106,9 +109,11 @@ public static class EffectsComposer
                 if (a <= 0f) { continue; }
 
                 byte alpha = bytes[o + 3];
-                bytes[o] = Cap((byte)(bytes[o] * (1 - a) + color.Red * a), alpha);
-                bytes[o + 1] = Cap((byte)(bytes[o + 1] * (1 - a) + color.Green * a), alpha);
-                bytes[o + 2] = Cap((byte)(bytes[o + 2] * (1 - a) + color.Blue * a), alpha);
+                // The pixel is premultiplied, so the vignette colour is too (exactly 1 on opaque pixels).
+                float k = alpha / 255f;
+                bytes[o] = Cap((byte)(bytes[o] * (1 - a) + color.Red * k * a), alpha);
+                bytes[o + 1] = Cap((byte)(bytes[o + 1] * (1 - a) + color.Green * k * a), alpha);
+                bytes[o + 2] = Cap((byte)(bytes[o + 2] * (1 - a) + color.Blue * k * a), alpha);
                 // Alpha deliberately untouched: a vignette tints, it does not cut holes.
             }
         }
@@ -142,6 +147,7 @@ public static class EffectsComposer
             {
                 float n = (rng.Next(-128, 128) / 128f) * strength;
                 byte alpha = bytes[o + 3];
+                n *= alpha / 255f; // noise scales with coverage on premultiplied pixels (exactly 1 when opaque)
                 bytes[o] = Cap((byte)Math.Clamp(bytes[o] + n, 0, 255), alpha);
                 bytes[o + 1] = Cap((byte)Math.Clamp(bytes[o + 1] + n, 0, 255), alpha);
                 bytes[o + 2] = Cap((byte)Math.Clamp(bytes[o + 2] + n, 0, 255), alpha);
@@ -152,9 +158,9 @@ public static class EffectsComposer
     /// <summary>Inset frame, optionally rounded, optionally doubled with a thinner inner line.</summary>
     internal static void DrawBorder(SKBitmap canvas, BorderSettings b)
     {
-        var color = SkiaColors.Parse(b.Color, SKColors.White);
         int t = Math.Clamp(b.Thickness, 0, 64);
         if (t <= 0) { return; }
+        var color = SkiaColors.Parse(b.Color, SKColors.White);
 
         RequirePremulRgba(canvas);
         int maxRadius = Math.Min(canvas.Width, canvas.Height) / 2;
