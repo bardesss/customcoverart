@@ -103,6 +103,8 @@ public class CoverArtService : ICoverArtService
 
                 // A logo that cannot be decoded is dropped here, once, so the per-frame
                 // renderer (an animated export draws it on every frame) never retries it.
+                // The full decode (not a header probe) is deliberate: it catches corrupt bodies a
+                // header would pass, at the cost of decoding each logo once more.
                 if (layer.Type == "image" && !string.IsNullOrEmpty(layer.ImagePath))
                 {
                     using var probe = SafeImageLoader.TryDecode(layer.ImagePath, maxFrames: 1);

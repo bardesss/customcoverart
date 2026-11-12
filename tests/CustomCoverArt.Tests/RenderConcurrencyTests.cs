@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using CustomCoverArt.Models;
 using CustomCoverArt.Services;
@@ -70,20 +71,89 @@ public sealed class RenderConcurrencyTests : IDisposable
         return path;
     }
 
+    /// <summary>
+    /// Runs <paramref name="work"/> on <paramref name="count"/> dedicated threads released together by a barrier
+    /// (the pool may have fewer idle threads than that), and reports the most calls in flight at once.
+    /// </summary>
+    private static (T[] Results, int MaxInFlight) RunTogether<T>(int count, Func<int, T> work)
+    {
+        var results = new T[count];
+        var errors = new Exception?[count];
+        var inFlight = 0;
+        var maxInFlight = 0;
+        using var barrier = new Barrier(count);
+        var threads = Enumerable.Range(0, count).Select(i => new Thread(() =>
+        {
+            try
+            {
+                barrier.SignalAndWait();
+                var now = Interlocked.Increment(ref inFlight);
+                int seen;
+                while (now > (seen = Volatile.Read(ref maxInFlight)) && Interlocked.CompareExchange(ref maxInFlight, now, seen) != seen)
+                {
+                }
+
+                try { results[i] = work(i); }
+                finally { Interlocked.Decrement(ref inFlight); }
+            }
+            catch (Exception ex)
+            {
+                errors[i] = ex;
+            }
+        })).ToArray();
+        foreach (var t in threads) { t.Start(); }
+        foreach (var t in threads) { t.Join(); }
+        var failure = errors.FirstOrDefault(e => e is not null);
+        if (failure is not null)
+        {
+            throw new AggregateException(errors.Where(e => e is not null).Cast<Exception>());
+        }
+
+        return (results, maxInFlight);
+    }
+
     [Fact]
-    public async Task ParallelRenders_ProduceIdenticalBytes()
+    public void ParallelRenders_ProduceIdenticalBytes()
     {
         var font = CopyFont();
         var services = Enumerable.Range(0, 8).Select(_ => NewService()).ToArray();
 
-        var outputs = await Task.WhenAll(services.Select(s => s.GenerateFromDocumentAsync(EveryEffectDocument(font))));
+        var (outputs, maxInFlight) = RunTogether(8, i => services[i].GenerateFromDocumentAsync(EveryEffectDocument(font)).GetAwaiter().GetResult());
 
+        Assert.True(maxInFlight > 1, $"renders never overlapped (max in flight {maxInFlight})");
         Assert.Equal(8, outputs.Distinct().Count());
         var first = File.ReadAllBytes(outputs[0]);
         Assert.True(first.Length > 100);
         foreach (var path in outputs)
         {
             Assert.True(first.AsSpan().SequenceEqual(File.ReadAllBytes(path)), path);
+        }
+    }
+
+    [Fact]
+    public void ParallelCompose_OnManyThreads_GivesIdenticalPixels()
+    {
+        var font = CopyFont();
+        var reference = Compose(font);
+
+        for (var round = 0; round < 3; round++)
+        {
+            var (frames, maxInFlight) = RunTogether(8, _ => Compose(font));
+            Assert.True(maxInFlight > 1, $"composes never overlapped (max in flight {maxInFlight})");
+            foreach (var frame in frames)
+            {
+                Assert.True(reference.AsSpan().SequenceEqual(frame), "a parallel compose differs from the serial one");
+            }
+        }
+
+        static byte[] Compose(string fontPath)
+        {
+            var doc = EveryEffectDocument(fontPath);
+            doc.Canvas.Width = 400;
+            doc.Canvas.Height = 300;
+            using var canvas = RenderSurface.New(400, 300);
+            DocumentRenderer.ComposeDocumentFrame(canvas, null, doc);
+            return TestPixels.Bytes(canvas);
         }
     }
 
@@ -289,7 +359,7 @@ public sealed class RenderConcurrencyTests : IDisposable
         try
         {
             var saving = CoverArtService.SaveImageWithRetryAsync(bytes, target);
-            await Task.Delay(150);
+            await Task.Delay(50); // well inside the first 100 ms back-off; the last attempt is at 300 ms
             Assert.False(saving.IsCompleted, "should be retrying while the file is locked");
             locked.Dispose();
             await saving;

@@ -93,6 +93,11 @@ public static class CollageComposer
         var dst = SKRect.Create(x, y, tileW, tileH);
 
         using var pixmap = poster.PeekPixels();
+        if (pixmap is null)
+        {
+            return;
+        }
+
         using var image = SKImage.FromPixels(pixmap);
         var sampling = Resampling.For((int)System.Math.Round(cropW), (int)System.Math.Round(cropH), tileW, tileH);
         target.DrawImage(image, src, dst, sampling, paint);
