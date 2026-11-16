@@ -205,7 +205,13 @@ jobs:
           # Jellyfin pins its packages centrally in Directory.Packages.props.
           PROPS=$(gh api "repos/jellyfin/jellyfin/contents/Directory.Packages.props?ref=$TAG" --jq .content | base64 -d)
           HOST=$(printf '%s\n' "$PROPS" | grep -oP '(?<=Include="SkiaSharp" Version=")[^"]+' || true)
-          HB_HOST=$(printf '%s\n' "$PROPS" | grep -oP '(?<=Include="HarfBuzzSharp" Version=")[^"]+' || true)
+          # Jellyfin doesn't list HarfBuzzSharp itself: it pins HarfBuzzSharp.NativeAssets.Linux,
+          # which depends on the managed HarfBuzzSharp of the same version. Take a direct pin if
+          # one ever appears, else the native-assets one.
+          HB_HOST=$(printf '%s\n' "$PROPS" | grep -oPm1 '(?<=Include="HarfBuzzSharp" Version=")[^"]+' || true)
+          if [ -z "$HB_HOST" ]; then
+            HB_HOST=$(printf '%s\n' "$PROPS" | grep -oPm1 '(?<=Include="HarfBuzzSharp\.NativeAssets\.Linux" Version=")[^"]+' || true)
+          fi
           if [ -z "$HOST" ] || [ -z "$HB_HOST" ]; then
             echo "Could not read the SkiaSharp and HarfBuzzSharp versions from Directory.Packages.props at $TAG"; exit 1
           fi

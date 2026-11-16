@@ -128,11 +128,28 @@ public class WorkflowGuardTests
         Assert.Contains("[ \"$HB_HOST\" = \"$HB_PINNED\" ]", text);
         Assert.Contains("Jellyfin $TAG ships HarfBuzzSharp $HB_HOST (plugin pins $HB_PINNED)", text);
 
-        var pattern = Regex.Match(text, @"grep -oP '(\(\?<=Include=""HarfBuzzSharp""[^']+)'");
+        var pattern = Regex.Match(text, @"grep -oPm1 '(\(\?<=Include=""HarfBuzzSharp""[^']+)'");
         Assert.True(pattern.Success, "skia-pin job does not read HB_HOST from Directory.Packages.props");
         const string props = """
             <PackageVersion Include="HarfBuzzSharp.NativeAssets.Linux" Version="9.9.9" />
             <PackageVersion Include="HarfBuzzSharp" Version="8.3.1.5" />
+            """;
+        Assert.Equal(new[] { "8.3.1.5" }, Regex.Matches(props, pattern.Groups[1].Value).Select(m => m.Value));
+    }
+
+    /// <summary>
+    /// Jellyfin pins HarfBuzzSharp.NativeAssets.Linux rather than HarfBuzzSharp itself, so the
+    /// skia-pin job falls back to it when there is no direct pin (it failed on v12.4 without this).
+    /// </summary>
+    [Fact]
+    public void Compat_ReadsHarfBuzzFromNativeAssetsWhenNoDirectPin()
+    {
+        var text = Compat.Replace("\r\n", "\n");
+        var pattern = Regex.Match(text, @"if \[ -z ""\$HB_HOST"" \]; then\n\s+HB_HOST=\$\(printf '%s\\n' ""\$PROPS"" \| grep -oPm1 '(\(\?<=Include=""HarfBuzzSharp\\\.NativeAssets\\\.Linux""[^']+)'");
+        Assert.True(pattern.Success, "skia-pin job has no HarfBuzzSharp.NativeAssets.Linux fallback for HB_HOST");
+        const string props = """
+            <PackageVersion Include="HarfBuzzSharp.NativeAssets.Linux" Version="8.3.1.5" />
+            <PackageVersion Include="HarfBuzzSharp.NativeAssets.macOS" Version="9.9.9" />
             """;
         Assert.Equal(new[] { "8.3.1.5" }, Regex.Matches(props, pattern.Groups[1].Value).Select(m => m.Value));
     }
